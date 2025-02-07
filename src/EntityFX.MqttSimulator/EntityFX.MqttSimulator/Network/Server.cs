@@ -6,7 +6,7 @@ public class Server : NodeBase, IServer
 {
     private readonly Dictionary<string, IClient> _serverClients = new();
 
-    public INetwork Network { get; set; }
+    public INetwork Network { get; }
 
 
     public bool IsStarted { get; internal set; }
@@ -18,7 +18,7 @@ public class Server : NodeBase, IServer
     public event EventHandler<IClient>? ClientConnected;
     public event EventHandler<string>? ClientDisconnected;
 
-    public Server(string address, INetwork network, IMonitoring monitoring) : base(address, monitoring)
+    public Server(string address, INetwork network, INetworkGraph networkGraph) : base(address, networkGraph)
     {
         Network = network;
     }
@@ -88,7 +88,7 @@ public class Server : NodeBase, IServer
     public override Task ReceiveAsync(Packet packet)
     {
         PacketReceived?.Invoke(this, packet);
-        monitoring.Push(packet.From, packet.SourceType, packet.To, packet.DestinationType, packet.packet, MonitoringType.Receive, new { });
+        networkGraph.Monitoring.Push(packet.From, packet.SourceType, packet.To, packet.DestinationType, packet.packet, MonitoringType.Receive, new { });
         return Task.CompletedTask;
     }
 

@@ -1,9 +1,7 @@
 ﻿namespace EntityFX.MqttY.Contracts.Network
 {
-    public interface IServer : INode
+    public interface IServer : INode, ILeafNode
     {
-        INetwork Network { get; }
-
         bool IsStarted { get; }
 
         event EventHandler<Packet>? PacketReceived;

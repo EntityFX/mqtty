@@ -1,9 +1,7 @@
 ﻿namespace EntityFX.MqttY.Contracts.Network
 {
-    public interface IClient : INode
+    public interface IClient : INode, ILeafNode
     {
-        INetwork? Network { get; set; }
-
         bool IsConnected { get; }
 
         bool Connect(string server);

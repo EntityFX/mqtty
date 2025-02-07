@@ -1,5 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Network;
+using System.Collections.ObjectModel;
 
 public class Client : NodeBase, IClient
 {
@@ -7,7 +8,7 @@ public class Client : NodeBase, IClient
     public bool IsConnected { get; internal set; }
 
 
-    public INetwork? Network { get; set; }
+    public INetwork? Network { get; }
 
     public override NodeType NodeType => NodeType.Client;
 
@@ -16,7 +17,7 @@ public class Client : NodeBase, IClient
 
     private string _serverName = string.Empty;
 
-    public Client(string address, INetwork network, IMonitoring monitoring) : base(address, monitoring)
+    public Client(string address, INetwork network, INetworkGraph networkGraph) : base(address, networkGraph)
     {
         Network = network;
     }
@@ -45,7 +46,7 @@ public class Client : NodeBase, IClient
 
         _serverName = server;
 
-        monitoring.Push(this, remoteNode, null, EntityFX.MqttY.Contracts.Monitoring.MonitoringType.Connect, new { });
+        networkGraph.Monitoring.Push(this, remoteNode, null, EntityFX.MqttY.Contracts.Monitoring.MonitoringType.Connect, new { });
         IsConnected = true;
 
         return result;
@@ -110,7 +111,7 @@ public class Client : NodeBase, IClient
     public override async Task SendAsync(Packet packet)
     {
         if (!IsConnected) throw new InvalidOperationException("Not Connected To server");
-        monitoring.Push(packet.From, packet.SourceType, packet.To, packet.DestinationType, packet.packet, MonitoringType.Send, new { });
+        networkGraph.Monitoring.Push(packet.From, packet.SourceType, packet.To, packet.DestinationType, packet.packet, MonitoringType.Send, new { });
         await Network!.SendAsync(packet);
     }
 
@@ -126,7 +127,7 @@ public class Client : NodeBase, IClient
 
     public override Task ReceiveAsync(Packet packet)
     {
-        monitoring.Push(packet.From, packet.SourceType, packet.To, packet.DestinationType, packet.packet, MonitoringType.Receive, new { });
+        networkGraph.Monitoring.Push(packet.From, packet.SourceType, packet.To, packet.DestinationType, packet.packet, MonitoringType.Receive, new { });
         return Task.CompletedTask;
     }
 }

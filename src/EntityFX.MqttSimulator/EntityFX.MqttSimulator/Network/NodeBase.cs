@@ -4,7 +4,7 @@ using EntityFX.MqttY.Contracts.Network;
 
 public abstract class NodeBase : INode
 {
-    protected readonly IMonitoring monitoring;
+    protected readonly INetworkGraph networkGraph;
 
     public Guid Id { get; private set; }
 
@@ -16,10 +16,10 @@ public abstract class NodeBase : INode
 
     public abstract Task SendAsync(Packet packet);
 
-    public NodeBase(string address, IMonitoring monitoring)
+    public NodeBase(string address, INetworkGraph networkGraph)
     {
         Address = address;
         Id = Guid.NewGuid();
-        this.monitoring = monitoring;
+        this.networkGraph = networkGraph;
     }
 }

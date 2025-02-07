@@ -11,7 +11,7 @@ public class Network : NodeBase, INetwork
     private readonly Dictionary<string, INetwork> _linkedNetworks = new();
     private readonly Dictionary<string, IServer> _servers = new();
     private readonly Dictionary<string, IClient> _clients = new();
-
+    private readonly INetworkGraph networkGraph;
 
     public IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks => _linkedNetworks.ToImmutableDictionary();
 
@@ -22,8 +22,9 @@ public class Network : NodeBase, INetwork
 
     public override NodeType NodeType => NodeType.Network;
 
-    public Network(string address, IMonitoring monitoring) : base(address, monitoring)
+    public Network(string address, INetworkGraph networkGraph) : base(address, networkGraph)
     {
+        this.networkGraph = networkGraph;
     }
 
     public bool AddClient(IClient client)
@@ -72,7 +73,7 @@ public class Network : NodeBase, INetwork
             _linkedNetworks.Remove(network.Address);
         }
 
-        monitoring.Push(this, network, null, MonitoringType.Link, new { });
+        networkGraph.Monitoring.Push(this, network, null, MonitoringType.Link, new { });
 
         return true;
     }
@@ -92,7 +93,7 @@ public class Network : NodeBase, INetwork
             _linkedNetworks[network.Address] = network;
         }
 
-        monitoring.Push(this, network, null, MonitoringType.Unlink, new { });
+        networkGraph.Monitoring.Push(this, network, null, MonitoringType.Unlink, new { });
 
         return true;
     }
@@ -136,9 +137,18 @@ public class Network : NodeBase, INetwork
             return;
         }
 
-        var pathToRemote = GetPathToNetworkWeighted(packet.To, packet.DestinationType);
+        var fromNetwork = networkGraph.GetNodeNetwork(packet.From, packet.SourceType);
 
-        var pathQueue = new Queue<Network>(pathToRemote);
+        var toNetwork = networkGraph.GetNodeNetwork(packet.To, packet.DestinationType);
+
+        if (fromNetwork == null || toNetwork == null)
+        {
+            return;
+        }
+
+        var pathToRemote = networkGraph.PathFinder.GetPathToNetwork(fromNetwork.Address, toNetwork.Address);
+
+        var pathQueue = new Queue<INetwork>(pathToRemote);
         await SendToRemoteAsync(packet, pathQueue);
     }
 
@@ -161,20 +171,26 @@ public class Network : NodeBase, INetwork
         return true;
     }
 
-    private async Task<bool> SendToRemoteAsync(Packet packet, Queue<Network> path)
+    private async Task<bool> SendToRemoteAsync(Packet packet, Queue<INetwork> path)
     {
         if (!path.Any())
         {
             return false;
         }
 
-        var next = path.Dequeue();
+        var next = path.Dequeue() as Network;
 
+        if (next == null)
+        {
+            return false;
+        }
+
+        networkGraph.Monitoring.Push(this, next, packet.packet, MonitoringType.Send, new { });
         var result = await next.SendToLocalAsync(packet);
 
         if (!result)
         {
-            monitoring.Push(this, next, packet.packet, MonitoringType.Send, new { });
+
             await next.SendToRemoteAsync(packet, path);
         }
 
@@ -183,23 +199,7 @@ public class Network : NodeBase, INetwork
 
     public INode? FindNode(string address, NodeType type)
     {
-        INode? result = GetDestinationNode(address, type);
-
-        if (result != null)
-        {
-            return result;
-        }
-
-        var network = FindNodeNetwork(address, type);
-
-        if (network == null)
-        {
-            return result;
-        }
-
-        result = network.GetDestinationNode(address, type);
-
-        return result;
+        return networkGraph.GetNode(address, type);
     }
 
     public override string ToString()
@@ -231,63 +231,37 @@ public class Network : NodeBase, INetwork
         return result;
     }
 
-    public IEnumerable<Network> GetPathToNetworkWeighted(string addres, NodeType nodeTypes)
-    {
-        var except = new List<string>();
-        var allPaths = new List<List<Network>>();
-        var length = 0;
-        do
-        {
-            var path = new List<Network>();
-            FindNodeNetworkWithExcept(null, this, addres, nodeTypes, path, except);
+    //private IEnumerable<Network> GetPathToNetworkWeighted(string address, NodeType nodeTypes)
+    //{
+    //    var except = new List<string>();
+    //    var allPaths = new List<List<Network>>();
+    //    var length = 0;
+    //    do
+    //    {
+    //        var path = new List<Network>();
+    //        FindNodeNetworkWithExcept(null, this, address, nodeTypes, path, except);
 
-            if (path.Count == 0)
-            {
-                break;
-            }
+    //        if (path.Count == 0)
+    //        {
+    //            break;
+    //        }
 
-            allPaths.Add(path);
-            length = path.Count;
-        }
-        while (length > 0);
+    //        allPaths.Add(path);
+    //        length = path.Count;
+    //    }
+    //    while (length > 0);
 
-        var shortest = allPaths.Select(p => (p.Count, p)).OrderBy(p => p.Count).FirstOrDefault();
+    //    var shortest = allPaths.Select(p => (p.Count, p)).OrderBy(p => p.Count).FirstOrDefault();
 
-        return shortest.p ?? Enumerable.Empty<Network>();
-    }
+    //    return shortest.p ?? Enumerable.Empty<Network>();
+    //}
 
 
-    private Network? FindNodeNetwork(string address, NodeType nodeType)
-    {
-        var path = GetPathToNetworkWeighted(address, nodeType);
-
-        return path?.Any() == true ? path.LastOrDefault() : null;
-    }
-
-    private Network? FindNodeNetwork(
-        Network? previous, Network network, string address, NodeType nodeType, List<Network> path)
-    {
-        if (path.Count > 1000) { 
-            return null;
-        }
-
-        var node = network.GetDestinationNode(address, nodeType);
-        if (node != null)
-        {
-            return network;
-        }
-        foreach (var nn in network._linkedNetworks)
-        {
-            if (nn.Key.Equals(previous?.Address))
-            {
-                continue;
-            }
-            path.Add((Network)nn.Value);
-            return FindNodeNetwork(network, (Network)nn.Value, address, nodeType, path);
-        }
-
-        return network;
-    }
+    //private INetwork? FindNodeNetwork(string address, NodeType nodeType)
+    //{
+    //    var nodeNetwork = networkGraph.GetNodeNetwork(address, nodeType);
+    //    return nodeNetwork;
+    //}
 
     private bool FindNodeNetworkWithExcept(
         Network? previous, Network network, string address, NodeType nodeType, List<Network> path, List<string> except)
