@@ -41,7 +41,11 @@ public class SimplePathFinder : IPathFinder
         do
         {
             var path = new List<INetwork>();
-            FindNodeNetworkWithExcept(null, NetworkGraph.Networks[sourceNetworkAddress], destinationNetworkAddress, path, except);
+            var next = NetworkGraph?.Networks[sourceNetworkAddress];
+
+            if (next == null) continue;
+
+            FindNodeNetworkWithExcept(null, next, destinationNetworkAddress, path, except);
 
             if (path.Count == 0)
             {

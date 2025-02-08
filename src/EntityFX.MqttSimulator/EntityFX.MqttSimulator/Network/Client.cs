@@ -111,30 +111,36 @@ public class Client : NodeBase, IClient
         return Task.CompletedTask;
     }
 
-    public override async Task SendAsync(Packet packet)
+    public override async Task<Packet> SendAsync(Packet packet)
     {
         if (!IsConnected) throw new InvalidOperationException("Not Connected To server");
         networkGraph.Monitoring.Push(
-            packet.FromAddress, packet.FromType, packet.To, packet.ToType, 
+            packet.From, packet.FromType, packet.To, packet.ToType, 
             packet.Payload, MonitoringType.Send, new { });
-        await Network!.SendAsync(packet);
+        var response = await Network!.SendAsync(packet);
+
+        return response;
     }
 
-    public Task SendAsync(byte[] packet)
+    public async Task<byte[]> SendAsync(byte[] packet)
     {
-        return SendAsync(new Packet(Name, _serverName, NodeType.Client, NodeType.Server, packet));
+        var result = await SendAsync(new Packet(Name, _serverName, NodeType.Client, NodeType.Server, packet));
+
+        return result.Payload;
     }
 
-    public void Send(byte[] packet)
+    public byte[] Send(byte[] packet)
     {
-        SendAsync(packet).Wait();
+        return SendAsync(packet).Result;
     }
 
-    public override Task ReceiveAsync(Packet packet)
+    public override Task<Packet> ReceiveAsync(Packet packet)
     {
         networkGraph.Monitoring.Push(
-            packet.FromAddress, packet.FromType, packet.To, packet.ToType,
+            packet.From, packet.FromType, packet.To, packet.ToType,
             packet.Payload, MonitoringType.Receive, new { });
-        return Task.CompletedTask;
+
+
+        return Task.FromResult(networkGraph.GetReversePacket(packet));
     }
 }

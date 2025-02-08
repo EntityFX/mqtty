@@ -7,11 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Mqtt\" />
+    <ProjectReference Include="..\EntityFX.MqttSimulator.Contracts\EntityFX.MqttY.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EntityFX.MqttSimulator.Contracts\EntityFX.MqttY.Contracts.csproj" />
+    <Folder Include="Mqtt\Packets\" />
   </ItemGroup>
 
 </Project>

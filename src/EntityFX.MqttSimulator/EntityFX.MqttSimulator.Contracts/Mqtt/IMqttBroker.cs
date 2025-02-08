@@ -1,9 +1,12 @@
-﻿namespace EntityFX.MqttY.Contracts.Mqtt
+﻿using EntityFX.MqttY.Contracts.Network;
+
+namespace EntityFX.MqttY.Contracts.Mqtt
 {
-    public interface IMqttBroker
+    public interface IMqttBroker : INode
     {
         void Start();
 
         void Stop();
     }
+
 }

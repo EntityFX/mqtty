@@ -32,5 +32,7 @@ namespace EntityFX.MqttY.Contracts.Network
         ILeafNode? GetNode(string name, NodeType nodeType);
 
         void Configure(NetworkGraphOptions value);
+
+        Packet GetReversePacket(Packet packet);
     }
 }

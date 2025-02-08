@@ -4,7 +4,7 @@ using System.Collections.Concurrent;
 
 public class Monitoring : IMonitoring
 {
-    public event EventHandler<MonitoringItem> Added;
+    public event EventHandler<MonitoringItem>? Added;
 
     private ConcurrentDictionary<DateTimeOffset, MonitoringItem> _storage = new ConcurrentDictionary<DateTimeOffset, MonitoringItem>();
 

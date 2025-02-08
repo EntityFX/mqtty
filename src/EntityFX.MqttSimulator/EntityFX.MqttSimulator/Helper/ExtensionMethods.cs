@@ -10,6 +10,7 @@
         /// </summary>
         public static void Set<T>(this Dictionary<T, KeyValuePair<int, LinkedList<Path<T>>>> Dictionary,
                                   T destination, int Cost, params Path<T>[] paths)
+            where T: notnull
         {
             var CompletePath = paths == null ? new LinkedList<Path<T>>() : new LinkedList<Path<T>>(paths);
             Dictionary[destination] = new KeyValuePair<int, LinkedList<Path<T>>>(Cost, CompletePath);

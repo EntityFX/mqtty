@@ -1,5 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-using EntityFX.MqttY.Contracts.Monitoring;
+﻿using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Network;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -11,7 +10,6 @@ public class Network : NodeBase, INetwork
     private readonly Dictionary<string, INetwork> _linkedNetworks = new();
     private readonly Dictionary<string, IServer> _servers = new();
     private readonly Dictionary<string, IClient> _clients = new();
-    private readonly INetworkGraph networkGraph;
 
     public IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks => _linkedNetworks.ToImmutableDictionary();
 
@@ -24,7 +22,6 @@ public class Network : NodeBase, INetwork
 
     public Network(string name, string address, INetworkGraph networkGraph) : base(name, address, networkGraph)
     {
-        this.networkGraph = networkGraph;
     }
 
     public bool AddClient(IClient client)
@@ -133,42 +130,43 @@ public class Network : NodeBase, INetwork
         return true;
     }
 
-    public override Task ReceiveAsync(Packet packet)
+    public override Task<Packet> ReceiveAsync(Packet packet)
     {
-        throw new NotImplementedException();
+        return SendAsync(networkGraph.GetReversePacket(packet));
     }
 
-    public override async Task SendAsync(Packet packet)
+    public override async Task<Packet> SendAsync(Packet packet)
     {
         networkGraph.Monitoring.Push(
-            packet.FromAddress, packet.ToType, Address, NodeType.Network,
+            packet.From, packet.ToType, Address, NodeType.Network,
             packet.Payload, MonitoringType.Push, new { });
 
         var sentToLocal = await SendToLocalAsync(this, packet);
 
-        if (sentToLocal)
+        if (sentToLocal != null)
         {
-            return;
+            return sentToLocal!;
         }
 
-        var fromNetwork = networkGraph.GetNetworkByNode(packet.FromAddress, packet.FromType);
+        var fromNetwork = networkGraph.GetNetworkByNode(packet.From, packet.FromType);
 
         var toNetwork = networkGraph.GetNetworkByNode(packet.To, packet.ToType);
 
         if (fromNetwork == null || toNetwork == null)
         {
-            return;
+            return networkGraph.GetReversePacket(packet);
         }
 
         var pathToRemote = networkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
 
         var pathQueue = new Queue<INetwork>(pathToRemote);
-        await SendToRemoteAsync(packet, pathQueue);
+        
+        return await SendToRemoteAsync(packet, pathQueue) ?? networkGraph.GetReversePacket(packet);
     }
 
-    private async Task<bool> SendToLocalAsync(INetwork network, Packet packet)
+    private async Task<Packet?> SendToLocalAsync(INetwork network, Packet packet)
     {
-        if (string.IsNullOrEmpty(packet.FromAddress))
+        if (string.IsNullOrEmpty(packet.From))
         {
             throw new ArgumentException($"'{nameof(packet.To)}' cannot be null or empty.", nameof(packet.To));
         }
@@ -177,36 +175,35 @@ public class Network : NodeBase, INetwork
 
         if (destionationNode == null)
         {
-            return false;
+            return null;
         }
         networkGraph.Monitoring.Push(
             network.Address, NodeType.Network, packet.To, packet.ToType,
             packet.Payload, MonitoringType.Push, new { });
-        await destionationNode!.ReceiveAsync(packet);
 
-        return true;
+        return await destionationNode!.ReceiveAsync(packet);
     }
 
-    private async Task<bool> SendToRemoteAsync(Packet packet, Queue<INetwork> path)
+    private async Task<Packet?> SendToRemoteAsync(Packet packet, Queue<INetwork> path)
     {
         if (!path.Any())
         {
-            return false;
+            return null;
         }
 
         var next = path.Dequeue() as Network;
 
         if (next == null)
         {
-            return false;
+            return null;
         }
 
         networkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, new { });
         var result = await next.SendToLocalAsync(next, packet);
 
-        if (!result)
+        if (result == null)
         {
-            await next.SendToRemoteAsync(packet, path);
+            return await next.SendToRemoteAsync(packet, path);
         }
 
         return result;

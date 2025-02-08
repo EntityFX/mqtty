@@ -13,19 +13,22 @@ namespace EntityFX.MqttY.Helper
     public static class DijkstraEngine
     {
         public static LinkedList<Path<T>> CalculateShortestPathBetween<T>(T source, T destination, IEnumerable<Path<T>> Paths)
+            where T : notnull
         {
             return CalculateFrom(source, Paths)[destination];
         }
 
         public static Dictionary<T, LinkedList<Path<T>>> CalculateShortestFrom<T>(T source, IEnumerable<Path<T>> Paths)
+            where T : notnull
         {
             return CalculateFrom(source, Paths);
         }
 
         private static Dictionary<T, LinkedList<Path<T>>> CalculateFrom<T>(T source, IEnumerable<Path<T>> Paths)
+            where T : notnull
         {
             // validate the paths
-            if (Paths.Any(p => p.Source.Equals(p.Destination)))
+            if (Paths.Any(p => p.Source.Equals(p.Destination) == true) == true)
                 throw new ArgumentException("No path can have the same source and destination");
 
             // keep track of the shortest paths identified thus far
@@ -38,17 +41,17 @@ namespace EntityFX.MqttY.Helper
             Paths.SelectMany(p => new T[] { p.Source, p.Destination })           // union source and destinations
                     .Distinct()                                                  // remove duplicates
                     .ToList()                                                    // ToList exposes ForEach
-                    .ForEach(s => ShortestPaths.Set(s, Int32.MaxValue, null));   // add to ShortestPaths with MaxValue cost
+                    .ForEach(s => ShortestPaths.Set(s, Int32.MaxValue));   // add to ShortestPaths with MaxValue cost
 
             // update cost for self-to-self as 0; no path
-            ShortestPaths.Set(source, 0, null);
+            ShortestPaths.Set(source, 0);
 
             // keep this cached
             var LocationCount = ShortestPaths.Keys.Count;
 
             while (LocationsProcessed.Count < LocationCount)
             {
-                T _locationToProcess = default(T);
+                T? _locationToProcess = default;
 
                 //Search for the nearest location that isn't handled
                 foreach (T _location in ShortestPaths.OrderBy(p => p.Value.Key).Select(p => p.Key).ToList())
@@ -56,7 +59,8 @@ namespace EntityFX.MqttY.Helper
                     if (!LocationsProcessed.Contains(_location))
                     {
                         if (ShortestPaths[_location].Key == Int32.MaxValue)
-                            return ShortestPaths.ToDictionary(k => k.Key, v => v.Value.Value); //ShortestPaths[destination].Value;
+                            return ShortestPaths.ToDictionary(k => k.Key, v => v.Value.Value) 
+                                ?? new Dictionary<T, LinkedList<Path<T>>>(); //ShortestPaths[destination].Value;
 
                         _locationToProcess = _location;
                         break;
@@ -74,6 +78,11 @@ namespace EntityFX.MqttY.Helper
                             path.Cost + ShortestPaths[path.Source].Key,
                             ShortestPaths[path.Source].Value.Union(new Path<T>[] { path }).ToArray());
                     }
+                }
+
+                if (_locationToProcess == null)
+                {
+                    continue;
                 }
 
                 //Add the location to the list of processed locations

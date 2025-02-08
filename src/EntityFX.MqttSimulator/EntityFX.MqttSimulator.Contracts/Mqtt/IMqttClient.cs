@@ -6,13 +6,11 @@ using System.Threading.Tasks;
 
 namespace EntityFX.MqttY.Contracts.Mqtt
 {
-
-
     public interface IMqttClient
     {
         string ClientId { get; }
 
-        Task<MqttSession> ConnectAsync(MqttQos qos, bool retain = false);
+        Task<MqttSession?> ConnectAsync(string server, MqttQos qos, bool retain = false);
 
         Task DisconnectAsync();
 

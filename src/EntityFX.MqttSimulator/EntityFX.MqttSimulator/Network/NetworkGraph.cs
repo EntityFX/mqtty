@@ -85,7 +85,7 @@ public class NetworkGraph : INetworkGraph
 
             foreach (var link in networkOption.Value)
             {
-                if (link.Links == null || !networks.ContainsKey(link.Links)) continue;
+                if (link == null || link.Links == null || !networks.ContainsKey(link.Links)) continue;
 
                 networks[networkOption.Key].Link(networks[link.Links]);
             }
@@ -147,6 +147,17 @@ public class NetworkGraph : INetworkGraph
         }
 
         return nodes[(address, nodeType)];
+    }
+
+    public Packet GetReversePacket(Packet packet)
+    {
+        return new Packet(
+            To: packet.From,
+            From: packet.To,
+            Payload: new byte[0],
+            FromType: packet.ToType,
+            ToType: packet.FromType
+        );
     }
 
     public void RemoveClient(string clientAddress)

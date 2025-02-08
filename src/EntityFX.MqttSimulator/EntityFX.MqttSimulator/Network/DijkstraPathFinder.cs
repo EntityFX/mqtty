@@ -5,16 +5,21 @@ public class DijkstraPathFinder : IPathFinder
 {
     public INetworkGraph? NetworkGraph { get; set; }
 
-    private Path<string>[] paths;
+    private Path<string>[] paths = new Path<string>[0];
 
     public void Build()
     {
+        if (NetworkGraph?.Networks?.Any() != true)
+        {
+            return;
+        }
+
         var pathsList = new List<Path<string>>();
         foreach (var source in NetworkGraph.Networks)
         {
             foreach (var destination in source.Value.LinkedNearestNetworks)
             {
-                pathsList.Add(new Path<string>() { Source = source.Key, Destination = destination.Key, Cost = 1 });
+                pathsList.Add(new Path<string>(source.Key,destination.Key) { Cost = 1 });
             }
         }
         paths = pathsList.ToArray();
@@ -23,12 +28,18 @@ public class DijkstraPathFinder : IPathFinder
 
     public IEnumerable<INetwork> GetPathToNetwork(string sourceNetworkAddress, string destinationNetworkAddress)
     {
+        if (NetworkGraph?.Networks?.Any() != true)
+        {
+            return Enumerable.Empty<INetwork>();
+        }
+
         var path = DijkstraEngine.CalculateShortestPathBetween(sourceNetworkAddress, destinationNetworkAddress, paths);
 
 
-        var networks = path.Select(p => NetworkGraph.Networks.GetValueOrDefault(p.Destination));
+        var networks = path.Select(p => NetworkGraph.Networks.GetValueOrDefault(p.Destination))
+            .Where(n => n!= null).Select(n => n!);
   
 
-        return networks;
+        return networks ?? Enumerable.Empty<INetwork>();
     }
 }

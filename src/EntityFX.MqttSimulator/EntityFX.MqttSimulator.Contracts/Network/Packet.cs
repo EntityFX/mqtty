@@ -1,6 +1,6 @@
 ﻿namespace EntityFX.MqttY.Contracts.Network
 {
     public record Packet(
-        string FromAddress, string To, 
+        string From, string To, 
         NodeType FromType, NodeType ToType, byte[] Payload);
 }

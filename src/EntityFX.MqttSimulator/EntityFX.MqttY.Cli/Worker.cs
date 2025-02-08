@@ -28,9 +28,15 @@ internal class Worker : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var client = networkGraph.GetNode("c1", NodeType.Client) as IClient;
+
+        if (client == null)
+        {
+            await Task.CompletedTask;
+        }
+
         while (!stoppingToken.IsCancellationRequested)
         {
-            await client.SendAsync(new byte[] { 1 });
+            await client!.SendAsync(new byte[] { 1 });
             await Task.Delay(2000, stoppingToken);
         }
         await Task.CompletedTask;
