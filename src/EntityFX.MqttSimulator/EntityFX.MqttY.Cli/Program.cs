@@ -29,7 +29,7 @@ builder.Services
                 $"{(e.PacketSize > 0 ? $", Packet Size = {e.PacketSize}" : "")}.");
         return monitoring;
     })
-    .AddTransient<IPathFinder, SimplePathFinder>()
+    .AddTransient<IPathFinder, DijkstraPathFinder>()
     .AddTransient<INetworkGraph, NetworkGraph>();
 
 

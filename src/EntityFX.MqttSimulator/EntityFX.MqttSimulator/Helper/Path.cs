@@ -1,0 +1,19 @@
+﻿namespace EntityFX.MqttY.Helper
+{
+    public class Path<T>
+    {
+        public T Source { get; set; }
+
+        public T Destination { get; set; }
+
+        /// <summary>
+        /// Cost of using this path from Source to Destination
+        /// </summary>
+        /// <remarks>
+        /// Lower costs are preferable to higher costs
+        /// </remarks>
+        public int Cost { get; set; }
+    }
+
+
+}

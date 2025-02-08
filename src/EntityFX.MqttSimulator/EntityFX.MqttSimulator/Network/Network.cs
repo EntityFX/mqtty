@@ -22,7 +22,7 @@ public class Network : NodeBase, INetwork
 
     public override NodeType NodeType => NodeType.Network;
 
-    public Network(string address, INetworkGraph networkGraph) : base(address, networkGraph)
+    public Network(string name, string address, INetworkGraph networkGraph) : base(name, address, networkGraph)
     {
         this.networkGraph = networkGraph;
     }
@@ -35,7 +35,7 @@ public class Network : NodeBase, INetwork
         {
             return false;
         }
-        _clients[client.Address] = client;
+        _clients[client.Name] = client;
 
         return true;
     }
@@ -53,7 +53,7 @@ public class Network : NodeBase, INetwork
             clientNode.Disconnect();
         }
 
-        return _clients.Remove(clientNode.Address);
+        return _clients.Remove(clientNode.Name);
     }
 
 
@@ -61,11 +61,11 @@ public class Network : NodeBase, INetwork
     {
         if (network == null) throw new ArgumentNullException("network");
 
-        if (_linkedNetworks.ContainsKey(network.Address))
+        if (_linkedNetworks.ContainsKey(network.Name))
         {
             return false;
         }
-        _linkedNetworks[network.Address] = network;
+        _linkedNetworks[network.Name] = network;
 
         var result = network.Link(this);
 
@@ -78,7 +78,7 @@ public class Network : NodeBase, INetwork
     {
         if (network == null) throw new ArgumentNullException("network");
 
-        if (!_linkedNetworks.ContainsKey(network.Address))
+        if (!_linkedNetworks.ContainsKey(network.Name))
         {
             return false;
         }
@@ -86,7 +86,7 @@ public class Network : NodeBase, INetwork
         var result = network.Unlink(this);
         if (!result)
         {
-            _linkedNetworks[network.Address] = network;
+            _linkedNetworks[network.Name] = network;
         }
 
         networkGraph.Monitoring.Push(this, network, null, MonitoringType.Unlink, new { });
@@ -112,11 +112,11 @@ public class Network : NodeBase, INetwork
     {
         if (server == null) throw new ArgumentNullException("server");
 
-        if (_servers.ContainsKey(server.Address))
+        if (_servers.ContainsKey(server.Name))
         {
             return false;
         }
-        _servers[server.Address] = server;
+        _servers[server.Name] = server;
 
         return true;
     }
@@ -153,14 +153,14 @@ public class Network : NodeBase, INetwork
 
         var fromNetwork = networkGraph.GetNetworkByNode(packet.FromAddress, packet.FromType);
 
-        var toNetwork = networkGraph.GetNetworkByNode(packet.ToAddress, packet.ToType);
+        var toNetwork = networkGraph.GetNetworkByNode(packet.To, packet.ToType);
 
         if (fromNetwork == null || toNetwork == null)
         {
             return;
         }
 
-        var pathToRemote = networkGraph.PathFinder.GetPathToNetwork(fromNetwork.Address, toNetwork.Address);
+        var pathToRemote = networkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
 
         var pathQueue = new Queue<INetwork>(pathToRemote);
         await SendToRemoteAsync(packet, pathQueue);
@@ -170,17 +170,17 @@ public class Network : NodeBase, INetwork
     {
         if (string.IsNullOrEmpty(packet.FromAddress))
         {
-            throw new ArgumentException($"'{nameof(packet.ToAddress)}' cannot be null or empty.", nameof(packet.ToAddress));
+            throw new ArgumentException($"'{nameof(packet.To)}' cannot be null or empty.", nameof(packet.To));
         }
 
-        var destionationNode = GetDestinationNode(packet.ToAddress!, packet.ToType);
+        var destionationNode = GetDestinationNode(packet.To!, packet.ToType);
 
         if (destionationNode == null)
         {
             return false;
         }
         networkGraph.Monitoring.Push(
-            network.Address, NodeType.Network, packet.ToAddress, packet.ToType,
+            network.Address, NodeType.Network, packet.To, packet.ToType,
             packet.Payload, MonitoringType.Push, new { });
         await destionationNode!.ReceiveAsync(packet);
 
@@ -228,7 +228,7 @@ public class Network : NodeBase, INetwork
         switch (destinationNodeType)
         {
             case NodeType.Network:
-                if (id == Address)
+                if (id == Name)
                 {
                     result = this;
                 }

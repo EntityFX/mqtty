@@ -2,8 +2,9 @@
 using EntityFX.MqttY.Contracts.Options;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using System.Threading;
 
-internal class Worker : IHostedService
+internal class Worker : BackgroundService
 {
     private readonly IOptions<NetworkGraphOptions> options;
     private readonly INetworkGraph networkGraph;
@@ -14,15 +15,24 @@ internal class Worker : IHostedService
         this.networkGraph = networkGraph;
     }
 
+    
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public override async Task StartAsync(CancellationToken cancellationToken)
     {
         networkGraph.Configure(this.options.Value);
-        return Task.CompletedTask;
+
+        await base.StartAsync(cancellationToken);
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        return Task.CompletedTask;
+        var client = networkGraph.GetNode("c1", NodeType.Client) as IClient;
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            await client.SendAsync(new byte[] { 1 });
+            await Task.Delay(2000, stoppingToken);
+        }
+        await Task.CompletedTask;
     }
 }

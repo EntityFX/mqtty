@@ -19,7 +19,7 @@ public class Client : NodeBase, IClient
 
     private string _serverName = string.Empty;
 
-    public Client(string address, string protocolType, INetwork network, INetworkGraph networkGraph) : base(address, networkGraph)
+    public Client(string name, string address, string protocolType, INetwork network, INetworkGraph networkGraph) : base(name, address, networkGraph)
     {
         Network = network;
         ProtocolType = protocolType;
@@ -115,14 +115,14 @@ public class Client : NodeBase, IClient
     {
         if (!IsConnected) throw new InvalidOperationException("Not Connected To server");
         networkGraph.Monitoring.Push(
-            packet.FromAddress, packet.FromType, packet.ToAddress, packet.ToType, 
+            packet.FromAddress, packet.FromType, packet.To, packet.ToType, 
             packet.Payload, MonitoringType.Send, new { });
         await Network!.SendAsync(packet);
     }
 
     public Task SendAsync(byte[] packet)
     {
-        return SendAsync(new Packet(Address, _serverName, NodeType.Client, NodeType.Server, packet));
+        return SendAsync(new Packet(Name, _serverName, NodeType.Client, NodeType.Server, packet));
     }
 
     public void Send(byte[] packet)
@@ -133,7 +133,7 @@ public class Client : NodeBase, IClient
     public override Task ReceiveAsync(Packet packet)
     {
         networkGraph.Monitoring.Push(
-            packet.FromAddress, packet.FromType, packet.ToAddress, packet.ToType,
+            packet.FromAddress, packet.FromType, packet.To, packet.ToType,
             packet.Payload, MonitoringType.Receive, new { });
         return Task.CompletedTask;
     }

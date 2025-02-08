@@ -10,15 +10,18 @@ public abstract class NodeBase : INode
 
     public string Address { get; private set; }
 
+    public string Name { get; private set; }
+
     public abstract NodeType NodeType { get; }
 
     public abstract Task ReceiveAsync(Packet packet);
 
     public abstract Task SendAsync(Packet packet);
 
-    public NodeBase(string address, INetworkGraph networkGraph)
+    public NodeBase(string name, string address, INetworkGraph networkGraph)
     {
         Address = address;
+        Name = name;
         Id = Guid.NewGuid();
         this.networkGraph = networkGraph;
     }

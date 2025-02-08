@@ -19,8 +19,8 @@ public class Server : NodeBase, IServer
     public event EventHandler<IClient>? ClientConnected;
     public event EventHandler<string>? ClientDisconnected;
 
-    public Server(string address, string protocolType,
-        INetwork network, INetworkGraph networkGraph) : base(address, networkGraph)
+    public Server(string name, string address, string protocolType,
+        INetwork network, INetworkGraph networkGraph) : base(name, address, networkGraph)
     {
         ProtocolType = protocolType;
         Network = network;
@@ -51,7 +51,7 @@ public class Server : NodeBase, IServer
 
         var result = DetachClientFromServer(client);
 
-        ClientDisconnected?.Invoke(result, client.Address);
+        ClientDisconnected?.Invoke(result, client.Name);
 
         return result;
     }
@@ -70,7 +70,7 @@ public class Server : NodeBase, IServer
             return false;
         }
 
-        _serverClients[client.Address] = client;
+        _serverClients[client.Name] = client;
 
         return true;
     }
@@ -92,7 +92,7 @@ public class Server : NodeBase, IServer
     {
         PacketReceived?.Invoke(this, packet);
         networkGraph.Monitoring.Push(packet.FromAddress, packet.FromType, 
-            packet.ToAddress, packet.ToType, packet.Payload, MonitoringType.Receive, new { });
+            packet.To, packet.ToType, packet.Payload, MonitoringType.Receive, new { });
         return Task.CompletedTask;
     }
 

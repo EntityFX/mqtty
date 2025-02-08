@@ -22,47 +22,47 @@ public class NetworkGraph : INetworkGraph
 
     public IReadOnlyDictionary<string, INetwork> Networks => networks.ToImmutableDictionary();
 
-    public IClient? BuildClient(string clientAddress, string protocolType, INetwork network)
+    public IClient? BuildClient(string name, string protocolType, INetwork network)
     {
-        if (nodes.ContainsKey((clientAddress, NodeType.Client)))
+        if (nodes.ContainsKey((name, NodeType.Client)))
         {
             return null;
         }
 
-        var clientAddressFull = GetFullName(clientAddress, protocolType, network.Address);
-        var client = new Client(clientAddressFull, protocolType, network, this);
-        nodes.Add((clientAddressFull, NodeType.Client), client);
+        var clientAddressFull = GetAddress(name, protocolType, network.Address);
+        var client = new Client(name, clientAddressFull, protocolType, network, this);
+        nodes.Add((name, NodeType.Client), client);
 
         return client;
     }
 
-    public INetwork? BuildNetwork(string address)
+    public INetwork? BuildNetwork(string name, string address)
     {
         if (networks.ContainsKey(address))
         {
             return null;
         }
 
-        var network = new Network(address, this);
-        networks.Add(address, network);
+        var network = new Network(name, address, this);
+        networks.Add(name, network);
 
         return network;
     }
 
-    public ILeafNode? BuildNode(string address, NodeType nodeType)
+    public ILeafNode? BuildNode(string name, string address, NodeType nodeType)
     {
         throw new NotImplementedException();
     }
 
-    public IServer? BuildServer(string serverAddress, string protocolType, INetwork network)
+    public IServer? BuildServer(string name, string protocolType, INetwork network)
     {
-        if (nodes.ContainsKey((serverAddress, NodeType.Server)))
+        if (nodes.ContainsKey((name, NodeType.Server)))
         {
             return null;
         }
-        var serverAddressFull = $"{protocolType}://{serverAddress}.{network.Address}";
-        var server = new Server(serverAddressFull, protocolType, network, this);
-        nodes.Add((serverAddressFull, NodeType.Server), server);
+        var serverAddressFull = GetAddress(name, protocolType, network.Address); 
+        var server = new Server(name, serverAddressFull, protocolType, network, this);
+        nodes.Add((name, NodeType.Server), server);
 
         return server;
     }
@@ -76,7 +76,7 @@ public class NetworkGraph : INetworkGraph
 
         foreach (var networkOption in options.Networks)
         {
-            BuildNetwork(networkOption.Key);
+            BuildNetwork(networkOption.Key, networkOption.Key);
         }
 
         foreach (var networkOption in options.Networks)
@@ -91,9 +91,11 @@ public class NetworkGraph : INetworkGraph
             }
         }
 
+        PathFinder.Build();
+
         foreach (var node in options.Nodes)
         {
-            var linkNetwork = networks.GetValueOrDefault(node.Value.Links ?? string.Empty);
+            var linkNetwork = networks.GetValueOrDefault(node.Value.Network ?? string.Empty);
             if (linkNetwork == null) continue;
 
             if (node.Value.Type == NodeOptionType.Server)
@@ -116,20 +118,20 @@ public class NetworkGraph : INetworkGraph
 
             if (node.Value.Type == NodeOptionType.Client)
             {
-                if (node.Value.Connects == null) continue;
+                if (node.Value.ConnectsToServer == null) continue;
 
-                var nodeClient = GetNode(GetFullName(node.Key, node.Value.Specification ?? "tcp", node.Value.Links), NodeType.Client);
+                var nodeClient = GetNode(node.Key, NodeType.Client);
 
-                (nodeClient as IClient)?.Connect(node.Value.Connects);
+                (nodeClient as IClient)?.Connect(node.Value.ConnectsToServer);
 
                //node.Connect(nodeServer);
             }
         }
     }
 
-    public string GetFullName(string clientAddress, string protocolType, string networkAddress)
+    public string GetAddress(string name, string protocolType, string networkAddress)
     {
-        return $"{protocolType}://{clientAddress}.{networkAddress}";
+        return $"{protocolType}://{name}.{networkAddress}";
     }
 
     public INetwork? GetNetworkByNode(string address, NodeType nodeType)

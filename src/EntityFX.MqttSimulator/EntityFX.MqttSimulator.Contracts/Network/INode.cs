@@ -6,6 +6,8 @@
 
         string Address { get; }
 
+        string Name { get; }
+
         NodeType NodeType { get; }
 
         Task ReceiveAsync(Packet packet);

@@ -5,9 +5,9 @@
         public NodeOptionType Type { get; set; }
         public string? Specification { get; set; }
 
-        public string? Links { get; set; }
+        public string? Network { get; set; }
 
-        public string? Connects { get; set; }
+        public string? ConnectsToServer { get; set; }
     }
 
     public enum NodeOptionType
