@@ -17,10 +17,15 @@ namespace EntityFX.MqttY.Mqtt
 
         public string ClientId { get; set; }
 
+        public string Server => serverName;
+
         public async Task<MqttSession?> ConnectAsync(string server, MqttQos qos, bool retain = false)
         {
-            var result = Connect(server);
-            if (!result) return null;
+            if (!IsConnected)
+            {
+                var result = Connect(server);
+                if (!result) return null;
+            }
 
             var connect = new ConnectPacket(ClientId, true);
             var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(connect));

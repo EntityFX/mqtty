@@ -17,7 +17,7 @@ public class Client : NodeBase, IClient
 
     public event EventHandler<(string Client, byte[] Packet)>? PacketReceived;
 
-    private string _serverName = string.Empty;
+    protected string serverName = string.Empty;
 
     public Client(string name, string address, string protocolType, INetwork network, INetworkGraph networkGraph) : base(name, address, networkGraph)
     {
@@ -47,7 +47,7 @@ public class Client : NodeBase, IClient
             return false;
         }
 
-        _serverName = server;
+        serverName = server;
 
         networkGraph.Monitoring.Push(this, remoteNode, null, EntityFX.MqttY.Contracts.Monitoring.MonitoringType.Connect, new { });
         IsConnected = true;
@@ -77,7 +77,7 @@ public class Client : NodeBase, IClient
 
         if (Network == null) return false;
 
-        var result = DetachClientFromServer(_serverName);
+        var result = DetachClientFromServer(serverName);
 
         result = Network.RemoveClient(Address);
 
@@ -87,7 +87,7 @@ public class Client : NodeBase, IClient
             return false;
         }
 
-        _serverName = string.Empty;
+        serverName = string.Empty;
 
         IsConnected = false;
 
@@ -124,7 +124,7 @@ public class Client : NodeBase, IClient
 
     public async Task<byte[]> SendAsync(byte[] packet)
     {
-        var result = await SendAsync(new Packet(Name, _serverName, NodeType.Client, NodeType.Server, packet));
+        var result = await SendAsync(new Packet(Name, serverName, NodeType.Client, NodeType.Server, packet));
 
         return result.Payload;
     }
@@ -141,6 +141,6 @@ public class Client : NodeBase, IClient
             packet.Payload, MonitoringType.Receive, new { });
 
 
-        return Task.FromResult(networkGraph.GetReversePacket(packet));
+        return Task.FromResult(networkGraph.GetReversePacket(packet, packet.Payload));
     }
 }

@@ -132,7 +132,7 @@ public class Network : NodeBase, INetwork
 
     public override Task<Packet> ReceiveAsync(Packet packet)
     {
-        return SendAsync(networkGraph.GetReversePacket(packet));
+        return SendAsync(packet);
     }
 
     public override async Task<Packet> SendAsync(Packet packet)
@@ -154,14 +154,14 @@ public class Network : NodeBase, INetwork
 
         if (fromNetwork == null || toNetwork == null)
         {
-            return networkGraph.GetReversePacket(packet);
+            return networkGraph.GetReversePacket(packet, packet.Payload);
         }
 
         var pathToRemote = networkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
 
         var pathQueue = new Queue<INetwork>(pathToRemote);
         
-        return await SendToRemoteAsync(packet, pathQueue) ?? networkGraph.GetReversePacket(packet);
+        return await SendToRemoteAsync(packet, pathQueue) ?? networkGraph.GetReversePacket(packet, packet.Payload);
     }
 
     private async Task<Packet?> SendToLocalAsync(INetwork network, Packet packet)

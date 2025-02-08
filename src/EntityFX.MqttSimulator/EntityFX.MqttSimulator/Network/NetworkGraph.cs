@@ -1,6 +1,8 @@
 ﻿using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Mqtt;
 using System.Collections.Immutable;
 using System.Net;
 
@@ -30,10 +32,26 @@ public class NetworkGraph : INetworkGraph
         }
 
         var clientAddressFull = GetAddress(name, protocolType, network.Address);
-        var client = new Client(name, clientAddressFull, protocolType, network, this);
+
+        IClient? client = null;
+
+        if (protocolType == "mqtt")
+        {
+            client = new MqttClient(name, clientAddressFull, protocolType, network, this, null);
+        } else
+        {
+            client = new Client(name, clientAddressFull, protocolType, network, this);
+        }
+
         nodes.Add((name, NodeType.Client), client);
 
         return client;
+    }
+
+    public TCLient? BuildClient<TCLient>(string name, string protocolType, INetwork network)
+        where TCLient : IClient
+    {
+        return (TCLient?)BuildClient(name, protocolType, network);
     }
 
     public INetwork? BuildNetwork(string name, string address)
@@ -149,12 +167,12 @@ public class NetworkGraph : INetworkGraph
         return nodes[(address, nodeType)];
     }
 
-    public Packet GetReversePacket(Packet packet)
+    public Packet GetReversePacket(Packet packet, byte[] payload)
     {
         return new Packet(
             To: packet.From,
             From: packet.To,
-            Payload: new byte[0],
+            Payload: payload,
             FromType: packet.ToType,
             ToType: packet.FromType
         );

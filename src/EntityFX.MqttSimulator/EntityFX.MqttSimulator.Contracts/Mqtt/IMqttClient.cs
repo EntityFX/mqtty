@@ -1,4 +1,5 @@
-﻿using System;
+﻿using EntityFX.MqttY.Contracts.Network;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,8 +7,10 @@ using System.Threading.Tasks;
 
 namespace EntityFX.MqttY.Contracts.Mqtt
 {
-    public interface IMqttClient
+    public interface IMqttClient : IClient
     {
+        string Server { get; }
+
         string ClientId { get; }
 
         Task<MqttSession?> ConnectAsync(string server, MqttQos qos, bool retain = false);

@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Network;
+﻿using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -33,6 +34,15 @@ internal class Worker : BackgroundService
         {
             await Task.CompletedTask;
         }
+
+        if (client?.ProtocolType == "mqtt")
+        {
+            var mqttClient = client as IMqttClient;
+
+            await mqttClient!.ConnectAsync(mqttClient.Server, MqttQos.AtLeastOnce, true);
+        }
+
+
 
         while (!stoppingToken.IsCancellationRequested)
         {

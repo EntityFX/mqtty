@@ -88,18 +88,27 @@ public class Server : NodeBase, IServer
         return true;
     }
 
-    public override Task<Packet> ReceiveAsync(Packet packet)
+    public override async Task<Packet> ReceiveAsync(Packet packet)
     {
-        networkGraph.Monitoring.Push(packet.From, packet.FromType, 
+        networkGraph.Monitoring.Push(packet.From, packet.FromType,
             packet.To, packet.ToType, packet.Payload, MonitoringType.Receive, new { });
+
+        var response = ProcessReceive(packet);
+        networkGraph.Monitoring.Push(response.From, response.FromType,
+            response.To, response.ToType, response.Payload, MonitoringType.Send, new { });
         PacketReceived?.Invoke(this, packet);
 
-        return Task.FromResult(ProcessReceive(packet));
+        var result = await Network!.ReceiveAsync(response);
+
+        return result;
     }
 
     protected virtual Packet ProcessReceive(Packet packet)
     {
-        return networkGraph.GetReversePacket(packet);
+        var payload = new List<byte>();
+        payload.AddRange(packet.Payload);
+        payload.Add(0xFF);
+        return networkGraph.GetReversePacket(packet, payload.ToArray());
     }
 
     public override async Task<Packet> SendAsync(Packet packet)
