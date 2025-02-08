@@ -14,7 +14,7 @@
 
         bool AttachClient(IClient client);
 
-        bool DetachClient(string address);
+        bool DetachClient(string clientAddress);
 
         void Start();
 

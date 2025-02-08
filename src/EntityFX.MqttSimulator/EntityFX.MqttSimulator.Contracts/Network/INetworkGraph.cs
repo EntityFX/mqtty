@@ -1,4 +1,5 @@
 ﻿using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Contracts.Options;
 
 namespace EntityFX.MqttY.Contracts.Network
 {
@@ -9,22 +10,26 @@ namespace EntityFX.MqttY.Contracts.Network
 
         public IReadOnlyDictionary<string, INetwork> Networks { get; }
 
-        INetwork? BuildNetwork(string address);
+        INetwork? BuildNetwork(string networkAddress);
 
-        IClient? BuildClient(string address, INetwork network);
+        IClient? BuildClient(string clientAddress, string protocolType, INetwork network);
 
-        IServer? BuildServer(string address, INetwork network);
+        string GetFullName(string clientAddress, string protocolType, string networkAddress);
+
+        IServer? BuildServer(string serverAddress, string protocolType, INetwork network);
 
         ILeafNode? BuildNode(string address, NodeType nodeType);
 
-        void RemoveNetwork(INetwork network);
+        void RemoveNetwork(string networkAddress);
 
-        void RemoveClient(INetwork network);
+        void RemoveClient(string clientAddress);
 
-        void RemoveServer(INetwork network);
+        void RemoveServer(string serverAddress);
 
-        INetwork? GetNodeNetwork(string address, NodeType nodeType);
+        INetwork? GetNetworkByNode(string nodeAddress, NodeType nodeType);
 
-        ILeafNode? GetNode(string address, NodeType nodeType);
+        ILeafNode? GetNode(string nodeAddress, NodeType nodeType);
+
+        void Configure(NetworkGraphOptions value);
     }
 }

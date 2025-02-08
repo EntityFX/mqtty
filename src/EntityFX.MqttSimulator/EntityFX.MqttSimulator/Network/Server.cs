@@ -13,13 +13,16 @@ public class Server : NodeBase, IServer
 
     public override NodeType NodeType => NodeType.Server;
 
+    public string ProtocolType { get; }
 
     public event EventHandler<Packet>? PacketReceived;
     public event EventHandler<IClient>? ClientConnected;
     public event EventHandler<string>? ClientDisconnected;
 
-    public Server(string address, INetwork network, INetworkGraph networkGraph) : base(address, networkGraph)
+    public Server(string address, string protocolType,
+        INetwork network, INetworkGraph networkGraph) : base(address, networkGraph)
     {
+        ProtocolType = protocolType;
         Network = network;
     }
 
@@ -88,7 +91,8 @@ public class Server : NodeBase, IServer
     public override Task ReceiveAsync(Packet packet)
     {
         PacketReceived?.Invoke(this, packet);
-        networkGraph.Monitoring.Push(packet.From, packet.SourceType, packet.To, packet.DestinationType, packet.packet, MonitoringType.Receive, new { });
+        networkGraph.Monitoring.Push(packet.FromAddress, packet.FromType, 
+            packet.ToAddress, packet.ToType, packet.Payload, MonitoringType.Receive, new { });
         return Task.CompletedTask;
     }
 

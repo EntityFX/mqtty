@@ -68,10 +68,6 @@ public class Network : NodeBase, INetwork
         _linkedNetworks[network.Address] = network;
 
         var result = network.Link(this);
-        if (!result)
-        {
-            _linkedNetworks.Remove(network.Address);
-        }
 
         networkGraph.Monitoring.Push(this, network, null, MonitoringType.Link, new { });
 
@@ -94,6 +90,20 @@ public class Network : NodeBase, INetwork
         }
 
         networkGraph.Monitoring.Push(this, network, null, MonitoringType.Unlink, new { });
+
+        return true;
+    }
+
+    public bool UnlinkAll()
+    {
+        foreach (var network in _linkedNetworks.Values) 
+        { 
+            var result = network.UnlinkAll();
+            if (!result)
+            {
+                return false;
+            }
+        }
 
         return true;
     }
@@ -130,16 +140,20 @@ public class Network : NodeBase, INetwork
 
     public override async Task SendAsync(Packet packet)
     {
-        var sentToLocal = await SendToLocalAsync(packet);
+        networkGraph.Monitoring.Push(
+            packet.FromAddress, packet.ToType, Address, NodeType.Network,
+            packet.Payload, MonitoringType.Push, new { });
+
+        var sentToLocal = await SendToLocalAsync(this, packet);
 
         if (sentToLocal)
         {
             return;
         }
 
-        var fromNetwork = networkGraph.GetNodeNetwork(packet.From, packet.SourceType);
+        var fromNetwork = networkGraph.GetNetworkByNode(packet.FromAddress, packet.FromType);
 
-        var toNetwork = networkGraph.GetNodeNetwork(packet.To, packet.DestinationType);
+        var toNetwork = networkGraph.GetNetworkByNode(packet.ToAddress, packet.ToType);
 
         if (fromNetwork == null || toNetwork == null)
         {
@@ -152,20 +166,22 @@ public class Network : NodeBase, INetwork
         await SendToRemoteAsync(packet, pathQueue);
     }
 
-    private async Task<bool> SendToLocalAsync(Packet packet)
+    private async Task<bool> SendToLocalAsync(INetwork network, Packet packet)
     {
-        if (string.IsNullOrEmpty(packet.To))
+        if (string.IsNullOrEmpty(packet.FromAddress))
         {
-            throw new ArgumentException($"'{nameof(packet.To)}' cannot be null or empty.", nameof(packet.To));
+            throw new ArgumentException($"'{nameof(packet.ToAddress)}' cannot be null or empty.", nameof(packet.ToAddress));
         }
 
-        var destionationNode = GetDestinationNode(packet.To!, packet.DestinationType);
+        var destionationNode = GetDestinationNode(packet.ToAddress!, packet.ToType);
 
         if (destionationNode == null)
         {
             return false;
         }
-
+        networkGraph.Monitoring.Push(
+            network.Address, NodeType.Network, packet.ToAddress, packet.ToType,
+            packet.Payload, MonitoringType.Push, new { });
         await destionationNode!.ReceiveAsync(packet);
 
         return true;
@@ -185,12 +201,11 @@ public class Network : NodeBase, INetwork
             return false;
         }
 
-        networkGraph.Monitoring.Push(this, next, packet.packet, MonitoringType.Send, new { });
-        var result = await next.SendToLocalAsync(packet);
+        networkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, new { });
+        var result = await next.SendToLocalAsync(next, packet);
 
         if (!result)
         {
-
             await next.SendToRemoteAsync(packet, path);
         }
 
@@ -229,68 +244,5 @@ public class Network : NodeBase, INetwork
         }
 
         return result;
-    }
-
-    //private IEnumerable<Network> GetPathToNetworkWeighted(string address, NodeType nodeTypes)
-    //{
-    //    var except = new List<string>();
-    //    var allPaths = new List<List<Network>>();
-    //    var length = 0;
-    //    do
-    //    {
-    //        var path = new List<Network>();
-    //        FindNodeNetworkWithExcept(null, this, address, nodeTypes, path, except);
-
-    //        if (path.Count == 0)
-    //        {
-    //            break;
-    //        }
-
-    //        allPaths.Add(path);
-    //        length = path.Count;
-    //    }
-    //    while (length > 0);
-
-    //    var shortest = allPaths.Select(p => (p.Count, p)).OrderBy(p => p.Count).FirstOrDefault();
-
-    //    return shortest.p ?? Enumerable.Empty<Network>();
-    //}
-
-
-    //private INetwork? FindNodeNetwork(string address, NodeType nodeType)
-    //{
-    //    var nodeNetwork = networkGraph.GetNodeNetwork(address, nodeType);
-    //    return nodeNetwork;
-    //}
-
-    private bool FindNodeNetworkWithExcept(
-        Network? previous, Network network, string address, NodeType nodeType, List<Network> path, List<string> except)
-    {
-        var node = network.GetDestinationNode(address, nodeType);
-        if (node != null)
-        {
-            except.Remove(network.Address);
-            return true;
-        }
-
-        except.Add(network.Address);
-        foreach (var nn in network._linkedNetworks)
-        {
-            if (except.Contains(nn.Key))
-            {
-                continue;
-            }
-
-            if (nn.Key.Equals(previous?.Address))
-            {
-                continue;
-            }
-
-            path.Add((Network)nn.Value);
-
-            return FindNodeNetworkWithExcept(network, (Network)nn.Value, address, nodeType, path, except);
-        }
-
-        return false;
     }
 }

@@ -16,15 +16,17 @@ namespace EntityFX.MqttY.Contracts.Network
 
         bool Unlink(INetwork network);
 
+        bool UnlinkAll();
+
         bool AddServer(IServer server);
 
         bool RemoveServer(string server);
 
         bool AddClient(IClient client);
 
-        bool RemoveClient(string client);
+        bool RemoveClient(string clientAddress);
 
-        INode? FindNode(string address, NodeType type);
+        INode? FindNode(string nodeAddress, NodeType type);
 
     }
 }
