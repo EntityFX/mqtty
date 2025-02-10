@@ -135,33 +135,37 @@ public class Network : NodeBase, INetwork
         return SendAsync(packet);
     }
 
-    public override async Task<Packet> SendAsync(Packet packet)
+    public override Task<Packet> SendAsync(Packet packet)
     {
-        networkGraph.Monitoring.Push(
+        return Task.Run(async () =>
+        {
+            networkGraph.Monitoring.Push(
             packet.From, packet.ToType, Address, NodeType.Network,
             packet.Payload, MonitoringType.Push, new { });
 
-        var sentToLocal = await SendToLocalAsync(this, packet);
+            var sentToLocal = await SendToLocalAsync(this, packet);
 
-        if (sentToLocal != null)
-        {
-            return sentToLocal!;
-        }
+            if (sentToLocal != null)
+            {
+                return sentToLocal!;
+            }
 
-        var fromNetwork = networkGraph.GetNetworkByNode(packet.From, packet.FromType);
+            var fromNetwork = networkGraph.GetNetworkByNode(packet.From, packet.FromType);
 
-        var toNetwork = networkGraph.GetNetworkByNode(packet.To, packet.ToType);
+            var toNetwork = networkGraph.GetNetworkByNode(packet.To, packet.ToType);
 
-        if (fromNetwork == null || toNetwork == null)
-        {
-            return networkGraph.GetReversePacket(packet, packet.Payload);
-        }
+            if (fromNetwork == null || toNetwork == null)
+            {
+                return networkGraph.GetReversePacket(packet, packet.Payload);
+            }
 
-        var pathToRemote = networkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
+            var pathToRemote = networkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
 
-        var pathQueue = new Queue<INetwork>(pathToRemote);
-        
-        return await SendToRemoteAsync(packet, pathQueue) ?? networkGraph.GetReversePacket(packet, packet.Payload);
+            var pathQueue = new Queue<INetwork>(pathToRemote);
+
+            return await SendToRemoteAsync(packet, pathQueue) ?? networkGraph.GetReversePacket(packet, packet.Payload);
+        });
+
     }
 
     private async Task<Packet?> SendToLocalAsync(INetwork network, Packet packet)

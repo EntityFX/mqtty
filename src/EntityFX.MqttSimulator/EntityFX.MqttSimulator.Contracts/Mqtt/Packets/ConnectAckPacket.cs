@@ -1,20 +1,25 @@
 ﻿namespace EntityFX.MqttY.Contracts.Mqtt.Packets
 {
-    internal class ConnectAck : IPacket, IEquatable<ConnectAck>
+
+    public class ConnectAckPacket : PacketBase, IPacket, IEquatable<ConnectAckPacket>
     {
-        public ConnectAck(MqttConnectionStatus status, bool existingSession)
+        public ConnectAckPacket()
+        {
+            
+        }
+
+        public ConnectAckPacket(MqttConnectionStatus status, bool existingSession)
         {
             Status = status;
             SessionPresent = existingSession;
+            Type = MqttPacketType.ConnectAck;
         }
 
-        public MqttPacketType Type { get { return MqttPacketType.ConnectAck; } }
+        public MqttConnectionStatus Status { get; internal set;  }
 
-        public MqttConnectionStatus Status { get; }
+        public bool SessionPresent { get; internal set; }
 
-        public bool SessionPresent { get; }
-
-        public bool Equals(ConnectAck? other)
+        public bool Equals(ConnectAckPacket? other)
         {
             if (other == null)
                 return false;
@@ -28,7 +33,7 @@
             if (obj == null)
                 return false;
 
-            var connectAck = obj as ConnectAck;
+            var connectAck = obj as ConnectAckPacket;
 
             if (connectAck == null)
                 return false;
@@ -36,7 +41,7 @@
             return Equals(connectAck);
         }
 
-        public static bool operator ==(ConnectAck? connectAck, ConnectAck? other)
+        public static bool operator ==(ConnectAckPacket? connectAck, ConnectAckPacket? other)
         {
             if ((object?)connectAck == null || (object?)other == null)
                 return Object.Equals(connectAck, other);
@@ -44,7 +49,7 @@
             return connectAck.Equals(other);
         }
 
-        public static bool operator !=(ConnectAck? connectAck, ConnectAck? other)
+        public static bool operator !=(ConnectAckPacket? connectAck, ConnectAckPacket? other)
         {
             if ((object?)connectAck == null || (object?)other == null)
                 return !Object.Equals(connectAck, other);

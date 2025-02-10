@@ -1,7 +1,5 @@
 ﻿namespace EntityFX.MqttY.Contracts.Mqtt.Packets
 {
-
-
     /// <summary>
     /// Represents one of the possible MQTT packet types
     /// </summary>

@@ -11,8 +11,8 @@
 
         event EventHandler<(string Client, byte[] Packet)>? PacketReceived;
 
-        Task<byte[]> SendAsync(byte[] packet);
+        Task<byte[]> SendAsync(byte[] packet, string? category = null);
 
-        byte[] Send(byte[] packet);
+        byte[] Send(byte[] packet, string? category = null);
     }
 }

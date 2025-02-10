@@ -2,5 +2,5 @@
 {
     public record Packet(
         string From, string To, 
-        NodeType FromType, NodeType ToType, byte[] Payload);
+        NodeType FromType, NodeType ToType, byte[] Payload, string? Category = null);
 }

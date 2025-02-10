@@ -1,6 +1,7 @@
 ﻿namespace EntityFX.MqttY.Contracts.Mqtt.Packets
 {
-    public class ConnectPacket : IPacket, IEquatable<ConnectPacket>
+
+    public class ConnectPacket : PacketBase, IPacket, IEquatable<ConnectPacket>
     {
         public ConnectPacket(string clientId, bool cleanSession)
         {
@@ -12,15 +13,15 @@
             ClientId = clientId;
             CleanSession = cleanSession;
             KeepAlive = 0;
+            Type = MqttPacketType.Connect;
         }
 
         public ConnectPacket()
         {
             CleanSession = true;
             KeepAlive = 0;
+            Type = MqttPacketType.Connect;
         }
-
-        public MqttPacketType Type { get { return MqttPacketType.Connect; } }
 
         public string? ClientId { get; set; }
 

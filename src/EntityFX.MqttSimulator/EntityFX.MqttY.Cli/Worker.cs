@@ -28,7 +28,7 @@ internal class Worker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var client = networkGraph.GetNode("c1", NodeType.Client) as IClient;
+        var client = networkGraph.GetNode("mc1", NodeType.Client) as IClient;
 
         if (client == null)
         {
@@ -41,8 +41,6 @@ internal class Worker : BackgroundService
 
             await mqttClient!.ConnectAsync(mqttClient.Server, MqttQos.AtLeastOnce, true);
         }
-
-
 
         while (!stoppingToken.IsCancellationRequested)
         {

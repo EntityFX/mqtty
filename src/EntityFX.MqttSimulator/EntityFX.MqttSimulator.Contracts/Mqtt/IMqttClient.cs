@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Network;
+﻿using EntityFX.MqttY.Contracts.Mqtt.Packets;
+using EntityFX.MqttY.Contracts.Network;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,11 +14,11 @@ namespace EntityFX.MqttY.Contracts.Mqtt
 
         string ClientId { get; }
 
-        Task<MqttSession?> ConnectAsync(string server, MqttQos qos, bool retain = false);
+        Task<SessionState> ConnectAsync(string server, MqttQos qos, bool retain = false);
 
         Task DisconnectAsync();
 
-        Task<bool> PublishAsync(string topic, IEnumerable<byte> payload);
+        Task<bool> PublishAsync(string topic, byte[] payload, MqttQos qos, bool retain = false);
 
         Task SubscribeAsync(string topicFilter, MqttQos qos);
 

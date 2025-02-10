@@ -122,16 +122,16 @@ public class Client : NodeBase, IClient
         return response;
     }
 
-    public async Task<byte[]> SendAsync(byte[] packet)
+    public async Task<byte[]> SendAsync(byte[] packet, string? category = null)
     {
-        var result = await SendAsync(new Packet(Name, serverName, NodeType.Client, NodeType.Server, packet));
+        var result = await SendAsync(new Packet(Name, serverName, NodeType.Client, NodeType.Server, packet, category));
 
         return result.Payload;
     }
 
-    public byte[] Send(byte[] packet)
+    public byte[] Send(byte[] packet, string? category = null)
     {
-        return SendAsync(packet).Result;
+        return SendAsync(packet, category).Result;
     }
 
     public override Task<Packet> ReceiveAsync(Packet packet)
