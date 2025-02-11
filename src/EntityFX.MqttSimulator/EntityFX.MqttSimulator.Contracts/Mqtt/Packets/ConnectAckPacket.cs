@@ -1,6 +1,5 @@
 ﻿namespace EntityFX.MqttY.Contracts.Mqtt.Packets
 {
-
     public class ConnectAckPacket : PacketBase, IPacket, IEquatable<ConnectAckPacket>
     {
         public ConnectAckPacket()

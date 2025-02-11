@@ -35,16 +35,17 @@ internal class Worker : BackgroundService
             await Task.CompletedTask;
         }
 
+        IMqttClient? mqttClient = null;
         if (client?.ProtocolType == "mqtt")
         {
-            var mqttClient = client as IMqttClient;
+            mqttClient = client as IMqttClient;
 
             await mqttClient!.ConnectAsync(mqttClient.Server, MqttQos.AtLeastOnce, true);
         }
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await client!.SendAsync(new byte[] { 1 });
+            await mqttClient!.PublishAsync("topic/one", new byte[] { 1 }, MqttQos.AtMostOnce);
             await Task.Delay(2000, stoppingToken);
         }
         await Task.CompletedTask;

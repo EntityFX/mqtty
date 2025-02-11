@@ -2,9 +2,11 @@
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Mqtt.Internals;
+using System;
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Channels;
 
 namespace EntityFX.MqttY.Mqtt
 {
@@ -43,7 +45,7 @@ namespace EntityFX.MqttY.Mqtt
 
             var connect = new ConnectPacket(ClientId, true);
 
-            var response = await SendAsync(connect.PacketToBytes());
+            var response = await SendAsync(connect.PacketToBytes(), "Connect");
             var connAck = response.BytesToPacket<ConnectAckPacket>();
 
             if (connAck == null)
@@ -65,7 +67,7 @@ namespace EntityFX.MqttY.Mqtt
             throw new NotImplementedException();
         }
 
-        public Task<bool> PublishAsync(string topic, byte[] payload, MqttQos qos, bool retain = false)
+        public async Task<bool> PublishAsync(string topic, byte[] payload, MqttQos qos, bool retain = false)
         {
             ushort? packetId = qos == MqttQos.AtMostOnce ? null : (ushort?)packetIdProvider.GetPacketId();
             var publish = new PublishPacket(topic, qos, retain, duplicated: false, packetId: packetId)
@@ -73,7 +75,30 @@ namespace EntityFX.MqttY.Mqtt
                 Payload = payload
             };
 
-            return Task.FromResult(true);
+            if (!IsConnected)
+            {
+                SaveMessage(publish, ClientId, PendingMessageStatus.PendingToSend);
+                return true;
+            }
+
+            var response = await SendAsync(publish.PacketToBytes(), "Publish");
+
+            if (qos == MqttQos.AtLeastOnce)
+            {
+                var publishAck = response.BytesToPacket<PublishAckPacket>();
+            }
+            else if (qos == MqttQos.ExactlyOnce)
+            {
+                var publishReceived = response.BytesToPacket<PublishReceivedPacket>();
+
+                var publishRelease = new PublishReleasePacket(packetId ?? 0);
+
+                var completeResponse = await SendAsync(publishRelease.PacketToBytes(), "PublishRelease");
+
+                var publishComplete = completeResponse.BytesToPacket<PublishCompletePacket>();
+            }
+
+            return true;
         }
 
         public Task SubscribeAsync(string topicFilter, MqttQos qos)
@@ -154,6 +179,37 @@ namespace EntityFX.MqttY.Mqtt
                 .FirstOrDefault(p => p.PacketId.HasValue && p.PacketId.Value == packetId);
 
             session.RemovePendingMessage(pendingMessage);
+
+            sessionRepository.AddOrUpdate(session.Id, session, (key, value) => session);
+        }
+
+        private void SaveMessage(PublishPacket message, string clientId, PendingMessageStatus status)
+        {
+            if (message.QualityOfService == MqttQos.AtMostOnce)
+            {
+                return;
+            }
+
+            
+            sessionRepository.TryGetValue(clientId, out ClientSession? session);
+
+            if (session == null)
+            {
+                throw new MqttException(string.Format($"Client Session {clientId} Not Found", clientId));
+            }
+
+            var savedMessage = new PendingMessage
+            {
+                Status = status,
+                QualityOfService = message.QualityOfService,
+                Duplicated = message.Duplicated,
+                Retain = message.Retain,
+                Topic = message.Topic,
+                PacketId = message.PacketId,
+                Payload = message.Payload
+            };
+
+            session.AddPendingMessage(savedMessage);
 
             sessionRepository.AddOrUpdate(session.Id, session, (key, value) => session);
         }

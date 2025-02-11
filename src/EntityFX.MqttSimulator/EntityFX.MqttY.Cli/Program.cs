@@ -26,7 +26,8 @@ builder.Services
         var monitoring = new Monitoring();
         monitoring.Added += (sender, e) =>
             Console.WriteLine($"<{e.Date:u}>, {{{e.Type}}} {e.SourceType}[\"{e.From}\"] -> {e.DestinationType}[\"{e.To}\"]" +
-                $"{(e.PacketSize > 0 ? $", Packet Size = {e.PacketSize}" : "")}.");
+                $"{(e.PacketSize > 0 ? $", Packet Size = {e.PacketSize}" : "")}" +
+                $"{(!string.IsNullOrEmpty(e.Category) ? $", Category = {e.Category}" : "")}.");
         return monitoring;
     })
     .AddTransient<IPathFinder, DijkstraPathFinder>()
