@@ -37,7 +37,7 @@ public class NetworkGraph : INetworkGraph
 
         if (protocolType == "mqtt")
         {
-            client = new MqttClient(name, clientAddressFull, protocolType, network, this, null);
+            client = new MqttClient(name, clientAddressFull, protocolType, network, this, name);
         } else
         {
             client = new Client(name, clientAddressFull, protocolType, network, this);

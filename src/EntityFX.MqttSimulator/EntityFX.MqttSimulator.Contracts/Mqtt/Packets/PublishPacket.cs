@@ -25,7 +25,7 @@
 
         public byte[] Payload { get; set; }
 
-        public bool Equals(PublishPacket other)
+        public bool Equals(PublishPacket? other)
         {
             if (other == null)
                 return false;
@@ -44,7 +44,7 @@
             return equals;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj == null)
                 return false;
@@ -57,17 +57,17 @@
             return Equals(publish);
         }
 
-        public static bool operator ==(PublishPacket publish, PublishPacket other)
+        public static bool operator ==(PublishPacket? publish, PublishPacket? other)
         {
-            if ((object)publish == null || (object)other == null)
+            if ((object?)publish == null || (object?)other == null)
                 return Object.Equals(publish, other);
 
             return publish.Equals(other);
         }
 
-        public static bool operator !=(PublishPacket publish, PublishPacket other)
+        public static bool operator !=(PublishPacket? publish, PublishPacket? other)
         {
-            if ((object)publish == null || (object)other == null)
+            if ((object?)publish == null || (object?)other == null)
                 return !Object.Equals(publish, other);
 
             return !publish.Equals(other);

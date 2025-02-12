@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -19,19 +20,29 @@ namespace EntityFX.MqttY.Mqtt
     {
         private readonly ConcurrentDictionary<string, ClientSession> sessions = new ConcurrentDictionary<string, ClientSession>();
 
+        private readonly MqttQos MaximumQualityOfService = MqttQos.AtLeastOnce;
+
+        readonly IMqttTopicEvaluator topicEvaluator;
+
         public override NodeType NodeType => NodeType.Server;
 
         public MqttBroker(string name, string address, string protocolType, INetwork network, INetworkGraph networkGraph)
             : base(name, address, protocolType, network, networkGraph)
         {
             this.PacketReceived += MqttBroker_PacketReceived;
+            topicEvaluator = new MqttTopicEvaluator(true);
         }
 
         protected override Packet ProcessReceive(Packet packet)
         {
             var payload = packet.Payload.BytesToPacket<PacketBase>();
+            if (payload == null)
+            {
+                base.ProcessReceive(packet);
+            }
+
             IPacket? result = null;
-            switch (payload.Type)
+            switch (payload!.Type)
             {
                 case MqttPacketType.Connect:
                     result = ProcessConnect(packet.Payload.BytesToPacket<ConnectPacket>());
@@ -47,6 +58,7 @@ namespace EntityFX.MqttY.Mqtt
                 case MqttPacketType.PublishComplete:
                     break;
                 case MqttPacketType.Subscribe:
+                    result = ProcessSubscribe(packet.From, packet.Payload.BytesToPacket<SubscribePacket>());
                     break;
                 case MqttPacketType.SubscribeAck:
                     break;
@@ -68,7 +80,73 @@ namespace EntityFX.MqttY.Mqtt
             return networkGraph.GetReversePacket(packet, resultPayload);
         }
 
-        private IPacket? ProcessConnect(ConnectPacket? connectPacket)
+        private SubscribeAckPacket? ProcessSubscribe(string clientId, SubscribePacket? subscribePacket)
+        {
+            if (subscribePacket == null)
+            {
+                return null;
+            }
+
+            sessions.TryGetValue(clientId, out ClientSession? session);
+
+            if (session == null)
+            {
+                throw new MqttException($"Client Session {clientId} Not Found");
+            }
+
+            var returnCodes = new List<SubscribeReturnCode>();
+
+            foreach (var subscription in subscribePacket.Subscriptions)
+            {
+                try
+                {
+                    if (!topicEvaluator.IsValidTopicFilter(subscription.TopicFilter))
+                    {
+                        returnCodes.Add(SubscribeReturnCode.Failure);
+                        continue;
+                    }
+
+                    var clientSubscription = session
+                        .GetSubscriptions()
+                        .FirstOrDefault(s => s.TopicFilter == subscription.TopicFilter);
+
+                    if (clientSubscription != null)
+                    {
+                        clientSubscription.MaximumQualityOfService = subscription.MaximumQualityOfService;
+                    }
+                    else
+                    {
+                        clientSubscription = new ClientSubscription
+                        {
+                            ClientId = clientId,
+                            TopicFilter = subscription.TopicFilter,
+                            MaximumQualityOfService = subscription.MaximumQualityOfService
+                        };
+
+                        session.AddSubscription(clientSubscription);
+                    }
+
+                    //TODO: add retained send
+                    //await SendRetainedMessagesAsync(clientSubscription, channel)
+                    //    .ConfigureAwait(continueOnCapturedContext: false);
+
+                    var supportedQos = MaximumQualityOfService;
+                    var returnCode = supportedQos.ToReturnCode();
+
+                    returnCodes.Add(returnCode);
+                }
+                catch (Exception ex)
+                {
+                    returnCodes.Add(SubscribeReturnCode.Failure);
+                }
+            }
+
+            sessions.AddOrUpdate(session.Id, session, (key, value) => session);
+
+            return new SubscribeAckPacket(subscribePacket.PacketId, returnCodes.ToArray());
+        }
+
+        private ConnectAckPacket? ProcessConnect(ConnectPacket? connectPacket)
         {
             if (connectPacket == null) return null;
 

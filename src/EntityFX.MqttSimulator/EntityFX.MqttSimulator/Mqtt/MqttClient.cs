@@ -4,6 +4,7 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Mqtt.Internals;
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
@@ -15,16 +16,16 @@ namespace EntityFX.MqttY.Mqtt
     {
         private readonly PacketIdProvider packetIdProvider = new();
 
-        private IDictionary<MqttPacketType, Func<string, ushort, IPacket?>> senderRules;
+        private readonly ConcurrentDictionary<string, ClientSession> sessionRepository;
 
-        private ConcurrentDictionary<string, ClientSession> sessionRepository;
+        private IDictionary<MqttPacketType, Func<string, ushort, IPacket?>> senderRules;
 
 
         public MqttClient(string name, string address, string protocolType, 
             INetwork network, INetworkGraph networkGraph, string? clientId) 
             : base(name, address, protocolType, network, networkGraph)
         {
-            ClientId = clientId ?? Guid.NewGuid().ToString();
+            ClientId = clientId ?? name;
             senderRules = DefineSenderRules();
         }
 
@@ -101,9 +102,25 @@ namespace EntityFX.MqttY.Mqtt
             return true;
         }
 
-        public Task SubscribeAsync(string topicFilter, MqttQos qos)
+        public async Task SubscribeAsync(string topicFilter, MqttQos qos)
         {
-            throw new NotImplementedException();
+            var packetId = packetIdProvider.GetPacketId();
+            var subscribe = new SubscribePacket(packetId, new[] { new Subscription(topicFilter, qos) });
+
+            var subscribeTimeout = TimeSpan.FromSeconds(60);
+
+            var response = await SendAsync(subscribe.PacketToBytes(), "Subscribe");
+            var subscribeAck = response.BytesToPacket<SubscribeAckPacket>();
+
+            if (subscribeAck == null)
+            {
+                throw new MqttClientException($"Subscription Disconnected: {Id}, {topicFilter}");
+            }
+
+            if (subscribeAck.ReturnCodes.FirstOrDefault() == SubscribeReturnCode.Failure)
+            {
+                throw new MqttClientException($"Subscription Rejected: {Id}, {topicFilter}");
+            }
         }
 
         public Task<bool> UnsubscribeAsync(string topicFilter)

@@ -28,24 +28,29 @@ internal class Worker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var client = networkGraph.GetNode("mc1", NodeType.Client) as IClient;
+        var mqttClient1 = networkGraph.GetNode("mc1", NodeType.Client) as IMqttClient;
+        var mqttClient2 = networkGraph.GetNode("mc2", NodeType.Client) as IMqttClient;
 
-        if (client == null)
+        if (mqttClient1 == null)
         {
             await Task.CompletedTask;
         }
 
-        IMqttClient? mqttClient = null;
-        if (client?.ProtocolType == "mqtt")
+        if (mqttClient2 == null)
         {
-            mqttClient = client as IMqttClient;
-
-            await mqttClient!.ConnectAsync(mqttClient.Server, MqttQos.AtLeastOnce, true);
+            await Task.CompletedTask;
         }
+
+        await mqttClient1!.ConnectAsync(mqttClient1.Server, MqttQos.AtLeastOnce, true);
+        await mqttClient2!.ConnectAsync(mqttClient1.Server, MqttQos.AtLeastOnce, true);
+
+
+        await mqttClient2!.SubscribeAsync(mqttClient1.Server, MqttQos.AtLeastOnce);
+
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await mqttClient!.PublishAsync("topic/one", new byte[] { 1 }, MqttQos.AtMostOnce);
+            await mqttClient1!.PublishAsync("topic/one", new byte[] { 1 }, MqttQos.AtMostOnce);
             await Task.Delay(2000, stoppingToken);
         }
         await Task.CompletedTask;
