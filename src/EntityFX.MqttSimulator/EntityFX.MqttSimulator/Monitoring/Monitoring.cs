@@ -10,7 +10,8 @@ public class Monitoring : IMonitoring
 
     public IEnumerable<MonitoringItem> Items => _storage.Values.Take(10000);
 
-    public void Push(string from, NodeType fromType, string to, NodeType toType, byte[]? packet, MonitoringType type, string category, Guid scope, object details)
+    public void Push(string from, NodeType fromType, string to, NodeType toType, byte[]? packet, 
+        MonitoringType type, string? category, Guid scope, object details)
     {
         var item = new MonitoringItem(
             Guid.NewGuid(), DateTimeOffset.Now, from,
@@ -23,7 +24,8 @@ public class Monitoring : IMonitoring
     }
 
 
-    public void Push(INode from, INode to, byte[]? packet, MonitoringType type, string category, Guid scope, object details)
+    public void Push(INode from, INode to, byte[]? packet, MonitoringType type, 
+        string? category, Guid scope, object details)
     {
         Push(from.Address,
             from.NodeType, to.Address, to.NodeType,

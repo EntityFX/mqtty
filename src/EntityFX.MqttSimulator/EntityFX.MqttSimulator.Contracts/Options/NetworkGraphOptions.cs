@@ -8,8 +8,8 @@ namespace EntityFX.MqttY.Contracts.Options
 {
     public class NetworkGraphOptions
     {
-        public Dictionary<string, IEnumerable<NetworkOption?>?> Networks { get; set; } = new();
+        public SortedDictionary<string, NetworkNodeOption> Networks { get; set; } = new();
 
-        public Dictionary<string, NodeOption> Nodes { get; set; } = new();
+        public SortedDictionary<string, NodeOption> Nodes { get; set; } = new();
     }
 }

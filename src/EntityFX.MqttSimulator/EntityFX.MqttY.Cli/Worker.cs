@@ -4,23 +4,27 @@ using EntityFX.MqttY.Contracts.Options;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System.Threading;
+using EntityFX.MqttY.Utils;
 
 internal class Worker : BackgroundService
 {
-    private readonly IOptions<NetworkGraphOptions> options;
-    private readonly INetworkGraph networkGraph;
+    private readonly IOptions<NetworkGraphOptions> _options;
+    private readonly INetworkGraph _networkGraph;
+    private readonly PlantUmlGraphGenerator _plantUmlGraphGenerator;
 
-    public Worker(IOptions<NetworkGraphOptions> options, INetworkGraph networkGraph)
+    public Worker(IOptions<NetworkGraphOptions> options, INetworkGraph networkGraph, 
+        PlantUmlGraphGenerator plantUmlGraphGenerator)
     {
-        this.options = options;
-        this.networkGraph = networkGraph;
+        this._options = options;
+        this._networkGraph = networkGraph;
+        _plantUmlGraphGenerator = plantUmlGraphGenerator;
     }
-
-    
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        networkGraph.Configure(this.options.Value);
+        _networkGraph.Configure(this._options.Value);
+        var plantGraph = _plantUmlGraphGenerator.Generate(_networkGraph);
+        File.WriteAllText("graph.puml", plantGraph);
 
         await base.StartAsync(cancellationToken);
     }
@@ -28,8 +32,8 @@ internal class Worker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var mqttClient1 = networkGraph.GetNode("mc1", NodeType.Client) as IMqttClient;
-        var mqttClient2 = networkGraph.GetNode("mc2", NodeType.Client) as IMqttClient;
+        var mqttClient1 = _networkGraph.GetNode("mc1", NodeType.Client) as IMqttClient;
+        var mqttClient2 = _networkGraph.GetNode("mc2", NodeType.Client) as IMqttClient;
 
         if (mqttClient1 == null)
         {

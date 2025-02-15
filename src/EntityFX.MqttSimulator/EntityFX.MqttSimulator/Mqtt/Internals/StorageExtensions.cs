@@ -46,8 +46,12 @@
             }
         }
 
-        public static void RemovePendingMessage(this ClientSession session, PendingMessage pending)
+        public static void RemovePendingMessage(this ClientSession session, PendingMessage? pending)
         {
+            if (pending == null)
+            {
+                return;
+            }
             lock (pendingMessagesLock)
             {
                 session.PendingMessages.Remove(pending);
@@ -70,8 +74,12 @@
             }
         }
 
-        public static void RemovePendingAcknowledgement(this ClientSession session, PendingAcknowledgement pending)
+        public static void RemovePendingAcknowledgement(this ClientSession session, PendingAcknowledgement? pending)
         {
+            if (pending == null)
+            {
+                return;
+            }
             lock (pendingAcksLock)
             {
                 session.PendingAcknowledgements.Remove(pending);

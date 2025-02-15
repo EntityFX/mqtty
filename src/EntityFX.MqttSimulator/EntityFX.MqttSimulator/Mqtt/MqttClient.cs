@@ -14,19 +14,20 @@ namespace EntityFX.MqttY.Mqtt
 
     internal class MqttClient : Client, IMqttClient
     {
-        private readonly PacketIdProvider packetIdProvider = new();
+        private readonly PacketIdProvider _packetIdProvider = new();
 
-        private readonly ConcurrentDictionary<string, ClientSession> sessionRepository;
+        private readonly ConcurrentDictionary<string, ClientSession> _sessionRepository 
+            = new ();
 
-        private IDictionary<MqttPacketType, Func<string, ushort, IPacket?>> senderRules;
+        private IDictionary<MqttPacketType, Func<string, ushort, IPacket?>> _senderRules;
 
 
-        public MqttClient(string name, string address, string protocolType, 
+        public MqttClient(int index, string name, string address, string protocolType, 
             INetwork network, INetworkGraph networkGraph, string? clientId) 
-            : base(name, address, protocolType, network, networkGraph)
+            : base(index, name, address, protocolType, network, networkGraph)
         {
             ClientId = clientId ?? name;
-            senderRules = DefineSenderRules();
+            _senderRules = DefineSenderRules();
         }
 
         public string ClientId { get; set; }
@@ -70,7 +71,7 @@ namespace EntityFX.MqttY.Mqtt
 
         public async Task<bool> PublishAsync(string topic, byte[] payload, MqttQos qos, bool retain = false)
         {
-            ushort? packetId = qos == MqttQos.AtMostOnce ? null : (ushort?)packetIdProvider.GetPacketId();
+            ushort? packetId = qos == MqttQos.AtMostOnce ? null : (ushort?)_packetIdProvider.GetPacketId();
             var publish = new PublishPacket(topic, qos, retain, duplicated: false, packetId: packetId)
             {
                 Payload = payload
@@ -104,7 +105,7 @@ namespace EntityFX.MqttY.Mqtt
 
         public async Task SubscribeAsync(string topicFilter, MqttQos qos)
         {
-            var packetId = packetIdProvider.GetPacketId();
+            var packetId = _packetIdProvider.GetPacketId();
             var subscribe = new SubscribePacket(packetId, new[] { new Subscription(topicFilter, qos) });
 
             var subscribeTimeout = TimeSpan.FromSeconds(60);
@@ -166,7 +167,7 @@ namespace EntityFX.MqttY.Mqtt
 
         private void RemovePendingAcknowledgement(string clientId, ushort packetId, MqttPacketType type)
         {
-            sessionRepository.TryGetValue(clientId, out ClientSession? session);
+            _sessionRepository.TryGetValue(clientId, out ClientSession? session);
 
             if (session == null)
             {
@@ -179,12 +180,12 @@ namespace EntityFX.MqttY.Mqtt
 
             session.RemovePendingAcknowledgement(pendingAcknowledgement);
 
-            sessionRepository.AddOrUpdate(session.Id, session, (key, value) => session);
+            _sessionRepository.AddOrUpdate(session.Id, session, (key, value) => session);
         }
 
         private void RemovePendingMessage(string clientId, ushort packetId)
         {
-            sessionRepository.TryGetValue(clientId, out ClientSession? session);
+            _sessionRepository.TryGetValue(clientId, out ClientSession? session);
 
             if (session == null)
             {
@@ -197,7 +198,7 @@ namespace EntityFX.MqttY.Mqtt
 
             session.RemovePendingMessage(pendingMessage);
 
-            sessionRepository.AddOrUpdate(session.Id, session, (key, value) => session);
+            _sessionRepository.AddOrUpdate(session.Id, session, (key, value) => session);
         }
 
         private void SaveMessage(PublishPacket message, string clientId, PendingMessageStatus status)
@@ -208,7 +209,7 @@ namespace EntityFX.MqttY.Mqtt
             }
 
             
-            sessionRepository.TryGetValue(clientId, out ClientSession? session);
+            _sessionRepository.TryGetValue(clientId, out ClientSession? session);
 
             if (session == null)
             {
@@ -228,7 +229,7 @@ namespace EntityFX.MqttY.Mqtt
 
             session.AddPendingMessage(savedMessage);
 
-            sessionRepository.AddOrUpdate(session.Id, session, (key, value) => session);
+            _sessionRepository.AddOrUpdate(session.Id, session, (key, value) => session);
         }
     }
 }

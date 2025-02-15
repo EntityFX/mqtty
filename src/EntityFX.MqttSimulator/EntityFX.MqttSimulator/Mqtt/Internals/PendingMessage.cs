@@ -12,10 +12,10 @@ namespace EntityFX.MqttY.Mqtt.Internals
 
         public bool Retain { get; set; }
 
-        public string Topic { get; set; }
+        public string Topic { get; set; } = string.Empty;
 
         public ushort? PacketId { get; set; }
 
-        public byte[] Payload { get; set; }
+        public byte[] Payload { get; set; } = Array.Empty<byte>();
     }
 }

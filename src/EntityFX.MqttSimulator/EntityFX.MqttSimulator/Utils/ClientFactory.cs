@@ -8,13 +8,22 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions>
 {
     public IClient? Create(NodeBuildOptions options)
     {
+        if (options.Network == null)
+        {
+            return null;
+        }
+        
         if (options.Protocol == "mqtt")
         {
-            return new MqttClient(
+            return new MqttClient(options.Index,
                 options.Name, options.Address ?? options.Name, 
                 options.Protocol, options.Network, options.NetworkGraph, options.Name);
         }
 
-        return new Client(options.Name, options.Address ?? options.Name, options.Protocol, options.Network, options.NetworkGraph);
+        return new Client(options.Index,options.Name, options.Address ?? options.Name, options.Protocol, 
+            options.Network, options.NetworkGraph)
+        {
+            Group = options.Group
+        };
     }
 }

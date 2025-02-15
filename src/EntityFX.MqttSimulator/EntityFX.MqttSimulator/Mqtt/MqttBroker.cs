@@ -26,8 +26,8 @@ namespace EntityFX.MqttY.Mqtt
 
         public override NodeType NodeType => NodeType.Server;
 
-        public MqttBroker(string name, string address, string protocolType, INetwork network, INetworkGraph networkGraph)
-            : base(name, address, protocolType, network, networkGraph)
+        public MqttBroker(int index, string name, string address, string protocolType, INetwork network, INetworkGraph networkGraph)
+            : base(index, name, address, protocolType, network, networkGraph)
         {
             this.PacketReceived += MqttBroker_PacketReceived;
             topicEvaluator = new MqttTopicEvaluator(true);
@@ -77,7 +77,7 @@ namespace EntityFX.MqttY.Mqtt
             }
 
             var resultPayload = result?.PacketToBytes() ?? Array.Empty<byte>();
-            return networkGraph.GetReversePacket(packet, resultPayload);
+            return NetworkGraph.GetReversePacket(packet, resultPayload);
         }
 
         private SubscribeAckPacket? ProcessSubscribe(string clientId, SubscribePacket? subscribePacket)
@@ -135,7 +135,7 @@ namespace EntityFX.MqttY.Mqtt
 
                     returnCodes.Add(returnCode);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     returnCodes.Add(SubscribeReturnCode.Failure);
                 }

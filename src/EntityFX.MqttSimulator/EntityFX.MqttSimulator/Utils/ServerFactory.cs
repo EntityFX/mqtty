@@ -8,14 +8,22 @@ internal class ServerFactory : IFactory<IServer?, NodeBuildOptions>
 {
     public IServer? Create(NodeBuildOptions options)
     {
+        if (options.Network == null)
+        {
+            return null;
+        }
+        
         if (options.Protocol == "mqtt")
         {
             return new MqttBroker
-            (options.Name, options.Address ?? options.Name, 
+            (options.Index, options.Name, options.Address ?? options.Name, 
                 options.Protocol, options.Network, options.NetworkGraph);
         }
 
-        return new Server(options.Name, options.Address ?? options.Name, 
-            options.Protocol, options.Network, options.NetworkGraph);
+        return new Server(options.Index, options.Name, options.Address ?? options.Name, 
+            options.Protocol, options.Network, options.NetworkGraph)
+        {
+            Group = options.Group
+        };
     }
 }

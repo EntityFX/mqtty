@@ -8,10 +8,9 @@
         public string? Network { get; set; }
 
         public string? ConnectsToServer { get; set; }
-    }
 
-    public enum NodeOptionType
-    {
-        Client, Server
+        public int? Quantity { get; set; }
+        
+        public int? Index { get; set; }
     }
 }

@@ -1,11 +1,10 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
-using EntityFX.MqttY.Contracts.Mqtt;
+﻿using System.Collections.Immutable;
+using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
-using EntityFX.MqttY.Mqtt;
-using System.Collections.Immutable;
-using System.Net;
 using EntityFX.MqttY.Contracts.Utils;
+
+namespace EntityFX.MqttY.Network;
 
 public class NetworkGraph : INetworkGraph
 {
@@ -30,7 +29,7 @@ public class NetworkGraph : INetworkGraph
 
     public IReadOnlyDictionary<string, INetwork> Networks => _networks.ToImmutableDictionary();
 
-    public IClient? BuildClient(string name, string protocolType, INetwork network)
+    public IClient? BuildClient(int index, string name, string protocolType, INetwork network, string? group = null)
     {
         if (_nodes.ContainsKey((name, NodeType.Client)))
         {
@@ -41,7 +40,7 @@ public class NetworkGraph : INetworkGraph
 
         var client = _networkBuilder
             .ClientFactory.Create(
-                new NodeBuildOptions(this, network, name, clientAddressFull, protocolType));
+                new NodeBuildOptions(this, network, index, name, clientAddressFull, group, protocolType));
 
         if (client == null)
         {
@@ -53,31 +52,38 @@ public class NetworkGraph : INetworkGraph
         return client;
     }
 
-    public TCLient? BuildClient<TCLient>(string name, string protocolType, INetwork network)
+    public TCLient? BuildClient<TCLient>(int index, string name, string protocolType, INetwork network, string? group = null)
         where TCLient : IClient
     {
-        return (TCLient?)BuildClient(name, protocolType, network);
+        return (TCLient?)BuildClient(index, name, protocolType, network, group);
     }
 
-    public INetwork? BuildNetwork(string name, string address)
+    public INetwork? BuildNetwork(int index, string name, string address)
     {
         if (_networks.ContainsKey(address))
         {
             return null;
         }
+        var network = _networkBuilder
+            .NetworkFactory.Create(
+                new NodeBuildOptions(this, null, index, name, address, null, String.Empty));
 
-        var network = new Network(name, address, this);
+        if (network == null)
+        {
+            return null;
+        }
+        
         _networks.Add(name, network);
 
         return network;
     }
 
-    public ILeafNode? BuildNode(string name, string address, NodeType nodeType)
+    public ILeafNode? BuildNode(int index, string name, string address, NodeType nodeType, string? group = null)
     {
-        throw new NotImplementedException();
+        return null;
     }
 
-    public IServer? BuildServer(string name, string protocolType, INetwork network)
+    public IServer? BuildServer(int index, string name, string protocolType, INetwork network, string? group = null)
     {
         if (_nodes.ContainsKey((name, NodeType.Server)))
         {
@@ -87,7 +93,7 @@ public class NetworkGraph : INetworkGraph
         
         var server = _networkBuilder
             .ServerFactory.Create(
-                new NodeBuildOptions(this, network, name, serverAddressFull, protocolType));
+                new NodeBuildOptions(this, network, index, name, serverAddressFull, group, protocolType));
 
         if (server == null)
         {
@@ -108,7 +114,7 @@ public class NetworkGraph : INetworkGraph
 
         foreach (var networkOption in options.Networks)
         {
-            BuildNetwork(networkOption.Key, networkOption.Key);
+            BuildNetwork(networkOption.Value.Index, networkOption.Key, networkOption.Key);
         }
 
         ConfigureLinks(options);
@@ -130,9 +136,22 @@ public class NetworkGraph : INetworkGraph
                     continue;
                 case NodeOptionType.Client:
                 {
-                    var nodeClient = GetNode(node.Key, NodeType.Client);
 
-                    (nodeClient as IClient)?.Connect(node.Value.ConnectsToServer);
+                    if (node.Value.Quantity > 1)
+                    {
+                        Enumerable.Range(1, node.Value.Quantity.Value).ToList()
+                            .ForEach(
+                                (nc) =>
+                                {
+                                    var nodeClient = GetNode($"{node.Key}{nc}", NodeType.Client);
+                                    (nodeClient as IClient)?.Connect(node.Value.ConnectsToServer);
+                                });
+                    }
+                    else
+                    {
+                        var nodeClient = GetNode(node.Key, NodeType.Client);
+                        (nodeClient as IClient)?.Connect(node.Value.ConnectsToServer);
+                    }
                     break;
                 }
                 case NodeOptionType.Server:
@@ -148,6 +167,7 @@ public class NetworkGraph : INetworkGraph
 
     private void BuildNodes(NetworkGraphOptions options)
     {
+        var index = 0;
         foreach (var node in options.Nodes)
         {
             var linkNetwork = _networks.GetValueOrDefault(node.Value.Network ?? string.Empty);
@@ -157,15 +177,30 @@ public class NetworkGraph : INetworkGraph
             {
                 case NodeOptionType.Server:
                 {
-                    var server = BuildServer(node.Key, node.Value.Specification ?? "tcp", linkNetwork);
+                    BuildServer(index, node.Key, node.Value.Specification ?? "tcp", linkNetwork);
                     break;
                 }
                 case NodeOptionType.Client:
                 {
-                    var client = BuildClient(node.Key, node.Value.Specification ?? "tcp", linkNetwork);
+                    if (node.Value.Quantity > 1)
+                    {
+                        Enumerable.Range(1, node.Value.Quantity.Value).ToList()
+                            .ForEach(
+                                (nc) => BuildClient(
+                                    index, $"{node.Key}{nc}", 
+                                    node.Value.Specification ?? "tcp", linkNetwork, node.Key));
+                    }
+                    else
+                    {
+                        BuildClient(index, node.Key, node.Value.Specification ?? "tcp", linkNetwork);
+                    }
+                    
+
                     break;
                 }
             }
+
+            index++;
         }
     }
 
@@ -173,13 +208,13 @@ public class NetworkGraph : INetworkGraph
     {
         foreach (var networkOption in options.Networks)
         {
-            if (networkOption.Value?.Any() != true) continue;
+            if (networkOption.Value?.Links?.Any() != true) continue;
 
-            foreach (var link in networkOption.Value)
+            foreach (var link in networkOption.Value.Links)
             {
-                if (link == null || link.Links == null || !_networks.ContainsKey(link.Links)) continue;
+                if (link?.Network == null || !_networks.ContainsKey(link.Network)) continue;
 
-                _networks[networkOption.Key].Link(_networks[link.Links]);
+                _networks[networkOption.Key].Link(_networks[link.Network]);
             }
         }
     }

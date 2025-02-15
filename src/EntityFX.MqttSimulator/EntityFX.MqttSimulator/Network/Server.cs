@@ -19,8 +19,8 @@ public class Server : NodeBase, IServer
     public event EventHandler<IClient>? ClientConnected;
     public event EventHandler<string>? ClientDisconnected;
 
-    public Server(string name, string address, string protocolType,
-        INetwork network, INetworkGraph networkGraph) : base(name, address, networkGraph)
+    public Server(int index, string name, string address, string protocolType,
+        INetwork network, INetworkGraph networkGraph) : base(index, name, address, networkGraph)
     {
         ProtocolType = protocolType;
         Network = network;
@@ -28,10 +28,6 @@ public class Server : NodeBase, IServer
 
     public bool AttachClient(IClient client)
     {
-        if (Network == null) return false;
-
-        if (client == null) return false;
-
         var result = AttachClientToServer(client);
 
         ClientConnected?.Invoke(result, client);
@@ -41,8 +37,6 @@ public class Server : NodeBase, IServer
 
     public bool DetachClient(string address)
     {
-        if (Network == null) return false;
-
         var node = Network.FindNode(address, NodeType.Client);
 
         var client = node as IClient;
@@ -63,7 +57,6 @@ public class Server : NodeBase, IServer
 
     private bool AttachClientToServer(IClient client)
     {
-        if (Network == null) return false;
 
         if (_serverClients.ContainsKey(client.Address))
         {
@@ -90,11 +83,11 @@ public class Server : NodeBase, IServer
 
     public override async Task<Packet> ReceiveAsync(Packet packet)
     {
-        networkGraph.Monitoring.Push(packet.From, packet.FromType,
+        NetworkGraph.Monitoring.Push(packet.From, packet.FromType,
             packet.To, packet.ToType, packet.Payload, MonitoringType.Receive, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
 
         var response = ProcessReceive(packet);
-        networkGraph.Monitoring.Push(response.From, response.FromType,
+        NetworkGraph.Monitoring.Push(response.From, response.FromType,
             response.To, response.ToType, response.Payload, MonitoringType.Send, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
         PacketReceived?.Invoke(this, packet);
 
@@ -108,7 +101,7 @@ public class Server : NodeBase, IServer
         var payload = new List<byte>();
         payload.AddRange(packet.Payload);
         payload.Add(0xFF);
-        return networkGraph.GetReversePacket(packet, payload.ToArray());
+        return NetworkGraph.GetReversePacket(packet, payload.ToArray());
     }
 
     public override async Task<Packet> SendAsync(Packet packet)
@@ -120,8 +113,6 @@ public class Server : NodeBase, IServer
     {
         if (IsStarted) return;
 
-        if (Network == null) return;
-
         var result = Network.AddServer(this);
 
         IsStarted = result;
@@ -130,8 +121,6 @@ public class Server : NodeBase, IServer
     public void Stop()
     {
         if (!IsStarted) return;
-
-        if (Network == null) return;
 
         var result = Network.RemoveServer(Address);
 

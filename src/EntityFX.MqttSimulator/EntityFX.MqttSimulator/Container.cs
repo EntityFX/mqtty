@@ -1,6 +1,7 @@
 using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Utils;
+using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Utils;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +21,7 @@ public static class Container
                                       $"{(!string.IsNullOrEmpty(e.Category) ? $", Category = {e.Category}" : "")}.");
                 return monitoring;
             })
+            .AddScoped<PlantUmlGraphGenerator>()
             .AddScoped<IFactory<IClient?, NodeBuildOptions>, ClientFactory>()
             .AddScoped<IFactory<IServer?, NodeBuildOptions>, ServerFactory>()
             .AddScoped<IFactory<INetwork?, NodeBuildOptions>, NetworkFactory>()

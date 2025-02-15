@@ -10,16 +10,16 @@ namespace EntityFX.MqttY.Contracts.Network
 
         public IReadOnlyDictionary<string, INetwork> Networks { get; }
 
-        INetwork? BuildNetwork(string name, string address);
+        INetwork? BuildNetwork(int index, string name, string address);
 
-        IClient? BuildClient(string name, string protocolType, INetwork network);
+        IClient? BuildClient(int index, string name, string protocolType, INetwork network, string? group = null);
 
-        TClient? BuildClient<TClient>(string name, string protocolType, INetwork network)
+        TClient? BuildClient<TClient>(int index, string name, string protocolType, INetwork network, string? group = null)
             where TClient : IClient;
 
-        IServer? BuildServer(string name, string protocolType, INetwork network);
+        IServer? BuildServer(int index, string name, string protocolType, INetwork network, string? group = null);
 
-        ILeafNode? BuildNode(string name, string address, NodeType nodeType);
+        ILeafNode? BuildNode(int index, string name, string address, NodeType nodeType, string? group = null);
 
         string GetAddress(string name, string protocolType, string network);
 

@@ -19,7 +19,8 @@ public class Client : NodeBase, IClient
 
     protected string serverName = string.Empty;
 
-    public Client(string name, string address, string protocolType, INetwork network, INetworkGraph networkGraph) : base(name, address, networkGraph)
+    public Client(int index, string name, string address, string protocolType, INetwork network, INetworkGraph networkGraph) 
+        : base(index, name, address, networkGraph)
     {
         Network = network;
         ProtocolType = protocolType;
@@ -49,7 +50,7 @@ public class Client : NodeBase, IClient
 
         serverName = server;
 
-        networkGraph.Monitoring.Push(this, remoteNode, null, EntityFX.MqttY.Contracts.Monitoring.MonitoringType.Connect, "connect", Guid.NewGuid(), new { });
+        NetworkGraph.Monitoring.Push(this, remoteNode, null, EntityFX.MqttY.Contracts.Monitoring.MonitoringType.Connect, "connect", Guid.NewGuid(), new { });
         IsConnected = true;
 
         return result;
@@ -114,7 +115,7 @@ public class Client : NodeBase, IClient
     public override async Task<Packet> SendAsync(Packet packet)
     {
         if (!IsConnected) throw new InvalidOperationException("Not Connected To server");
-        networkGraph.Monitoring.Push(
+        NetworkGraph.Monitoring.Push(
             packet.From, packet.FromType, packet.To, packet.ToType, 
             packet.Payload, MonitoringType.Send, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
         var response = await Network!.SendAsync(packet);
@@ -136,11 +137,11 @@ public class Client : NodeBase, IClient
 
     public override Task<Packet> ReceiveAsync(Packet packet)
     {
-        networkGraph.Monitoring.Push(
+        NetworkGraph.Monitoring.Push(
             packet.From, packet.FromType, packet.To, packet.ToType,
             packet.Payload, MonitoringType.Receive, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
 
 
-        return Task.FromResult(networkGraph.GetReversePacket(packet, packet.Payload));
+        return Task.FromResult(NetworkGraph.GetReversePacket(packet, packet.Payload));
     }
 }

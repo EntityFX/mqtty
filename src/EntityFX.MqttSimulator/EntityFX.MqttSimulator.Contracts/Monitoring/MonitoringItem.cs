@@ -8,5 +8,5 @@ namespace EntityFX.MqttY.Contracts.Monitoring
         NodeType SourceType,
         string To,
         NodeType DestinationType,
-        uint PacketSize, MonitoringType Type, string Protocol, object Details, string Category);
+        uint PacketSize, MonitoringType Type, string Protocol, object Details, string? Category);
 }

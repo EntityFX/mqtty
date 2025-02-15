@@ -1,8 +1,8 @@
 ﻿namespace EntityFX.MqttY.Contracts.Options
 {
-    public class NetworkOption
+    public class NetworkLinkOption
     {
-        public string? Links { get; set; }
+        public string? Network { get; set; }
 
         public int? W { get; set; }
     }

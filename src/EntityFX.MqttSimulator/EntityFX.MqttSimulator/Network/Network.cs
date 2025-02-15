@@ -1,9 +1,8 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
+﻿using System.Collections.Immutable;
 using EntityFX.MqttY.Contracts.Network;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 using MonitoringType = EntityFX.MqttY.Contracts.Monitoring.MonitoringType;
+
+namespace EntityFX.MqttY.Network;
 
 public class Network : NodeBase, INetwork
 {
@@ -20,7 +19,8 @@ public class Network : NodeBase, INetwork
 
     public override NodeType NodeType => NodeType.Network;
 
-    public Network(string name, string address, INetworkGraph networkGraph) : base(name, address, networkGraph)
+    public Network(int index, string name, string address, INetworkGraph networkGraph) 
+        : base(index, name, address, networkGraph)
     {
     }
 
@@ -66,7 +66,7 @@ public class Network : NodeBase, INetwork
 
         var result = network.Link(this);
 
-        networkGraph.Monitoring.Push(this, network, null, MonitoringType.Link, "link", Guid.NewGuid(), new { });
+        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Link, "link", Guid.NewGuid(), new { });
 
         return true;
     }
@@ -86,7 +86,7 @@ public class Network : NodeBase, INetwork
             _linkedNetworks[network.Name] = network;
         }
 
-        networkGraph.Monitoring.Push(this, network, null, MonitoringType.Unlink, "unlink", Guid.NewGuid(), new { });
+        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Unlink, "unlink", Guid.NewGuid(), new { });
 
         return true;
     }
@@ -139,9 +139,9 @@ public class Network : NodeBase, INetwork
     {
         return Task.Run(async () =>
         {
-            networkGraph.Monitoring.Push(
-            packet.From, packet.ToType, Address, NodeType.Network,
-            packet.Payload, MonitoringType.Push, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
+            NetworkGraph.Monitoring.Push(
+                packet.From, packet.ToType, Address, NodeType.Network,
+                packet.Payload, MonitoringType.Push, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
 
             var sentToLocal = await SendToLocalAsync(this, packet);
 
@@ -150,20 +150,20 @@ public class Network : NodeBase, INetwork
                 return sentToLocal!;
             }
 
-            var fromNetwork = networkGraph.GetNetworkByNode(packet.From, packet.FromType);
+            var fromNetwork = NetworkGraph.GetNetworkByNode(packet.From, packet.FromType);
 
-            var toNetwork = networkGraph.GetNetworkByNode(packet.To, packet.ToType);
+            var toNetwork = NetworkGraph.GetNetworkByNode(packet.To, packet.ToType);
 
             if (fromNetwork == null || toNetwork == null)
             {
-                return networkGraph.GetReversePacket(packet, packet.Payload);
+                return NetworkGraph.GetReversePacket(packet, packet.Payload);
             }
 
-            var pathToRemote = networkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
+            var pathToRemote = NetworkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
 
             var pathQueue = new Queue<INetwork>(pathToRemote);
 
-            return await SendToRemoteAsync(packet, pathQueue) ?? networkGraph.GetReversePacket(packet, packet.Payload);
+            return await SendToRemoteAsync(packet, pathQueue) ?? NetworkGraph.GetReversePacket(packet, packet.Payload);
         });
 
     }
@@ -181,7 +181,7 @@ public class Network : NodeBase, INetwork
         {
             return null;
         }
-        networkGraph.Monitoring.Push(
+        NetworkGraph.Monitoring.Push(
             network.Address, NodeType.Network, packet.To, packet.ToType,
             packet.Payload, MonitoringType.Push, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
 
@@ -202,7 +202,7 @@ public class Network : NodeBase, INetwork
             return null;
         }
 
-        networkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
+        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
         var result = await next.SendToLocalAsync(next, packet);
 
         if (result == null)
@@ -215,7 +215,7 @@ public class Network : NodeBase, INetwork
 
     public INode? FindNode(string address, NodeType type)
     {
-        return networkGraph.GetNode(address, type);
+        return NetworkGraph.GetNode(address, type);
     }
 
     public override string ToString()
