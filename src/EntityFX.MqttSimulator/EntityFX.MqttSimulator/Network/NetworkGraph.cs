@@ -5,16 +5,22 @@ using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Mqtt;
 using System.Collections.Immutable;
 using System.Net;
+using EntityFX.MqttY.Contracts.Utils;
 
 public class NetworkGraph : INetworkGraph
 {
-    private readonly Dictionary<(string Address, NodeType NodeType), ILeafNode> nodes = new();
-    private readonly Dictionary<string, INetwork> networks = new();
+    private readonly INetworkBuilder _networkBuilder;
+    private readonly Dictionary<(string Address, NodeType NodeType), ILeafNode> _nodes = new();
+    private readonly Dictionary<string, INetwork> _networks = new();
 
-    public NetworkGraph(IPathFinder pathFinder, IMonitoring monitoring)
+    public NetworkGraph(
+        INetworkBuilder networkBuilder, 
+        IPathFinder pathFinder, 
+        IMonitoring monitoring)
     {
-        this.PathFinder = pathFinder;
-        this.Monitoring = monitoring;
+        _networkBuilder = networkBuilder;
+        PathFinder = pathFinder;
+        Monitoring = monitoring;
         PathFinder.NetworkGraph = this;
     }
 
@@ -22,28 +28,27 @@ public class NetworkGraph : INetworkGraph
 
     public IMonitoring Monitoring { get; }
 
-    public IReadOnlyDictionary<string, INetwork> Networks => networks.ToImmutableDictionary();
+    public IReadOnlyDictionary<string, INetwork> Networks => _networks.ToImmutableDictionary();
 
     public IClient? BuildClient(string name, string protocolType, INetwork network)
     {
-        if (nodes.ContainsKey((name, NodeType.Client)))
+        if (_nodes.ContainsKey((name, NodeType.Client)))
         {
             return null;
         }
 
         var clientAddressFull = GetAddress(name, protocolType, network.Address);
 
-        IClient? client = null;
+        var client = _networkBuilder
+            .ClientFactory.Create(
+                new NodeBuildOptions(this, network, name, clientAddressFull, protocolType));
 
-        if (protocolType == "mqtt")
+        if (client == null)
         {
-            client = new MqttClient(name, clientAddressFull, protocolType, network, this, name);
-        } else
-        {
-            client = new Client(name, clientAddressFull, protocolType, network, this);
+            return null;
         }
 
-        nodes.Add((name, NodeType.Client), client);
+        _nodes.Add((name, NodeType.Client), client);
 
         return client;
     }
@@ -56,13 +61,13 @@ public class NetworkGraph : INetworkGraph
 
     public INetwork? BuildNetwork(string name, string address)
     {
-        if (networks.ContainsKey(address))
+        if (_networks.ContainsKey(address))
         {
             return null;
         }
 
         var network = new Network(name, address, this);
-        networks.Add(name, network);
+        _networks.Add(name, network);
 
         return network;
     }
@@ -74,23 +79,22 @@ public class NetworkGraph : INetworkGraph
 
     public IServer? BuildServer(string name, string protocolType, INetwork network)
     {
-        if (nodes.ContainsKey((name, NodeType.Server)))
+        if (_nodes.ContainsKey((name, NodeType.Server)))
         {
             return null;
         }
         var serverAddressFull = GetAddress(name, protocolType, network.Address);
+        
+        var server = _networkBuilder
+            .ServerFactory.Create(
+                new NodeBuildOptions(this, network, name, serverAddressFull, protocolType));
 
-        IServer? server = null;
-        if (protocolType == "mqtt")
+        if (server == null)
         {
-            server = new MqttBroker(name, serverAddressFull, protocolType, network, this);
-        }
-        else
-        {
-            server = new Server(name, serverAddressFull, protocolType, network, this);
+            return null;
         }
 
-        nodes.Add((name, NodeType.Server), server);
+        _nodes.Add((name, NodeType.Server), server);
 
         return server;
     }
@@ -120,13 +124,24 @@ public class NetworkGraph : INetworkGraph
     {
         foreach (var node in options.Nodes)
         {
-            if (node.Value.Type == NodeOptionType.Client)
+            switch (node.Value.Type)
             {
-                if (node.Value.ConnectsToServer == null) continue;
+                case NodeOptionType.Client when node.Value.ConnectsToServer == null:
+                    continue;
+                case NodeOptionType.Client:
+                {
+                    var nodeClient = GetNode(node.Key, NodeType.Client);
 
-                var nodeClient = GetNode(node.Key, NodeType.Client);
+                    (nodeClient as IClient)?.Connect(node.Value.ConnectsToServer);
+                    break;
+                }
+                case NodeOptionType.Server:
+                {
+                    var nodeServer = GetNode(node.Key, NodeType.Server);
 
-                (nodeClient as IClient)?.Connect(node.Value.ConnectsToServer);
+                    (nodeServer as IServer)?.Start();
+                    break;
+                }
             }
         }
     }
@@ -135,21 +150,21 @@ public class NetworkGraph : INetworkGraph
     {
         foreach (var node in options.Nodes)
         {
-            var linkNetwork = networks.GetValueOrDefault(node.Value.Network ?? string.Empty);
+            var linkNetwork = _networks.GetValueOrDefault(node.Value.Network ?? string.Empty);
             if (linkNetwork == null) continue;
 
-            if (node.Value.Type == NodeOptionType.Server)
+            switch (node.Value.Type)
             {
-                var server = BuildServer(node.Key, node.Value.Specification ?? "tcp", linkNetwork);
-                if (server == null) continue;
-
-                server.Start();
-            }
-
-            if (node.Value.Type == NodeOptionType.Client)
-            {
-                var client = BuildClient(node.Key, node.Value.Specification ?? "tcp", linkNetwork);
-                if (client == null) continue;
+                case NodeOptionType.Server:
+                {
+                    var server = BuildServer(node.Key, node.Value.Specification ?? "tcp", linkNetwork);
+                    break;
+                }
+                case NodeOptionType.Client:
+                {
+                    var client = BuildClient(node.Key, node.Value.Specification ?? "tcp", linkNetwork);
+                    break;
+                }
             }
         }
     }
@@ -162,9 +177,9 @@ public class NetworkGraph : INetworkGraph
 
             foreach (var link in networkOption.Value)
             {
-                if (link == null || link.Links == null || !networks.ContainsKey(link.Links)) continue;
+                if (link == null || link.Links == null || !_networks.ContainsKey(link.Links)) continue;
 
-                networks[networkOption.Key].Link(networks[link.Links]);
+                _networks[networkOption.Key].Link(_networks[link.Links]);
             }
         }
     }
@@ -181,12 +196,12 @@ public class NetworkGraph : INetworkGraph
 
     public ILeafNode? GetNode(string address, NodeType nodeType)
     {
-        if (!nodes.ContainsKey((address, nodeType)))
+        if (!_nodes.ContainsKey((address, nodeType)))
         {
             return null;
         }
 
-        return nodes[(address, nodeType)];
+        return _nodes[(address, nodeType)];
     }
 
     public Packet GetReversePacket(Packet packet, byte[] payload)
@@ -202,7 +217,7 @@ public class NetworkGraph : INetworkGraph
 
     public void RemoveClient(string clientAddress)
     {
-        if (!nodes.ContainsKey((clientAddress, NodeType.Client)))
+        if (!_nodes.ContainsKey((clientAddress, NodeType.Client)))
         {
             return;
         }
@@ -215,18 +230,18 @@ public class NetworkGraph : INetworkGraph
 
         client.Disconnect();
 
-        nodes.Remove((clientAddress, NodeType.Client));
+        _nodes.Remove((clientAddress, NodeType.Client));
 
     }
 
     public void RemoveNetwork(string networkAddress)
     {
-        if (networks.ContainsKey(networkAddress))
+        if (_networks.ContainsKey(networkAddress))
         {
             return;
         }
 
-        var network = networks.GetValueOrDefault(networkAddress);
+        var network = _networks.GetValueOrDefault(networkAddress);
         if (network == null)
         {
             return;
@@ -234,11 +249,24 @@ public class NetworkGraph : INetworkGraph
 
         network.UnlinkAll();
 
-        networks.Remove(networkAddress);
+        _networks.Remove(networkAddress);
     }
 
     public void RemoveServer(string serverAddress)
     {
-        throw new NotImplementedException();
+        if (!_nodes.ContainsKey((serverAddress, NodeType.Server)))
+        {
+            return;
+        }
+
+        var server = GetNode(serverAddress, NodeType.Client) as IServer;
+        if (server == null)
+        {
+            return;
+        }
+
+        server.Stop();
+
+        _nodes.Remove((serverAddress, NodeType.Client));
     }
 }

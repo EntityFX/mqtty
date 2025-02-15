@@ -14,8 +14,8 @@ namespace EntityFX.MqttY.Contracts.Network
 
         IClient? BuildClient(string name, string protocolType, INetwork network);
 
-        TCLient? BuildClient<TCLient>(string name, string protocolType, INetwork network)
-            where TCLient : IClient;
+        TClient? BuildClient<TClient>(string name, string protocolType, INetwork network)
+            where TClient : IClient;
 
         IServer? BuildServer(string name, string protocolType, INetwork network);
 
