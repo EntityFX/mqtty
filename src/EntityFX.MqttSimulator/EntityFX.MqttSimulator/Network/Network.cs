@@ -66,7 +66,7 @@ public class Network : NodeBase, INetwork
 
         var result = network.Link(this);
 
-        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Link, "link", Guid.NewGuid(), new { });
+        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Link, "link");
 
         return true;
     }
@@ -86,7 +86,7 @@ public class Network : NodeBase, INetwork
             _linkedNetworks[network.Name] = network;
         }
 
-        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Unlink, "unlink", Guid.NewGuid(), new { });
+        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Unlink, "unlink");
 
         return true;
     }
@@ -141,7 +141,7 @@ public class Network : NodeBase, INetwork
         {
             NetworkGraph.Monitoring.Push(
                 packet.From, packet.ToType, Address, NodeType.Network,
-                packet.Payload, MonitoringType.Push, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
+                packet.Payload, MonitoringType.Push, packet.Category);
 
             var sentToLocal = await SendToLocalAsync(this, packet);
 
@@ -183,7 +183,7 @@ public class Network : NodeBase, INetwork
         }
         NetworkGraph.Monitoring.Push(
             network.Address, NodeType.Network, packet.To, packet.ToType,
-            packet.Payload, MonitoringType.Push, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
+            packet.Payload, MonitoringType.Push, packet.Category);
 
         return await destionationNode!.ReceiveAsync(packet);
     }
@@ -202,7 +202,7 @@ public class Network : NodeBase, INetwork
             return null;
         }
 
-        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
+        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, packet.Category);
         var result = await next.SendToLocalAsync(next, packet);
 
         if (result == null)

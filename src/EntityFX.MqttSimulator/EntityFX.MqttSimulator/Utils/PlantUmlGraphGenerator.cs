@@ -14,7 +14,7 @@ public class PlantUmlGraphGenerator
         var sortedNetworks = networkGraph.Networks.Values.OrderBy(v => v.Index).ToArray();
         foreach (var network in sortedNetworks)
         {
-            plantUmlBuilder.AppendLine($"cloud {network.Name}");
+            AppendNode(plantUmlBuilder, "cloud", network.Name, null, "A9DCDF");
         }
 
         var visitedNetworks = new HashSet<string>();
@@ -38,7 +38,8 @@ public class PlantUmlGraphGenerator
                 {
                     continue;
                 }
-                plantUmlBuilder.AppendLine($"circle {client.Key}");
+                AppendNode(plantUmlBuilder, "circle", client.Key, 
+                    client.Value.ProtocolType, "ADD1B2");
                 if (client.Value.Group != null)
                 {
                     visitedGroups.Add(client.Value.Group);
@@ -51,7 +52,8 @@ public class PlantUmlGraphGenerator
                 {
                     continue;
                 }
-                plantUmlBuilder.AppendLine($"rectangle {server.Key}");
+                AppendNode(plantUmlBuilder, "rectangle", server.Key, 
+                    server.Value.ProtocolType, "E3664A");
                 if (server.Value.Group != null)
                 {
                     visitedGroups.Add(server.Value.Group);
@@ -91,5 +93,13 @@ public class PlantUmlGraphGenerator
         plantUmlBuilder.AppendLine("@enduml");
 
         return plantUmlBuilder.ToString();
+    }
+
+    private static void AppendNode(StringBuilder plantUmlBuilder, 
+        string nodeType, string name, string? stereotype = null, string? color = null)
+    {
+        plantUmlBuilder.AppendLine($"{nodeType} {name} " +
+                                   $"{(stereotype != null ? $"<<{stereotype}>>" : "")}" +
+                                   $"{(color != null ? $"#{color}" : "")}");
     }
 }

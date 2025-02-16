@@ -5,18 +5,23 @@ using System.Collections.Concurrent;
 public class Monitoring : IMonitoring
 {
     public event EventHandler<MonitoringItem>? Added;
+    public event EventHandler<MonitoringScope>? ScopeStarted;
+    public event EventHandler<MonitoringScope>? ScopeEnded;
 
-    private ConcurrentDictionary<DateTimeOffset, MonitoringItem> _storage = new ConcurrentDictionary<DateTimeOffset, MonitoringItem>();
+    private readonly ConcurrentDictionary<DateTimeOffset, MonitoringItem> _storage = new();
+
+    private readonly ConcurrentStack<MonitoringScope> _scopes = new();
 
     public IEnumerable<MonitoringItem> Items => _storage.Values.Take(10000);
 
     public void Push(string from, NodeType fromType, string to, NodeType toType, byte[]? packet, 
-        MonitoringType type, string? category, Guid scope, object details)
+        MonitoringType type, string? category)
     {
+        _scopes.TryPeek(out var currentScope);
         var item = new MonitoringItem(
             Guid.NewGuid(), DateTimeOffset.Now, from,
             fromType, to, toType,
-            (uint)(packet?.Length ?? 0), type, string.Empty, details, category);
+            (uint)(packet?.Length ?? 0), type, string.Empty, currentScope, category);
 
         _storage.TryAdd(item.Date, item);
 
@@ -25,10 +30,33 @@ public class Monitoring : IMonitoring
 
 
     public void Push(INode from, INode to, byte[]? packet, MonitoringType type, 
-        string? category, Guid scope, object details)
+        string? category)
     {
         Push(from.Address,
             from.NodeType, to.Address, to.NodeType,
-            packet, type, category, scope, details);
+            packet, type, category);
+    }
+
+    public MonitoringScope BeginScope(string scope)
+    {
+        var scopeItem = new MonitoringScope(Guid.NewGuid(), scope, _scopes.Count, DateTimeOffset.Now);
+        _scopes.Push(scopeItem);
+        ScopeStarted?.Invoke(this, scopeItem);
+        return scopeItem;
+    }
+
+    public MonitoringScope? EndScope()
+    {
+        if (!_scopes.Any())
+        {
+            return null;
+        }
+
+        if (!_scopes.TryPeek(out var currentScope))
+        {
+            return null;
+        }
+        ScopeEnded?.Invoke(this, currentScope);
+        return currentScope;
     }
 }

@@ -50,7 +50,8 @@ public class Client : NodeBase, IClient
 
         serverName = server;
 
-        NetworkGraph.Monitoring.Push(this, remoteNode, null, EntityFX.MqttY.Contracts.Monitoring.MonitoringType.Connect, "connect", Guid.NewGuid(), new { });
+        NetworkGraph.Monitoring.Push(this, remoteNode, null, EntityFX.MqttY.Contracts.Monitoring.MonitoringType.Connect, 
+            "connect");
         IsConnected = true;
 
         return result;
@@ -115,11 +116,13 @@ public class Client : NodeBase, IClient
     public override async Task<Packet> SendAsync(Packet packet)
     {
         if (!IsConnected) throw new InvalidOperationException("Not Connected To server");
+
+        NetworkGraph.Monitoring.BeginScope("Tcp client Send");
         NetworkGraph.Monitoring.Push(
             packet.From, packet.FromType, packet.To, packet.ToType, 
-            packet.Payload, MonitoringType.Send, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
+            packet.Payload, MonitoringType.Send, packet.Category);
         var response = await Network!.SendAsync(packet);
-
+        NetworkGraph.Monitoring.EndScope();
         return response;
     }
 
@@ -139,7 +142,7 @@ public class Client : NodeBase, IClient
     {
         NetworkGraph.Monitoring.Push(
             packet.From, packet.FromType, packet.To, packet.ToType,
-            packet.Payload, MonitoringType.Receive, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
+            packet.Payload, MonitoringType.Receive, packet.Category);
 
 
         return Task.FromResult(NetworkGraph.GetReversePacket(packet, packet.Payload));

@@ -15,10 +15,7 @@ public static class Container
             .AddScoped<IMonitoring, Monitoring>((sb) =>
             {
                 var monitoring = new Monitoring();
-                monitoring.Added += (sender, e) =>
-                    Console.WriteLine($"<{e.Date:u}>, {{{e.Type}}} {e.SourceType}[\"{e.From}\"] -> {e.DestinationType}[\"{e.To}\"]" +
-                                      $"{(e.PacketSize > 0 ? $", Packet Size = {e.PacketSize}" : "")}" +
-                                      $"{(!string.IsNullOrEmpty(e.Category) ? $", Category = {e.Category}" : "")}.");
+                ConfigureMonitoring(monitoring);
                 return monitoring;
             })
             .AddScoped<PlantUmlGraphGenerator>()
@@ -28,5 +25,21 @@ public static class Container
             .AddScoped<INetworkBuilder, NetworkBuilder>()
             .AddScoped<IPathFinder, DijkstraPathFinder>()
             .AddScoped<INetworkGraph, NetworkGraph>();
+    }
+
+    private static void ConfigureMonitoring(Monitoring monitoring)
+    {
+        monitoring.Added += (sender, e) =>
+            Console.WriteLine(
+                $"{new string (' ', e.Scope?.Level ?? 0)}<{e.Date:u}>: " +
+                $"{{{e.Type}}} {e.SourceType}[\"{e.From}\"] -> {e.DestinationType}[\"{e.To}\"]" +
+                $"{(e.PacketSize > 0 ? $", Packet Size = {e.PacketSize}" : "")}" +
+                $"{(!string.IsNullOrEmpty(e.Category) ? $", Category = {e.Category}" : "")}.");
+
+        monitoring.ScopeStarted += (sender, scope) =>
+            Console.WriteLine($"<{scope.Date:u}>: Begin scope <{scope.Id}>: \"{scope.Name}\"");
+        
+        monitoring.ScopeEnded += (sender, scope) =>
+            Console.WriteLine($"<{scope.Date:u}>: End scope <{scope.Id}>: \"{scope.Name}\"");
     }
 }

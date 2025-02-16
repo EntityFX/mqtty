@@ -84,11 +84,11 @@ public class Server : NodeBase, IServer
     public override async Task<Packet> ReceiveAsync(Packet packet)
     {
         NetworkGraph.Monitoring.Push(packet.From, packet.FromType,
-            packet.To, packet.ToType, packet.Payload, MonitoringType.Receive, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
+            packet.To, packet.ToType, packet.Payload, MonitoringType.Receive, packet.Category);
 
         var response = ProcessReceive(packet);
         NetworkGraph.Monitoring.Push(response.From, response.FromType,
-            response.To, response.ToType, response.Payload, MonitoringType.Send, packet.Category, packet.scope ?? Guid.NewGuid(), new { });
+            response.To, response.ToType, response.Payload, MonitoringType.Send, packet.Category);
         PacketReceived?.Invoke(this, packet);
 
         var result = await Network!.ReceiveAsync(response);
