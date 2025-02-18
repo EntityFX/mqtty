@@ -53,7 +53,11 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions>
         {
             var mqttClient = new MqttClient(options.Index,
                 options.Name, options.Address ?? options.Name, 
-                options.Protocol, options.Network, options.NetworkGraph, options.Name);
+                options.Protocol, options.Network, options.NetworkGraph, options.Name)
+            {
+                Group = options.Group,
+                GroupAmount = options.GroupAmount
+            };
 
             return mqttClient;
         }

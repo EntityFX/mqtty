@@ -12,6 +12,8 @@
         
         string? Group { get; set; }
 
+        int? GroupAmount { get; set; }
+
         NodeType NodeType { get; }
 
         Task<Packet> ReceiveWithResponseAsync(Packet packet);

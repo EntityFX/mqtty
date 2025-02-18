@@ -15,6 +15,7 @@ public abstract class NodeBase : INode
     public string? Group { get; set; }
 
     public abstract NodeType NodeType { get; }
+    public int? GroupAmount { get; set; }
 
     public abstract Task<Packet> ReceiveWithResponseAsync(Packet packet);
 

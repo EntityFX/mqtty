@@ -38,8 +38,8 @@ public class PlantUmlGraphGenerator
                 {
                     continue;
                 }
-                AppendNode(plantUmlBuilder, "circle", client.Key, 
-                    client.Value.ProtocolType, "ADD1B2");
+                AppendNode(plantUmlBuilder, "circle", client.Value.Group ?? client.Key, 
+                    client.Value.ProtocolType, "ADD1B2", client.Value.GroupAmount > 0 ? $"Count clients: {client.Value.GroupAmount}" : null);
                 if (client.Value.Group != null)
                 {
                     visitedGroups.Add(client.Value.Group);
@@ -69,7 +69,7 @@ public class PlantUmlGraphGenerator
                 {
                     continue;
                 }
-                plantUmlBuilder.AppendLine($"{client.Key} --> {network.Name}");
+                plantUmlBuilder.AppendLine($"{client.Value.Group ?? client.Key} --> {network.Name}");
                 if (client.Value.Group != null)
                 {
                     visitedGroups.Add(client.Value.Group);
@@ -96,10 +96,19 @@ public class PlantUmlGraphGenerator
     }
 
     private static void AppendNode(StringBuilder plantUmlBuilder, 
-        string nodeType, string name, string? stereotype = null, string? color = null)
+        string nodeType, string name, string? stereotype = null, string? color = null, string? comment = null)
     {
         plantUmlBuilder.AppendLine($"{nodeType} {name} " +
                                    $"{(stereotype != null ? $"<<{stereotype}>>" : "")}" +
-                                   $"{(color != null ? $"#{color}" : "")}");
+                                   $"{(color != null ? $"#{color}" : "")}" +
+                                   $"{(!string.IsNullOrEmpty(comment) ? " [" : "")}");
+
+        if (comment != null)
+        {
+            plantUmlBuilder.AppendLine(name);
+            plantUmlBuilder.AppendLine("---");
+            plantUmlBuilder.AppendLine(comment);
+            plantUmlBuilder.AppendLine("]");
+        }
     }
 }

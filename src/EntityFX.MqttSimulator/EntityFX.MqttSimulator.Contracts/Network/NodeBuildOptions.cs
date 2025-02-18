@@ -5,13 +5,14 @@ public class NodeBuildOptions
     public NodeBuildOptions(
         INetworkGraph networkGraph, INetwork? network,
         int index,
-        string name, string address, string? group, string protocol, string? connectsTo, Dictionary<string, string[]>? additional)
+        string name, string address, string? group, int? groupAmount, string protocol, string? connectsTo, Dictionary<string, string[]>? additional)
     {
         NetworkGraph = networkGraph;
         Network = network;
         Index = index;
         Name = name;
         Group = group;
+        GroupAmount = groupAmount;
         Address = address;
         Protocol = protocol;
         ConnectsTo = connectsTo;
@@ -24,6 +25,7 @@ public class NodeBuildOptions
     public string Name { get; init; }
     
     public string? Group { get; init; }
+    public int? GroupAmount { get; init; }
         
     public string? Address { get; init; }
         
