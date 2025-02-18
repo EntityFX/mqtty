@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Mqtt;
+﻿using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Mqtt.Internals;
@@ -16,8 +17,8 @@ namespace EntityFX.MqttY.Mqtt
     {
         private readonly PacketIdProvider _packetIdProvider = new();
 
-        private readonly ConcurrentDictionary<string, ClientSession> _sessionRepository 
-            = new ();
+        private readonly IRepository<ClientSession> _sessionRepository 
+            = new InMemoryRepository<ClientSession> ();
 
         private IDictionary<MqttPacketType, Func<string, ushort, IPacket?>> _senderRules;
 
@@ -27,15 +28,19 @@ namespace EntityFX.MqttY.Mqtt
             : base(index, name, address, protocolType, network, networkGraph)
         {
             ClientId = clientId ?? name;
-            _senderRules = DefineSenderRules();
         }
 
         public string ClientId { get; set; }
 
         public string Server => serverName;
 
-        public async Task<SessionState> ConnectAsync(string server, MqttQos qos, bool retain = false)
+        public async Task<SessionState> ConnectAsync(string server, bool cleanSession = false)
         {
+            var connect = new ConnectPacket(ClientId, true);
+            var payload = GetPacket(server, NodeType.Server, connect.PacketToBytes(), "MQTT Connect");
+
+            NetworkGraph.Monitoring.TryBeginScope(ref payload!, $"Connect {Name} to {server}");
+
             if (!IsConnected)
             {
                 var result = Connect(server);
@@ -45,10 +50,17 @@ namespace EntityFX.MqttY.Mqtt
                 }
             }
 
-            var connect = new ConnectPacket(ClientId, true);
+            OpenClientSession(cleanSession);
 
-            var response = await SendAsync(connect.PacketToBytes(), "Connect");
-            var connAck = response.BytesToPacket<ConnectAckPacket>();
+
+            var response = await SendWithResponseAsync(payload);
+
+            if (response == null)
+            {
+                throw new MqttException($"No connack");
+            }
+
+            var connAck = response.Payload.BytesToPacket<ConnectAckPacket>();
 
             if (connAck == null)
             {
@@ -60,6 +72,7 @@ namespace EntityFX.MqttY.Mqtt
                 throw new MqttConnectException(connAck.Status, connAck.Status.ToString());
             }
 
+            NetworkGraph.Monitoring.TryEndScope(ref response);
 
             return connAck.SessionPresent ? SessionState.SessionPresent : SessionState.CleanSession; ;
         }
@@ -77,28 +90,21 @@ namespace EntityFX.MqttY.Mqtt
                 Payload = payload
             };
 
+            var packetPayload = GetPacket(serverName, NodeType.Server, publish.PacketToBytes(), "MQTT Publish");
+            NetworkGraph.Monitoring.TryBeginScope(ref packetPayload!, $"Publish {Name} to {packetPayload.To} with topic {topic}");
+
             if (!IsConnected)
             {
                 SaveMessage(publish, ClientId, PendingMessageStatus.PendingToSend);
                 return true;
             }
 
-            var response = await SendAsync(publish.PacketToBytes(), "Publish");
-
-            if (qos == MqttQos.AtLeastOnce)
+            if (qos > MqttQos.AtMostOnce)
             {
-                var publishAck = response.BytesToPacket<PublishAckPacket>();
+                SaveMessage(publish, ClientId, PendingMessageStatus.PendingToAcknowledge);
             }
-            else if (qos == MqttQos.ExactlyOnce)
-            {
-                var publishReceived = response.BytesToPacket<PublishReceivedPacket>();
 
-                var publishRelease = new PublishReleasePacket(packetId ?? 0);
-
-                var completeResponse = await SendAsync(publishRelease.PacketToBytes(), "PublishRelease");
-
-                var publishComplete = completeResponse.BytesToPacket<PublishCompletePacket>();
-            }
+            await SendAsync(packetPayload);
 
             return true;
         }
@@ -107,11 +113,12 @@ namespace EntityFX.MqttY.Mqtt
         {
             var packetId = _packetIdProvider.GetPacketId();
             var subscribe = new SubscribePacket(packetId, new[] { new Subscription(topicFilter, qos) });
-
+            var payload = GetPacket(serverName, NodeType.Server, subscribe.PacketToBytes(), "MQTT Subscribe");
+            NetworkGraph.Monitoring.TryBeginScope(ref payload!, $"Subscribe {Name} to {payload.To} with topic {topicFilter}");
             var subscribeTimeout = TimeSpan.FromSeconds(60);
 
-            var response = await SendAsync(subscribe.PacketToBytes(), "Subscribe");
-            var subscribeAck = response.BytesToPacket<SubscribeAckPacket>();
+            var response = await SendWithResponseAsync(payload);
+            var subscribeAck = response.Payload.BytesToPacket<SubscribeAckPacket>();
 
             if (subscribeAck == null)
             {
@@ -122,6 +129,8 @@ namespace EntityFX.MqttY.Mqtt
             {
                 throw new MqttClientException($"Subscription Rejected: {Id}, {topicFilter}");
             }
+
+            NetworkGraph.Monitoring.TryEndScope(ref response);
         }
 
         public Task<bool> UnsubscribeAsync(string topicFilter)
@@ -129,45 +138,89 @@ namespace EntityFX.MqttY.Mqtt
             throw new NotImplementedException();
         }
 
-        private Dictionary<MqttPacketType, Func<string, ushort, IPacket?>> DefineSenderRules()
+        protected override async Task OnReceivedAsync(Packet packet)
         {
-            var senderRules = new Dictionary<MqttPacketType, Func<string, ushort, IPacket?>>
+            var payload = packet.Payload.BytesToPacket<PacketBase>();
+            if (payload == null)
             {
-                {
-                    MqttPacketType.PublishAck,
-                    (clientId, packetId) =>
-                    {
-                        RemovePendingMessage(clientId, packetId);
+                await base.OnReceivedAsync(packet);
+            }
 
-                        return default;
-                    }
-                },
-                {
-                    MqttPacketType.PublishReceived,
-                    (clientId, packetId) =>
-                    {
-                        RemovePendingMessage(clientId, packetId);
+            switch (payload!.Type)
+            {
+                case MqttPacketType.PublishAck:
+                    await ProcessAckPacket(packet, packet.Payload.BytesToPacket<PublishPacket>());
+                    break;
+                case MqttPacketType.PublishReceived:
+                    break;
+                case MqttPacketType.PublishRelease:
+                    break;
+                case MqttPacketType.PingResponse:
+                    break;
 
-                        return new PublishReleasePacket(packetId);
-                    }
-                },
-                {
-                    MqttPacketType.PublishComplete,
-                    (clientId, packetId) =>
-                    {
-                        RemovePendingAcknowledgement(clientId, packetId, MqttPacketType.PublishRelease);
+                case MqttPacketType.Publish:
+                    await ProcessPublish(packet, packet.Payload.BytesToPacket<PublishPacket>());
+                    break;
 
-                        return default;
-                    }
-                }
-            };
 
-            return senderRules;
+                default:
+                    break;
+            }
+        }
+
+        private async Task ProcessPublish(Packet packet, PublishPacket? publishPacket)
+        {
+
+        }
+
+        private Task ProcessAckPacket(Packet payload, PublishPacket? publishPacket)
+        {
+            if (publishPacket == null)
+            {
+                return Task.CompletedTask;
+            }
+
+            var session = _sessionRepository.Read(ClientId);
+
+            if (session == null)
+            {
+                throw new MqttException($"Client Session {ClientId} Not Found");
+            }
+
+            var pendingMessage = session
+                .GetPendingMessages()
+                .FirstOrDefault(p => p.PacketId.HasValue && p.PacketId.Value == publishPacket.PacketId);
+
+            session.RemovePendingMessage(pendingMessage);
+
+            _sessionRepository.Update(session);
+
+            NetworkGraph.Monitoring.TryEndScope(ref payload);
+
+            return Task.CompletedTask;
+        }
+
+        private void OpenClientSession(bool cleanSession)
+        {
+            var session = string.IsNullOrEmpty(ClientId) ? default(ClientSession) : _sessionRepository.Read(ClientId);
+
+            if (cleanSession && session != null)
+            {
+                _sessionRepository.Delete(session.Id);
+                session = null;
+            }
+
+            if (session == null)
+            {
+                session = new ClientSession(ClientId, cleanSession);
+
+                _sessionRepository.Create(session);
+            }
         }
 
         private void RemovePendingAcknowledgement(string clientId, ushort packetId, MqttPacketType type)
         {
-            _sessionRepository.TryGetValue(clientId, out ClientSession? session);
+            var session = _sessionRepository.Read(clientId);
 
             if (session == null)
             {
@@ -180,12 +233,12 @@ namespace EntityFX.MqttY.Mqtt
 
             session.RemovePendingAcknowledgement(pendingAcknowledgement);
 
-            _sessionRepository.AddOrUpdate(session.Id, session, (key, value) => session);
+            _sessionRepository.Update(session);
         }
 
         private void RemovePendingMessage(string clientId, ushort packetId)
         {
-            _sessionRepository.TryGetValue(clientId, out ClientSession? session);
+            var session = _sessionRepository.Read(clientId);
 
             if (session == null)
             {
@@ -198,7 +251,7 @@ namespace EntityFX.MqttY.Mqtt
 
             session.RemovePendingMessage(pendingMessage);
 
-            _sessionRepository.AddOrUpdate(session.Id, session, (key, value) => session);
+            _sessionRepository.Update(session);
         }
 
         private void SaveMessage(PublishPacket message, string clientId, PendingMessageStatus status)
@@ -208,8 +261,7 @@ namespace EntityFX.MqttY.Mqtt
                 return;
             }
 
-            
-            _sessionRepository.TryGetValue(clientId, out ClientSession? session);
+            var session = _sessionRepository.Read(clientId);
 
             if (session == null)
             {
@@ -229,7 +281,19 @@ namespace EntityFX.MqttY.Mqtt
 
             session.AddPendingMessage(savedMessage);
 
-            _sessionRepository.AddOrUpdate(session.Id, session, (key, value) => session);
+            _sessionRepository.Update(session);
+        }
+
+        protected override void BeforeSend(Packet packet)
+        {
+        }
+
+        protected override void AfterSend(Packet packet)
+        {
+        }
+
+        protected override void BeforeReceive(Packet packet)
+        {
         }
     }
 }

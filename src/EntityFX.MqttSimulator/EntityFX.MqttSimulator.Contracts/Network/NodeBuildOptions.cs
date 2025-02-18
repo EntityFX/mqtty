@@ -5,7 +5,7 @@ public class NodeBuildOptions
     public NodeBuildOptions(
         INetworkGraph networkGraph, INetwork? network,
         int index,
-        string name, string address, string? group, string protocol)
+        string name, string address, string? group, string protocol, string? connectsTo, Dictionary<string, string[]>? additional)
     {
         NetworkGraph = networkGraph;
         Network = network;
@@ -14,6 +14,8 @@ public class NodeBuildOptions
         Group = group;
         Address = address;
         Protocol = protocol;
+        ConnectsTo = connectsTo;
+        Additional = additional;
     }
 
     public INetworkGraph NetworkGraph { get; init; }
@@ -26,4 +28,8 @@ public class NodeBuildOptions
     public string? Address { get; init; }
         
     public string Protocol { get; init; }
+
+    public string? ConnectsTo { get; init; }
+
+    public Dictionary<string, string[]>? Additional { get; init; }
 }

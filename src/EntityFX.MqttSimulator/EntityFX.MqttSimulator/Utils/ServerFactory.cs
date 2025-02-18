@@ -6,6 +6,11 @@ namespace EntityFX.MqttY.Utils;
 
 internal class ServerFactory : IFactory<IServer?, NodeBuildOptions>
 {
+    public IServer? Configure(NodeBuildOptions options, IServer? service)
+    {
+        return service;
+    }
+
     public IServer? Create(NodeBuildOptions options)
     {
         if (options.Network == null)

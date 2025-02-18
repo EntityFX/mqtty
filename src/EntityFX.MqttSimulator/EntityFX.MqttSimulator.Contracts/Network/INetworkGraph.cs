@@ -12,14 +12,18 @@ namespace EntityFX.MqttY.Contracts.Network
 
         INetwork? BuildNetwork(int index, string name, string address);
 
-        IClient? BuildClient(int index, string name, string protocolType, INetwork network, string? group = null);
+        IClient? BuildClient(int index, string name, string protocolType, INetwork network, string? group = null, 
+            Dictionary<string, string[]> additional = null);
 
-        TClient? BuildClient<TClient>(int index, string name, string protocolType, INetwork network, string? group = null)
+        TClient? BuildClient<TClient>(int index, string name, string protocolType, INetwork network, string? group = null, 
+            Dictionary<string, string[]> additional = null)
             where TClient : IClient;
 
-        IServer? BuildServer(int index, string name, string protocolType, INetwork network, string? group = null);
+        IServer? BuildServer(int index, string name, string protocolType, INetwork network, string? group = null, 
+            Dictionary<string, string[]> additional = null);
 
-        ILeafNode? BuildNode(int index, string name, string address, NodeType nodeType, string? group = null);
+        ILeafNode? BuildNode(int index, string name, string address, NodeType nodeType, string? group = null,
+            Dictionary<string, string[]> additional = null);
 
         string GetAddress(string name, string protocolType, string network);
 
@@ -36,6 +40,6 @@ namespace EntityFX.MqttY.Contracts.Network
 
         void Configure(NetworkGraphOptions value);
 
-        Packet GetReversePacket(Packet packet, byte[] payload);
+        Packet GetReversePacket(Packet packet, byte[] payload, string? category);
     }
 }

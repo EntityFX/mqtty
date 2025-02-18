@@ -14,8 +14,13 @@
 
         NodeType NodeType { get; }
 
-        Task<Packet> ReceiveAsync(Packet packet);
+        Task<Packet> ReceiveWithResponseAsync(Packet packet);
 
-        Task<Packet> SendAsync(Packet packet);
+        Task<Packet> SendWithResponseAsync(Packet packet);
+
+        Task SendAsync(Packet packet);
+
+        Task ReceiveAsync(Packet packet);
+
     }
 }

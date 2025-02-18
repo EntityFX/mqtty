@@ -9,10 +9,14 @@
         bool Disconnect();
 
 
-        event EventHandler<(string Client, byte[] Packet)>? PacketReceived;
+        event EventHandler<Packet>? PacketReceived;
 
-        Task<byte[]> SendAsync(byte[] packet, string? category = null);
+        Task<byte[]> SendWithResponseAsync(byte[] packet, string? category = null);
 
-        byte[] Send(byte[] packet, string? category = null);
+        Task SendAsync(byte[] packet, string? category = null);
+
+        byte[] SendWithResponse(byte[] packet, string? category = null);
+
+        void Send(byte[] packet, string? category = null);
     }
 }

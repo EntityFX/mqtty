@@ -1,6 +1,6 @@
 ﻿namespace EntityFX.MqttY.Mqtt.Internals
 {
-    internal class ClientSession
+    internal class ClientSession : IStorageObject
     {
         public ClientSession(string clientId, bool clean = false)
         {

@@ -35,26 +35,26 @@ internal class Worker : BackgroundService
         var mqttClient1 = _networkGraph.GetNode("mc1", NodeType.Client) as IMqttClient;
         var mqttClient2 = _networkGraph.GetNode("mc2", NodeType.Client) as IMqttClient;
 
-        if (mqttClient1 == null)
-        {
-            await Task.CompletedTask;
-        }
+        //if (mqttClient1 == null)
+        //{
+        //    await Task.CompletedTask;
+        //}
 
-        if (mqttClient2 == null)
-        {
-            await Task.CompletedTask;
-        }
+        //if (mqttClient2 == null)
+        //{
+        //    await Task.CompletedTask;
+        //}
 
-        await mqttClient1!.ConnectAsync(mqttClient1.Server, MqttQos.AtLeastOnce, true);
-        await mqttClient2!.ConnectAsync(mqttClient1.Server, MqttQos.AtLeastOnce, true);
+        //await mqttClient1!.ConnectAsync(mqttClient1.Server);
+        //await mqttClient2!.ConnectAsync(mqttClient1.Server);
 
 
-        await mqttClient2!.SubscribeAsync(mqttClient1.Server, MqttQos.AtLeastOnce);
+        //await mqttClient2!.SubscribeAsync("telemetry/#", MqttQos.AtLeastOnce);
 
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await mqttClient1!.PublishAsync("topic/one", new byte[] { 1 }, MqttQos.AtMostOnce);
+            await mqttClient1!.PublishAsync("telemetry/temperature", new byte[] { 7 }, MqttQos.AtLeastOnce);
             await Task.Delay(2000, stoppingToken);
         }
         await Task.CompletedTask;

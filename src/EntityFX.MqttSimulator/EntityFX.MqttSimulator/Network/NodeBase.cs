@@ -16,9 +16,19 @@ public abstract class NodeBase : INode
 
     public abstract NodeType NodeType { get; }
 
-    public abstract Task<Packet> ReceiveAsync(Packet packet);
+    public abstract Task<Packet> ReceiveWithResponseAsync(Packet packet);
 
-    public abstract Task<Packet> SendAsync(Packet packet);
+    public abstract Task<Packet> SendWithResponseAsync(Packet packet);
+
+    public abstract Task SendAsync(Packet packet);
+
+    public abstract Task ReceiveAsync(Packet packet);
+
+    protected abstract void BeforeReceive(Packet packet);
+    protected abstract void AfterReceive(Packet packet);
+
+    protected abstract void BeforeSend(Packet packet);
+    protected abstract void AfterSend(Packet packet);
 
     public NodeBase(int index, string name, string address, INetworkGraph networkGraph)
     {
@@ -28,4 +38,7 @@ public abstract class NodeBase : INode
         Index = index;
         this.NetworkGraph = networkGraph;
     }
+
+    protected Packet GetPacket(string to, NodeType toType, byte[] payload, string? category = null)
+        => new Packet(Name, to, NodeType, toType, payload, category);
 }

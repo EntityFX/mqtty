@@ -81,32 +81,54 @@ public class Server : NodeBase, IServer
         return true;
     }
 
-    public override async Task<Packet> ReceiveAsync(Packet packet)
+    public override async Task<Packet> ReceiveWithResponseAsync(Packet packet)
     {
-        NetworkGraph.Monitoring.Push(packet.From, packet.FromType,
-            packet.To, packet.ToType, packet.Payload, MonitoringType.Receive, packet.Category);
-
-        var response = ProcessReceive(packet);
-        NetworkGraph.Monitoring.Push(response.From, response.FromType,
-            response.To, response.ToType, response.Payload, MonitoringType.Send, packet.Category);
+        BeforeReceive(packet);
+        var response = OnReceivedWithResponse(packet);
         PacketReceived?.Invoke(this, packet);
-
-        var result = await Network!.ReceiveAsync(response);
+        AfterReceive(packet);
+        var result = await Network!.ReceiveWithResponseAsync(response);
 
         return result;
     }
 
-    protected virtual Packet ProcessReceive(Packet packet)
+    public override async Task ReceiveAsync(Packet packet)
+    {
+        BeforeReceive(packet);
+
+        await OnReceived(packet);
+        AfterReceive(packet);
+    }
+
+
+    protected virtual Packet OnReceivedWithResponse(Packet packet)
     {
         var payload = new List<byte>();
         payload.AddRange(packet.Payload);
         payload.Add(0xFF);
-        return NetworkGraph.GetReversePacket(packet, payload.ToArray());
+        PacketReceived?.Invoke(this, packet);
+        return NetworkGraph.GetReversePacket(packet, payload.ToArray(), packet.Category);
     }
 
-    public override async Task<Packet> SendAsync(Packet packet)
+    protected virtual Task OnReceived(Packet packet)
     {
-        return await Network.SendAsync(packet);
+        PacketReceived?.Invoke(this, packet);
+
+        return Task.CompletedTask;
+    }
+
+
+    public override async Task<Packet> SendWithResponseAsync(Packet packet)
+    {
+        BeforeSend(packet);
+        return await Network.SendWithResponseAsync(packet);
+    }
+
+    public override async Task SendAsync(Packet packet)
+    {
+        BeforeSend(packet);
+        await Network.SendAsync(packet);
+        AfterSend(packet);
     }
 
     public void Start()
@@ -125,5 +147,25 @@ public class Server : NodeBase, IServer
         var result = Network.RemoveServer(Address);
 
         IsStarted = !result;
+    }
+
+    protected override void BeforeReceive(Packet packet)
+    {
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category);
+    }
+
+    protected override void AfterReceive(Packet packet)
+    {
+ 
+    }
+
+    protected override void BeforeSend(Packet packet)
+    {
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category);
+    }
+
+    protected override void AfterSend(Packet packet)
+    {
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category);
     }
 }
