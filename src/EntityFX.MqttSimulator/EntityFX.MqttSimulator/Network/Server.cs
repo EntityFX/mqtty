@@ -1,6 +1,8 @@
 ﻿using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using System.Net;
+using static System.Formats.Asn1.AsnWriter;
 
 public class Server : NodeBase, IServer
 {
@@ -84,17 +86,25 @@ public class Server : NodeBase, IServer
     public override async Task<Packet> ReceiveWithResponseAsync(Packet packet)
     {
         BeforeReceive(packet);
+
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category, packet.Scope);
+        //NetworkGraph.Monitoring.WithEndScope(ref packet);
+
         var response = OnReceivedWithResponse(packet);
+
         PacketReceived?.Invoke(this, packet);
         AfterReceive(packet);
-        var result = await Network!.ReceiveWithResponseAsync(response);
+        var receivePacket = await Network!.ReceiveWithResponseAsync(response);
+        NetworkGraph.Monitoring.WithEndScope(ref receivePacket);
 
-        return result;
+        return receivePacket;
     }
 
     public override async Task ReceiveAsync(Packet packet)
     {
         BeforeReceive(packet);
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category, packet.Scope);
+        NetworkGraph.Monitoring.WithEndScope(ref packet);
 
         await OnReceived(packet);
         AfterReceive(packet);
@@ -121,13 +131,29 @@ public class Server : NodeBase, IServer
     public override async Task<Packet> SendWithResponseAsync(Packet packet)
     {
         BeforeSend(packet);
-        return await Network.SendWithResponseAsync(packet);
+        var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Send packet {packet.From} to {packet.To}");
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category, scope);
+
+        var result = await Network.SendWithResponseAsync(packet);
+
+        NetworkGraph.Monitoring.WithEndScope(ref packet);
+
+        AfterSend(packet);
+        return result;
     }
 
     public override async Task SendAsync(Packet packet)
     {
         BeforeSend(packet);
+
+        var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Send packet {packet.From} to {packet.To}");
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category, scope);
+
         await Network.SendAsync(packet);
+
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category);
+        NetworkGraph.Monitoring.WithEndScope(ref packet);
+
         AfterSend(packet);
     }
 
@@ -161,11 +187,9 @@ public class Server : NodeBase, IServer
 
     protected override void BeforeSend(Packet packet)
     {
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category);
     }
 
     protected override void AfterSend(Packet packet)
     {
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category);
     }
 }

@@ -257,7 +257,7 @@ public class NetworkGraph : INetworkGraph
             FromType: packet.ToType,
             ToType: packet.FromType,
             Category: category ?? packet.Category,
-            scope: packet.scope
+            Scope: packet.Scope
         );
     }
 

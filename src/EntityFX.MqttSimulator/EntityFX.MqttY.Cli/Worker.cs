@@ -20,21 +20,20 @@ internal class Worker : BackgroundService
         _plantUmlGraphGenerator = plantUmlGraphGenerator;
     }
 
-    public override async Task StartAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _networkGraph.Configure(this._options.Value);
         var plantGraph = _plantUmlGraphGenerator.Generate(_networkGraph);
         File.WriteAllText("graph.puml", plantGraph);
 
-        await base.StartAsync(cancellationToken);
-    }
+        await Task.Delay(2000, stoppingToken);
 
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
         var mqttClient1 = _networkGraph.GetNode("mc1", NodeType.Client) as IMqttClient;
         var mqttClient2 = _networkGraph.GetNode("mc2", NodeType.Client) as IMqttClient;
 
+
+        await Task.Delay(2000, stoppingToken);
         //if (mqttClient1 == null)
         //{
         //    await Task.CompletedTask;
@@ -51,12 +50,14 @@ internal class Worker : BackgroundService
 
         //await mqttClient2!.SubscribeAsync("telemetry/#", MqttQos.AtLeastOnce);
 
+        await mqttClient1!.PublishAsync("telemetry/temperature", new byte[] { 7 }, MqttQos.AtLeastOnce);
 
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            await mqttClient1!.PublishAsync("telemetry/temperature", new byte[] { 7 }, MqttQos.AtLeastOnce);
-            await Task.Delay(2000, stoppingToken);
-        }
+
+        //while (!stoppingToken.IsCancellationRequested)
+        //{
+        //    await mqttClient1!.PublishAsync("telemetry/temperature", new byte[] { 7 }, MqttQos.AtLeastOnce);
+        //    await Task.Delay(2000, stoppingToken);
+        //}
         await Task.CompletedTask;
     }
 }

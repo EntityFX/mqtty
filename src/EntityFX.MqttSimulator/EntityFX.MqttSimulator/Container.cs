@@ -16,7 +16,7 @@ public static class Container
         return serviceCollection
             .AddScoped<IMonitoring, Monitoring>((sb) =>
             {
-                var monitoring = new Monitoring();
+                var monitoring = new Monitoring(true);
                 ConfigureMonitoring(monitoring);
                 return monitoring;
             })
@@ -32,47 +32,55 @@ public static class Container
     private static void ConfigureMonitoring(Monitoring monitoring)
     {
         monitoring.Added += (sender, e) =>
-            PrintMonitoringItem(e);
+            PrintItem(e);
 
         monitoring.ScopeStarted += (sender, scope) =>
             BeginScope(scope);
 
         monitoring.ScopeEnded += (sender, scope) =>
-            PrintEndScope(scope);
+            PrintScopeItems(scope);
     }
 
     private static void BeginScope(MonitoringScope scope)
     {
     }
 
-    private static void PrintEndScope(MonitoringScope scope)
-    {
-        PrintScopeItems(scope);
-    }
-
     private static void PrintScopeItems(MonitoringScope scope)
     {
+        if (scope.Parent != null)
+        {
+            return;
+        }
+
         lock (_lock)
         {
-            Console.WriteLine($"<{scope.Date:u}>: Begin scope <{scope.Id}>: \"{scope.Name}\"");
-
-            if (scope.Items?.Any() == true)
-            {
-                foreach (var item in scope.Items)
-                {
-                    Console.WriteLine(
-                        $"{new string(' ', (item.Scope?.Level + 1 ?? 0) * 4)}<{item.Date:u}>: " +
-                        $"{{{item.Type}}} {item.SourceType}[\"{item.From}\"] -> {item.DestinationType}[\"{item.To}\"]" +
-                        $"{(item.PacketSize > 0 ? $", Packet Size = {item.PacketSize}" : "")}" +
-                        $"{(!string.IsNullOrEmpty(item.Category) ? $", Category = {item.Category}" : "")}.");
-                }
-            }
-
-            Console.WriteLine($"<{scope.Date:u}>: End scope <{scope.Id}>: \"{scope.Name}\"");
+            PrintScope(scope);
         }
     }
 
-    private static void PrintMonitoringItem(MonitoringItem item)
+    private static void PrintScope(MonitoringScope scope)
+    {
+        Console.WriteLine($"{new string(' ', (scope?.Level ?? 0) * 4)}<{scope.Date:u}>: Begin Scope <{scope.Id}>: \"{scope.ScopeLabel}\"");
+
+
+        if (scope.Items?.Any() == true)
+        {
+            foreach (var item in scope.Items)
+            {
+                if (item.MonitoringItemType == MonitoringItemType.Scope)
+                {
+                    PrintScope((MonitoringScope)item);
+                } else
+                {
+                    PrintMonitoringItem((MonitoringItem)item);
+                }
+            }
+        }
+
+        Console.WriteLine($"{new string(' ', (scope?.Level ?? 0) * 4)}<{scope.Date:u}>: End Scope <{scope.Id}>: \"{scope.ScopeLabel}\"");
+    }
+
+    private static void PrintItem(MonitoringItem item)
     {
         lock (_lock)
         {
@@ -84,5 +92,14 @@ public static class Container
             $"{(item.PacketSize > 0 ? $", Packet Size = {item.PacketSize}" : "")}" +
             $"{(!string.IsNullOrEmpty(item.Category) ? $", Category = {item.Category}" : "")}.");
         }
+    }
+
+    private static void PrintMonitoringItem(MonitoringItem item)
+    {
+        Console.WriteLine(
+            $"{new string(' ', (item.Scope?.Level + 1 ?? 0) * 4)}<{item.Date:u}>: " +
+            $"{{{item.Type}}} {item.SourceType}[\"{item.From}\"] -> {item.DestinationType}[\"{item.To}\"]" +
+            $"{(item.PacketSize > 0 ? $", Packet Size = {item.PacketSize}" : "")}" +
+            $"{(!string.IsNullOrEmpty(item.Category) ? $", Category = {item.Category}" : "")}.");
     }
 }

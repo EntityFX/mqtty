@@ -27,18 +27,30 @@ public class Client : NodeBase, IClient
         ProtocolType = protocolType;
     }
 
-    public bool Connect(string server)
+    public async Task<bool> ConnectAsync(string server)
     {
         if (IsConnected) return true;
 
-        if (Network == null) return false;
+        var response = await ConnectImplementationAsync(server,
+            GetPacket(server, NodeType.Server, new byte[] { 0xFF }, "Connect"));
+
+        if (response == null) return false;
+
+        return true;
+    }
+
+    protected async Task<Packet?> ConnectImplementationAsync(string server, Packet connectPacket)
+    {
+
+
+        if (Network == null) return null;
 
         var result = Network.AddClient(this);
 
         if (!result)
         {
             IsConnected = false;
-            return false;
+            return null;
         }
 
         var remoteNode = AttachClientToServer(server);
@@ -46,16 +58,20 @@ public class Client : NodeBase, IClient
         if (remoteNode == null)
         {
             IsConnected = false;
-            return false;
+            return null;
         }
+
+        var payload = new byte[] { 0xFF };
+        var scope = NetworkGraph.Monitoring.WithBeginScope(ref connectPacket!, $"Connect {connectPacket.From} to {connectPacket.To}");
+        NetworkGraph.Monitoring.Push(connectPacket, MonitoringType.Connect, $"Client {connectPacket.From} connects to server {connectPacket.To}");
+        var response = await SendWithResponseImplementationAsync(connectPacket);
+        NetworkGraph.Monitoring.WithEndScope(ref response!);
 
         serverName = server;
 
-        NetworkGraph.Monitoring.Push(this, remoteNode, null, EntityFX.MqttY.Contracts.Monitoring.MonitoringType.Connect,
-            "connect");
         IsConnected = true;
 
-        return result;
+        return response;
     }
 
     private INode? AttachClientToServer(string server)
@@ -111,8 +127,12 @@ public class Client : NodeBase, IClient
     public override async Task<Packet> SendWithResponseAsync(Packet packet)
     {
         if (!IsConnected) throw new InvalidOperationException("Not Connected To server");
+        return await SendWithResponseImplementationAsync(packet);
+    }
+
+    private async Task<Packet> SendWithResponseImplementationAsync(Packet packet)
+    {
         BeforeSend(packet);
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category);
         var response = await Network!.SendWithResponseAsync(packet);
         AfterSend(packet);
         return response;
@@ -123,7 +143,6 @@ public class Client : NodeBase, IClient
         if (!IsConnected) throw new InvalidOperationException("Not Connected To server");
 
         BeforeSend(packet);
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category);
         await Network!.SendAsync(packet);
         AfterSend(packet);
     }
@@ -189,11 +208,10 @@ public class Client : NodeBase, IClient
 
     protected override void BeforeSend(Packet packet)
     {
-        NetworkGraph.Monitoring.TryBeginScope(ref packet, packet.Category ?? string.Empty);
+
     }
 
     protected override void AfterSend(Packet packet)
     {
-        NetworkGraph.Monitoring.TryEndScope(ref packet);
     }
 }

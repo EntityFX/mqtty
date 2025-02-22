@@ -4,7 +4,7 @@
     {
         bool IsConnected { get; }
 
-        bool Connect(string server);
+        Task<bool> ConnectAsync(string server);
 
         bool Disconnect();
 

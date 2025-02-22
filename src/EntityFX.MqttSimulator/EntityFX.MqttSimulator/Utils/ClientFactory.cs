@@ -36,7 +36,7 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions>
 
         }  else
         {
-            service?.Connect(options.ConnectsTo);
+            service?.ConnectAsync(options.ConnectsTo);
         }
 
         return service;
