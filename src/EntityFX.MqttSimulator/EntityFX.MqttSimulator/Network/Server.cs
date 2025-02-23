@@ -89,7 +89,7 @@ public class Server : NodeBase, IServer
 
         NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category, packet.Scope);
         //NetworkGraph.Monitoring.WithEndScope(ref packet);
-
+        Tick();
         var response = OnReceivedWithResponse(packet);
 
         PacketReceived?.Invoke(this, packet);
@@ -104,6 +104,7 @@ public class Server : NodeBase, IServer
     {
         BeforeReceive(packet);
         NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category, packet.Scope);
+        Tick();
         NetworkGraph.Monitoring.WithEndScope(ref packet);
 
         await OnReceived(packet);
@@ -133,7 +134,7 @@ public class Server : NodeBase, IServer
         BeforeSend(packet);
         var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Send packet {packet.From} to {packet.To}");
         NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category, scope);
-
+        Tick();
         var result = await Network.SendWithResponseAsync(packet);
 
         NetworkGraph.Monitoring.WithEndScope(ref packet);
@@ -148,7 +149,7 @@ public class Server : NodeBase, IServer
 
         var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Send packet {packet.From} to {packet.To}");
         NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category, scope);
-
+        Tick();
         await Network.SendAsync(packet);
 
         NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category);

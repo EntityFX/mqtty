@@ -41,5 +41,9 @@ namespace EntityFX.MqttY.Contracts.Network
         void Configure(NetworkGraphOptions value);
 
         Packet GetReversePacket(Packet packet, byte[] payload, string? category);
+
+        void Refresh();
+
+        void Tick(INode nodeBase);
     }
 }

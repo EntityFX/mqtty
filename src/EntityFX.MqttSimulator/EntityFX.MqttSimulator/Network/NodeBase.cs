@@ -42,4 +42,14 @@ public abstract class NodeBase : INode
 
     protected Packet GetPacket(string to, NodeType toType, byte[] payload, string? category = null)
         => new Packet(Name, to, NodeType, toType, payload, category);
+
+    public virtual void Refresh()
+    {
+        Tick();
+    }
+
+    public virtual void Tick()
+    {
+        NetworkGraph.Tick(this);
+    }
 }

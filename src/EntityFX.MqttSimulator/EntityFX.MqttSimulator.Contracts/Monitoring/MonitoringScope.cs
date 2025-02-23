@@ -17,4 +17,9 @@ public class MonitoringScope : IMonitoringItem
     public MonitoringItemType MonitoringItemType => MonitoringItemType.Scope;
 
     public ScopeStatus ScopeStatus { get; set; } = ScopeStatus.Begin;
+
+    public long StartTick { get; init; }
+    public long EndTick { get; set; }
+    public long Ticks { get; set; }
+
 }

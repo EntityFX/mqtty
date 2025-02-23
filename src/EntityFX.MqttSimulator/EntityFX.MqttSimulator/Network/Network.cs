@@ -228,7 +228,7 @@ public class Network : NodeBase, INetwork
         }
         NetworkGraph.Monitoring.Push(packet, MonitoringType.Push, packet.Category);
         NetworkGraph.Monitoring.WithEndScope(ref packet);
-
+        Tick();
         return await destionationNode!.ReceiveWithResponseAsync(packet);
     }
 
@@ -246,7 +246,7 @@ public class Network : NodeBase, INetwork
             return false;
         }
         NetworkGraph.Monitoring.Push(packet, MonitoringType.Push, packet.Category);
-
+        Tick();
         await destionationNode!.ReceiveAsync(packet);
 
         return true;
@@ -266,7 +266,16 @@ public class Network : NodeBase, INetwork
             return null;
         }
 
-        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, packet.Category, packet.Scope);
+        Tick();
+        packet.DecrementTtl();
+
+        if (packet.Ttl == 0)
+        {
+            NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, "Unreachable", packet.Scope, packet.Ttl);
+            //destination uneachable
+            return packet;
+        }
+        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, packet.Category, packet.Scope, packet.Ttl);
         var result = await next.SendToLocalWithResponseAsync(next, packet);
 
         if (result == null)
@@ -291,7 +300,17 @@ public class Network : NodeBase, INetwork
             return false;
         }
 
-        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, packet.Category, packet.Scope);
+        Tick();
+        packet.DecrementTtl();
+
+        if (packet.Ttl == 0)
+        {
+            NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, "Unreachable", packet.Scope);
+            //destination uneachable
+            return false;
+        }
+
+        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, packet.Category, packet.Scope, packet.Ttl);
         var result = await next.SendToLocalAsync(next, packet);
 
         if (!result)

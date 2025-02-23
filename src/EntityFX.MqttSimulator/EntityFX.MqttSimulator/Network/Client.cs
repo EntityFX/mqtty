@@ -41,8 +41,6 @@ public class Client : NodeBase, IClient
 
     protected async Task<Packet?> ConnectImplementationAsync(string server, Packet connectPacket)
     {
-
-
         if (Network == null) return null;
 
         var result = Network.AddClient(this);
@@ -133,6 +131,7 @@ public class Client : NodeBase, IClient
     private async Task<Packet> SendWithResponseImplementationAsync(Packet packet)
     {
         BeforeSend(packet);
+        Tick();
         var response = await Network!.SendWithResponseAsync(packet);
         AfterSend(packet);
         return response;
@@ -143,6 +142,7 @@ public class Client : NodeBase, IClient
         if (!IsConnected) throw new InvalidOperationException("Not Connected To server");
 
         BeforeSend(packet);
+        Tick();
         await Network!.SendAsync(packet);
         AfterSend(packet);
     }
@@ -169,16 +169,19 @@ public class Client : NodeBase, IClient
         SendAsync(payload, category).Wait();
     }
 
-    public override Task<Packet> ReceiveWithResponseAsync(Packet packet)
+    public override async Task<Packet> ReceiveWithResponseAsync(Packet packet)
     {
         BeforeReceive(packet);
+        Tick();
+        await OnReceivedWithResponseAsync(packet);
         AfterReceive(packet);
-        return Task.FromResult(packet);
+        return packet;
     }
 
     public override async Task ReceiveAsync(Packet packet)
     {
         BeforeReceive(packet);
+        Tick();
         await OnReceivedAsync(packet);
         AfterReceive(packet);
     }

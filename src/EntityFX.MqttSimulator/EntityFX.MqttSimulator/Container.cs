@@ -60,7 +60,8 @@ public static class Container
 
     private static void PrintScope(MonitoringScope scope)
     {
-        Console.WriteLine($"{new string(' ', (scope?.Level ?? 0) * 4)}<{scope.Date:u}>: Begin Scope <{scope.Id}>: \"{scope.ScopeLabel}\"");
+        Console.WriteLine($"{new string(' ', (scope?.Level ?? 0) * 4)}<{scope.Date:u}>: " +
+            $"Begin Scope <{scope.Id}> (StartTick={scope.StartTick}, Ticks={scope.Ticks}): \"{scope.ScopeLabel}\"");
 
 
         if (scope.Items?.Any() == true)
@@ -86,18 +87,15 @@ public static class Container
         {
             if (item.Scope != null) return;
 
-        Console.WriteLine(
-            $"{new string(' ', (item.Scope?.Level + 1 ?? 0) * 4)}<{item.Date:u}>: " +
-            $"{{{item.Type}}} {item.SourceType}[\"{item.From}\"] -> {item.DestinationType}[\"{item.To}\"]" +
-            $"{(item.PacketSize > 0 ? $", Packet Size = {item.PacketSize}" : "")}" +
-            $"{(!string.IsNullOrEmpty(item.Category) ? $", Category = {item.Category}" : "")}.");
+            PrintMonitoringItem(item);
         }
     }
 
     private static void PrintMonitoringItem(MonitoringItem item)
     {
         Console.WriteLine(
-            $"{new string(' ', (item.Scope?.Level + 1 ?? 0) * 4)}<{item.Date:u}>: " +
+            $"{new string(' ', (item.Scope?.Level + 1 ?? 0) * 4)}<{item.Date:u}> " +
+            $"(Tick={item.Tick}) {(item.Ttl != null ? $"{{Ttl={item.Ttl}}}" : "")}: " +
             $"{{{item.Type}}} {item.SourceType}[\"{item.From}\"] -> {item.DestinationType}[\"{item.To}\"]" +
             $"{(item.PacketSize > 0 ? $", Packet Size = {item.PacketSize}" : "")}" +
             $"{(!string.IsNullOrEmpty(item.Category) ? $", Category = {item.Category}" : "")}.");

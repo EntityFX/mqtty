@@ -24,5 +24,9 @@
 
         Task ReceiveAsync(Packet packet);
 
+        void Tick();
+
+        void Refresh();
+
     }
 }

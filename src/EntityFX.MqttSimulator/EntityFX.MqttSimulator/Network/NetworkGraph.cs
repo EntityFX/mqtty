@@ -315,4 +315,33 @@ public class NetworkGraph : INetworkGraph
 
         _nodes.Remove((serverAddress, NodeType.Client));
     }
+
+    public void Refresh()
+    {
+        var scope = Monitoring.BeginScope("Refresh network graph");
+        Monitoring.Push(MonitoringType.Refresh, $"Refresh whole network", scope);
+
+        var bytes = Array.Empty<byte>();
+
+        foreach (var network in _networks)
+        {
+            Monitoring.Push(
+                network.Value, network.Value, bytes, MonitoringType.Refresh, $"Refresh network {network.Key}", scope);
+            network.Value.Refresh();
+        }
+
+        foreach (var node in _nodes)
+        {
+            Monitoring.Push(
+                node.Value, node.Value, bytes, MonitoringType.Refresh, $"Refresh node {node.Key}", scope);
+            node.Value.Refresh();
+        }
+
+        Monitoring.EndScope(scope);
+    }
+
+    public void Tick(INode nodeBase)
+    {
+        Monitoring.Tick();
+    }
 }

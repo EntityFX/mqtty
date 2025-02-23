@@ -42,6 +42,8 @@ internal class Worker : BackgroundService
         {
             await mqttClient1!.PublishAsync("telemetry/temperature", new byte[] { 7 }, MqttQos.AtLeastOnce);
             await Task.Delay(2000);
+
+            _networkGraph.Refresh();
         }
         await Task.CompletedTask;
     }

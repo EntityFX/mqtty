@@ -14,6 +14,8 @@ namespace EntityFX.MqttY.Contracts.Mqtt
 
         string ClientId { get; }
 
+        event EventHandler<MqttMessage> MessageReceived;
+
         Task<SessionState> ConnectAsync(string server, bool cleanSession = false);
 
         Task DisconnectAsync();

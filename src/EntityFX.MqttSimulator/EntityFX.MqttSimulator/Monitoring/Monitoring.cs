@@ -4,6 +4,7 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Network;
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Net.Sockets;
 using System.Xml.Linq;
 using static System.Formats.Asn1.AsnWriter;
 
@@ -24,18 +25,19 @@ public class Monitoring : IMonitoring
 
     private int _scopesEnded = 0;
 
+    private long _tick = 0;
+
     public Monitoring(bool scopesEnabled)
     {
         this.scopesEnabled = scopesEnabled;
     }
 
-    private void Push(string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
-        MonitoringType type, string? category, MonitoringScope? scope = null)
+    public void Push(MonitoringType type, string? category, MonitoringScope? scope = null, int? ttl = null)
     {
         var item = new MonitoringItem(
-            Guid.NewGuid(), DateTimeOffset.Now, from,
-            fromType, to, toType,
-            (uint)(packet?.Length ?? 0), type, string.Empty, scope, category);
+            Guid.NewGuid(), _tick, DateTimeOffset.Now, string.Empty,
+                NodeType.Custom, string.Empty, NodeType.Custom,
+            0, type, string.Empty, scope, category, ttl);
 
         _storage.TryAdd(item.Date, item);
 
@@ -44,11 +46,27 @@ public class Monitoring : IMonitoring
         Added?.Invoke(this, item);
     }
 
-    public void Push(INode from, INode to, byte[]? packet, MonitoringType type, string? category, MonitoringScope? scope = null)
+    private void Push(string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
+        MonitoringType type, string? category, MonitoringScope? scope = null, int? ttl = null)
+    {
+        var item = new MonitoringItem(
+            Guid.NewGuid(), _tick, DateTimeOffset.Now, from,
+            fromType, to, toType,
+            (uint)(packet?.Length ?? 0), type, string.Empty, scope, category, ttl);
+
+        _storage.TryAdd(item.Date, item);
+
+        scope?.Items.Add(item);
+
+        Added?.Invoke(this, item);
+    }
+
+    public void Push(INode from, INode to, byte[]? packet, MonitoringType type, 
+        string? category, MonitoringScope? scope = null, int? ttl = null)
     {
         Push(from.Address,
             from.NodeType, to.Address, to.NodeType, packet,
-            type, category, scope);
+            type, category, scope, ttl);
     }
 
 
@@ -57,10 +75,10 @@ public class Monitoring : IMonitoring
     {
         Push(packet.From,
             packet.FromType, packet.To, packet.ToType, packet.Payload,
-            type, category, packet?.Scope ?? scope);
+            type, category, packet?.Scope ?? scope, packet?.Ttl);
     }
 
-    public MonitoringScope BeginScope(string scope, MonitoringScope? parent)
+    public MonitoringScope BeginScope(string scope, MonitoringScope? parent = null)
     {
         var scopeItem = new MonitoringScope()
         {
@@ -68,7 +86,8 @@ public class Monitoring : IMonitoring
             ScopeLabel = scope,
             Level = parent?.Level + 1 ?? 0,
             Date = DateTimeOffset.Now,
-            Parent = parent
+            Parent = parent,
+            StartTick = _tick
         };
         _scopes.AddOrUpdate(scopeItem.Id, scopeItem, (key, value) => scopeItem);
         (parent)?.Items.Add(scopeItem);
@@ -78,7 +97,7 @@ public class Monitoring : IMonitoring
         return scopeItem!;
     }
 
-    public void TryBeginScope(ref Packet packet, string scope)
+    public void BeginScope(ref Packet packet, string scope)
     {
         if (!scopesEnabled) return;
 
@@ -112,27 +131,7 @@ public class Monitoring : IMonitoring
         return;
     }
 
-    public MonitoringScope? EndScope(Guid? scopeId)
-    {
-        if (!scopesEnabled) return null;
-
-        if (!_scopes.Any() || scopeId == null)
-        {
-            return null;
-        }
-
-        var currentScope = _scopes.GetValueOrDefault(scopeId.Value);
-
-        if (currentScope == null)
-        {
-            return null;
-        }
-        ScopeEnded?.Invoke(this, currentScope);
-
-        return currentScope;
-    }
-
-    public void TryEndScope(ref Packet packet)
+    public void EndScope(ref Packet packet)
     {
         if (!scopesEnabled) return;
 
@@ -144,7 +143,7 @@ public class Monitoring : IMonitoring
         var scope = packet.Scope;
         if (scope != null)
         {
-            TryEndScope(scope!);
+            EndScope(scope!);
         }
         packet = packet with
         {
@@ -153,7 +152,7 @@ public class Monitoring : IMonitoring
         return;
     }
 
-    public void TryEndScope(MonitoringScope? scope)
+    public void EndScope(MonitoringScope? scope)
     {
         if (!scopesEnabled) return;
 
@@ -163,10 +162,17 @@ public class Monitoring : IMonitoring
         }
 
         scope.ScopeStatus = ScopeStatus.End;
+        scope.EndTick = _tick;
+        scope.Ticks = scope.EndTick - scope.StartTick;
 
         Interlocked.Increment(ref _scopesEnded);
         ScopeEnded?.Invoke(this, scope);
 
         return;
+    }
+
+    public void Tick()
+    {
+        Interlocked.Increment(ref _tick);
     }
 }

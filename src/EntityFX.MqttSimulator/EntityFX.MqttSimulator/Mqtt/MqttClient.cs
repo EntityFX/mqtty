@@ -23,6 +23,7 @@ namespace EntityFX.MqttY.Mqtt
 
         private IDictionary<MqttPacketType, Func<string, ushort, IPacket?>> _senderRules;
 
+        public event EventHandler<MqttMessage> MessageReceived;
 
         public MqttClient(int index, string name, string address, string protocolType,
             INetwork network, INetworkGraph networkGraph, string? clientId)
@@ -107,6 +108,18 @@ namespace EntityFX.MqttY.Mqtt
                 throw new MqttClientException($"Subscription Rejected: {Id}, {topicFilter}");
             }
 
+            var session = _sessionRepository.Read(ClientId);
+
+            if (session == null)
+            {
+                return;
+            }
+
+            session.Subscriptions.Add(new ClientSubscription() { 
+                ClientId = ClientId, 
+                MaximumQualityOfService = qos,
+                TopicFilter = topicFilter});
+
             NetworkGraph.Monitoring.WithEndScope(ref response!);
         }
 
@@ -151,10 +164,11 @@ namespace EntityFX.MqttY.Mqtt
                 await base.OnReceivedAsync(packet);
             }
 
+            NetworkGraph.Monitoring.WithEndScope(ref packet);
             switch (payload!.Type)
             {
                 case MqttPacketType.PublishAck:
-                    await ProcessAckPacket(packet, packet.Payload.BytesToPacket<PublishAckPacket>());
+                    await ProcessPublishAckFromBroker(packet, packet.Payload.BytesToPacket<PublishAckPacket>());
                     break;
                 case MqttPacketType.PublishReceived:
                     break;
@@ -163,21 +177,27 @@ namespace EntityFX.MqttY.Mqtt
                 case MqttPacketType.PingResponse:
                     break;
                 case MqttPacketType.Publish:
-                    await ProcessPublish(packet, packet.Payload.BytesToPacket<PublishPacket>());
+                    await ProcessPublishFromBroker(packet, packet.Payload.BytesToPacket<PublishPacket>());
                     break;
                 default:
                     break;
             }
         }
 
-        private async Task ProcessPublish(Packet packet, PublishPacket? publishPacket)
+        private async Task ProcessPublishFromBroker(Packet packet, PublishPacket? publishPacket)
         {
             if (publishPacket == null)
             {
                 return;
             }
+            NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, 
+                $"MQTT Client {ClientId} receives Publish message from {packet.From} broker by topic {publishPacket.Topic}");
+
             NetworkGraph.Monitoring.WithEndScope(ref packet);
             await SendPublishAck(packet, ClientId, publishPacket.QualityOfService, publishPacket);
+
+            MessageReceived?.Invoke(this,
+                new MqttMessage(publishPacket.Topic, publishPacket.Payload, publishPacket.QualityOfService, packet.From));
         }
 
         private async Task SendPublishAck(Packet packet, string clientId, MqttQos qos, PublishPacket publishPacket)
@@ -190,7 +210,7 @@ namespace EntityFX.MqttY.Mqtt
         }
 
 
-        private Task ProcessAckPacket(Packet payload, PublishAckPacket? publishAckPacket)
+        private Task ProcessPublishAckFromBroker(Packet payload, PublishAckPacket? publishAckPacket)
         {
             if (publishAckPacket == null)
             {

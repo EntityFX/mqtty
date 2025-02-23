@@ -3,9 +3,10 @@
 namespace EntityFX.MqttY.Contracts.Monitoring
 {
     public record MonitoringItemExtended<TDetails>
-        (Guid Id, DateTimeOffset Date, string From, NodeType SourceType, string To, NodeType DestinationType,
+        (Guid Id, long Tick, DateTimeOffset Date, string From, NodeType SourceType, string To, NodeType DestinationType,
             uint PacketSize, MonitoringType Type, string Protocol, TDetails Details, 
-            MonitoringScope? Scope, string? Category)
+            MonitoringScope? Scope, string? Category, int? Ttl)
 
-        : MonitoringItem(Id, Date, From, SourceType, To, DestinationType, PacketSize, Type, Protocol, Scope, Category);
+        : MonitoringItem(Id, Tick, Date, From, SourceType, To, DestinationType, 
+            PacketSize, Type, Protocol, Scope, Category, Ttl);
 }

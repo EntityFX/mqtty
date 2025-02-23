@@ -9,6 +9,7 @@
         Disconnect,
         Link,
         Unlink,
-        DestinationUnreachable
+        DestinationUnreachable,
+        Refresh
     }
 }
