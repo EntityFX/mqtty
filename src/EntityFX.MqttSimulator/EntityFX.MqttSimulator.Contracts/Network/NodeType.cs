@@ -5,6 +5,7 @@
         Network = 0,
         Server = 1,
         Client = 2,
-        Custom = 3
+        Application = 3,
+        Other = 4
     }
 }

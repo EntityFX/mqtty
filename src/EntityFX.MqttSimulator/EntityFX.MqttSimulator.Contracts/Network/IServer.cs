@@ -1,6 +1,6 @@
 ﻿namespace EntityFX.MqttY.Contracts.Network
 {
-    public interface IServer : INode, ILeafNode
+    public interface IServer : ISender, ILeafNode
     {
         bool IsStarted { get; }
 

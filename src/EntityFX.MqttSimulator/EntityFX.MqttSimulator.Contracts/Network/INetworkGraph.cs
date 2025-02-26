@@ -25,6 +25,9 @@ namespace EntityFX.MqttY.Contracts.Network
         ILeafNode? BuildNode(int index, string name, string address, NodeType nodeType, string? group = null, int? groupAmount = null,
             Dictionary<string, string[]>? additional = null);
 
+        IApplication? BuildApplication<TConfiguration>(int index, string name, string protocolType, INetwork network, string? group = null, int? groupAmount = null,
+            TConfiguration? applicationConfig = default);
+
         string GetAddress(string name, string protocolType, string network);
 
 

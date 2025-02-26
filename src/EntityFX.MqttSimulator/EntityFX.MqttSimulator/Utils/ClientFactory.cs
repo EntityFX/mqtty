@@ -5,9 +5,9 @@ using EntityFX.MqttY.Mqtt;
 
 namespace EntityFX.MqttY.Utils;
 
-internal class ClientFactory : IFactory<IClient?, NodeBuildOptions>
+internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>>
 {
-    public IClient? Configure(NodeBuildOptions options, IClient? service)
+    public IClient? Configure(NodeBuildOptions<Dictionary<string, string[]>> options, IClient? service)
     {
         if (string.IsNullOrEmpty(options.ConnectsTo))
         {
@@ -42,7 +42,7 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions>
         return service;
     }
 
-    public IClient? Create(NodeBuildOptions options)
+    public IClient? Create(NodeBuildOptions<Dictionary<string, string[]>> options)
     {
         if (options.Network == null)
         {

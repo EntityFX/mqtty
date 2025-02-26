@@ -37,7 +37,7 @@ public class Monitoring : IMonitoring
     {
         var item = new MonitoringItem(
             Guid.NewGuid(), _tick, DateTimeOffset.Now, string.Empty,
-                NodeType.Custom, string.Empty, NodeType.Custom,
+                NodeType.Other, string.Empty, NodeType.Other,
             0, type, string.Empty, scope, category, ttl);
 
         _storage.TryAdd(item.Date, item);

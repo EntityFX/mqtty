@@ -16,9 +16,9 @@ public static class Container
         return serviceCollection
             .AddScoped<IMonitoring>((sp) => ConfigureMonitoring(sp))
             .AddScoped<PlantUmlGraphGenerator>()
-            .AddScoped<IFactory<IClient?, NodeBuildOptions>, ClientFactory>()
-            .AddScoped<IFactory<IServer?, NodeBuildOptions>, ServerFactory>()
-            .AddScoped<IFactory<INetwork, NodeBuildOptions>, NetworkFactory>()
+            .AddScoped<IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>>, ClientFactory>()
+            .AddScoped<IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>>, ServerFactory>()
+            .AddScoped<IFactory<INetwork, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>>, NetworkFactory>()
             .AddScoped<INetworkBuilder, NetworkBuilder>()
             .AddScoped<IPathFinder, DijkstraPathFinder>()
             .AddScoped<INetworkGraph, NetworkGraph>();

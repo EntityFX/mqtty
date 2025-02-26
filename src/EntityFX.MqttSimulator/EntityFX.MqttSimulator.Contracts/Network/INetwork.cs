@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace EntityFX.MqttY.Contracts.Network
 {
-    public interface INetwork : INode
+    public interface INetwork : ISender
     {
         IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks { get; }
         IReadOnlyDictionary<string, IServer> Servers { get; }

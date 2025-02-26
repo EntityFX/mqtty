@@ -16,14 +16,6 @@
 
         NodeType NodeType { get; }
 
-        Task<Packet> ReceiveWithResponseAsync(Packet packet);
-
-        Task<Packet> SendWithResponseAsync(Packet packet);
-
-        Task SendAsync(Packet packet);
-
-        Task ReceiveAsync(Packet packet);
-
         void Tick();
 
         void Refresh();

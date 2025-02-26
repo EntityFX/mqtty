@@ -6,9 +6,9 @@ namespace EntityFX.MqttY.Utils;
 internal class NetworkBuilder : INetworkBuilder
 {
     public NetworkBuilder(
-        IFactory<IClient?, NodeBuildOptions> clientFactory, 
-        IFactory<IServer?, NodeBuildOptions> serverFactory, 
-        IFactory<INetwork?, NodeBuildOptions> networkFactory)
+        IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>> clientFactory, 
+        IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>> serverFactory, 
+        IFactory<INetwork?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>> networkFactory)
     {
         ClientFactory = clientFactory;
         ServerFactory = serverFactory;
@@ -19,13 +19,13 @@ internal class NetworkBuilder : INetworkBuilder
     
     private INetworkGraph? _networkGraph;
     
-    public IFactory<IClient?, NodeBuildOptions> ClientFactory { get; }
+    public IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>> ClientFactory { get; }
     
-    public IFactory<IServer?, NodeBuildOptions> ServerFactory { get; }
+    public IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>> ServerFactory { get; }
     
-    public IFactory<INetwork?, NodeBuildOptions> NetworkFactory { get; }
-    
+    public IFactory<INetwork?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>> NetworkFactory { get; }
 
+    public IFactory<IApplication?, NodeBuildOptions<object>, object> ApplicationFactory { get; }
 
     public INetworkBuilder WithNetwork(INetwork network)
     {

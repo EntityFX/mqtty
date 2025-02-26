@@ -1,6 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
 
-public abstract class NodeBase : INode
+public abstract class NodeBase : ISender
 {
     protected readonly INetworkGraph NetworkGraph;
 

@@ -343,9 +343,9 @@ public class Network : NodeBase, INetwork
         return $"N: {Address}";
     }
 
-    private INode? GetDestinationNode(string id, NodeType destinationNodeType)
+    private ISender? GetDestinationNode(string id, NodeType destinationNodeType)
     {
-        INode? result = null;
+        ISender? result = null;
         switch (destinationNodeType)
         {
             case NodeType.Network:

@@ -1,11 +1,11 @@
 namespace EntityFX.MqttY.Contracts.Network;
 
-public class NodeBuildOptions
+public class NodeBuildOptions<TOptions>
 {
     public NodeBuildOptions(
         INetworkGraph networkGraph, INetwork? network,
         int index,
-        string name, string address, string? group, int? groupAmount, string protocol, string? connectsTo, Dictionary<string, string[]>? additional)
+        string name, string address, string? group, int? groupAmount, string protocol, string? connectsTo, TOptions? additional)
     {
         NetworkGraph = networkGraph;
         Network = network;
@@ -33,5 +33,5 @@ public class NodeBuildOptions
 
     public string? ConnectsTo { get; init; }
 
-    public Dictionary<string, string[]>? Additional { get; init; }
+    public TOptions? Additional { get; init; }
 }
