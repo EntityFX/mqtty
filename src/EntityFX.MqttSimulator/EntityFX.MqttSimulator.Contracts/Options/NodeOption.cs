@@ -14,5 +14,7 @@
         public int? Index { get; set; }
 
         public Dictionary<string, string[]> Additional { get; init; } = new Dictionary<string, string[]>();
+
+        public object? Configuration { get; set; }
     }
 }

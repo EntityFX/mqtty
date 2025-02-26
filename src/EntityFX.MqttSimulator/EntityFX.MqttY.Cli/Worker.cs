@@ -5,16 +5,19 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System.Threading;
 using EntityFX.MqttY.Utils;
+using Microsoft.Extensions.Configuration;
 
 internal class Worker : BackgroundService
 {
+    private readonly IConfiguration configuration;
     private readonly IOptions<NetworkGraphOptions> _options;
     private readonly INetworkGraph _networkGraph;
     private readonly PlantUmlGraphGenerator _plantUmlGraphGenerator;
 
-    public Worker(IOptions<NetworkGraphOptions> options, INetworkGraph networkGraph, 
+    public Worker(IConfiguration configuration, IOptions<NetworkGraphOptions> options, INetworkGraph networkGraph, 
         PlantUmlGraphGenerator plantUmlGraphGenerator)
     {
+        this.configuration = configuration;
         this._options = options;
         this._networkGraph = networkGraph;
         _plantUmlGraphGenerator = plantUmlGraphGenerator;

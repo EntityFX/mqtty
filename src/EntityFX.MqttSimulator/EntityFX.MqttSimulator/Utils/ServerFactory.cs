@@ -4,10 +4,11 @@ using EntityFX.MqttY.Mqtt;
 
 namespace EntityFX.MqttY.Utils;
 
-internal class ServerFactory : IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>>
+internal class ServerFactory : IFactory<IServer?, Dictionary<string, string[]>>
 {
     public IServer? Configure(NodeBuildOptions<Dictionary<string, string[]>> options, IServer? service)
     {
+        service?.Start();
         return service;
     }
 

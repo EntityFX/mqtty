@@ -5,7 +5,7 @@ using EntityFX.MqttY.Mqtt;
 
 namespace EntityFX.MqttY.Utils;
 
-internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>>
+internal class ClientFactory : IFactory<IClient?, Dictionary<string, string[]>>
 {
     public IClient? Configure(NodeBuildOptions<Dictionary<string, string[]>> options, IClient? service)
     {

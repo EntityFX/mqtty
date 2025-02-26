@@ -11,6 +11,7 @@ namespace EntityFX.MqttY.Contracts.Network
         IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks { get; }
         IReadOnlyDictionary<string, IServer> Servers { get; }
         IReadOnlyDictionary<string, IClient> Clients { get; }
+        IReadOnlyDictionary<string, IApplication> Applications { get; }
 
         bool Link(INetwork network);
 
@@ -21,6 +22,10 @@ namespace EntityFX.MqttY.Contracts.Network
         bool AddServer(IServer server);
 
         bool RemoveServer(string server);
+
+        bool AddApplication(IApplication application);
+
+        bool RemoveApplication(string application);
 
         bool AddClient(IClient client);
 

@@ -8,10 +8,11 @@ using System.Threading.Tasks;
 
 namespace EntityFX.MqttY.Application.Mqtt
 {
-    public class MqttRelay : Application
+    public class MqttRelay : Application<MqttRelayConfiguration>
     {
-        public MqttRelay(int index, string name, string address, string protocolType, INetwork network, INetworkGraph networkGraph) 
-            : base(index, name, address, protocolType, network, networkGraph)
+        public MqttRelay(int index, string name, string address, string protocolType, INetwork network, INetworkGraph networkGraph,
+            MqttRelayConfiguration? mqttRelayConfiguration) 
+            : base(index, name, address, protocolType, network, networkGraph, mqttRelayConfiguration)
         {
         }
     }

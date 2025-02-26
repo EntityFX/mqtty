@@ -3,6 +3,7 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Utils;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EntityFX.MqttY;
@@ -16,9 +17,10 @@ public static class Container
         return serviceCollection
             .AddScoped<IMonitoring>((sp) => ConfigureMonitoring(sp))
             .AddScoped<PlantUmlGraphGenerator>()
-            .AddScoped<IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>>, ClientFactory>()
-            .AddScoped<IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>>, ServerFactory>()
-            .AddScoped<IFactory<INetwork, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>>, NetworkFactory>()
+            .AddScoped<IFactory<IClient?, Dictionary<string, string[]>>, ClientFactory>()
+            .AddScoped<IFactory<IServer?, Dictionary<string, string[]>>, ServerFactory>()
+            .AddScoped<IFactory<INetwork, Dictionary<string, string[]>>, NetworkFactory>()
+            .AddScoped<IFactory<IApplication?, object>, ApplicationFactory>()
             .AddScoped<INetworkBuilder, NetworkBuilder>()
             .AddScoped<IPathFinder, DijkstraPathFinder>()
             .AddScoped<INetworkGraph, NetworkGraph>();

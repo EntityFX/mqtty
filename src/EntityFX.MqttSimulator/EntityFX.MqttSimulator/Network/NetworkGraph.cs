@@ -7,6 +7,7 @@ using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
+using Microsoft.Extensions.Configuration;
 
 namespace EntityFX.MqttY.Network;
 
@@ -139,9 +140,15 @@ public class NetworkGraph : INetworkGraph
         var servers = options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Server).ToArray();
         foreach (var node in servers)
         {
-            var nodeServer = GetNode(node.Key, NodeType.Server);
+            var nodeServer = GetNode(node.Key, NodeType.Server) as IServer;
+            if (nodeServer == null) continue;
 
-            (nodeServer as IServer)?.Start();
+            var bo = new NodeBuildOptions<Dictionary<string, string[]>>(
+                this, nodeServer.Network, nodeServer.Index, nodeServer.Name, nodeServer.Address,
+                nodeServer.Group, nodeServer.GroupAmount, nodeServer.ProtocolType, node.Value.ConnectsToServer, node.Value.Additional);
+
+            _networkBuilder.ServerFactory.Configure(bo, nodeServer);
+
         }
 
         var clients = options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Client).ToArray();
@@ -178,6 +185,21 @@ public class NetworkGraph : INetworkGraph
                 _networkBuilder.ClientFactory.Configure(bo, nodeClient);
             }
         }
+
+        var applications = options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Application).ToArray();
+        foreach (var application in applications)
+        {
+            var nodeApplication = GetNode(application.Key, NodeType.Application) as IApplication;
+            if (nodeApplication == null) continue;
+
+            var bo = new NodeBuildOptions<object>(
+                this, nodeApplication.Network, nodeApplication.Index, nodeApplication.Name, nodeApplication.Address,
+                nodeApplication.Group, nodeApplication.GroupAmount, nodeApplication.ProtocolType,
+                null, application.Value.Configuration);
+
+            _networkBuilder.ApplicationFactory.Configure(bo, nodeApplication);
+
+        }
     }
 
     private void BuildNodes(NetworkGraphOptions options)
@@ -191,28 +213,28 @@ public class NetworkGraph : INetworkGraph
             switch (node.Value.Type)
             {
                 case NodeOptionType.Server:
-                    {
-                        BuildServer(index, node.Key, node.Value.Specification ?? "tcp", linkNetwork, null, null, node.Value.Additional);
-                        break;
-                    }
+
+                    BuildServer(index, node.Key, node.Value.Specification ?? "tcp", linkNetwork, null, null, node.Value.Additional);
+                    break;
+
                 case NodeOptionType.Client:
+
+                    if (node.Value.Quantity > 1)
                     {
-                        if (node.Value.Quantity > 1)
-                        {
-                            Enumerable.Range(1, node.Value.Quantity.Value).ToList()
-                                .ForEach(
-                                    (nc) => BuildClient(
-                                        index, $"{node.Key}{nc}",
-                                        node.Value.Specification ?? "tcp", linkNetwork, node.Key, node.Value.Quantity, node.Value.Additional));
-                        }
-                        else
-                        {
-                            BuildClient(index, node.Key, node.Value.Specification ?? "tcp", linkNetwork, null, null, node.Value.Additional);
-                        }
-
-
-                        break;
+                        Enumerable.Range(1, node.Value.Quantity.Value).ToList()
+                            .ForEach(
+                                (nc) => BuildClient(
+                                    index, $"{node.Key}{nc}",
+                                    node.Value.Specification ?? "tcp", linkNetwork, node.Key, node.Value.Quantity, node.Value.Additional));
                     }
+                    else
+                    {
+                        BuildClient(index, node.Key, node.Value.Specification ?? "tcp", linkNetwork, null, null, node.Value.Additional);
+                    }
+                    break;
+                case NodeOptionType.Application:
+                    BuildApplication(index, node.Key, node.Value.Specification ?? "tcp", linkNetwork, null, null, node.Value.Configuration);
+                    break;
             }
 
             index++;
@@ -369,7 +391,7 @@ public class NetworkGraph : INetworkGraph
             return null;
         }
 
-        _nodes.Add((name, NodeType.Server), server);
+        _nodes.Add((name, NodeType.Application), server);
 
         return server;
     }

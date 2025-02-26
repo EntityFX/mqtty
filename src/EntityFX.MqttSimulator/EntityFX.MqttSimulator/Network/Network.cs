@@ -9,12 +9,15 @@ public class Network : NodeBase, INetwork
     private readonly Dictionary<string, INetwork> _linkedNetworks = new();
     private readonly Dictionary<string, IServer> _servers = new();
     private readonly Dictionary<string, IClient> _clients = new();
+    private readonly Dictionary<string, IApplication> _applications = new();
 
     public IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks => _linkedNetworks.ToImmutableDictionary();
 
     public IReadOnlyDictionary<string, IServer> Servers => _servers.ToImmutableDictionary();
 
     public IReadOnlyDictionary<string, IClient> Clients => _clients.ToImmutableDictionary();
+
+    public IReadOnlyDictionary<string, IApplication> Applications => _applications.ToImmutableDictionary();
 
 
     public override NodeType NodeType => NodeType.Network;
@@ -381,5 +384,30 @@ public class Network : NodeBase, INetwork
 
     protected override void AfterSend(Packet packet)
     {
+    }
+
+    public bool AddApplication(IApplication application)
+    {
+        if (application == null) throw new ArgumentNullException("application");
+
+        if (_applications.ContainsKey(application.Name))
+        {
+            return false;
+        }
+        _applications[application.Name] = application;
+
+        return true;
+    }
+
+    public bool RemoveApplication(string application)
+    {
+        if (!_applications.ContainsKey(application))
+        {
+            return false;
+        }
+
+        _applications.Remove(application);
+
+        return true;
     }
 }

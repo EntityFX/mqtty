@@ -178,6 +178,20 @@ public class PlantUmlGraphGenerator
                     visitedGroups.Add(server.Value.Group);
                 }
             }
+
+            foreach (var application in network.Applications)
+            {
+                if (application.Value.Group != null && visitedGroups.Contains(application.Value.Group))
+                {
+                    continue;
+                }
+                AppendNode(plantUmlBuilder, "component", application.Key,
+                    application.Value.ProtocolType, "4AE366");
+                if (application.Value.Group != null)
+                {
+                    visitedGroups.Add(application.Value.Group);
+                }
+            }
         }
     }
 
@@ -208,6 +222,19 @@ public class PlantUmlGraphGenerator
                 if (server.Value.Group != null)
                 {
                     visitedGroups.Add(server.Value.Group);
+                }
+            }
+
+            foreach (var application in network.Applications)
+            {
+                if (application.Value.Group != null && visitedGroups.Contains(application.Value.Group))
+                {
+                    continue;
+                }
+                plantUmlBuilder.AppendLine($"{application.Key} --> {network.Name}");
+                if (application.Value.Group != null)
+                {
+                    visitedGroups.Add(application.Value.Group);
                 }
             }
         }

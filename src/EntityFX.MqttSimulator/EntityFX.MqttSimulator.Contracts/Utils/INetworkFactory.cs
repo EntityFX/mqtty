@@ -4,12 +4,12 @@ namespace EntityFX.MqttY.Contracts.Utils;
 
 public interface INetworkBuilder
 {
-    IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>> ClientFactory { get; }
+    IFactory<IClient?, Dictionary<string, string[]>> ClientFactory { get; }
     
-    IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>> ServerFactory { get; }
+    IFactory<IServer?, Dictionary<string, string[]>> ServerFactory { get; }
     
-    IFactory<INetwork?, NodeBuildOptions<Dictionary<string, string[]>>, Dictionary<string, string[]>> NetworkFactory { get; }
+    IFactory<INetwork?, Dictionary<string, string[]>> NetworkFactory { get; }
 
-    IFactory<IApplication?, NodeBuildOptions<object>, object> ApplicationFactory { get; }
+    IFactory<IApplication?, object> ApplicationFactory { get; }
     
 }
