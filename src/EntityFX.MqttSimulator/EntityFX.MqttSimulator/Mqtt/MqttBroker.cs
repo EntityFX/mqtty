@@ -79,7 +79,7 @@ namespace EntityFX.MqttY.Mqtt
             {
                 await base.OnReceived(packet);
             }
-
+            NetworkGraph.Monitoring.WithEndScope(ref packet);
             switch (payload!.Type)
             {
                 case MqttPacketType.Publish:

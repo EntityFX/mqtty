@@ -22,4 +22,7 @@ public class MonitoringScope : IMonitoringItem
     public long EndTick { get; set; }
     public long Ticks { get; set; }
 
+    public string? Source { get; set; }
+    public string? Destination { get; set; }
+
 }

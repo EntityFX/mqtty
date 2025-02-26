@@ -144,8 +144,7 @@ public class Network : NodeBase, INetwork
     {
         return Task.Run(async () =>
         {
-            var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Push {packet.From} -> {packet.To}");
-            NetworkGraph.Monitoring.Push(packet, MonitoringType.Push, packet.Category);
+            var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Push packet {packet.From} -> {packet.To}");
 
             var result = await SendToLocalWithResponseAsync(this, packet);
 
@@ -155,16 +154,20 @@ public class Network : NodeBase, INetwork
                 return result!;
             }
 
+            var sourceNode = NetworkGraph.GetNode(packet.From, packet.FromType);
+
             var fromNetwork = NetworkGraph.GetNetworkByNode(packet.From, packet.FromType);
 
             var toNetwork = NetworkGraph.GetNetworkByNode(packet.To, packet.ToType);
 
-            if (fromNetwork == null || toNetwork == null)
+            if (sourceNode == null || fromNetwork == null || toNetwork == null)
             {
                 result = NetworkGraph.GetReversePacket(packet, packet.Payload, packet.Category);
                 NetworkGraph.Monitoring.WithEndScope(ref result);
                 return result;
             }
+
+            NetworkGraph.Monitoring.Push(sourceNode, fromNetwork, packet.Payload, MonitoringType.Push, packet.Category, packet.Scope, packet.Ttl);
 
             var pathToRemote = NetworkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
 
@@ -181,24 +184,28 @@ public class Network : NodeBase, INetwork
     {
         return Task.Run(async () =>
         {
-            var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Push {packet.From} -> {packet.To}");
-            NetworkGraph.Monitoring.Push(packet, MonitoringType.Push, packet.Category, scope);
+            var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Transfer packet {packet.From} to {packet.To}");
+            //NetworkGraph.Monitoring.Push(packet, MonitoringType.Push, packet.Category, scope);
 
-            var sentToLocal = await SendToLocalWithResponseAsync(this, packet);
+            var sentToLocal = await SendToLocalAsync(this, packet);
 
-            if (sentToLocal != null)
+            if (sentToLocal == true)
             {
                 return;
             }
+
+            var sourceNode = NetworkGraph.GetNode(packet.From, packet.FromType);
 
             var fromNetwork = NetworkGraph.GetNetworkByNode(packet.From, packet.FromType);
 
             var toNetwork = NetworkGraph.GetNetworkByNode(packet.To, packet.ToType);
 
-            if (fromNetwork == null || toNetwork == null)
+            if (sourceNode == null || fromNetwork == null || toNetwork == null)
             {
                 return;
             }
+
+            //NetworkGraph.Monitoring.Push(sourceNode, fromNetwork, packet.Payload, MonitoringType.Push, packet.Category, packet.Scope, packet.Ttl);
 
             var pathToRemote = NetworkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
 
@@ -226,9 +233,11 @@ public class Network : NodeBase, INetwork
         {
             return null;
         }
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Push, packet.Category);
-        NetworkGraph.Monitoring.WithEndScope(ref packet);
+
         Tick();
+
+        NetworkGraph.Monitoring.Push(network, destionationNode, packet.Payload, MonitoringType.Push, packet.Category, packet.Scope, packet.Ttl);
+        NetworkGraph.Monitoring.WithEndScope(ref packet);
         return await destionationNode!.ReceiveWithResponseAsync(packet);
     }
 
@@ -245,8 +254,11 @@ public class Network : NodeBase, INetwork
         {
             return false;
         }
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Push, packet.Category);
+
         Tick();
+
+        NetworkGraph.Monitoring.Push(network, destionationNode, packet.Payload, MonitoringType.Receive, packet.Category, packet.Scope, packet.Ttl);
+        NetworkGraph.Monitoring.WithEndScope(ref packet);
         await destionationNode!.ReceiveAsync(packet);
 
         return true;

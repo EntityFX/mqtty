@@ -136,15 +136,16 @@ public class NetworkGraph : INetworkGraph
 
     private void ConfigureNodes(NetworkGraphOptions options)
     {
-        foreach (var node in options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Server))
+        var servers = options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Server).ToArray();
+        foreach (var node in servers)
         {
             var nodeServer = GetNode(node.Key, NodeType.Server);
 
             (nodeServer as IServer)?.Start();
-            break;
         }
 
-        foreach (var node in options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Client))
+        var clients = options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Client).ToArray();
+        foreach (var node in clients)
         {
             if (node.Value.Quantity > 1)
             {
@@ -153,6 +154,11 @@ public class NetworkGraph : INetworkGraph
                         (nc) =>
                         {
                             var nodeClient = GetNode($"{node.Key}{nc}", NodeType.Client) as IClient;
+
+                            if (nodeClient == null)
+                            {
+                                return;
+                            }
 
                             var bo = new NodeBuildOptions(
                                 this, nodeClient.Network, nodeClient.Index, nodeClient.Name, nodeClient.Address,

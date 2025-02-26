@@ -5,6 +5,7 @@ using EntityFX.MqttY.Network;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Net.Sockets;
+using System.Reflection.Emit;
 using System.Xml.Linq;
 using static System.Formats.Asn1.AsnWriter;
 
@@ -64,8 +65,8 @@ public class Monitoring : IMonitoring
     public void Push(INode from, INode to, byte[]? packet, MonitoringType type, 
         string? category, MonitoringScope? scope = null, int? ttl = null)
     {
-        Push(from.Address,
-            from.NodeType, to.Address, to.NodeType, packet,
+        Push(from.Name,
+            from.NodeType, to.Name, to.NodeType, packet,
             type, category, scope, ttl);
     }
 
@@ -87,7 +88,9 @@ public class Monitoring : IMonitoring
             Level = parent?.Level + 1 ?? 0,
             Date = DateTimeOffset.Now,
             Parent = parent,
-            StartTick = _tick
+            StartTick = _tick,
+            Source = parent?.Source,
+            Destination = parent?.Destination
         };
         _scopes.AddOrUpdate(scopeItem.Id, scopeItem, (key, value) => scopeItem);
         (parent)?.Items.Add(scopeItem);
@@ -104,6 +107,8 @@ public class Monitoring : IMonitoring
         if (packet.Scope == null)
         {
             var newScope = BeginScope(scope, null);
+            newScope.Source = packet.From;
+            newScope.Destination = packet.To;
             packet = packet with
             {
                 Scope = newScope

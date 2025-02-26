@@ -87,13 +87,14 @@ public class Server : NodeBase, IServer
     {
         BeforeReceive(packet);
 
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category, packet.Scope);
+        //NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category, packet.Scope);
         //NetworkGraph.Monitoring.WithEndScope(ref packet);
         Tick();
         var response = OnReceivedWithResponse(packet);
 
         PacketReceived?.Invoke(this, packet);
         AfterReceive(packet);
+
         var receivePacket = await Network!.ReceiveWithResponseAsync(response);
         NetworkGraph.Monitoring.WithEndScope(ref receivePacket);
 
@@ -103,7 +104,7 @@ public class Server : NodeBase, IServer
     public override async Task ReceiveAsync(Packet packet)
     {
         BeforeReceive(packet);
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category, packet.Scope);
+        //NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category, packet.Scope);
         Tick();
         NetworkGraph.Monitoring.WithEndScope(ref packet);
 
@@ -178,7 +179,7 @@ public class Server : NodeBase, IServer
 
     protected override void BeforeReceive(Packet packet)
     {
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category);
+       // NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category);
     }
 
     protected override void AfterReceive(Packet packet)

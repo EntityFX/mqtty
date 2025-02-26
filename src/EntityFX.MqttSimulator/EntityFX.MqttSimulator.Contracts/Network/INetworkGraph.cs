@@ -13,17 +13,17 @@ namespace EntityFX.MqttY.Contracts.Network
         INetwork? BuildNetwork(int index, string name, string address);
 
         IClient? BuildClient(int index, string name, string protocolType, INetwork network, string? group = null, int? groupAmount = null, 
-            Dictionary<string, string[]> additional = null);
+            Dictionary<string, string[]>? additional = null);
 
         TClient? BuildClient<TClient>(int index, string name, string protocolType, INetwork network, string? group = null, int? groupAmount = null, 
-            Dictionary<string, string[]> additional = null)
+            Dictionary<string, string[]>? additional = null)
             where TClient : IClient;
 
         IServer? BuildServer(int index, string name, string protocolType, INetwork network, string? group = null, int? groupAmount = null, 
-            Dictionary<string, string[]> additional = null);
+            Dictionary<string, string[]>? additional = null);
 
         ILeafNode? BuildNode(int index, string name, string address, NodeType nodeType, string? group = null, int? groupAmount = null,
-            Dictionary<string, string[]> additional = null);
+            Dictionary<string, string[]>? additional = null);
 
         string GetAddress(string name, string protocolType, string network);
 

@@ -26,6 +26,7 @@ namespace EntityFX.MqttY.Contracts.Monitoring
         void EndScope(ref Packet packet);
 
         void EndScope(MonitoringScope? scope);
+
         void Tick();
     }
 }

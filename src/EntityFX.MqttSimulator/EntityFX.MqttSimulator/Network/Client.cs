@@ -62,6 +62,7 @@ public class Client : NodeBase, IClient
         var payload = new byte[] { 0xFF };
         var scope = NetworkGraph.Monitoring.WithBeginScope(ref connectPacket!, $"Connect {connectPacket.From} to {connectPacket.To}");
         NetworkGraph.Monitoring.Push(connectPacket, MonitoringType.Connect, $"Client {connectPacket.From} connects to server {connectPacket.To}");
+
         var response = await SendWithResponseImplementationAsync(connectPacket);
         NetworkGraph.Monitoring.WithEndScope(ref response!);
 
@@ -171,8 +172,8 @@ public class Client : NodeBase, IClient
 
     public override async Task<Packet> ReceiveWithResponseAsync(Packet packet)
     {
-        BeforeReceive(packet);
         Tick();
+        BeforeReceive(packet);
         await OnReceivedWithResponseAsync(packet);
         AfterReceive(packet);
         return packet;
@@ -180,8 +181,8 @@ public class Client : NodeBase, IClient
 
     public override async Task ReceiveAsync(Packet packet)
     {
-        BeforeReceive(packet);
         Tick();
+        BeforeReceive(packet);
         await OnReceivedAsync(packet);
         AfterReceive(packet);
     }

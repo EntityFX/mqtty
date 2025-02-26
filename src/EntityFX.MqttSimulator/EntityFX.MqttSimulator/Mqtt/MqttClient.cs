@@ -21,9 +21,7 @@ namespace EntityFX.MqttY.Mqtt
         private readonly IRepository<ClientSession> _sessionRepository
             = new InMemoryRepository<ClientSession>();
 
-        private IDictionary<MqttPacketType, Func<string, ushort, IPacket?>> _senderRules;
-
-        public event EventHandler<MqttMessage> MessageReceived;
+        public event EventHandler<MqttMessage>? MessageReceived;
 
         public MqttClient(int index, string name, string address, string protocolType,
             INetwork network, INetworkGraph networkGraph, string? clientId)
@@ -92,7 +90,7 @@ namespace EntityFX.MqttY.Mqtt
             var subscribe = new SubscribePacket(packetId, new[] { new Subscription(topicFilter, qos) });
             var payload = GetPacket(serverName, NodeType.Server, subscribe.PacketToBytes(), "MQTT Subscribe");
             var scope = NetworkGraph.Monitoring.WithBeginScope(ref payload!, $"Subscribe {Name} to {payload.To} using topic {topicFilter}");
-            NetworkGraph.Monitoring.Push(payload, MonitoringType.Connect, $"MQTT Client {ClientId} subscribes to broker {payload.To} using topic {topicFilter}");
+            NetworkGraph.Monitoring.Push(payload, MonitoringType.Send, $"MQTT Client {ClientId} subscribes to broker {payload.To} using topic {topicFilter}");
             var subscribeTimeout = TimeSpan.FromSeconds(60);
 
             var response = await SendWithResponseAsync(payload);
@@ -134,6 +132,8 @@ namespace EntityFX.MqttY.Mqtt
             var packetPayload = GetPacket(serverName, NodeType.Server, publish.PacketToBytes(), "MQTT Publish");
             var scope = NetworkGraph.Monitoring.WithBeginScope(ref packetPayload!,
                 $"Publish {Name} to {packetPayload.To} with topic {topic}");
+            NetworkGraph.Monitoring.Push(packetPayload, MonitoringType.Send,
+                $"MQTT Client {ClientId} publishes to broker {packetPayload.To} using topic {topic}");
 
             if (!IsConnected)
             {
@@ -147,7 +147,6 @@ namespace EntityFX.MqttY.Mqtt
             }
 
             await SendAsync(packetPayload);
-            //NetworkGraph.Monitoring.TryEndScope(scope);
             return true;
         }
 
