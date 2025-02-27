@@ -15,6 +15,7 @@ public class Client : NodeBase, IClient
 
     public override NodeType NodeType => NodeType.Client;
 
+    public INode? Parent { get; set; }
 
     public event EventHandler<Packet>? PacketReceived;
 

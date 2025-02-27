@@ -2,6 +2,7 @@
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Utils;
 using Microsoft.Extensions.Configuration;
+using System.Text.RegularExpressions;
 namespace EntityFX.MqttY.Utils;
 
 internal class ApplicationFactory : IFactory<IApplication?, object>
@@ -16,7 +17,7 @@ internal class ApplicationFactory : IFactory<IApplication?, object>
     public IApplication? Configure(NodeBuildOptions<object> options, IApplication? application)
     {
 
-        application?.Start();
+        application?.StartAsync().Wait();
         return application;
     }
 
@@ -35,7 +36,11 @@ internal class ApplicationFactory : IFactory<IApplication?, object>
 
             return new MqttRelay
                 (options.Index, options.Name, options.Address ?? options.Name,
-                options.Protocol, options.Network, options.NetworkGraph, mqttRelayConf);
+                options.Protocol, options.Network, options.NetworkGraph, mqttRelayConf)
+            {
+                Group = options.Group,
+                GroupAmount = options.GroupAmount
+            };
         }
 
         return new Application.Application<object>(options.Index, options.Name, options.Address ?? options.Name,

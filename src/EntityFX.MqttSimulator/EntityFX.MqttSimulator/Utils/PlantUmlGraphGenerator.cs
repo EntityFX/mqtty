@@ -1,6 +1,7 @@
 using System.Text;
 using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Network;
 
 namespace EntityFX.MqttY.Utils;
 
@@ -151,19 +152,7 @@ public class PlantUmlGraphGenerator
     {
         foreach (var network in sortedNetworks)
         {
-            foreach (var client in network.Clients)
-            {
-                if (client.Value.Group != null && visitedGroups.Contains(client.Value.Group))
-                {
-                    continue;
-                }
-                AppendNode(plantUmlBuilder, "circle", client.Value.Group ?? client.Key,
-                    client.Value.ProtocolType, "ADD1B2", client.Value.GroupAmount > 0 ? $"Count clients: {client.Value.GroupAmount}" : null);
-                if (client.Value.Group != null)
-                {
-                    visitedGroups.Add(client.Value.Group);
-                }
-            }
+            AppendClients(plantUmlBuilder, visitedGroups, network.Clients, true);
 
             foreach (var server in network.Servers)
             {
@@ -185,12 +174,29 @@ public class PlantUmlGraphGenerator
                 {
                     continue;
                 }
-                AppendNode(plantUmlBuilder, "component", application.Key,
-                    application.Value.ProtocolType, "4AE366");
+                AppendApplicationNode(plantUmlBuilder, application.Key,
+                    application.Value, "4AE366");
                 if (application.Value.Group != null)
                 {
                     visitedGroups.Add(application.Value.Group);
                 }
+            }
+        }
+    }
+
+    private static void AppendClients(StringBuilder plantUmlBuilder, HashSet<string> visitedGroups, IReadOnlyDictionary<string, IClient> items, bool checkParent)
+    {
+        foreach (var client in items)
+        {
+            if ((checkParent && client.Value.Parent != null) || client.Value.Group != null && visitedGroups.Contains(client.Value.Group))
+            {
+                continue;
+            }
+            AppendNode(plantUmlBuilder, "circle", client.Value.Group ?? client.Key,
+                client.Value.ProtocolType, "ADD1B2", client.Value.GroupAmount > 0 ? $"Count clients: {client.Value.GroupAmount}" : null);
+            if (client.Value.Group != null)
+            {
+                visitedGroups.Add(client.Value.Group);
             }
         }
     }
@@ -205,7 +211,7 @@ public class PlantUmlGraphGenerator
                 {
                     continue;
                 }
-                plantUmlBuilder.AppendLine($"{client.Value.Group ?? client.Key} --> {network.Name}");
+                AppendConnection(plantUmlBuilder, client.Value, client.Key, network);
                 if (client.Value.Group != null)
                 {
                     visitedGroups.Add(client.Value.Group);
@@ -218,7 +224,7 @@ public class PlantUmlGraphGenerator
                 {
                     continue;
                 }
-                plantUmlBuilder.AppendLine($"{server.Key} --> {network.Name}");
+                AppendConnection(plantUmlBuilder, server.Value, server.Key, network);
                 if (server.Value.Group != null)
                 {
                     visitedGroups.Add(server.Value.Group);
@@ -231,13 +237,19 @@ public class PlantUmlGraphGenerator
                 {
                     continue;
                 }
-                plantUmlBuilder.AppendLine($"{application.Key} --> {network.Name}");
+                AppendConnection(plantUmlBuilder, application.Value, application.Key, network);
                 if (application.Value.Group != null)
                 {
                     visitedGroups.Add(application.Value.Group);
                 }
             }
         }
+    }
+
+    private static StringBuilder AppendConnection(StringBuilder plantUmlBuilder, ILeafNode from, string key, INode to)
+    {
+        var arrow = from.Parent == null ?  "-->" : "..>";
+        return plantUmlBuilder.AppendLine($"{from.Group ?? key} {arrow} {to.Name}");
     }
 
     private static void AppendNode(StringBuilder plantUmlBuilder, 
@@ -254,6 +266,27 @@ public class PlantUmlGraphGenerator
             plantUmlBuilder.AppendLine("---");
             plantUmlBuilder.AppendLine(comment);
             plantUmlBuilder.AppendLine("]");
+        }
+    }
+
+    private static void AppendApplicationNode(StringBuilder plantUmlBuilder,
+    string name, IApplication application = null, string? color = null, string? comment = null)
+    {
+        var stereotype = application.ProtocolType;
+
+        var hasItems = application.Clients.Any() == true;
+        plantUmlBuilder.AppendLine($"component {name} " +
+                                   $"{(stereotype != null ? $"<<{stereotype}>>" : "")}" +
+                                   $"{(color != null ? $"#{color}" : "")}" +
+                                   $"{(hasItems ? " {" : "")}");
+
+        if (hasItems)
+        {
+            var visitedGroups = new HashSet<string>();
+
+            AppendClients(plantUmlBuilder, visitedGroups, application.Clients, false);
+
+            plantUmlBuilder.AppendLine("}");
         }
     }
 }

@@ -4,6 +4,8 @@
     {
         INetwork? Network { get; }
 
+        INode? Parent { get; set; }
+
         public string ProtocolType { get; }
     }
 }

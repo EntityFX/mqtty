@@ -2,10 +2,21 @@
 {
     public interface IApplication : INode, ILeafNode
     {
+        IReadOnlyDictionary<string, IServer> Servers { get; }
+        IReadOnlyDictionary<string, IClient> Clients { get; }
+
         bool IsStarted { get; }
 
-        void Start();
+        bool AddServer(IServer server);
 
-        void Stop();
+        bool RemoveServer(string server);
+
+        bool AddClient(IClient client);
+
+        bool RemoveClient(string clientAddress);
+
+        Task StartAsync();
+
+        Task StopAsync();
     }
 }

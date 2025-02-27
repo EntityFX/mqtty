@@ -10,6 +10,8 @@ public class Server : NodeBase, IServer
 
     public INetwork Network { get; }
 
+    public INode? Parent { get; set; }
+
 
     public bool IsStarted { get; internal set; }
 
