@@ -19,14 +19,18 @@ public class Server : NodeBase, IServer
 
     public string ProtocolType { get; }
 
+    public string Specification { get; }
+
     public event EventHandler<Packet>? PacketReceived;
     public event EventHandler<IClient>? ClientConnected;
     public event EventHandler<string>? ClientDisconnected;
 
     public Server(int index, string name, string address, string protocolType,
+        string specification,
         INetwork network, INetworkGraph networkGraph) : base(index, name, address, networkGraph)
     {
         ProtocolType = protocolType;
+        Specification = specification;
         Network = network;
     }
 
@@ -136,7 +140,7 @@ public class Server : NodeBase, IServer
     {
         BeforeSend(packet);
         var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Send packet {packet.From} to {packet.To}");
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category, scope);
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, $"Send packet {packet.From} to {packet.To}", ProtocolType, packet.Category, scope);
         Tick();
         var result = await Network.SendWithResponseAsync(packet);
 
@@ -151,11 +155,11 @@ public class Server : NodeBase, IServer
         BeforeSend(packet);
 
         var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Send packet {packet.From} to {packet.To}");
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category, scope);
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, $"Send packet {packet.From} to {packet.To}", ProtocolType, packet.Category, scope);
         Tick();
         await Network.SendAsync(packet);
 
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, packet.Category);
+        //NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, $"Send packet {packet.From} to {packet.To}", packet.Category);
         NetworkGraph.Monitoring.WithEndScope(ref packet);
 
         AfterSend(packet);

@@ -12,7 +12,7 @@ namespace EntityFX.MqttY.Contracts.Monitoring
         string To,
         NodeType DestinationType,
         uint PacketSize, MonitoringType Type,
-        string Protocol, MonitoringScope? Scope, string? Category, int? Ttl) : IMonitoringItem
+        string Protocol, string Message, MonitoringScope? Scope, string? Category, int? Ttl) : IMonitoringItem
     {
         public MonitoringItemType MonitoringItemType => MonitoringItemType.Item;
     }

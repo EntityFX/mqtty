@@ -23,17 +23,19 @@ namespace EntityFX.MqttY.Mqtt
 
         private readonly MqttQos MaximumQualityOfService = MqttQos.AtLeastOnce;
 
-        readonly IMqttTopicEvaluator topicEvaluator;
+        private readonly IMqttTopicEvaluator topicEvaluator;
 
         public override NodeType NodeType => NodeType.Server;
 
         private readonly PacketIdProvider _packetIdProvider = new();
 
-        public MqttBroker(int index, string name, string address, string protocolType, INetwork network, INetworkGraph networkGraph)
-            : base(index, name, address, protocolType, network, networkGraph)
+        public MqttBroker(int index, string name, string address, string protocolType, 
+            string specification,
+            INetwork network, INetworkGraph networkGraph , IMqttTopicEvaluator mqttTopicEvaluator)
+            : base(index, name, address, protocolType, specification, network, networkGraph)
         {
             this.PacketReceived += MqttBroker_PacketReceived;
-            topicEvaluator = new MqttTopicEvaluator(true);
+            this.topicEvaluator = mqttTopicEvaluator;
         }
 
         protected override Packet OnReceivedWithResponse(Packet packet)

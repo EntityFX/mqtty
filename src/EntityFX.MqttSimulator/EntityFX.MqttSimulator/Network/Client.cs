@@ -10,6 +10,8 @@ public class Client : NodeBase, IClient
 
     public string ProtocolType { get; }
 
+    public string Specification { get; private set; } = string.Empty;
+
 
     public INetwork? Network { get; }
 
@@ -21,11 +23,14 @@ public class Client : NodeBase, IClient
 
     protected string serverName = string.Empty;
 
-    public Client(int index, string name, string address, string protocolType, INetwork network, INetworkGraph networkGraph)
+    public Client(int index, string name, string address, string protocolType, 
+        string specification,
+        INetwork network, INetworkGraph networkGraph)
         : base(index, name, address, networkGraph)
     {
         Network = network;
         ProtocolType = protocolType;
+        Specification = specification;
     }
 
     public async Task<bool> ConnectAsync(string server)
@@ -62,7 +67,7 @@ public class Client : NodeBase, IClient
 
         var payload = new byte[] { 0xFF };
         var scope = NetworkGraph.Monitoring.WithBeginScope(ref connectPacket!, $"Connect {connectPacket.From} to {connectPacket.To}");
-        NetworkGraph.Monitoring.Push(connectPacket, MonitoringType.Connect, $"Client {connectPacket.From} connects to server {connectPacket.To}");
+        NetworkGraph.Monitoring.Push(connectPacket, MonitoringType.Connect, $"Client {connectPacket.From} connects to server {connectPacket.To}", ProtocolType, "Connect");
 
         var response = await SendWithResponseImplementationAsync(connectPacket);
         NetworkGraph.Monitoring.WithEndScope(ref response!);
@@ -151,7 +156,7 @@ public class Client : NodeBase, IClient
 
     public async Task<byte[]> SendWithResponseAsync(byte[] payload, string? category = null)
     {
-        var result = await SendWithResponseAsync(GetPacket(serverName, NodeType.Server, payload, category));
+        var result = await SendWithResponseAsync(GetPacket(serverName, NodeType.Server, payload, ProtocolType, category));
 
         return result.Payload;
     }
@@ -163,7 +168,7 @@ public class Client : NodeBase, IClient
 
     public async Task SendAsync(byte[] payload, string? category = null)
     {
-        await SendAsync(new Packet(Name, serverName, NodeType.Client, NodeType.Server, payload, category));
+        await SendAsync(new Packet(Name, serverName, NodeType.Client, NodeType.Server, payload, ProtocolType, category));
     }
 
     public void Send(byte[] payload, string? category = null)
@@ -204,7 +209,7 @@ public class Client : NodeBase, IClient
 
     protected override void BeforeReceive(Packet packet)
     {
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category);
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, $"Recieve message from {packet.From} to {packet.To}", ProtocolType, packet.Category);
     }
 
     protected override void AfterReceive(Packet packet)

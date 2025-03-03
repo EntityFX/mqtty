@@ -33,12 +33,12 @@ public class Monitoring : IMonitoring
         this.scopesEnabled = scopesEnabled;
     }
 
-    public void Push(MonitoringType type, string? category, MonitoringScope? scope = null, int? ttl = null)
+    public void Push(MonitoringType type, string message, string protocol, string? category, MonitoringScope? scope = null, int? ttl = null)
     {
         var item = new MonitoringItem(
             Guid.NewGuid(), _tick, DateTimeOffset.Now, string.Empty,
                 NodeType.Other, string.Empty, NodeType.Other,
-            0, type, string.Empty, scope, category, ttl);
+            0, type, string.Empty, message, scope, category, ttl);
 
         _storage.TryAdd(item.Date, item);
 
@@ -48,12 +48,12 @@ public class Monitoring : IMonitoring
     }
 
     private void Push(string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
-        MonitoringType type, string? category, MonitoringScope? scope = null, int? ttl = null)
+        MonitoringType type, string message, string protocol, string? category, MonitoringScope? scope = null, int? ttl = null)
     {
         var item = new MonitoringItem(
             Guid.NewGuid(), _tick, DateTimeOffset.Now, from,
             fromType, to, toType,
-            (uint)(packet?.Length ?? 0), type, string.Empty, scope, category, ttl);
+            (uint)(packet?.Length ?? 0), type, protocol, message, scope, category, ttl);
 
         _storage.TryAdd(item.Date, item);
 
@@ -62,21 +62,21 @@ public class Monitoring : IMonitoring
         Added?.Invoke(this, item);
     }
 
-    public void Push(INode from, INode to, byte[]? packet, MonitoringType type, 
-        string? category, MonitoringScope? scope = null, int? ttl = null)
+    public void Push(INode from, INode to, byte[]? packet, MonitoringType type, string message,
+        string protocol, string? category, MonitoringScope? scope = null, int? ttl = null)
     {
         Push(from.Name,
             from.NodeType, to.Name, to.NodeType, packet,
-            type, category, scope, ttl);
+            type, message, protocol, category, scope, ttl);
     }
 
 
-    public void Push(Packet packet, MonitoringType type,
-        string? category, MonitoringScope? scope = null)
+    public void Push(Packet packet, MonitoringType type, string message,
+        string protocol, string? category, MonitoringScope? scope = null)
     {
         Push(packet.From,
             packet.FromType, packet.To, packet.ToType, packet.Payload,
-            type, category, packet?.Scope ?? scope, packet?.Ttl);
+            type, message, protocol, category, packet?.Scope ?? scope, packet?.Ttl);
     }
 
     public MonitoringScope BeginScope(string scope, MonitoringScope? parent = null)

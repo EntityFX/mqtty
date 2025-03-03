@@ -40,8 +40,8 @@ public abstract class NodeBase : ISender
         this.NetworkGraph = networkGraph;
     }
 
-    protected Packet GetPacket(string to, NodeType toType, byte[] payload, string? category = null)
-        => new Packet(Name, to, NodeType, toType, payload, category);
+    protected Packet GetPacket(string to, NodeType toType, byte[] payload, string protocol = null, string? category = null)
+        => new Packet(Name, to, NodeType, toType, payload, protocol, category);
 
     public virtual void Refresh()
     {

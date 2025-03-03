@@ -5,7 +5,8 @@ public class NodeBuildOptions<TOptions>
     public NodeBuildOptions(
         INetworkGraph networkGraph, INetwork? network,
         int index,
-        string name, string address, string? group, int? groupAmount, string protocol, string? connectsTo, TOptions? additional)
+        string name, string address, string? group, int? groupAmount, 
+        string protocol, string specification, string? connectsTo, TOptions? additional)
     {
         NetworkGraph = networkGraph;
         Network = network;
@@ -15,6 +16,7 @@ public class NodeBuildOptions<TOptions>
         GroupAmount = groupAmount;
         Address = address;
         Protocol = protocol;
+        Specification = specification;
         ConnectsTo = connectsTo;
         Additional = additional;
     }
@@ -30,6 +32,8 @@ public class NodeBuildOptions<TOptions>
     public string? Address { get; init; }
         
     public string Protocol { get; init; }
+
+    public string Specification { get; init; }
 
     public string? ConnectsTo { get; init; }
 

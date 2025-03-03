@@ -32,18 +32,15 @@ internal class Worker : BackgroundService
         await Task.Delay(1000);
 
 
-        var mqttClient1 = _networkGraph.GetNode("mc1", NodeType.Client) as IMqttClient;
-        var mqttClient2 = _networkGraph.GetNode("mc2", NodeType.Client) as IMqttClient;
+        var mgx11 = _networkGraph.GetNode("mgx11", NodeType.Client) as IMqttClient;
+       // var mqttClient2 = _networkGraph.GetNode("mc2", NodeType.Client) as IMqttClient;
 
-
-        await Task.Delay(1000);
-
-        await mqttClient1!.PublishAsync("telemetry/temperature", new byte[] { 7 }, MqttQos.AtLeastOnce);
+        await mgx11!.PublishAsync("telemetry/temperature", new byte[] { 7 }, MqttQos.AtLeastOnce);
 
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await mqttClient1!.PublishAsync("telemetry/temperature", new byte[] { 7 }, MqttQos.AtLeastOnce);
+            await mgx11!.PublishAsync("telemetry/temperature", new byte[] { 7 }, MqttQos.AtLeastOnce);
             await Task.Delay(2000);
 
             _networkGraph.Refresh();

@@ -15,6 +15,8 @@ namespace EntityFX.MqttY.Application
         public TOptions? Options { get; }
         public string ProtocolType { get; private set; } = string.Empty;
 
+        public string Specification { get; private set; } = string.Empty;
+
         public Guid Id { get; private set; }
 
         public int Index { get; private set; }
@@ -36,12 +38,13 @@ namespace EntityFX.MqttY.Application
 
         protected readonly INetworkGraph NetworkGraph;
 
-        public Application(int index, string name, string address, string protocolType, 
+        public Application(int index, string name, string address, string protocolType, string specification,
             INetwork network, INetworkGraph networkGraph, TOptions? options)
         {
             Address = address;
             Network = network;
             ProtocolType = protocolType;
+            Specification = specification;
             Name = name;
             Id = Guid.NewGuid();
             Index = index;

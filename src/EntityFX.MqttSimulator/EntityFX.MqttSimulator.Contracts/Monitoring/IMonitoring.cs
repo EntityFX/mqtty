@@ -12,11 +12,11 @@ namespace EntityFX.MqttY.Contracts.Monitoring
 
         public IEnumerable<MonitoringItem> Items { get; }
 
-        public void Push(MonitoringType type, string? category, MonitoringScope? scope = null, int? ttl = null);
+        public void Push(MonitoringType type, string message, string? category, string protocol, MonitoringScope? scope = null, int? ttl = null);
 
-        public void Push(Packet packet, MonitoringType type, string? category, MonitoringScope? scope = null);
+        public void Push(Packet packet, MonitoringType type, string message, string protocol, string? category, MonitoringScope? scope = null);
 
-        void Push(INode from, INode to, byte[]? packet, MonitoringType type, string? category, 
+        void Push(INode from, INode to, byte[]? packet, MonitoringType type, string message, string protocol, string? category, 
             MonitoringScope? scope = null, int? ttl = null);
 
         MonitoringScope BeginScope(string scopeMessage, MonitoringScope? parent = null);

@@ -1,6 +1,8 @@
 using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Utils;
+using EntityFX.MqttY.Mqtt.Internals;
 using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Utils;
 using Microsoft.Extensions.Configuration;
@@ -23,7 +25,8 @@ public static class Container
             .AddScoped<IFactory<IApplication?, object>, ApplicationFactory>()
             .AddScoped<INetworkBuilder, NetworkBuilder>()
             .AddScoped<IPathFinder, DijkstraPathFinder>()
-            .AddScoped<INetworkGraph, NetworkGraph>();
+            .AddScoped<INetworkGraph, NetworkGraph>()
+            .AddScoped<IMqttTopicEvaluator, MqttTopicEvaluator>((serviceProvider) => new MqttTopicEvaluator(true));
     }
 
     private static IMonitoring ConfigureMonitoring(IServiceProvider sp)

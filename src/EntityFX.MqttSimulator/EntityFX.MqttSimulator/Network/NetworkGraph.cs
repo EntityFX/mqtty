@@ -34,8 +34,9 @@ public class NetworkGraph : INetworkGraph
 
     public IReadOnlyDictionary<string, INetwork> Networks => _networks.ToImmutableDictionary();
 
-    public IClient? BuildClient(int index, string name, string protocolType,
-        INetwork network, string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = default)
+    public IClient? BuildClient(int index, string name, string protocolType, string specification,
+        INetwork network, string? group = null, int? groupAmount = null, 
+        Dictionary<string, string[]>? additional = default)
     {
         if (_nodes.ContainsKey((name, NodeType.Client)))
         {
@@ -46,7 +47,9 @@ public class NetworkGraph : INetworkGraph
 
         var client = _networkBuilder
             .ClientFactory.Create(
-                new NodeBuildOptions<Dictionary<string, string[]>>(this, network, index, name, clientAddressFull, group, groupAmount, protocolType, null, additional));
+                new NodeBuildOptions<Dictionary<string, string[]>>(
+                    this, network, index, name, clientAddressFull, group, groupAmount, protocolType, 
+                    specification, null, additional));
 
         if (client == null)
         {
@@ -58,11 +61,12 @@ public class NetworkGraph : INetworkGraph
         return client;
     }
 
-    public TCLient? BuildClient<TCLient>(int index, string name, string protocolType, INetwork network,
+    public TCLient? BuildClient<TCLient>(int index, string name, string protocolType, string specification,
+        INetwork network,
         string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = default)
         where TCLient : IClient
     {
-        return (TCLient?)BuildClient(index, name, protocolType, network, group, groupAmount, additional);
+        return (TCLient?)BuildClient(index, name, protocolType, specification, network, group, groupAmount, additional);
     }
 
     public INetwork? BuildNetwork(int index, string name, string address)
@@ -73,7 +77,7 @@ public class NetworkGraph : INetworkGraph
         }
         var network = _networkBuilder
             .NetworkFactory.Create(
-                new NodeBuildOptions<Dictionary<string, string[]>>(this, null, index, name, address, null, null, String.Empty, null, new()));
+                new NodeBuildOptions<Dictionary<string, string[]>>(this, null, index, name, address, null, null, null, String.Empty, null, new()));
 
         if (network == null)
         {
@@ -91,7 +95,8 @@ public class NetworkGraph : INetworkGraph
         return null;
     }
 
-    public IServer? BuildServer(int index, string name, string protocolType, INetwork network,
+    public IServer? BuildServer(int index, string name, string protocolType, string specification,
+        INetwork network,
         string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = null)
     {
         if (_nodes.ContainsKey((name, NodeType.Server)))
@@ -102,7 +107,8 @@ public class NetworkGraph : INetworkGraph
 
         var server = _networkBuilder
             .ServerFactory.Create(
-                new NodeBuildOptions<Dictionary<string, string[]>>(this, network, index, name, serverAddressFull, group, groupAmount, protocolType, null, additional));
+                new NodeBuildOptions<Dictionary<string, string[]>>(this, network, index, name, serverAddressFull, group, groupAmount, protocolType, 
+                specification, null, additional));
 
         if (server == null)
         {
@@ -145,7 +151,8 @@ public class NetworkGraph : INetworkGraph
 
             var bo = new NodeBuildOptions<Dictionary<string, string[]>>(
                 this, nodeServer.Network, nodeServer.Index, nodeServer.Name, nodeServer.Address,
-                nodeServer.Group, nodeServer.GroupAmount, nodeServer.ProtocolType, node.Value.ConnectsToServer, node.Value.Additional);
+                nodeServer.Group, nodeServer.GroupAmount, nodeServer.ProtocolType, 
+                nodeServer.Specification, node.Value.ConnectsToServer, node.Value.Additional);
 
             _networkBuilder.ServerFactory.Configure(bo, nodeServer);
 
@@ -169,7 +176,9 @@ public class NetworkGraph : INetworkGraph
 
                             var bo = new NodeBuildOptions<Dictionary<string, string[]>>(
                                 this, nodeClient.Network, nodeClient.Index, nodeClient.Name, nodeClient.Address,
-                                nodeClient.Group, nodeClient.GroupAmount, nodeClient.ProtocolType, node.Value.ConnectsToServer, node.Value.Additional);
+                                nodeClient.Group, nodeClient.GroupAmount, nodeClient.ProtocolType,
+                                node.Value.Specification ?? string.Empty,
+                                node.Value.ConnectsToServer, node.Value.Additional);
 
                             _networkBuilder.ClientFactory.Configure(bo, nodeClient);
                         });
@@ -181,7 +190,8 @@ public class NetworkGraph : INetworkGraph
 
                 var bo = new NodeBuildOptions<Dictionary<string, string[]>>(
                     this, nodeClient.Network, nodeClient.Index, nodeClient.Name, nodeClient.Address,
-                    nodeClient.Group, nodeClient.GroupAmount, nodeClient.ProtocolType, node.Value.ConnectsToServer, node.Value.Additional);
+                    nodeClient.Group, nodeClient.GroupAmount, nodeClient.ProtocolType, 
+                    node.Value.Specification ?? string.Empty, node.Value.ConnectsToServer, node.Value.Additional);
                 _networkBuilder.ClientFactory.Configure(bo, nodeClient);
             }
         }
@@ -195,6 +205,7 @@ public class NetworkGraph : INetworkGraph
             var bo = new NodeBuildOptions<object>(
                 this, nodeApplication.Network, nodeApplication.Index, nodeApplication.Name, nodeApplication.Address,
                 nodeApplication.Group, nodeApplication.GroupAmount, nodeApplication.ProtocolType,
+                nodeApplication.Specification ?? string.Empty,
                 null, application.Value.Configuration);
 
             _networkBuilder.ApplicationFactory.Configure(bo, nodeApplication);
@@ -214,7 +225,9 @@ public class NetworkGraph : INetworkGraph
             {
                 case NodeOptionType.Server:
 
-                    BuildServer(index, node.Key, node.Value.Specification ?? "tcp", linkNetwork, null, null, node.Value.Additional);
+                    BuildServer(index, node.Key, node.Value.Protocol ?? "tcp",
+                        node.Value.Specification ?? "tcp-server",
+                        linkNetwork, null, null, node.Value.Additional);
                     break;
 
                 case NodeOptionType.Client:
@@ -225,15 +238,21 @@ public class NetworkGraph : INetworkGraph
                             .ForEach(
                                 (nc) => BuildClient(
                                     index, $"{node.Key}{nc}",
-                                    node.Value.Specification ?? "tcp", linkNetwork, node.Key, node.Value.Quantity, node.Value.Additional));
+                                    node.Value.Protocol ?? "tcp",
+                                    node.Value.Specification ?? "tcp-client",
+                                    linkNetwork, node.Key, node.Value.Quantity, node.Value.Additional));
                     }
                     else
                     {
-                        BuildClient(index, node.Key, node.Value.Specification ?? "tcp", linkNetwork, null, null, node.Value.Additional);
+                        BuildClient(index, node.Key, node.Value.Protocol ?? "tcp",
+                            node.Value.Specification ?? "tcp-client",
+                            linkNetwork, null, null, node.Value.Additional);
                     }
                     break;
                 case NodeOptionType.Application:
-                    BuildApplication(index, node.Key, node.Value.Specification ?? "tcp", linkNetwork, null, null, node.Value.Configuration);
+                    BuildApplication(index, node.Key, node.Value.Protocol ?? "tcp",
+                        node.Value.Specification ?? "tcp-app",
+                        linkNetwork, null, null, node.Value.Configuration);
                     break;
             }
 
@@ -284,6 +303,7 @@ public class NetworkGraph : INetworkGraph
             Payload: payload,
             FromType: packet.ToType,
             ToType: packet.FromType,
+            Protocol: packet.Protocol,
             Category: category ?? packet.Category,
             Scope: packet.Scope
         );
@@ -347,21 +367,21 @@ public class NetworkGraph : INetworkGraph
     public void Refresh()
     {
         var scope = Monitoring.BeginScope("Refresh network graph");
-        Monitoring.Push(MonitoringType.Refresh, $"Refresh whole network", scope);
+        Monitoring.Push(MonitoringType.Refresh, $"Refresh whole network", "Network", "Refresh", scope);
 
         var bytes = Array.Empty<byte>();
 
         foreach (var network in _networks)
         {
             Monitoring.Push(
-                network.Value, network.Value, bytes, MonitoringType.Refresh, $"Refresh network {network.Key}", scope);
+                network.Value, network.Value, bytes, MonitoringType.Refresh, $"Refresh network {network.Key}", "Network", "Refresh", scope);
             network.Value.Refresh();
         }
 
         foreach (var node in _nodes)
         {
             Monitoring.Push(
-                node.Value, node.Value, bytes, MonitoringType.Refresh, $"Refresh node {node.Key}", scope);
+                node.Value, node.Value, bytes, MonitoringType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh", scope);
             node.Value.Refresh();
         }
 
@@ -374,7 +394,8 @@ public class NetworkGraph : INetworkGraph
     }
 
     public IApplication? BuildApplication<TConfiguration>(
-        int index, string name, string protocolType, INetwork network, string? group = null, int? groupAmount = null, TConfiguration? applicationConfig = default)
+        int index, string name, string protocolType, string specification, INetwork network, 
+        string? group = null, int? groupAmount = null, TConfiguration? applicationConfig = default)
     {
         if (_nodes.ContainsKey((name, NodeType.Application)))
         {
@@ -384,7 +405,8 @@ public class NetworkGraph : INetworkGraph
 
         var server = _networkBuilder
             .ApplicationFactory.Create(
-                new NodeBuildOptions<object>(this, network, index, name, serverAddressFull, group, groupAmount, protocolType, null, applicationConfig));
+                new NodeBuildOptions<object>(this, network, index, name, serverAddressFull,
+                group, groupAmount, protocolType, specification, null, applicationConfig));
 
         if (server == null)
         {

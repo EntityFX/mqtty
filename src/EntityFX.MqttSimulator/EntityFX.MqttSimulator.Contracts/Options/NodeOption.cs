@@ -3,6 +3,8 @@
     public class NodeOption
     {
         public NodeOptionType Type { get; set; }
+        public string? Protocol { get; set; }
+
         public string? Specification { get; set; }
 
         public string? Network { get; set; }

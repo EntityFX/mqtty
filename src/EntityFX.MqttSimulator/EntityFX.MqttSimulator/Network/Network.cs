@@ -69,7 +69,7 @@ public class Network : NodeBase, INetwork
 
         var result = network.Link(this);
 
-        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Link, "link");
+        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Link, $"Link network {this.Name} to {network.Name}", "Network", "Link");
 
         return true;
     }
@@ -89,7 +89,7 @@ public class Network : NodeBase, INetwork
             _linkedNetworks[network.Name] = network;
         }
 
-        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Unlink, "unlink");
+        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Unlink, $"Unlink network {this.Name} from {network.Name}", "Network", "Unlink");
 
         return true;
     }
@@ -147,7 +147,7 @@ public class Network : NodeBase, INetwork
     {
         return Task.Run(async () =>
         {
-            var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Push packet {packet.From} -> {packet.To}");
+            var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Push packet from {packet.From} to {packet.To}");
 
             var result = await SendToLocalWithResponseAsync(this, packet);
 
@@ -170,7 +170,8 @@ public class Network : NodeBase, INetwork
                 return result;
             }
 
-            NetworkGraph.Monitoring.Push(sourceNode, fromNetwork, packet.Payload, MonitoringType.Push, packet.Category, packet.Scope, packet.Ttl);
+            NetworkGraph.Monitoring.Push(sourceNode, fromNetwork, packet.Payload, MonitoringType.Push, 
+                $"Push packet {sourceNode.Name} to network {fromNetwork.Name}", "Network", packet.Category, packet.Scope, packet.Ttl);
 
             var pathToRemote = NetworkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
 
@@ -239,7 +240,8 @@ public class Network : NodeBase, INetwork
 
         Tick();
 
-        NetworkGraph.Monitoring.Push(network, destionationNode, packet.Payload, MonitoringType.Push, packet.Category, packet.Scope, packet.Ttl);
+        NetworkGraph.Monitoring.Push(network, destionationNode, packet.Payload, MonitoringType.Push, 
+            $"Push packet from network {network.Name} to node {destionationNode.Name}", "Network", packet.Category, packet.Scope, packet.Ttl);
         NetworkGraph.Monitoring.WithEndScope(ref packet);
         return await destionationNode!.ReceiveWithResponseAsync(packet);
     }
@@ -260,7 +262,8 @@ public class Network : NodeBase, INetwork
 
         Tick();
 
-        NetworkGraph.Monitoring.Push(network, destionationNode, packet.Payload, MonitoringType.Receive, packet.Category, packet.Scope, packet.Ttl);
+        NetworkGraph.Monitoring.Push(network, destionationNode, packet.Payload, MonitoringType.Receive, 
+            $"Push packet from network {network.Name} to node {destionationNode.Name}", "Network", packet.Category, packet.Scope, packet.Ttl);
         NetworkGraph.Monitoring.WithEndScope(ref packet);
         await destionationNode!.ReceiveAsync(packet);
 
@@ -286,11 +289,13 @@ public class Network : NodeBase, INetwork
 
         if (packet.Ttl == 0)
         {
-            NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, "Unreachable", packet.Scope, packet.Ttl);
+            NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Unreachable, 
+                $"Packet unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope, packet.Ttl);
             //destination uneachable
             return packet;
         }
-        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, packet.Category, packet.Scope, packet.Ttl);
+        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, 
+            $"Push packet from network {this.Name} to {next.Name}", "Network", packet.Category, packet.Scope, packet.Ttl);
         var result = await next.SendToLocalWithResponseAsync(next, packet);
 
         if (result == null)
@@ -320,12 +325,14 @@ public class Network : NodeBase, INetwork
 
         if (packet.Ttl == 0)
         {
-            NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, "Unreachable", packet.Scope);
+            NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Unreachable, 
+                $"Packet unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope);
             //destination uneachable
             return false;
         }
 
-        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, packet.Category, packet.Scope, packet.Ttl);
+        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, 
+            $"Push packet from network {this.Name} to {next.Name}", "Network", packet.Category, packet.Scope, packet.Ttl);
         var result = await next.SendToLocalAsync(next, packet);
 
         if (!result)

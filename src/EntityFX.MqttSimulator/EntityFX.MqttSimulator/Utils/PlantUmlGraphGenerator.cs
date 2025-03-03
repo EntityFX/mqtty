@@ -118,13 +118,16 @@ public class PlantUmlGraphGenerator
     {
         var plantUmlBuilder = new StringBuilder();
         plantUmlBuilder.AppendLine("@startuml");
-        plantUmlBuilder.AppendLine("left to right direction");
+        //plantUmlBuilder.AppendLine("left to right direction");
 
         var sortedNetworks = networkGraph.Networks.Values.OrderBy(v => v.Index).ToArray();
+        AppendBlockNode(plantUmlBuilder, "rectangle", string.Empty, "network", null, null);
         foreach (var network in sortedNetworks)
         {
             AppendNode(plantUmlBuilder, "cloud", network.Name, null, "A9DCDF");
         }
+        plantUmlBuilder.AppendLine("}");
+        plantUmlBuilder.AppendLine();
 
         var visitedNetworks = new HashSet<string>();
 
@@ -152,35 +155,46 @@ public class PlantUmlGraphGenerator
     {
         foreach (var network in sortedNetworks)
         {
+            if (network.Servers?.Any() != true && network.Applications?.Any() != true) continue;
+
+            AppendBlockNode(plantUmlBuilder, "rectangle", $"Nodes of {network.Name} network", "nodes", null, null);
             AppendClients(plantUmlBuilder, visitedGroups, network.Clients, true);
 
-            foreach (var server in network.Servers)
+            if (network.Servers?.Any() == true)
             {
-                if (server.Value.Group != null && visitedGroups.Contains(server.Value.Group))
+                foreach (var server in network.Servers)
                 {
-                    continue;
-                }
-                AppendNode(plantUmlBuilder, "rectangle", server.Key,
-                    server.Value.ProtocolType, "E3664A");
-                if (server.Value.Group != null)
-                {
-                    visitedGroups.Add(server.Value.Group);
+                    if (server.Value.Group != null && visitedGroups.Contains(server.Value.Group))
+                    {
+                        continue;
+                    }
+                    AppendNode(plantUmlBuilder, "rectangle", server.Key,
+                        server.Value.ProtocolType, "E3664A");
+                    if (server.Value.Group != null)
+                    {
+                        visitedGroups.Add(server.Value.Group);
+                    }
                 }
             }
 
-            foreach (var application in network.Applications)
+            if (network.Applications?.Any() == true)
             {
-                if (application.Value.Group != null && visitedGroups.Contains(application.Value.Group))
+                foreach (var application in network.Applications)
                 {
-                    continue;
-                }
-                AppendApplicationNode(plantUmlBuilder, application.Key,
-                    application.Value, "4AE366");
-                if (application.Value.Group != null)
-                {
-                    visitedGroups.Add(application.Value.Group);
+                    if (application.Value.Group != null && visitedGroups.Contains(application.Value.Group))
+                    {
+                        continue;
+                    }
+                    AppendApplicationNode(plantUmlBuilder, application.Key,
+                        application.Value, "4AE366");
+                    if (application.Value.Group != null)
+                    {
+                        visitedGroups.Add(application.Value.Group);
+                    }
                 }
             }
+            plantUmlBuilder.AppendLine("}");
+            plantUmlBuilder.AppendLine();
         }
     }
 
@@ -248,16 +262,16 @@ public class PlantUmlGraphGenerator
 
     private static StringBuilder AppendConnection(StringBuilder plantUmlBuilder, ILeafNode from, string key, INode to)
     {
-        var arrow = from.Parent == null ?  "-->" : "..>";
+        var arrow = from.Parent == null ? "-->" : "..>";
         return plantUmlBuilder.AppendLine($"{from.Group ?? key} {arrow} {to.Name}");
     }
 
-    private static void AppendNode(StringBuilder plantUmlBuilder, 
+    private static void AppendNode(StringBuilder plantUmlBuilder,
         string nodeType, string name, string? stereotype = null, string? color = null, string? comment = null)
     {
         plantUmlBuilder.AppendLine($"{nodeType} {name} " +
                                    $"{(stereotype != null ? $"<<{stereotype}>>" : "")}" +
-                                   $"{(color != null ? $"#{color}" : "")}" +
+                                   $"{(color != null ? $" #{color}" : "")}" +
                                    $"{(!string.IsNullOrEmpty(comment) ? " [" : "")}");
 
         if (comment != null)
@@ -270,14 +284,14 @@ public class PlantUmlGraphGenerator
     }
 
     private static void AppendApplicationNode(StringBuilder plantUmlBuilder,
-    string name, IApplication application = null, string? color = null, string? comment = null)
+    string name, IApplication application, string? color = null, string? comment = null)
     {
         var stereotype = application.ProtocolType;
 
         var hasItems = application.Clients.Any() == true;
-        plantUmlBuilder.AppendLine($"component {name} " +
+        plantUmlBuilder.AppendLine($"component \"{name}\" " +
                                    $"{(stereotype != null ? $"<<{stereotype}>>" : "")}" +
-                                   $"{(color != null ? $"#{color}" : "")}" +
+                                   $"{(color != null ? $" #{color}" : "")}" +
                                    $"{(hasItems ? " {" : "")}");
 
         if (hasItems)
@@ -287,6 +301,16 @@ public class PlantUmlGraphGenerator
             AppendClients(plantUmlBuilder, visitedGroups, application.Clients, false);
 
             plantUmlBuilder.AppendLine("}");
+            plantUmlBuilder.AppendLine();
         }
+    }
+
+    private static void AppendBlockNode(StringBuilder plantUmlBuilder,
+        string nodeType, string name, string stereotype, string? color = null, string? comment = null)
+    {
+        plantUmlBuilder.AppendLine($"{nodeType} {(string.IsNullOrEmpty(name) ? string.Empty : $"\"{name}\"")} " +
+                                   $"{(stereotype != null ? $"<<{stereotype}>>" : "")}" +
+                                   $"{(color != null ? $" #{color}" : "")}" +
+                                   $" {{");
     }
 }

@@ -7,5 +7,7 @@
         INode? Parent { get; set; }
 
         public string ProtocolType { get; }
+
+        public string Specification { get; }
     }
 }

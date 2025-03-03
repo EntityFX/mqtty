@@ -53,7 +53,7 @@ internal class ClientFactory : IFactory<IClient?, Dictionary<string, string[]>>
         {
             var mqttClient = new MqttClient(options.Index,
                 options.Name, options.Address ?? options.Name, 
-                options.Protocol, options.Network, options.NetworkGraph, options.Name)
+                options.Protocol, options.Specification, options.Network, options.NetworkGraph, options.Name)
             {
                 Group = options.Group,
                 GroupAmount = options.GroupAmount
@@ -62,7 +62,8 @@ internal class ClientFactory : IFactory<IClient?, Dictionary<string, string[]>>
             return mqttClient;
         }
 
-        return new Client(options.Index,options.Name, options.Address ?? options.Name, options.Protocol, 
+        return new Client(options.Index,options.Name, options.Address ?? options.Name, options.Protocol,
+            options.Specification,
             options.Network, options.NetworkGraph)
         {
             Group = options.Group
