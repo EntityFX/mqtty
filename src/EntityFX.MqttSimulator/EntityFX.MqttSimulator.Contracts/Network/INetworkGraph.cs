@@ -1,5 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Options;
+using System.Collections.Immutable;
 
 namespace EntityFX.MqttY.Contracts.Network
 {
@@ -8,7 +9,7 @@ namespace EntityFX.MqttY.Contracts.Network
         public IPathFinder PathFinder { get; }
         public IMonitoring Monitoring { get; }
 
-        public IReadOnlyDictionary<string, INetwork> Networks { get; }
+        public IImmutableDictionary<string, INetwork> Networks { get; }
 
         INetwork? BuildNetwork(int index, string name, string address);
 

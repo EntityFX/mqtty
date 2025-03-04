@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Net.Sockets;
 using System.Reflection;
@@ -14,8 +15,8 @@ namespace EntityFX.MqttY.Network;
 public class NetworkGraph : INetworkGraph
 {
     private readonly INetworkBuilder _networkBuilder;
-    private readonly Dictionary<(string Address, NodeType NodeType), ILeafNode> _nodes = new();
-    private readonly Dictionary<string, INetwork> _networks = new();
+    private readonly ConcurrentDictionary<(string Address, NodeType NodeType), ILeafNode> _nodes = new();
+    private readonly ConcurrentDictionary<string, INetwork> _networks = new();
 
     public NetworkGraph(
         INetworkBuilder networkBuilder,
@@ -32,7 +33,7 @@ public class NetworkGraph : INetworkGraph
 
     public IMonitoring Monitoring { get; }
 
-    public IReadOnlyDictionary<string, INetwork> Networks => _networks.ToImmutableDictionary();
+    public IImmutableDictionary<string, INetwork> Networks => _networks.ToImmutableDictionary();
 
     public IClient? BuildClient(int index, string name, string protocolType, string specification,
         INetwork network, string? group = null, int? groupAmount = null, 
@@ -56,7 +57,7 @@ public class NetworkGraph : INetworkGraph
             return null;
         }
 
-        _nodes.Add((name, NodeType.Client), client);
+        _nodes.TryAdd((name, NodeType.Client), client);
 
         return client;
     }
@@ -84,7 +85,7 @@ public class NetworkGraph : INetworkGraph
             return null;
         }
 
-        _networks.Add(name, network);
+        _networks.TryAdd(name, network);
 
         return network;
     }
@@ -115,7 +116,7 @@ public class NetworkGraph : INetworkGraph
             return null;
         }
 
-        _nodes.Add((name, NodeType.Server), server);
+        _nodes.TryAdd((name, NodeType.Server), server);
 
         return server;
     }
@@ -324,7 +325,7 @@ public class NetworkGraph : INetworkGraph
 
         client.Disconnect();
 
-        _nodes.Remove((clientAddress, NodeType.Client));
+        _nodes.Remove((clientAddress, NodeType.Client), out _);
 
     }
 
@@ -343,7 +344,7 @@ public class NetworkGraph : INetworkGraph
 
         network.UnlinkAll();
 
-        _networks.Remove(networkAddress);
+        _networks.Remove(networkAddress, out _);
     }
 
     public void RemoveServer(string serverAddress)
@@ -361,7 +362,7 @@ public class NetworkGraph : INetworkGraph
 
         server.Stop();
 
-        _nodes.Remove((serverAddress, NodeType.Client));
+        _nodes.Remove((serverAddress, NodeType.Client), out _);
     }
 
     public void Refresh()
@@ -413,7 +414,7 @@ public class NetworkGraph : INetworkGraph
             return null;
         }
 
-        _nodes.Add((name, NodeType.Application), server);
+        _nodes.TryAdd((name, NodeType.Application), server);
 
         return server;
     }
