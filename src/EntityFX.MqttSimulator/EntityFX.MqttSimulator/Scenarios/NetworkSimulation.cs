@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace EntityFX.MqttY.Scenarios
 {
-    public class MqttNetworkSimulation
+    public class NetworkSimulation
     {
         public INetworkGraph? NetworkGraph { get; set; }
     }

@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Network;
+﻿using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Contracts.Network;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
@@ -35,6 +36,7 @@ namespace EntityFX.MqttY.Application
         public IReadOnlyDictionary<string, IClient> Clients => _clients.ToImmutableDictionary();
 
         public INode? Parent {  get; set; }
+        public MonitoringScope? Scope { get; set; }
 
         protected readonly INetworkGraph NetworkGraph;
 

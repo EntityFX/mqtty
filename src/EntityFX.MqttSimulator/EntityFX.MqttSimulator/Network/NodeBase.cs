@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Network;
+﻿using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Contracts.Network;
 
 public abstract class NodeBase : ISender
 {
@@ -16,6 +17,7 @@ public abstract class NodeBase : ISender
 
     public abstract NodeType NodeType { get; }
     public int? GroupAmount { get; set; }
+    public MonitoringScope? Scope { get; set; }
 
     public abstract Task<Packet> ReceiveWithResponseAsync(Packet packet);
 

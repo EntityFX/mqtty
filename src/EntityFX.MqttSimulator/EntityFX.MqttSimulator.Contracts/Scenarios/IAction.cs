@@ -5,7 +5,9 @@
     {
         int Index { get; init; }
 
-        TimeSpan? Timeout { get; init; }
+        TimeSpan? ActionTimeout { get; init; }
+
+        TimeSpan? IterrationsTimeout { get; init; }
 
         TimeSpan? Delay { get; init; }
 

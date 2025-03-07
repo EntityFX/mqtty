@@ -35,7 +35,7 @@ internal class Worker : BackgroundService
 
    //     _networkGraph.Configure(this._options.Value);
 
-        var actions = new Dictionary<int, IAction<MqttNetworkSimulation>>()
+        var actions = new Dictionary<int, IAction<NetworkSimulation>>()
         {
             [0] = new MqttNetworkInitAction(this._options.Value, _networkGraph)
             {
@@ -44,18 +44,18 @@ internal class Worker : BackgroundService
             },
             [1] = new MqttPublishAction()
             {
-                Timeout = TimeSpan.FromSeconds(1),
-                Iterrations = 7,
+                IterrationsTimeout = TimeSpan.FromSeconds(10),
+                //Iterrations = 7,
                 Config = new MqttPublishOptions()
                 {
                     Payload = new byte[] { 9, 8, 7 },
                     Topic = "telemetry/temperature",
-                    MqttClientName = "mgx11"
+                    MqttClientName = "mgx1_1"
                 }
             },
         };
 
-        var worker = new Scenario<MqttNetworkSimulation>(serviceProvider, new MqttNetworkSimulation(), actions.ToImmutableDictionary());
+        var worker = new Scenario<NetworkSimulation>(serviceProvider, new NetworkSimulation(), actions.ToImmutableDictionary());
         await worker.ExecuteAsync();
 
         //var plantGraph = _plantUmlGraphGenerator.Generate(_networkGraph);
@@ -69,14 +69,5 @@ internal class Worker : BackgroundService
 
         //await mgx11!.PublishAsync("telemetry/temperature", new byte[] { 7 }, MqttQos.AtLeastOnce);
 
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            //await mgx11!.PublishAsync("telemetry/temperature", new byte[] { 7 }, MqttQos.AtLeastOnce);
-            await Task.Delay(2000);
-
-            _networkGraph.Refresh();
-        }
-        await Task.CompletedTask;
     }
 }

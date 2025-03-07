@@ -69,7 +69,7 @@ public class Network : NodeBase, INetwork
 
         var result = network.Link(this);
 
-        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Link, $"Link network {this.Name} to {network.Name}", "Network", "Link");
+        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Link, $"Link network {this.Name} to {network.Name}", "Network", "Link", Scope);
 
         return true;
     }

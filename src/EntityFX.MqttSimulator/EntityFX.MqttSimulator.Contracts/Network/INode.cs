@@ -1,4 +1,6 @@
-﻿namespace EntityFX.MqttY.Contracts.Network
+﻿using EntityFX.MqttY.Contracts.Monitoring;
+
+namespace EntityFX.MqttY.Contracts.Network
 {
     public interface INode
     {
@@ -13,6 +15,8 @@
         string? Group { get; set; }
 
         int? GroupAmount { get; set; }
+
+        public MonitoringScope? Scope { get; set; }
 
         NodeType NodeType { get; }
 

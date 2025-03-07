@@ -5,14 +5,12 @@ using EntityFX.MqttY.Network;
 
 namespace EntityFX.MqttY.Scenarios
 {
-    public class MqttNetworkInitAction : ScenarioAction<MqttNetworkSimulation, NetworkGraphOptions>
+    public class NetworkInitAction : ScenarioAction<NetworkSimulation, NetworkGraphOptions>
     {
-        private readonly NetworkGraphOptions options;
         private readonly INetworkGraph networkGraph;
 
-        public MqttNetworkInitAction(NetworkGraphOptions options, INetworkGraph networkGraph)
+        public NetworkInitAction(INetworkGraph networkGraph)
         {
-            this.options = options;
             this.networkGraph = networkGraph;
         }
 
@@ -26,6 +24,8 @@ namespace EntityFX.MqttY.Scenarios
             networkGraph.Configure(Config);
 
             Context!.NetworkGraph = networkGraph;
+
+            networkGraph.Refresh();
 
             return Task.CompletedTask;
         }

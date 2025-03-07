@@ -33,19 +33,46 @@ namespace EntityFX.MqttY.Contracts.Scenarios
                     await Task.Delay(action.Value.Delay.Value);
                 }
 
-                var iterrations = action.Value.Iterrations;
-
-                for (int i = 0; i < iterrations; i++)
+                if (action.Value.IterrationsTimeout != null)
                 {
-                    var actionTask = action.Value.ExecuteAsync();
-
-                    if (action.Value.Timeout > TimeSpan.Zero)
-                    {
-                        await actionTask.WaitAsync(action.Value.Timeout.Value);
-                    }
-
-                    actionTask.Wait();
+                    await ExecuteTimeoutIterationsAsync(action.Value, action.Value.IterrationsTimeout.Value);
                 }
+                else 
+                {
+                    await ExecuteIterationsAsync(action.Value, action.Value.Iterrations);
+                }
+            }
+        }
+
+        private async Task ExecuteIterationsAsync(IAction<TContext> action, int iterrations)
+        {
+            for (int i = 0; i < iterrations; i++)
+            {
+                var actionTask = action.ExecuteAsync();
+
+                if (action.ActionTimeout > TimeSpan.Zero)
+                {
+                    await actionTask.WaitAsync(action.ActionTimeout.Value);
+                }
+
+                actionTask.Wait();
+            }
+        }
+
+        private async Task ExecuteTimeoutIterationsAsync(IAction<TContext> action, TimeSpan timeout)
+        {
+            var start = DateTime.Now;
+            while (DateTime.Now - start < timeout)
+            {
+                var actionTask = action.ExecuteAsync();
+
+                if (action.ActionTimeout > TimeSpan.Zero)
+                {
+                    await actionTask.WaitAsync(action.ActionTimeout.Value);
+                }
+
+                actionTask.Wait();
+
             }
         }
     }

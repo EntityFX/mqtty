@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Xml.Linq;
 using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
@@ -144,6 +145,31 @@ public class NetworkGraph : INetworkGraph
 
     private void ConfigureNodes(NetworkGraphOptions options)
     {
+        ConfigureServers(options);
+        ConfigureClients(options);
+        ConfigureApplications(options);
+    }
+
+    private void ConfigureApplications(NetworkGraphOptions options)
+    {
+        var applications = options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Application).ToArray();
+        foreach (var application in applications)
+        {
+            var nodeApplication = GetNode(application.Key, NodeType.Application) as IApplication;
+            if (nodeApplication == null) continue;
+
+            var bo = new NodeBuildOptions<object>(
+                this, nodeApplication.Network, nodeApplication.Index, nodeApplication.Name, nodeApplication.Address,
+                nodeApplication.Group, nodeApplication.GroupAmount, nodeApplication.ProtocolType,
+                nodeApplication.Specification ?? string.Empty,
+                null, application.Value.Configuration);
+
+            _networkBuilder.ApplicationFactory.Configure(bo, nodeApplication);
+        }
+    }
+
+    private void ConfigureServers(NetworkGraphOptions options)
+    {
         var servers = options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Server).ToArray();
         foreach (var node in servers)
         {
@@ -152,13 +178,16 @@ public class NetworkGraph : INetworkGraph
 
             var bo = new NodeBuildOptions<Dictionary<string, string[]>>(
                 this, nodeServer.Network, nodeServer.Index, nodeServer.Name, nodeServer.Address,
-                nodeServer.Group, nodeServer.GroupAmount, nodeServer.ProtocolType, 
+                nodeServer.Group, nodeServer.GroupAmount, nodeServer.ProtocolType,
                 nodeServer.Specification, node.Value.ConnectsToServer, node.Value.Additional);
 
             _networkBuilder.ServerFactory.Configure(bo, nodeServer);
 
         }
+    }
 
+    private void ConfigureClients(NetworkGraphOptions options)
+    {
         var clients = options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Client).ToArray();
         foreach (var node in clients)
         {
@@ -168,7 +197,7 @@ public class NetworkGraph : INetworkGraph
                     .ForEach(
                         (nc) =>
                         {
-                            var nodeClient = GetNode($"{node.Key}{nc}", NodeType.Client) as IClient;
+                            var nodeClient = GetNode($"{node.Key}_{nc}", NodeType.Client) as IClient;
 
                             if (nodeClient == null)
                             {
@@ -191,26 +220,10 @@ public class NetworkGraph : INetworkGraph
 
                 var bo = new NodeBuildOptions<Dictionary<string, string[]>>(
                     this, nodeClient.Network, nodeClient.Index, nodeClient.Name, nodeClient.Address,
-                    nodeClient.Group, nodeClient.GroupAmount, nodeClient.ProtocolType, 
+                    nodeClient.Group, nodeClient.GroupAmount, nodeClient.ProtocolType,
                     node.Value.Specification ?? string.Empty, node.Value.ConnectsToServer, node.Value.Additional);
                 _networkBuilder.ClientFactory.Configure(bo, nodeClient);
             }
-        }
-
-        var applications = options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Application).ToArray();
-        foreach (var application in applications)
-        {
-            var nodeApplication = GetNode(application.Key, NodeType.Application) as IApplication;
-            if (nodeApplication == null) continue;
-
-            var bo = new NodeBuildOptions<object>(
-                this, nodeApplication.Network, nodeApplication.Index, nodeApplication.Name, nodeApplication.Address,
-                nodeApplication.Group, nodeApplication.GroupAmount, nodeApplication.ProtocolType,
-                nodeApplication.Specification ?? string.Empty,
-                null, application.Value.Configuration);
-
-            _networkBuilder.ApplicationFactory.Configure(bo, nodeApplication);
-
         }
     }
 
@@ -238,7 +251,7 @@ public class NetworkGraph : INetworkGraph
                         Enumerable.Range(1, node.Value.Quantity.Value).ToList()
                             .ForEach(
                                 (nc) => BuildClient(
-                                    index, $"{node.Key}{nc}",
+                                    index, $"{node.Key}_{nc}",
                                     node.Value.Protocol ?? "tcp",
                                     node.Value.Specification ?? "tcp-client",
                                     linkNetwork, node.Key, node.Value.Quantity, node.Value.Additional));
@@ -263,6 +276,7 @@ public class NetworkGraph : INetworkGraph
 
     private void ConfigureLinks(NetworkGraphOptions options)
     {
+        var scope = Monitoring.BeginScope("Configure sourceNetwork links");
         foreach (var networkOption in options.Networks)
         {
             if (networkOption.Value?.Links?.Any() != true) continue;
@@ -271,9 +285,16 @@ public class NetworkGraph : INetworkGraph
             {
                 if (link?.Network == null || !_networks.ContainsKey(link.Network)) continue;
 
-                _networks[networkOption.Key].Link(_networks[link.Network]);
+                var sourceNetwork = _networks[networkOption.Key];
+                var destinationNetwork = _networks[link.Network];
+                sourceNetwork.Scope = scope;
+                destinationNetwork.Scope = scope;
+                sourceNetwork.Link(destinationNetwork);
+                sourceNetwork.Scope = null;
+                destinationNetwork.Scope = null;
             }
         }
+        Monitoring.EndScope(scope);
     }
 
     public string GetAddress(string name, string protocolType, string networkAddress)
@@ -367,15 +388,15 @@ public class NetworkGraph : INetworkGraph
 
     public void Refresh()
     {
-        var scope = Monitoring.BeginScope("Refresh network graph");
-        Monitoring.Push(MonitoringType.Refresh, $"Refresh whole network", "Network", "Refresh", scope);
+        var scope = Monitoring.BeginScope("Refresh sourceNetwork graph");
+        Monitoring.Push(MonitoringType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
 
         var bytes = Array.Empty<byte>();
 
         foreach (var network in _networks)
         {
             Monitoring.Push(
-                network.Value, network.Value, bytes, MonitoringType.Refresh, $"Refresh network {network.Key}", "Network", "Refresh", scope);
+                network.Value, network.Value, bytes, MonitoringType.Refresh, $"Refresh sourceNetwork {network.Key}", "Network", "Refresh", scope);
             network.Value.Refresh();
         }
 
