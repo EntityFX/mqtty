@@ -38,4 +38,6 @@ public class NodeBuildOptions<TOptions>
     public string? ConnectsTo { get; init; }
 
     public TOptions? Additional { get; init; }
+    
+    public string? OptionsPath { get; set; }
 }

@@ -4,7 +4,7 @@ namespace EntityFX.MqttY.Contracts.Utils;
 
 public interface IFactory<TService, TApplicationOptions>
 {
-    TService Create(NodeBuildOptions<TApplicationOptions> options);
+    TService Create(TApplicationOptions options);
 
-    TService Configure(NodeBuildOptions<TApplicationOptions> options, TService service);
+    TService Configure(TApplicationOptions options, TService service);
 }

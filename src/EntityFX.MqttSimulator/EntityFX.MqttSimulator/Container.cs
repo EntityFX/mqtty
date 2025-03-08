@@ -1,6 +1,8 @@
 using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Contracts.Scenarios;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Mqtt.Internals;
 using EntityFX.MqttY.Network;
@@ -19,10 +21,11 @@ public static class Container
         return serviceCollection
             .AddScoped<IMonitoring>((sp) => ConfigureMonitoring(sp))
             .AddScoped<PlantUmlGraphGenerator>()
-            .AddScoped<IFactory<IClient?, Dictionary<string, string[]>>, ClientFactory>()
-            .AddScoped<IFactory<IServer?, Dictionary<string, string[]>>, ServerFactory>()
-            .AddScoped<IFactory<INetwork, Dictionary<string, string[]>>, NetworkFactory>()
-            .AddScoped<IFactory<IApplication?, object>, ApplicationFactory>()
+            .AddScoped<IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>>, ClientFactory>()
+            .AddScoped<IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>>, ServerFactory>()
+            .AddScoped<IFactory<INetwork, NodeBuildOptions<Dictionary<string, string[]>>>, NetworkFactory>()
+            .AddScoped<IFactory<IApplication?, NodeBuildOptions<object>>, ApplicationFactory>()
+            .AddScoped<IFactory<IScenario?, (string Scenario, IDictionary<string, ScenarioOption> Options)>, ScenarioFactory>()
             .AddScoped<INetworkBuilder, NetworkBuilder>()
             .AddScoped<IPathFinder, DijkstraPathFinder>()
             .AddScoped<INetworkGraph, NetworkGraph>()

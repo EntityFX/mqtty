@@ -3,7 +3,7 @@ using EntityFX.MqttY.Contracts.Utils;
 
 namespace EntityFX.MqttY.Utils;
 
-internal class NetworkFactory : IFactory<INetwork, Dictionary<string, string[]>>
+internal class NetworkFactory : IFactory<INetwork, NodeBuildOptions<Dictionary<string, string[]>>>
 {
     public INetwork Configure(NodeBuildOptions<Dictionary<string, string[]>> options, INetwork service)
     {

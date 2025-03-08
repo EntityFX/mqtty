@@ -33,13 +33,13 @@ namespace EntityFX.MqttY.Contracts.Scenarios
                     await Task.Delay(action.Value.Delay.Value);
                 }
 
-                if (action.Value.IterrationsTimeout != null)
+                if (action.Value.IterationsTimeout != null)
                 {
-                    await ExecuteTimeoutIterationsAsync(action.Value, action.Value.IterrationsTimeout.Value);
+                    await ExecuteTimeoutIterationsAsync(action.Value, action.Value.IterationsTimeout.Value);
                 }
                 else 
                 {
-                    await ExecuteIterationsAsync(action.Value, action.Value.Iterrations);
+                    await ExecuteIterationsAsync(action.Value, action.Value.Iterations);
                 }
             }
         }

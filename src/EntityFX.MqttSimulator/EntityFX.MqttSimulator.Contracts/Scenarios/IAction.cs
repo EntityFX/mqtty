@@ -7,11 +7,11 @@
 
         TimeSpan? ActionTimeout { get; init; }
 
-        TimeSpan? IterrationsTimeout { get; init; }
+        TimeSpan? IterationsTimeout { get; init; }
 
         TimeSpan? Delay { get; init; }
 
-        int Iterrations { get; init; }
+        int Iterations { get; init; }
 
         ActionType Type { get; init; }
 

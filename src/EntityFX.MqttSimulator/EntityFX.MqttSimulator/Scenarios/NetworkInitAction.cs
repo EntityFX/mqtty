@@ -5,7 +5,7 @@ using EntityFX.MqttY.Network;
 
 namespace EntityFX.MqttY.Scenarios
 {
-    public class NetworkInitAction : ScenarioAction<NetworkSimulation, NetworkGraphOptions>
+    public class NetworkInitAction : ScenarioAction<NetworkSimulation, NetworkGraphOption>
     {
         private readonly INetworkGraph networkGraph;
 

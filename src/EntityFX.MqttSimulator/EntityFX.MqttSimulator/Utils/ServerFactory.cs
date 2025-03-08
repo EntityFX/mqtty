@@ -6,13 +6,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace EntityFX.MqttY.Utils;
 
-internal class ServerFactory : IFactory<IServer?, Dictionary<string, string[]>>
+internal class ServerFactory : IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>>
 {
-    private readonly IServiceProvider serviceProvider;
+    private readonly IServiceProvider _serviceProvider;
 
     public ServerFactory(IServiceProvider serviceProvider)
     {
-        this.serviceProvider = serviceProvider;
+        this._serviceProvider = serviceProvider;
     }
 
     public IServer? Configure(NodeBuildOptions<Dictionary<string, string[]>> options, IServer? service)
@@ -28,7 +28,7 @@ internal class ServerFactory : IFactory<IServer?, Dictionary<string, string[]>>
             return null;
         }
 
-        var mqttTopicEvaluator = serviceProvider.GetRequiredService<IMqttTopicEvaluator>();
+        var mqttTopicEvaluator = _serviceProvider.GetRequiredService<IMqttTopicEvaluator>();
 
         if (options.Protocol == "mqtt")
         {

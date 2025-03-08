@@ -8,16 +8,16 @@
 
         public TimeSpan? ActionTimeout { get; init; }
 
-        public TimeSpan? IterrationsTimeout { get; init; }
+        public TimeSpan? IterationsTimeout { get; init; }
 
-        public int Iterrations { get; init; } = 1;
+        public int Iterations { get; init; } = 1;
         public TimeSpan? Delay { get; init; }
         public ActionType Type { get; init; }
         public TContext? Context { get; set; }
         public TConfig? Config { get; set; }
         public ScenarioAction()
         {
-            Iterrations = 1;
+            Iterations = 1;
         }
 
         public virtual Task ExecuteAsync()

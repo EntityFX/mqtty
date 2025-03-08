@@ -30,6 +30,8 @@ public class NetworkGraph : INetworkGraph
         PathFinder.NetworkGraph = this;
     }
 
+    public string? OptionsPath { get; set; }
+
     public IPathFinder PathFinder { get; }
 
     public IMonitoring Monitoring { get; }
@@ -37,7 +39,7 @@ public class NetworkGraph : INetworkGraph
     public IImmutableDictionary<string, INetwork> Networks => _networks.ToImmutableDictionary();
 
     public IClient? BuildClient(int index, string name, string protocolType, string specification,
-        INetwork network, string? group = null, int? groupAmount = null, 
+        INetwork network, string? group = null, int? groupAmount = null,
         Dictionary<string, string[]>? additional = default)
     {
         if (_nodes.ContainsKey((name, NodeType.Client)))
@@ -50,7 +52,7 @@ public class NetworkGraph : INetworkGraph
         var client = _networkBuilder
             .ClientFactory.Create(
                 new NodeBuildOptions<Dictionary<string, string[]>>(
-                    this, network, index, name, clientAddressFull, group, groupAmount, protocolType, 
+                    this, network, index, name, clientAddressFull, group, groupAmount, protocolType,
                     specification, null, additional));
 
         if (client == null)
@@ -63,12 +65,12 @@ public class NetworkGraph : INetworkGraph
         return client;
     }
 
-    public TCLient? BuildClient<TCLient>(int index, string name, string protocolType, string specification,
+    public TClient? BuildClient<TClient>(int index, string name, string protocolType, string specification,
         INetwork network,
         string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = default)
-        where TCLient : IClient
+        where TClient : IClient
     {
-        return (TCLient?)BuildClient(index, name, protocolType, specification, network, group, groupAmount, additional);
+        return (TClient?)BuildClient(index, name, protocolType, specification, network, group, groupAmount, additional);
     }
 
     public INetwork? BuildNetwork(int index, string name, string address)
@@ -77,9 +79,11 @@ public class NetworkGraph : INetworkGraph
         {
             return null;
         }
+
         var network = _networkBuilder
             .NetworkFactory.Create(
-                new NodeBuildOptions<Dictionary<string, string[]>>(this, null, index, name, address, null, null, null, String.Empty, null, new()));
+                new NodeBuildOptions<Dictionary<string, string[]>>(this, null, index, name, address, null, null, null,
+                    String.Empty, null, new()));
 
         if (network == null)
         {
@@ -91,7 +95,8 @@ public class NetworkGraph : INetworkGraph
         return network;
     }
 
-    public ILeafNode? BuildNode(int index, string name, string address, NodeType nodeType, string? group = null, int? groupAmount = null,
+    public ILeafNode? BuildNode(int index, string name, string address, NodeType nodeType, string? group = null,
+        int? groupAmount = null,
         Dictionary<string, string[]>? additional = null)
     {
         return null;
@@ -105,12 +110,14 @@ public class NetworkGraph : INetworkGraph
         {
             return null;
         }
+
         var serverAddressFull = GetAddress(name, protocolType, network.Address);
 
         var server = _networkBuilder
             .ServerFactory.Create(
-                new NodeBuildOptions<Dictionary<string, string[]>>(this, network, index, name, serverAddressFull, group, groupAmount, protocolType, 
-                specification, null, additional));
+                new NodeBuildOptions<Dictionary<string, string[]>>(this, network, index, name, serverAddressFull, group,
+                    groupAmount, protocolType,
+                    specification, null, additional));
 
         if (server == null)
         {
@@ -122,37 +129,37 @@ public class NetworkGraph : INetworkGraph
         return server;
     }
 
-    public void Configure(NetworkGraphOptions options)
+    public void Configure(NetworkGraphOption option)
     {
-        if (options.Networks.Any() != true)
+        if (option.Networks.Any() != true)
         {
             return;
         }
 
-        foreach (var networkOption in options.Networks)
+        foreach (var networkOption in option.Networks)
         {
             BuildNetwork(networkOption.Value.Index, networkOption.Key, networkOption.Key);
         }
 
-        ConfigureLinks(options);
+        ConfigureLinks(option);
 
         PathFinder.Build();
 
-        BuildNodes(options);
+        BuildNodes(option);
 
-        ConfigureNodes(options);
+        ConfigureNodes(option);
     }
 
-    private void ConfigureNodes(NetworkGraphOptions options)
+    private void ConfigureNodes(NetworkGraphOption option)
     {
-        ConfigureServers(options);
-        ConfigureClients(options);
-        ConfigureApplications(options);
+        ConfigureServers(option);
+        ConfigureClients(option);
+        ConfigureApplications(option);
     }
 
-    private void ConfigureApplications(NetworkGraphOptions options)
+    private void ConfigureApplications(NetworkGraphOption option)
     {
-        var applications = options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Application).ToArray();
+        var applications = option.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Application).ToArray();
         foreach (var application in applications)
         {
             var nodeApplication = GetNode(application.Key, NodeType.Application) as IApplication;
@@ -168,9 +175,9 @@ public class NetworkGraph : INetworkGraph
         }
     }
 
-    private void ConfigureServers(NetworkGraphOptions options)
+    private void ConfigureServers(NetworkGraphOption option)
     {
-        var servers = options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Server).ToArray();
+        var servers = option.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Server).ToArray();
         foreach (var node in servers)
         {
             var nodeServer = GetNode(node.Key, NodeType.Server) as IServer;
@@ -182,13 +189,12 @@ public class NetworkGraph : INetworkGraph
                 nodeServer.Specification, node.Value.ConnectsToServer, node.Value.Additional);
 
             _networkBuilder.ServerFactory.Configure(bo, nodeServer);
-
         }
     }
 
-    private void ConfigureClients(NetworkGraphOptions options)
+    private void ConfigureClients(NetworkGraphOption option)
     {
-        var clients = options.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Client).ToArray();
+        var clients = option.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Client).ToArray();
         foreach (var node in clients)
         {
             if (node.Value.Quantity > 1)
@@ -227,10 +233,10 @@ public class NetworkGraph : INetworkGraph
         }
     }
 
-    private void BuildNodes(NetworkGraphOptions options)
+    private void BuildNodes(NetworkGraphOption option)
     {
         var index = 0;
-        foreach (var node in options.Nodes)
+        foreach (var node in option.Nodes)
         {
             var linkNetwork = _networks.GetValueOrDefault(node.Value.Network ?? string.Empty);
             if (linkNetwork == null) continue;
@@ -262,6 +268,7 @@ public class NetworkGraph : INetworkGraph
                             node.Value.Specification ?? "tcp-client",
                             linkNetwork, null, null, node.Value.Additional);
                     }
+
                     break;
                 case NodeOptionType.Application:
                     BuildApplication(index, node.Key, node.Value.Protocol ?? "tcp",
@@ -274,10 +281,10 @@ public class NetworkGraph : INetworkGraph
         }
     }
 
-    private void ConfigureLinks(NetworkGraphOptions options)
+    private void ConfigureLinks(NetworkGraphOption option)
     {
         var scope = Monitoring.BeginScope("Configure sourceNetwork links");
-        foreach (var networkOption in options.Networks)
+        foreach (var networkOption in option.Networks)
         {
             if (networkOption.Value?.Links?.Any() != true) continue;
 
@@ -294,6 +301,7 @@ public class NetworkGraph : INetworkGraph
                 destinationNetwork.Scope = null;
             }
         }
+
         Monitoring.EndScope(scope);
     }
 
@@ -347,7 +355,6 @@ public class NetworkGraph : INetworkGraph
         client.Disconnect();
 
         _nodes.Remove((clientAddress, NodeType.Client), out _);
-
     }
 
     public void RemoveNetwork(string networkAddress)
@@ -396,14 +403,16 @@ public class NetworkGraph : INetworkGraph
         foreach (var network in _networks)
         {
             Monitoring.Push(
-                network.Value, network.Value, bytes, MonitoringType.Refresh, $"Refresh sourceNetwork {network.Key}", "Network", "Refresh", scope);
+                network.Value, network.Value, bytes, MonitoringType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                "Network", "Refresh", scope);
             network.Value.Refresh();
         }
 
         foreach (var node in _nodes)
         {
             Monitoring.Push(
-                node.Value, node.Value, bytes, MonitoringType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh", scope);
+                node.Value, node.Value, bytes, MonitoringType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                scope);
             node.Value.Refresh();
         }
 
@@ -416,19 +425,23 @@ public class NetworkGraph : INetworkGraph
     }
 
     public IApplication? BuildApplication<TConfiguration>(
-        int index, string name, string protocolType, string specification, INetwork network, 
+        int index, string name, string protocolType, string specification, INetwork network,
         string? group = null, int? groupAmount = null, TConfiguration? applicationConfig = default)
     {
         if (_nodes.ContainsKey((name, NodeType.Application)))
         {
             return null;
         }
+
         var serverAddressFull = GetAddress(name, protocolType, network.Address);
 
         var server = _networkBuilder
             .ApplicationFactory.Create(
                 new NodeBuildOptions<object>(this, network, index, name, serverAddressFull,
-                group, groupAmount, protocolType, specification, null, applicationConfig));
+                    group, groupAmount, protocolType, specification, null, applicationConfig)
+                {
+                    OptionsPath = OptionsPath
+                });
 
         if (server == null)
         {

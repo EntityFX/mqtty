@@ -5,17 +5,18 @@ using EntityFX.MqttY.Contracts.Utils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.RegularExpressions;
+
 namespace EntityFX.MqttY.Utils;
 
-internal class ApplicationFactory : IFactory<IApplication?, object>
+internal class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<object>>
 {
-    private readonly IConfiguration configuration;
-    private readonly IServiceProvider serviceProvider;
+    private readonly IConfiguration _configuration;
+    private readonly IServiceProvider _serviceProvider;
 
     public ApplicationFactory(IConfiguration configuration, IServiceProvider serviceProvider)
     {
-        this.configuration = configuration;
-        this.serviceProvider = serviceProvider;
+        this._configuration = configuration;
+        this._serviceProvider = serviceProvider;
     }
 
     public IApplication? Configure(NodeBuildOptions<object> options, IApplication? application)
@@ -32,13 +33,16 @@ internal class ApplicationFactory : IFactory<IApplication?, object>
             return null;
         }
 
-        if (options.Protocol == "mqtt" && options.Specification == "mqtt-relay")
+        var applicationConfigurationPath = $"{(string.IsNullOrEmpty(options.OptionsPath) ? "" : $"{options.OptionsPath}:")}" +
+                                           $"nodes:{options.Name}:configuration";
+        var configurationSection = _configuration.GetSection(applicationConfigurationPath);
+
+        if (options is { Protocol: "mqtt", Specification: "mqtt-relay" })
         {
-            var mqttRelayConfSection = configuration.GetSection($"networkGraph:nodes:{options.Name}:configuration");
-            var mqttRelayConf = mqttRelayConfSection
+            var mqttRelayConf = configurationSection
                 .Get<MqttRelayConfiguration>();
 
-            var mqttTopicEvaluator = serviceProvider.GetRequiredService<IMqttTopicEvaluator>();
+            var mqttTopicEvaluator = _serviceProvider.GetRequiredService<IMqttTopicEvaluator>();
 
             return new MqttRelay
                 (options.Index, options.Name, options.Address ?? options.Name,
@@ -49,10 +53,9 @@ internal class ApplicationFactory : IFactory<IApplication?, object>
             };
         }
 
-        if (options.Protocol == "mqtt" && options.Specification == "mqtt-receiver")
+        if (options is { Protocol: "mqtt", Specification: "mqtt-receiver" })
         {
-            var mqttReceiverConfSection = configuration.GetSection($"networkGraph:nodes:{options.Name}:configuration");
-            var mqttReceiverConf = mqttReceiverConfSection
+            var mqttReceiverConf = configurationSection
                 .Get<MqttReceiverConfiguration>();
 
             return new MqttReceiver

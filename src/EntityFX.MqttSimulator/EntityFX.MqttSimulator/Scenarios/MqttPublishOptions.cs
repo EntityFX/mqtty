@@ -4,8 +4,8 @@
     {
         public string Topic { get; init; } = string.Empty;
 
-        public string MqttClientName { get; init; } = string.Empty;
+        public string ClientName { get; init; } = string.Empty;
 
-        public object? Payload { get; init; } = null;
+        public byte[] Payload { get; init; } = Array.Empty<byte>();
     }
 }

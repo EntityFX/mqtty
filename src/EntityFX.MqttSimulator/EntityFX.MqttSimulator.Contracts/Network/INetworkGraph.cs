@@ -6,6 +6,8 @@ namespace EntityFX.MqttY.Contracts.Network
 {
     public interface INetworkGraph
     {
+        public string? OptionsPath { get; set; }
+        
         public IPathFinder PathFinder { get; }
         public IMonitoring Monitoring { get; }
 
@@ -46,7 +48,7 @@ namespace EntityFX.MqttY.Contracts.Network
 
         ILeafNode? GetNode(string name, NodeType nodeType);
 
-        void Configure(NetworkGraphOptions value);
+        void Configure(NetworkGraphOption value);
 
         Packet GetReversePacket(Packet packet, byte[] payload, string? category);
 

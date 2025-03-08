@@ -14,7 +14,7 @@ namespace EntityFX.MqttY.Scenarios
                 throw new ArgumentNullException(nameof(Config));
             }
 
-            var mqttClient = Context!.NetworkGraph!.GetNode(Config.MqttClientName, NodeType.Client) as IMqttClient;
+            var mqttClient = Context!.NetworkGraph!.GetNode(Config.ClientName, NodeType.Client) as IMqttClient;
 
             await mqttClient!.PublishAsync(Config.Topic, new byte[] { 7 }, MqttQos.AtLeastOnce);
 

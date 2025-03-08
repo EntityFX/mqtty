@@ -19,8 +19,7 @@ builder.Configuration
     .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true, false);
 
 builder.Services
-    .Configure<NetworkGraphOptions>(
-        builder.Configuration.GetSection("networkGraph"));
+    .Configure<MqttYOptions>(builder.Configuration);
 
 builder.Services
     .AddHostedService<Worker>()
