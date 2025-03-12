@@ -1,17 +1,22 @@
-﻿using EntityFX.MqttY.Contracts.Network;
+﻿using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Scenarios;
+using EntityFX.MqttY.Contracts.Utils;
+using EntityFX.MqttY.Factories;
 using EntityFX.MqttY.Network;
 
 namespace EntityFX.MqttY.Scenarios
 {
-    public class NetworkInitAction : ScenarioAction<NetworkSimulation, NetworkGraphOption>
+    internal class NetworkInitAction : ScenarioAction<NetworkSimulation, NetworkGraphFactoryOption>
     {
-        private readonly INetworkGraph networkGraph;
+        private readonly IFactory<INetworkGraph, NetworkGraphFactoryOption> networkGraphFactory;
 
-        public NetworkInitAction(INetworkGraph networkGraph)
+        public NetworkInitAction(IScenario<NetworkSimulation> scenario, 
+            IFactory<INetworkGraph, NetworkGraphFactoryOption> networkGraphFactory)
+            : base(scenario)
         {
-            this.networkGraph = networkGraph;
+            this.networkGraphFactory = networkGraphFactory;
         }
 
         public override Task ExecuteAsync()
@@ -21,7 +26,16 @@ namespace EntityFX.MqttY.Scenarios
                 throw new ArgumentNullException(nameof(Config));
             }
 
-            networkGraph.Configure(Config);
+            if (Config.MonitoringOption.Path != null)
+            {
+                Config.MonitoringOption.Path = Config.MonitoringOption.Path
+                    .Replace("{scenario}", Scenario.Name)
+                    .Replace("{date}", $"{DateTime.Now:yyyy_MM_dd__HH_mm}");
+            }
+
+            var networkGraph = networkGraphFactory.Create(Config);
+
+            networkGraph.Configure(Config.NetworkGraphOption);
 
             Context!.NetworkGraph = networkGraph;
 

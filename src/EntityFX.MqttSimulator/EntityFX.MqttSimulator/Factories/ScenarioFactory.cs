@@ -7,7 +7,7 @@ using EntityFX.MqttY.Scenarios;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace EntityFX.MqttY.Utils;
+namespace EntityFX.MqttY.Factories;
 
 internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDictionary<string, ScenarioOption> Options)>
 {
@@ -31,47 +31,50 @@ internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDiction
         {
             return null;
         }
-        
+
         var scenarioOptions = options.Options[options.Scenario];
 
         if (scenarioOptions.Type == "networkSimulation")
         {
-            var actionsDictionary = BuildActions<NetworkSimulation>(options.Scenario, scenarioOptions);
-
-            var scenario = new Scenario<NetworkSimulation>(_serviceProvider, new NetworkSimulation(),
-                actionsDictionary.ToImmutableDictionary());
+            var scenario = new Scenario<NetworkSimulation>(_serviceProvider, options.Scenario, new NetworkSimulation(), 
+                (s) => BuildActions<NetworkSimulation>(s, options.Scenario, scenarioOptions));
             return scenario;
         }
 
         return null;
     }
 
-    private Dictionary<int, IAction<TContext>> BuildActions<TContext>(string scenarioName,
+    private Dictionary<int, IAction<TContext>> BuildActions<TContext>(IScenario<NetworkSimulation> s,
+        string scenarioName,
         ScenarioOption scenarioOptions)
     {
         var actions = new List<IAction<TContext>>();
-        foreach (var actionOption 
+        foreach (var actionOption
                  in scenarioOptions.Actions.OrderBy(a => a.Value.Index))
         {
             var configurationPath = $"scenarios:{scenarioName}:actions:{actionOption.Key}:configuration";
-            
+
             var configurationSection =
                 _configuration.GetSection(configurationPath);
-            
+
             var actionOptionValue = actionOption.Value;
 
             IAction<TContext>? action = null;
             switch (actionOption.Value.Type)
             {
                 case "network-init":
-                    var networkGraphOption = configurationSection.Get<NetworkGraphOption>();
+                    var networkGraphOption = configurationSection.GetSection("graph").Get<NetworkGraphOption>();
+                    var monitoringOption = configurationSection.GetSection("monitoring").Get<MonitoringOption>();
 
-                    var networkGraph = _serviceProvider.GetRequiredService<INetworkGraph>();
-                    networkGraph.OptionsPath = configurationPath;
+                    var networkGraph = _serviceProvider.GetRequiredService<IFactory<INetworkGraph, NetworkGraphFactoryOption>>();
 
-                    var networkInitAction = new NetworkInitAction(networkGraph)
+                    var networkInitAction = new NetworkInitAction(s, networkGraph)
                     {
-                        Config = networkGraphOption,
+                        Config = new NetworkGraphFactoryOption() {
+                            MonitoringOption = monitoringOption ?? new MonitoringOption(), 
+                            NetworkGraphOption = networkGraphOption ?? new NetworkGraphOption(), 
+                            OptionsPath = configurationPath
+                        },
                         Delay = actionOptionValue.Delay,
                         Iterations = actionOptionValue.Iterations,
                         IterationsTimeout = actionOptionValue.IterationsTimeout,
@@ -83,7 +86,7 @@ internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDiction
                 case "mqtt-publish":
                     var mqttPublishOptions = configurationSection.Get<MqttPublishOptions>();
 
-                    var mqttPublishAction = new MqttPublishAction()
+                    var mqttPublishAction = new MqttPublishAction(s)
                     {
                         Config = mqttPublishOptions,
                         Delay = actionOptionValue.Delay,
@@ -97,7 +100,7 @@ internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDiction
             }
 
             if (action == null) continue;
-            
+
             actions.Add(action);
         }
 

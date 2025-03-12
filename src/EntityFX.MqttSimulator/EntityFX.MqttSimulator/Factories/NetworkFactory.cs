@@ -1,7 +1,7 @@
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Utils;
 
-namespace EntityFX.MqttY.Utils;
+namespace EntityFX.MqttY.Factories;
 
 internal class NetworkFactory : IFactory<INetwork, NodeBuildOptions<Dictionary<string, string[]>>>
 {

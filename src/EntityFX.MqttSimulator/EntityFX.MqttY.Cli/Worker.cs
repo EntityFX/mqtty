@@ -11,6 +11,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Immutable;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Scenarios;
+using EntityFX.MqttY.Contracts.Monitoring;
 
 internal class Worker : BackgroundService
 {
@@ -18,19 +19,16 @@ internal class Worker : BackgroundService
     private readonly IConfiguration _configuration;
     private readonly IOptions<MqttYOptions> _options;
     private readonly IFactory<IScenario?, (string Scenario, IDictionary<string, ScenarioOption> Options)> _scenariosFactory;
-    private readonly INetworkGraph _networkGraph;
     private readonly PlantUmlGraphGenerator _plantUmlGraphGenerator;
 
     public Worker(IServiceProvider serviceProvider, IConfiguration configuration, 
         IOptions<MqttYOptions> options, IFactory<IScenario?, (string Scenario, IDictionary<string, ScenarioOption> Options)> scenariosFactory,
-        INetworkGraph networkGraph,
         PlantUmlGraphGenerator plantUmlGraphGenerator)
     {
         _serviceProvider = serviceProvider;
         _configuration = configuration;
         _options = options;
         _scenariosFactory = scenariosFactory;
-        this._networkGraph = networkGraph;
         _plantUmlGraphGenerator = plantUmlGraphGenerator;
     }
 
@@ -44,6 +42,16 @@ internal class Worker : BackgroundService
         }
 
         await scenario.ExecuteAsync();
+
+        var context = scenario.Context as NetworkSimulation;
+
+        var items = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter() { 
+            ByMonitoringType = new[] { MonitoringType.Link } });
+
+        var byProtocol = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter()
+        {
+            ByProtocol = "mqtt"
+        });
 
         //var plantGraph = _plantUmlGraphGenerator.Generate(_networkGraph);
         //File.WriteAllText("graph.puml", plantGraph);

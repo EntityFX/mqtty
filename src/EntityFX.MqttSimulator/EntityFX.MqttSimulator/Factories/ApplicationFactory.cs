@@ -6,7 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.RegularExpressions;
 
-namespace EntityFX.MqttY.Utils;
+namespace EntityFX.MqttY.Factories;
 
 internal class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<object>>
 {
@@ -15,8 +15,8 @@ internal class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<obj
 
     public ApplicationFactory(IConfiguration configuration, IServiceProvider serviceProvider)
     {
-        this._configuration = configuration;
-        this._serviceProvider = serviceProvider;
+        _configuration = configuration;
+        _serviceProvider = serviceProvider;
     }
 
     public IApplication? Configure(NodeBuildOptions<object> options, IApplication? application)
@@ -34,7 +34,7 @@ internal class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<obj
         }
 
         var applicationConfigurationPath = $"{(string.IsNullOrEmpty(options.OptionsPath) ? "" : $"{options.OptionsPath}:")}" +
-                                           $"nodes:{options.Name}:configuration";
+                                           $"graph:nodes:{options.Name}:configuration";
         var configurationSection = _configuration.GetSection(applicationConfigurationPath);
 
         if (options is { Protocol: "mqtt", Specification: "mqtt-relay" })

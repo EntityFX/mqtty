@@ -8,16 +8,23 @@ namespace EntityFX.MqttY.Contracts.Scenarios
 
         public TContext Context { get; init; }
 
-        public IImmutableDictionary<int, IAction<TContext>> Actions { get; init; }
+        object? IExecutable.Context => Context;
+
+        public IImmutableDictionary<int, IAction<TContext>> Actions { get; init; } 
+            = new Dictionary<int, IAction<TContext>>().ToImmutableDictionary();
 
         public IScenario? Next { get; set; }
         public string Name { get; init; } = nameof(Scenario<TContext>);
 
-        public Scenario(IServiceProvider serviceProvider, TContext context, IImmutableDictionary<int, IAction<TContext>> actions)
+
+
+        public Scenario(IServiceProvider serviceProvider, string scenario, TContext context,
+            Func<IScenario<TContext>, Dictionary<int, IAction<TContext>>> actionsBuildFunc)
         {
             this.serviceProvider = serviceProvider;
+            Name = scenario;
             Context = context;
-            Actions = actions;
+            Actions = actionsBuildFunc(this).ToImmutableDictionary();
         }
 
         public async Task ExecuteAsync()

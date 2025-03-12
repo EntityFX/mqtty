@@ -7,7 +7,6 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Reflection.Emit;
 using System.Xml.Linq;
-using static System.Formats.Asn1.AsnWriter;
 
 public class Monitoring : IMonitoring
 {
@@ -179,5 +178,48 @@ public class Monitoring : IMonitoring
     public void Tick()
     {
         Interlocked.Increment(ref _tick);
+    }
+
+    public IEnumerable<MonitoringItem> GetByFilter(MonitoringFilter filter)
+    {
+        var result = Items;
+
+        if (filter.ByDate != null)
+        {
+            result = result.Where(mi =>
+            {
+                var byDatePred = true;
+
+                if (filter?.ByDate.From != null)
+                {
+                    byDatePred = byDatePred && mi.Date >= filter.ByDate.From;
+                }
+
+                if (filter?.ByDate.To != null)
+                {
+                    byDatePred = byDatePred && mi.Date <= filter.ByDate.To;
+                }
+
+                return byDatePred;
+            });
+        }
+
+        if (filter.ByNodeType?.Any() == true)
+        {
+            result = result.Where(mi => filter.ByNodeType.Contains(mi.SourceType) 
+            || filter.ByNodeType.Contains(mi.DestinationType));
+        }
+
+        if (filter.ByProtocol?.Any() == true)
+        {
+            result = result.Where(mi => filter.ByProtocol.Contains(mi.Protocol));
+        }
+
+        if (filter.ByMonitoringType?.Any() == true)
+        {
+            result = result.Where(mi => filter.ByMonitoringType.Contains(mi.Type));
+        }
+
+        return result.Take(filter.Limit).ToArray();
     }
 }

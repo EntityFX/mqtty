@@ -5,5 +5,7 @@
         public string Name { get; init; }
 
         Task ExecuteAsync();
+
+        public object? Context { get; }
     }
 }

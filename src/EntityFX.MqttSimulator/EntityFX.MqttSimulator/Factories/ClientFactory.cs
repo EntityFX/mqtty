@@ -3,7 +3,7 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Mqtt;
 
-namespace EntityFX.MqttY.Utils;
+namespace EntityFX.MqttY.Factories;
 
 internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>>
 {
@@ -19,7 +19,7 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<Dictionary<st
             var connectResult = mqttClient.ConnectAsync(options.ConnectsTo, false).Result;
 
             var subscribes = options.Additional?.GetValueOrDefault("subscribe");
-            var subscribeQos =  options.Additional?.GetValueOrDefault("subscribeQos");
+            var subscribeQos = options.Additional?.GetValueOrDefault("subscribeQos");
 
             if (subscribes?.Any() == true)
             {
@@ -34,7 +34,8 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<Dictionary<st
 
             }
 
-        }  else
+        }
+        else
         {
             service?.ConnectAsync(options.ConnectsTo);
         }
@@ -48,11 +49,11 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<Dictionary<st
         {
             return null;
         }
-        
+
         if (options.Protocol == "mqtt")
         {
             var mqttClient = new MqttClient(options.Index,
-                options.Name, options.Address ?? options.Name, 
+                options.Name, options.Address ?? options.Name,
                 options.Protocol, options.Specification, options.Network, options.NetworkGraph, options.Name)
             {
                 Group = options.Group,
@@ -62,7 +63,7 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<Dictionary<st
             return mqttClient;
         }
 
-        return new Client(options.Index,options.Name, options.Address ?? options.Name, options.Protocol,
+        return new Client(options.Index, options.Name, options.Address ?? options.Name, options.Protocol,
             options.Specification,
             options.Network, options.NetworkGraph)
         {

@@ -4,7 +4,7 @@ using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Mqtt;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace EntityFX.MqttY.Utils;
+namespace EntityFX.MqttY.Factories;
 
 internal class ServerFactory : IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>>
 {
@@ -12,7 +12,7 @@ internal class ServerFactory : IFactory<IServer?, NodeBuildOptions<Dictionary<st
 
     public ServerFactory(IServiceProvider serviceProvider)
     {
-        this._serviceProvider = serviceProvider;
+        _serviceProvider = serviceProvider;
     }
 
     public IServer? Configure(NodeBuildOptions<Dictionary<string, string[]>> options, IServer? service)
@@ -33,11 +33,11 @@ internal class ServerFactory : IFactory<IServer?, NodeBuildOptions<Dictionary<st
         if (options.Protocol == "mqtt")
         {
             return new MqttBroker
-            (options.Index, options.Name, options.Address ?? options.Name, 
+            (options.Index, options.Name, options.Address ?? options.Name,
                 options.Protocol, options.Specification, options.Network, options.NetworkGraph, mqttTopicEvaluator);
         }
 
-        return new Server(options.Index, options.Name, options.Address ?? options.Name, 
+        return new Server(options.Index, options.Name, options.Address ?? options.Name,
             options.Protocol, options.Specification, options.Network, options.NetworkGraph)
         {
             Group = options.Group

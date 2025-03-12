@@ -15,9 +15,15 @@
         public ActionType Type { get; init; }
         public TContext? Context { get; set; }
         public TConfig? Config { get; set; }
-        public ScenarioAction()
+
+        object? IExecutable.Context => Context;
+
+        public IScenario<TContext> Scenario { get; init; }
+
+        public ScenarioAction(IScenario<TContext> scenario)
         {
             Iterations = 1;
+            Scenario = scenario;
         }
 
         public virtual Task ExecuteAsync()

@@ -16,6 +16,8 @@
         ActionType Type { get; init; }
 
         public TContext? Context { get; set; }
+
+        IScenario<TContext> Scenario { get; init; }
     }
 
     public interface IAction<TContext, TConfig> : IAction<TContext>
