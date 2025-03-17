@@ -38,7 +38,7 @@ public class Client : NodeBase, IClient
         if (IsConnected) return true;
 
         var response = await ConnectImplementationAsync(server,
-            GetPacket(server, NodeType.Server, new byte[] { 0xFF }, "Connect"));
+            GetPacket(Guid.NewGuid(), server, NodeType.Server, new byte[] { 0xFF }, "Connect"));
 
         if (response == null) return false;
 
@@ -65,11 +65,18 @@ public class Client : NodeBase, IClient
             return null;
         }
 
-        var payload = new byte[] { 0xFF };
         var scope = NetworkGraph.Monitoring.WithBeginScope(ref connectPacket!, $"Connect {connectPacket.From} to {connectPacket.To}");
         NetworkGraph.Monitoring.Push(connectPacket, MonitoringType.Connect, $"Client {connectPacket.From} connects to server {connectPacket.To}", ProtocolType, "Connect");
 
-        var response = await SendWithResponseImplementationAsync(connectPacket);
+        await SendAsync(connectPacket, false);
+
+        var response = await WaitResponse(connectPacket.Id);
+
+        if (response == null)
+        {
+            return null;
+        }
+
         NetworkGraph.Monitoring.WithEndScope(ref response!);
 
         serverName = server;
@@ -129,24 +136,16 @@ public class Client : NodeBase, IClient
         return serverNode.AttachClient(this);
     }
 
-    public override async Task<Packet> SendWithResponseAsync(Packet packet)
-    {
-        if (!IsConnected) throw new InvalidOperationException("Not Connected To server");
-        return await SendWithResponseImplementationAsync(packet);
-    }
-
-    private async Task<Packet> SendWithResponseImplementationAsync(Packet packet)
-    {
-        BeforeSend(packet);
-        Tick();
-        var response = await Network!.SendWithResponseAsync(packet);
-        AfterSend(packet);
-        return response;
-    }
 
     public override async Task SendAsync(Packet packet)
     {
-        if (!IsConnected) throw new InvalidOperationException("Not Connected To server");
+        await SendAsync(packet, true);
+    }
+
+    protected virtual async Task SendAsync(Packet packet, bool checkConnection)
+    {
+        if (checkConnection && !IsConnected) 
+            throw new InvalidOperationException("Not Connected To server");
 
         BeforeSend(packet);
         Tick();
@@ -154,21 +153,10 @@ public class Client : NodeBase, IClient
         AfterSend(packet);
     }
 
-    public async Task<byte[]> SendWithResponseAsync(byte[] payload, string? category = null)
-    {
-        var result = await SendWithResponseAsync(GetPacket(serverName, NodeType.Server, payload, ProtocolType, category));
-
-        return result.Payload;
-    }
-
-    public byte[] SendWithResponse(byte[] payload, string? category = null)
-    {
-        return SendWithResponseAsync(payload, category).Result;
-    }
-
     public async Task SendAsync(byte[] payload, string? category = null)
     {
-        await SendAsync(new Packet(Name, serverName, NodeType.Client, NodeType.Server, payload, ProtocolType, category));
+        await SendAsync(
+            new Packet(Name, serverName, NodeType.Client, NodeType.Server, payload, ProtocolType, category), true);
     }
 
     public void Send(byte[] payload, string? category = null)
@@ -176,28 +164,12 @@ public class Client : NodeBase, IClient
         SendAsync(payload, category).Wait();
     }
 
-    public override async Task<Packet> ReceiveWithResponseAsync(Packet packet)
-    {
-        Tick();
-        BeforeReceive(packet);
-        await OnReceivedWithResponseAsync(packet);
-        AfterReceive(packet);
-        return packet;
-    }
-
-    public override async Task ReceiveAsync(Packet packet)
+    protected override async Task ReceiveImplementationAsync(Packet packet)
     {
         Tick();
         BeforeReceive(packet);
         await OnReceivedAsync(packet);
         AfterReceive(packet);
-    }
-
-    protected virtual Task<Packet> OnReceivedWithResponseAsync(Packet packet)
-    {
-        PacketReceived?.Invoke(this, packet);
-
-        return Task.FromResult(packet);
     }
 
     protected virtual Task OnReceivedAsync(Packet packet)

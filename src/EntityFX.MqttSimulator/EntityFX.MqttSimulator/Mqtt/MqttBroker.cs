@@ -13,7 +13,6 @@ using System.Text;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-using static System.Formats.Asn1.AsnWriter;
 
 namespace EntityFX.MqttY.Mqtt
 {
@@ -38,42 +37,6 @@ namespace EntityFX.MqttY.Mqtt
             this.topicEvaluator = mqttTopicEvaluator;
         }
 
-        protected override Packet OnReceivedWithResponse(Packet packet)
-        {
-            if (packet.Payload.Length >= 1 &&  packet.Payload[0] == 0xFF)
-            {
-                return base.OnReceivedWithResponse(packet);
-            }
-            var payload = packet.Payload.BytesToPacket<PacketBase>();
-            if (payload == null)
-            {
-                return base.OnReceivedWithResponse(packet);
-            }
-
-            IPacket? result = null;
-            var category = string.Empty;
-            switch (payload!.Type)
-            {
-                case MqttPacketType.Connect:
-                    result = ProcessConnect(packet, packet.Payload.BytesToPacket<ConnectPacket>());
-                    category = "MQTT ConnAck";
-                    break;
-                case MqttPacketType.Disconnect:
-                    break;
-                case MqttPacketType.Subscribe:
-                    result = ProcessSubscribe(packet.From, packet.Payload.BytesToPacket<SubscribePacket>());
-                    category = "MQTT SubAck";
-                    break;
-                case MqttPacketType.Unsubscribe:
-                    break;
-                default:
-                    break;
-            }
-
-            var resultPayload = result?.PacketToBytes() ?? Array.Empty<byte>();
-            return NetworkGraph.GetReversePacket(packet, resultPayload, category);
-        }
-
         protected override async Task OnReceived(Packet packet)
         {
             var payload = packet.Payload.BytesToPacket<PacketBase>();
@@ -85,7 +48,7 @@ namespace EntityFX.MqttY.Mqtt
             switch (payload!.Type)
             {
                 case MqttPacketType.Publish:
-                    await ProcessFromClientPublish(packet, packet.From, packet.Payload.BytesToPacket<PublishPacket>());
+                    await ProcessFromClientPublish(packet, packet.Payload.BytesToPacket<PublishPacket>());
                     break;
                 case MqttPacketType.PublishReceived:
                     break;
@@ -94,14 +57,25 @@ namespace EntityFX.MqttY.Mqtt
                 case MqttPacketType.PingRequest:
                     break;
                 case MqttPacketType.PublishAck:
-                    await ProcessToClientPublishAck(packet, packet.From, packet.Payload.BytesToPacket<PublishAckPacket>());
+                    await ProcessToClientPublishAck(packet, packet.Payload.BytesToPacket<PublishAckPacket>());
+                    break;
+
+                case MqttPacketType.Connect:
+                    await ProcessConnect(packet, packet.Payload.BytesToPacket<ConnectPacket>());
+                    break;
+                case MqttPacketType.Disconnect:
+                    break;
+                case MqttPacketType.Subscribe:
+                    await ProcessSubscribe(packet, packet.Payload.BytesToPacket<SubscribePacket>());
+                    break;
+                case MqttPacketType.Unsubscribe:
                     break;
                 default:
                     break;
             }
         }
 
-        private async Task ProcessFromClientPublish(Packet packet, string clientId, PublishPacket? publishPacket)
+        private async Task ProcessFromClientPublish(Packet packet, PublishPacket? publishPacket)
         {
             if (publishPacket == null)
             {
@@ -109,6 +83,8 @@ namespace EntityFX.MqttY.Mqtt
             }
 
             NetworkGraph.Monitoring.WithEndScope(ref packet);
+
+            var clientId = packet.From;
 
             ValidatePublish(clientId, publishPacket);
 
@@ -139,13 +115,14 @@ namespace EntityFX.MqttY.Mqtt
 
             foreach (var subscription in subscriptions)
             {
-                await ProcessToClientPublishAsync(subscription, publishPacket);
+                await ProcessToClientPublishAsync(packet, subscription, publishPacket);
             }
 
             return;
         }
 
-        private async Task<bool> ProcessToClientPublishAsync(ClientSubscription subscription, PublishPacket? publishPacket)
+        private async Task<bool> ProcessToClientPublishAsync(
+            Packet packet, ClientSubscription subscription, PublishPacket? publishPacket)
         {
             if (publishPacket == null)
             {
@@ -163,7 +140,8 @@ namespace EntityFX.MqttY.Mqtt
                 Payload = publishPacket.Payload
             };
 
-            var packetPayload = GetPacket(subscription.ClientId, NodeType.Client, subscriptionPublish.PacketToBytes(), "MQTT Publish");
+            var packetPayload = GetPacket(
+                Guid.NewGuid(), subscription.ClientId, NodeType.Client, subscriptionPublish.PacketToBytes(), "MQTT Publish");
 
             if (subscriptionPublish.QualityOfService > MqttQos.AtMostOnce)
             {
@@ -175,12 +153,14 @@ namespace EntityFX.MqttY.Mqtt
             return true;
         }
 
-        private Task ProcessToClientPublishAck(Packet payload, string clientId, PublishAckPacket? publishAckPacket)
+        private Task ProcessToClientPublishAck(Packet packet, PublishAckPacket? publishAckPacket)
         {
             if (publishAckPacket == null)
             {
                 return Task.CompletedTask;
             }
+
+            var clientId = packet.From;
 
             var session = _sessionRepository.Read(clientId);
 
@@ -197,7 +177,7 @@ namespace EntityFX.MqttY.Mqtt
 
             _sessionRepository.Update(session);
 
-            NetworkGraph.Monitoring.WithEndScope(ref payload);
+            NetworkGraph.Monitoring.WithEndScope(ref packet);
 
             return Task.CompletedTask;
         }
@@ -256,12 +236,14 @@ namespace EntityFX.MqttY.Mqtt
             }
         }
 
-        private SubscribeAckPacket? ProcessSubscribe(string clientId, SubscribePacket? subscribePacket)
+        private async Task<bool> ProcessSubscribe(Packet packet, SubscribePacket? subscribePacket)
         {
             if (subscribePacket == null)
             {
-                return null;
+                return false;
             }
+
+            var clientId = packet.From;
 
             var session = _sessionRepository.Read(clientId);
 
@@ -315,12 +297,16 @@ namespace EntityFX.MqttY.Mqtt
 
             _sessionRepository.Update(session);
 
-            return new SubscribeAckPacket(subscribePacket.PacketId, returnCodes.ToArray());
+            var subscribeAck = new SubscribeAckPacket(subscribePacket.PacketId, returnCodes.ToArray());
+            var packetPayload = GetPacket(packet.Id, clientId, NodeType.Client, subscribeAck.PacketToBytes(), "MQTT SubAck");
+            await SendAsync(packetPayload);
+
+            return true;
         }
 
-        private ConnectAckPacket? ProcessConnect(Packet packet, ConnectPacket? connectPacket)
+        private async Task<bool> ProcessConnect(Packet packet, ConnectPacket? connectPacket)
         {
-            if (connectPacket == null) return null;
+            if (connectPacket == null) return false;
 
             var clientId = connectPacket.ClientId ?? string.Empty;
 
@@ -341,7 +327,11 @@ namespace EntityFX.MqttY.Mqtt
 
             var sessionPresent = connectPacket.CleanSession ? false : session != null;
 
-            return new ConnectAckPacket(MqttConnectionStatus.Accepted, sessionPresent);
+            var connecktAck = new ConnectAckPacket(MqttConnectionStatus.Accepted, sessionPresent);
+            var packetPayload = GetPacket(packet.Id, clientId, NodeType.Client, connecktAck.PacketToBytes(), "MQTT ConnAck");
+            await SendAsync(packetPayload);
+
+            return true;
         }
 
         private void MqttBroker_PacketReceived(object? sender, Packet e)

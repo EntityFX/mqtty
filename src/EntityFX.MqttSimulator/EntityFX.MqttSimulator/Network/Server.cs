@@ -89,24 +89,6 @@ public class Server : NodeBase, IServer
         return true;
     }
 
-    public override async Task<Packet> ReceiveWithResponseAsync(Packet packet)
-    {
-        BeforeReceive(packet);
-
-        //NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category, packet.Scope);
-        //NetworkGraph.Monitoring.WithEndScope(ref packet);
-        Tick();
-        var response = OnReceivedWithResponse(packet);
-
-        PacketReceived?.Invoke(this, packet);
-        AfterReceive(packet);
-
-        var receivePacket = await Network!.ReceiveWithResponseAsync(response);
-        NetworkGraph.Monitoring.WithEndScope(ref receivePacket);
-
-        return receivePacket;
-    }
-
     public override async Task ReceiveAsync(Packet packet)
     {
         BeforeReceive(packet);
@@ -119,35 +101,11 @@ public class Server : NodeBase, IServer
     }
 
 
-    protected virtual Packet OnReceivedWithResponse(Packet packet)
-    {
-        var payload = new List<byte>();
-        payload.AddRange(packet.Payload);
-        payload.Add(0xFF);
-        PacketReceived?.Invoke(this, packet);
-        return NetworkGraph.GetReversePacket(packet, payload.ToArray(), packet.Category);
-    }
-
     protected virtual Task OnReceived(Packet packet)
     {
         PacketReceived?.Invoke(this, packet);
 
         return Task.CompletedTask;
-    }
-
-
-    public override async Task<Packet> SendWithResponseAsync(Packet packet)
-    {
-        BeforeSend(packet);
-        var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Send packet {packet.From} to {packet.To}");
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, $"Send packet {packet.From} to {packet.To}", ProtocolType, packet.Category, scope);
-        Tick();
-        var result = await Network.SendWithResponseAsync(packet);
-
-        NetworkGraph.Monitoring.WithEndScope(ref packet);
-
-        AfterSend(packet);
-        return result;
     }
 
     public override async Task SendAsync(Packet packet)
@@ -199,5 +157,10 @@ public class Server : NodeBase, IServer
 
     protected override void AfterSend(Packet packet)
     {
+    }
+
+    protected override Task ReceiveImplementationAsync(Packet packet)
+    {
+        throw new NotImplementedException();
     }
 }

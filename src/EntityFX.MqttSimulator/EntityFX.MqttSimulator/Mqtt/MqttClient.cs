@@ -38,7 +38,8 @@ namespace EntityFX.MqttY.Mqtt
         public async Task<SessionState> ConnectAsync(string server, bool cleanSession = false)
         {
             var connect = new ConnectPacket(ClientId, true);
-            var payload = GetPacket(server, NodeType.Server, connect.PacketToBytes(), "MQTT Connect");
+            var connectId = Guid.NewGuid();
+            var payload = GetPacket(connectId, server, NodeType.Server, connect.PacketToBytes(), "MQTT Connect");
 
             if (IsConnected)
             {
@@ -89,12 +90,16 @@ namespace EntityFX.MqttY.Mqtt
         {
             var packetId = _packetIdProvider.GetPacketId();
             var subscribe = new SubscribePacket(packetId, new[] { new Subscription(topicFilter, qos) });
-            var payload = GetPacket(serverName, NodeType.Server, subscribe.PacketToBytes(), "MQTT Subscribe");
+            var subscribeId = Guid.NewGuid();
+            var payload = GetPacket(subscribeId, serverName, NodeType.Server, subscribe.PacketToBytes(), "MQTT Subscribe");
             var scope = NetworkGraph.Monitoring.WithBeginScope(ref payload!, $"Subscribe {Name} to {payload.To} using topic {topicFilter}");
             NetworkGraph.Monitoring.Push(payload, MonitoringType.Send, $"MQTT Client {ClientId} subscribes to broker {payload.To} using topic {topicFilter}", ProtocolType, "MQTT Subscribe");
             var subscribeTimeout = TimeSpan.FromSeconds(60);
 
-            var response = await SendWithResponseAsync(payload);
+            await SendAsync(payload);
+            //TODO: get response
+            var response = await WaitResponse(subscribeId);
+
             var subscribeAck = response.Payload.BytesToPacket<SubscribeAckPacket>();
 
             if (subscribeAck == null)
@@ -130,7 +135,7 @@ namespace EntityFX.MqttY.Mqtt
                 Payload = payload
             };
 
-            var packetPayload = GetPacket(serverName, NodeType.Server, publish.PacketToBytes(), "MQTT Publish");
+            var packetPayload = GetPacket(Guid.NewGuid(), serverName, NodeType.Server, publish.PacketToBytes(), "MQTT Publish");
             var scope = NetworkGraph.Monitoring.WithBeginScope(ref packetPayload!,
                 $"Publish {Name} to {packetPayload.To} with topic {topic}");
             NetworkGraph.Monitoring.Push(packetPayload, MonitoringType.Send, 

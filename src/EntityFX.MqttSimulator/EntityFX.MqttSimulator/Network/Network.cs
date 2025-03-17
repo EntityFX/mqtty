@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using EntityFX.MqttY.Contracts.Network;
 using MonitoringType = EntityFX.MqttY.Contracts.Monitoring.MonitoringType;
 
@@ -10,6 +11,7 @@ public class Network : NodeBase, INetwork
     private readonly Dictionary<string, IServer> _servers = new();
     private readonly Dictionary<string, IClient> _clients = new();
     private readonly Dictionary<string, IApplication> _applications = new();
+    private readonly ConcurrentQueue<NetworkPacket> _networkPackets = new();
 
     public IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks => _linkedNetworks.ToImmutableDictionary();
 
@@ -22,7 +24,7 @@ public class Network : NodeBase, INetwork
 
     public override NodeType NodeType => NodeType.Network;
 
-    public Network(int index, string name, string address, INetworkGraph networkGraph) 
+    public Network(int index, string name, string address, INetworkGraph networkGraph)
         : base(index, name, address, networkGraph)
     {
     }
@@ -96,8 +98,8 @@ public class Network : NodeBase, INetwork
 
     public bool UnlinkAll()
     {
-        foreach (var network in _linkedNetworks.Values) 
-        { 
+        foreach (var network in _linkedNetworks.Values)
+        {
             var result = network.UnlinkAll();
             if (!result)
             {
@@ -133,187 +135,83 @@ public class Network : NodeBase, INetwork
         return true;
     }
 
-    public override Task<Packet> ReceiveWithResponseAsync(Packet packet)
-    {
-        return SendWithResponseAsync(packet);
-    }
-
-    public override Task ReceiveAsync(Packet packet)
-    {
-        return SendAsync(packet);
-    }
-
-    public override Task<Packet> SendWithResponseAsync(Packet packet)
-    {
-        return Task.Run(async () =>
-        {
-            var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Push packet from {packet.From} to {packet.To}");
-
-            var result = await SendToLocalWithResponseAsync(this, packet);
-
-            if (result != null)
-            {
-                NetworkGraph.Monitoring.WithEndScope(ref packet);
-                return result!;
-            }
-
-            var sourceNode = NetworkGraph.GetNode(packet.From, packet.FromType);
-
-            var fromNetwork = NetworkGraph.GetNetworkByNode(packet.From, packet.FromType);
-
-            var toNetwork = NetworkGraph.GetNetworkByNode(packet.To, packet.ToType);
-
-            if (sourceNode == null || fromNetwork == null || toNetwork == null)
-            {
-                result = NetworkGraph.GetReversePacket(packet, packet.Payload, packet.Category);
-                NetworkGraph.Monitoring.WithEndScope(ref result);
-                return result;
-            }
-
-            NetworkGraph.Monitoring.Push(sourceNode, fromNetwork, packet.Payload, MonitoringType.Push, 
-                $"Push packet {sourceNode.Name} to network {fromNetwork.Name}", "Network", packet.Category, packet.Scope, packet.Ttl);
-
-            var pathToRemote = NetworkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
-
-            var pathQueue = new Queue<INetwork>(pathToRemote);
-
-            result =  await SendToRemoteWithResponseAsync(packet, pathQueue) ?? NetworkGraph.GetReversePacket(packet, packet.Payload, packet.Category);
-            NetworkGraph.Monitoring.WithEndScope(ref result);
-            return result;
-        });
-
-    }
-
     public override Task SendAsync(Packet packet)
     {
-        return Task.Run(async () =>
+        var networkPacket = GetNetworkPacketType(packet);
+
+        _networkPackets.Enqueue(networkPacket);
+
+        return Task.CompletedTask;
+    }
+
+    private NetworkPacket GetNetworkPacketType(Packet packet)
+    {
+        var destionationNode = GetDestinationNode(packet.To!, packet.ToType);
+
+        if (destionationNode != null)
         {
-            var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Transfer packet {packet.From} to {packet.To}");
-            //NetworkGraph.Monitoring.Push(packet, MonitoringType.Push, packet.Category, scope);
+            return new NetworkPacket(packet, new Queue<INetwork>(), NetworkPacketType.Local, destionationNode);
+        }
 
-            var sentToLocal = await SendToLocalAsync(this, packet);
+        var sourceNode = NetworkGraph.GetNode(packet.From, packet.FromType);
 
-            if (sentToLocal == true)
-            {
-                return;
-            }
+        var fromNetwork = NetworkGraph.GetNetworkByNode(packet.From, packet.FromType);
 
-            var sourceNode = NetworkGraph.GetNode(packet.From, packet.FromType);
+        var toNetwork = NetworkGraph.GetNetworkByNode(packet.To, packet.ToType);
 
-            var fromNetwork = NetworkGraph.GetNetworkByNode(packet.From, packet.FromType);
+        if (sourceNode == null || fromNetwork == null || toNetwork == null)
+        {
+            return new NetworkPacket(packet, new Queue<INetwork>(), NetworkPacketType.Unreachable, null);
+        }
 
-            var toNetwork = NetworkGraph.GetNetworkByNode(packet.To, packet.ToType);
+        var pathToRemote = NetworkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
 
-            if (sourceNode == null || fromNetwork == null || toNetwork == null)
-            {
-                return;
-            }
-
-            //NetworkGraph.Monitoring.Push(sourceNode, fromNetwork, packet.Payload, MonitoringType.Push, packet.Category, packet.Scope, packet.Ttl);
-
-            var pathToRemote = NetworkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
-
-            var pathQueue = new Queue<INetwork>(pathToRemote);
-
-            var result = await SendToRemoteAsync(packet, pathQueue);
-            if (result)
-            {
-                return;
-            }
-        });
+        var pathQueue = new Queue<INetwork>(pathToRemote);
+        destionationNode = (toNetwork as Network)?.GetDestinationNode(packet.To!, packet.ToType);
+        return new NetworkPacket(packet, pathQueue, NetworkPacketType.Remote, destionationNode);
     }
 
 
-    private async Task<Packet?> SendToLocalWithResponseAsync(INetwork network, Packet packet)
+    private async Task<bool> SendToLocalAsync(INetwork network, NetworkPacket networkPacket)
     {
+        var packet = networkPacket.Packet;
         if (string.IsNullOrEmpty(packet.From))
         {
             throw new ArgumentException($"'{nameof(packet.To)}' cannot be null or empty.", nameof(packet.To));
         }
 
-        var destionationNode = GetDestinationNode(packet.To!, packet.ToType);
-
-        if (destionationNode == null)
-        {
-            return null;
-        }
-
-        Tick();
-
-        NetworkGraph.Monitoring.Push(network, destionationNode, packet.Payload, MonitoringType.Push, 
-            $"Push packet from network {network.Name} to node {destionationNode.Name}", "Network", packet.Category, packet.Scope, packet.Ttl);
-        NetworkGraph.Monitoring.WithEndScope(ref packet);
-        return await destionationNode!.ReceiveWithResponseAsync(packet);
-    }
-
-    private async Task<bool> SendToLocalAsync(INetwork network, Packet packet)
-    {
-        if (string.IsNullOrEmpty(packet.From))
-        {
-            throw new ArgumentException($"'{nameof(packet.To)}' cannot be null or empty.", nameof(packet.To));
-        }
-
-        var destionationNode = GetDestinationNode(packet.To!, packet.ToType);
-
-        if (destionationNode == null)
+        if (networkPacket.DestionationNode == null)
         {
             return false;
         }
 
         Tick();
 
-        NetworkGraph.Monitoring.Push(network, destionationNode, packet.Payload, MonitoringType.Receive, 
-            $"Push packet from network {network.Name} to node {destionationNode.Name}", "Network", packet.Category, packet.Scope, packet.Ttl);
+        NetworkGraph.Monitoring.Push(network, networkPacket.DestionationNode, packet.Payload, MonitoringType.Receive,
+            $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}", 
+            "Network", packet.Category, packet.Scope, packet.Ttl);
         NetworkGraph.Monitoring.WithEndScope(ref packet);
-        await destionationNode!.ReceiveAsync(packet);
+        await networkPacket.DestionationNode!.ReceiveAsync(packet);
 
         return true;
     }
 
-    private async Task<Packet?> SendToRemoteWithResponseAsync(Packet packet, Queue<INetwork> path)
+
+    private async Task<bool> SendToRemoteAsync(NetworkPacket networkPacket)
     {
-        if (!path.Any())
-        {
-            return null;
-        }
-
-        var next = path.Dequeue() as Network;
-
-        if (next == null)
-        {
-            return null;
-        }
-
-        Tick();
-        packet.DecrementTtl();
-
-        if (packet.Ttl == 0)
-        {
-            NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Unreachable, 
-                $"Packet unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope, packet.Ttl);
-            //destination uneachable
-            return packet;
-        }
-        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, 
-            $"Push packet from network {this.Name} to {next.Name}", "Network", packet.Category, packet.Scope, packet.Ttl);
-        var result = await next.SendToLocalWithResponseAsync(next, packet);
-
-        if (result == null)
-        {
-             await next.SendToRemoteWithResponseAsync(packet, path);
-        }
-
-        return result;
-    }
-
-    private async Task<bool> SendToRemoteAsync(Packet packet, Queue<INetwork> path)
-    {
-        if (!path.Any())
+        var packet = networkPacket.Packet;
+        if (packet == null)
         {
             return false;
         }
 
-        var next = path.Dequeue() as Network;
+
+        if (!networkPacket.Path.Any())
+        {
+            return false;
+        }
+
+        var next = networkPacket.Path.Dequeue() as Network;
 
         if (next == null)
         {
@@ -325,21 +223,64 @@ public class Network : NodeBase, INetwork
 
         if (packet.Ttl == 0)
         {
-            NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Unreachable, 
+            NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Unreachable,
                 $"Packet unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope);
             //destination uneachable
             return false;
         }
 
-        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push, 
+        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push,
             $"Push packet from network {this.Name} to {next.Name}", "Network", packet.Category, packet.Scope, packet.Ttl);
-        var result = await next.SendToLocalAsync(next, packet);
+        var result = await next.SendToLocalAsync(next, networkPacket);
 
         if (!result)
         {
-            result = await next.SendToRemoteAsync(packet, path);
+            result = await next.SendToRemoteAsync(networkPacket);
         }
 
+        return result;
+    }
+
+    protected override Task ReceiveImplementationAsync(Packet packet)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override void Refresh()
+    {
+        while (_networkPackets.Count > 0)
+        {
+            NetworkPacket? networkPacket = null;
+            while (!_networkPackets.TryDequeue(out networkPacket))
+            {
+
+            }
+            if (networkPacket == null)
+            {
+                continue;
+            }
+
+            if (!ProcessTransferPacket(networkPacket!).Result)
+            {
+                continue;
+            }
+        }
+    }
+
+    private async Task<bool> ProcessTransferPacket(NetworkPacket networkPacket)
+    {
+        var result = false;
+        var packet = networkPacket.Packet;
+        var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Transfer packet {packet.From} to {packet.To}");
+
+        if (networkPacket.Type == NetworkPacketType.Local)
+        {
+            result = await SendToLocalAsync(this, networkPacket);
+        }
+        else if (networkPacket.Type == NetworkPacketType.Remote)
+        {
+            result = await SendToRemoteAsync(networkPacket);
+        }
         return result;
     }
 
@@ -353,7 +294,7 @@ public class Network : NodeBase, INetwork
         return $"N: {Address}";
     }
 
-    private ISender? GetDestinationNode(string id, NodeType destinationNodeType)
+    internal ISender? GetDestinationNode(string id, NodeType destinationNodeType)
     {
         ISender? result = null;
         switch (destinationNodeType)
