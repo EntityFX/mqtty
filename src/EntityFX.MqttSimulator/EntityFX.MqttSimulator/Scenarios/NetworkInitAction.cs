@@ -33,13 +33,13 @@ namespace EntityFX.MqttY.Scenarios
                     .Replace("{date}", $"{DateTime.Now:yyyy_MM_dd__HH_mm}");
             }
 
-            var networkGraph = networkGraphFactory.Create(Config);
+            Context!.NetworkGraph = networkGraphFactory.Create(Config);
 
-            networkGraph.Configure(Config.NetworkGraphOption);
+            Context!.NetworkGraph!.StartPeriodicRefreshAsync();
 
-            Context!.NetworkGraph = networkGraph;
+            Context!.NetworkGraph.Configure(Config.NetworkGraphOption);
 
-            networkGraph.Refresh();
+            Context!.NetworkGraph.Refresh();
 
             return Task.CompletedTask;
         }

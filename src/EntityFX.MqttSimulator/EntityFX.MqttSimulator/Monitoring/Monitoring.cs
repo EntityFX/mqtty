@@ -21,6 +21,8 @@ public class Monitoring : IMonitoring
 
     public IEnumerable<MonitoringItem> Items => _storage.Values.Take(10000);
 
+    public long Ticks => _tick;
+
     private int _scopesStarted = 0;
 
     private int _scopesEnded = 0;
@@ -32,12 +34,12 @@ public class Monitoring : IMonitoring
         this.scopesEnabled = scopesEnabled;
     }
 
-    public void Push(MonitoringType type, string message, string protocol, string? category, MonitoringScope? scope = null, int? ttl = null)
+    public void Push(MonitoringType type, string message, string protocol, string? category, MonitoringScope? scope = null, int? ttl = null, int? queueLength = null)
     {
         var item = new MonitoringItem(
             Guid.NewGuid(), _tick, DateTimeOffset.Now, string.Empty,
                 NodeType.Other, string.Empty, NodeType.Other,
-            0, type, string.Empty, message, scope, category, ttl);
+            0, type, string.Empty, message, scope, category, ttl, queueLength);
 
         _storage.TryAdd(item.Date, item);
 
@@ -47,12 +49,12 @@ public class Monitoring : IMonitoring
     }
 
     private void Push(string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
-        MonitoringType type, string message, string protocol, string? category, MonitoringScope? scope = null, int? ttl = null)
+        MonitoringType type, string message, string protocol, string? category, MonitoringScope? scope = null, int? ttl = null, int? queueLength = null)
     {
         var item = new MonitoringItem(
             Guid.NewGuid(), _tick, DateTimeOffset.Now, from,
             fromType, to, toType,
-            (uint)(packet?.Length ?? 0), type, protocol, message, scope, category, ttl);
+            (uint)(packet?.Length ?? 0), type, protocol, message, scope, category, ttl, queueLength);
 
         _storage.TryAdd(item.Date, item);
 
@@ -62,11 +64,11 @@ public class Monitoring : IMonitoring
     }
 
     public void Push(INode from, INode to, byte[]? packet, MonitoringType type, string message,
-        string protocol, string? category, MonitoringScope? scope = null, int? ttl = null)
+        string protocol, string? category, MonitoringScope? scope = null, int? ttl = null, int? queueLength = null)
     {
         Push(from.Name,
             from.NodeType, to.Name, to.NodeType, packet,
-            type, message, protocol, category, scope, ttl);
+            type, message, protocol, category, scope, ttl, queueLength);
     }
 
 

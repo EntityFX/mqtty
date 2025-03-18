@@ -189,7 +189,7 @@ public class Network : NodeBase, INetwork
 
         NetworkGraph.Monitoring.Push(network, networkPacket.DestionationNode, packet.Payload, MonitoringType.Receive,
             $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}", 
-            "Network", packet.Category, packet.Scope, packet.Ttl);
+            "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
         NetworkGraph.Monitoring.WithEndScope(ref packet);
         await networkPacket.DestionationNode!.ReceiveAsync(packet);
 
@@ -230,7 +230,7 @@ public class Network : NodeBase, INetwork
         }
 
         NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push,
-            $"Push packet from network {this.Name} to {next.Name}", "Network", packet.Category, packet.Scope, packet.Ttl);
+            $"Push packet from network {this.Name} to {next.Name}", "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
         var result = await next.SendToLocalAsync(next, networkPacket);
 
         if (!result)
@@ -243,7 +243,7 @@ public class Network : NodeBase, INetwork
 
     protected override Task ReceiveImplementationAsync(Packet packet)
     {
-        throw new NotImplementedException();
+        return Task.CompletedTask;
     }
 
     public override void Refresh()

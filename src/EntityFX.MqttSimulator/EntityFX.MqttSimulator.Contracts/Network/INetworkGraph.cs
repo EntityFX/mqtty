@@ -54,6 +54,10 @@ namespace EntityFX.MqttY.Contracts.Network
 
         void Refresh();
 
+        Task StartPeriodicRefreshAsync();
+
+        void StopPeriodicRefresh();
+
         void Tick(INode nodeBase);
     }
 }

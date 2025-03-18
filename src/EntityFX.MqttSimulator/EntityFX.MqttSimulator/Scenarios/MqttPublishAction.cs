@@ -25,7 +25,8 @@ namespace EntityFX.MqttY.Scenarios
 
             await mqttClient!.PublishAsync(Config.Topic, new byte[] { 7 }, MqttQos.AtLeastOnce);
 
-            Context!.NetworkGraph!.Refresh();
+            Context.NetworkGraph!.Refresh();
         }
+
     }
 }

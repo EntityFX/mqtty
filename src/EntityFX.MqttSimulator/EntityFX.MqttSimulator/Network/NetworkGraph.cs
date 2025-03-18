@@ -18,6 +18,7 @@ public class NetworkGraph : INetworkGraph
     private readonly INetworkBuilder _networkBuilder;
     private readonly ConcurrentDictionary<(string Address, NodeType NodeType), ILeafNode> _nodes = new();
     private readonly ConcurrentDictionary<string, INetwork> _networks = new();
+    private CancellationTokenSource cancelTokenSource;
 
     public NetworkGraph(
         INetworkBuilder networkBuilder,
@@ -419,6 +420,28 @@ public class NetworkGraph : INetworkGraph
         Monitoring.EndScope(scope);
     }
 
+    public Task StartPeriodicRefreshAsync()
+    {
+        //var ticksForRefresh = 50;
+
+        cancelTokenSource = new CancellationTokenSource();
+
+        return Task.Run(async () =>
+        {
+            var previousTicks = Monitoring.Ticks;
+            while (true)
+            {
+                await Task.Delay(10);
+                //if (Monitoring.Ticks - previousTicks < ticksForRefresh)
+                //{
+                //    continue;
+                //}
+                //previousTicks = Monitoring.Ticks;
+                Refresh();
+            }
+        }, cancelTokenSource.Token);
+    }
+
     public void Tick(INode nodeBase)
     {
         Monitoring.Tick();
@@ -451,5 +474,10 @@ public class NetworkGraph : INetworkGraph
         _nodes.TryAdd((name, NodeType.Application), server);
 
         return server;
+    }
+
+    public void StopPeriodicRefresh()
+    {
+        cancelTokenSource.Cancel();
     }
 }

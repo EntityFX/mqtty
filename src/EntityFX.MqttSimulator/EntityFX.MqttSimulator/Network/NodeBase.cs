@@ -67,18 +67,18 @@ public abstract class NodeBase : ISender
 
     protected Task<Packet?> WaitResponse(Guid packetId)
     {
-        return Task.Run(() =>
+        return Task.Run(async () =>
         {
             var limitTicks = 0;
             while (true)
             {
+                await Task.Delay(1);
                 var packet = recievedMessages.GetValueOrDefault(packetId);
                 if (packet != null)
                 {
                     recievedMessages.Remove(packetId);
                     return packet;
                 }
-                NetworkGraph.Refresh();
 
                 if (limitTicks >= 10000)
                 {
