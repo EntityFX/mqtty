@@ -11,6 +11,10 @@ public class Network : NodeBase, INetwork
     private readonly Dictionary<string, IServer> _servers = new();
     private readonly Dictionary<string, IClient> _clients = new();
     private readonly Dictionary<string, IApplication> _applications = new();
+
+    /// <summary>
+    /// TODO: Add max size limit
+    /// </summary>
     private readonly ConcurrentQueue<NetworkPacket> _networkPackets = new();
 
     public IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks => _linkedNetworks.ToImmutableDictionary();
@@ -135,6 +139,9 @@ public class Network : NodeBase, INetwork
         return true;
     }
 
+    //TODO: If queue limit is exceeded then reject Send
+    //bool?
+    //timeout?
     public override Task SendAsync(Packet packet)
     {
         var networkPacket = GetNetworkPacketType(packet);
@@ -246,6 +253,7 @@ public class Network : NodeBase, INetwork
         return Task.CompletedTask;
     }
 
+    //TODO: add tick reaction
     public override void Refresh()
     {
         while (_networkPackets.Count > 0)
@@ -267,6 +275,7 @@ public class Network : NodeBase, INetwork
         }
     }
 
+    //TODO: need VIRTUAL wait 
     private async Task<bool> ProcessTransferPacket(NetworkPacket networkPacket)
     {
         var result = false;

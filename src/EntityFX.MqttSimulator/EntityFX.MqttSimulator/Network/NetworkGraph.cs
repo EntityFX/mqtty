@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Xml.Linq;
 using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
@@ -426,12 +427,13 @@ public class NetworkGraph : INetworkGraph
 
         cancelTokenSource = new CancellationTokenSource();
 
-        return Task.Run(async () =>
+        return Task.Run(() =>
         {
             var previousTicks = Monitoring.Ticks;
             while (true)
             {
-                await Task.Delay(10);
+                //increment GLOBAL tick
+                //await Task.Delay(1);
                 //if (Monitoring.Ticks - previousTicks < ticksForRefresh)
                 //{
                 //    continue;

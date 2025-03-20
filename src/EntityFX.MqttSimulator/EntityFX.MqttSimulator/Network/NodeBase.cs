@@ -5,6 +5,8 @@ public abstract class NodeBase : ISender
 {
     protected readonly INetworkGraph NetworkGraph;
 
+    //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
+    //храним только Guid, ManualResetEventSlim
     private readonly Dictionary<Guid, Packet> recievedMessages = new Dictionary<Guid, Packet>();
 
     public Guid Id { get; private set; }
@@ -21,8 +23,11 @@ public abstract class NodeBase : ISender
     public int? GroupAmount { get; set; }
     public MonitoringScope? Scope { get; set; }
 
+
+    //Создаём ManualResetEventSlim 
     public abstract Task SendAsync(Packet packet);
 
+    //Добавляем и Снимаем ManualResetEventSlim 
     public virtual async Task ReceiveAsync(Packet packet)
     {
         recievedMessages.Add(packet.Id, packet);
@@ -55,6 +60,7 @@ public abstract class NodeBase : ISender
         };
 
 
+    //Здесь обновляем время ождидания и триггерим ManualResetEventSlim
     public virtual void Refresh()
     {
         Tick();
@@ -65,6 +71,8 @@ public abstract class NodeBase : ISender
         NetworkGraph.Tick(this);
     }
 
+    //подписываемся на ManualResetEventSlim и ждём его
+    //убрать цикл, ждёт N тиков (600,000?)
     protected Task<Packet?> WaitResponse(Guid packetId)
     {
         return Task.Run(async () =>
