@@ -15,9 +15,16 @@ internal class NetworkPacket
 
     public Packet Packet { get; }
 
-    //TODO: Introduce wait time: ticks to wait for, reinitilize throu each transfer
+    internal long WaitTime => _waitTime;
+
+    private long _waitTime = 2;
 
     public Queue<INetwork> Path { get; }
     public NetworkPacketType Type { get; }
     public ISender? DestionationNode { get; }
+
+    internal void ReduceWaitTime()
+    {
+        Interlocked.Decrement(ref _waitTime);
+    }
 }

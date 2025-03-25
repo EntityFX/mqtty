@@ -7,7 +7,7 @@ public abstract class NodeBase : ISender
 
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
-    private readonly Dictionary<Guid, Packet> recievedMessages = new Dictionary<Guid, Packet>();
+    private readonly Dictionary<Guid, NodePacket> monitorMessages = new Dictionary<Guid, NodePacket>();
 
     public Guid Id { get; private set; }
 
@@ -25,17 +25,46 @@ public abstract class NodeBase : ISender
 
 
     //Создаём ManualResetEventSlim 
-    public abstract Task SendAsync(Packet packet);
+    public async Task SendAsync(Packet packet)
+    {
+        PreSend(packet);
+
+        await SendImplementationAsync(packet);
+    }
+
+    private void PreSend(Packet packet)
+    {
+        if (monitorMessages.ContainsKey(packet.Id))
+        {
+            return;
+        }
+
+        monitorMessages.Add(packet.Id, new NodePacket()
+        {
+            Packet = packet,
+            ResetEventSlim = new ManualResetEventSlim(false),
+        });
+    }
 
     //Добавляем и Снимаем ManualResetEventSlim 
     public virtual async Task ReceiveAsync(Packet packet)
     {
-        recievedMessages.Add(packet.Id, packet);
-
         await ReceiveImplementationAsync(packet);
+
+        var monitorMessage = monitorMessages.GetValueOrDefault(packet.Id);
+
+        if (monitorMessage == null)
+        {
+            return;
+        }
+
+        monitorMessage.ResetEventSlim?.Set();
     }
+    
 
     protected abstract Task ReceiveImplementationAsync(Packet packet);
+
+    protected abstract Task SendImplementationAsync(Packet packet);
 
 
     protected abstract void BeforeReceive(Packet packet);
@@ -53,7 +82,7 @@ public abstract class NodeBase : ISender
         this.NetworkGraph = networkGraph;
     }
 
-    protected Packet GetPacket(Guid guid, string to, NodeType toType, byte[] payload, string protocol = null, string? category = null)
+    protected Packet GetPacket(Guid guid, string to, NodeType toType, byte[] payload, string protocol, string? category = null)
         => new Packet(Name, to, NodeType, toType, payload, protocol, category)
         {
             Id = guid
@@ -63,37 +92,40 @@ public abstract class NodeBase : ISender
     //Здесь обновляем время ождидания и триггерим ManualResetEventSlim
     public virtual void Refresh()
     {
-        Tick();
+        foreach (var packet in monitorMessages.Values.ToArray())
+        {
+            packet.ReduceWaitTime();
+        }
     }
 
-    public virtual void Tick()
-    {
-        NetworkGraph.Tick(this);
-    }
 
     //подписываемся на ManualResetEventSlim и ждём его
     //убрать цикл, ждёт N тиков (600,000?)
     protected Task<Packet?> WaitResponse(Guid packetId)
     {
-        return Task.Run(async () =>
+        return Task.Run(() =>
         {
-            var limitTicks = 0;
             while (true)
             {
-                await Task.Delay(1);
-                var packet = recievedMessages.GetValueOrDefault(packetId);
-                if (packet != null)
+                var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
+
+                if (monitorPacket == null)
                 {
-                    recievedMessages.Remove(packetId);
-                    return packet;
+                    continue;
                 }
 
-                if (limitTicks >= 10000)
+                if (monitorPacket.WaitTime <= 0)
                 {
+                    //expired, timeout
+                    monitorMessages.Remove(packetId);
                     return null;
                 }
 
-                limitTicks++;
+                if (monitorPacket?.ResetEventSlim?.IsSet == true)
+                {
+                    monitorMessages.Remove(packetId);
+                    return monitorPacket.Packet;
+                }
             }
         });
     }

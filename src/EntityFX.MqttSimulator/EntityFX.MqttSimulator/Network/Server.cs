@@ -93,7 +93,6 @@ public class Server : NodeBase, IServer
     {
         BeforeReceive(packet);
         //NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category, packet.Scope);
-        Tick();
         NetworkGraph.Monitoring.WithEndScope(ref packet);
 
         await OnReceived(packet);
@@ -108,13 +107,12 @@ public class Server : NodeBase, IServer
         return Task.CompletedTask;
     }
 
-    public override async Task SendAsync(Packet packet)
+    protected override async Task SendImplementationAsync(Packet packet)
     {
         BeforeSend(packet);
 
         var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Send packet {packet.From} to {packet.To}");
         NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, $"Send packet {packet.From} to {packet.To}", ProtocolType, packet.Category, scope);
-        Tick();
         await Network.SendAsync(packet);
 
         //NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, $"Send packet {packet.From} to {packet.To}", packet.Category);
@@ -161,6 +159,6 @@ public class Server : NodeBase, IServer
 
     protected override Task ReceiveImplementationAsync(Packet packet)
     {
-        throw new NotImplementedException();
+        return Task.CompletedTask;
     }
 }

@@ -19,7 +19,8 @@ public class NetworkGraph : INetworkGraph
     private readonly INetworkBuilder _networkBuilder;
     private readonly ConcurrentDictionary<(string Address, NodeType NodeType), ILeafNode> _nodes = new();
     private readonly ConcurrentDictionary<string, INetwork> _networks = new();
-    private CancellationTokenSource cancelTokenSource;
+
+    private CancellationTokenSource? cancelTokenSource;
 
     public NetworkGraph(
         INetworkBuilder networkBuilder,
@@ -84,7 +85,7 @@ public class NetworkGraph : INetworkGraph
 
         var network = _networkBuilder
             .NetworkFactory.Create(
-                new NodeBuildOptions<Dictionary<string, string[]>>(this, null, index, name, address, null, null, null,
+                new NodeBuildOptions<Dictionary<string, string[]>>(this, null, index, name, address, null, null, "IP",
                     String.Empty, null, new()));
 
         if (network == null)
@@ -429,7 +430,6 @@ public class NetworkGraph : INetworkGraph
 
         return Task.Run(() =>
         {
-            var previousTicks = Monitoring.Ticks;
             while (true)
             {
                 //increment GLOBAL tick
@@ -439,12 +439,13 @@ public class NetworkGraph : INetworkGraph
                 //    continue;
                 //}
                 //previousTicks = Monitoring.Ticks;
+                Tick();
                 Refresh();
             }
         }, cancelTokenSource.Token);
     }
 
-    public void Tick(INode nodeBase)
+    public void Tick()
     {
         Monitoring.Tick();
     }
@@ -480,6 +481,6 @@ public class NetworkGraph : INetworkGraph
 
     public void StopPeriodicRefresh()
     {
-        cancelTokenSource.Cancel();
+        cancelTokenSource?.Cancel();
     }
 }

@@ -15,8 +15,12 @@ namespace EntityFX.MqttY.Application.Mqtt
 
         public override async Task StartAsync()
         {
+            if (Options?.Server == null)
+            {
+                return;
+            }
 
-            _mqttClient = await AddMqttClient(Options?.Server);
+            _mqttClient = await AddMqttClient(Options.Server);
 
             await base.StartAsync();
 

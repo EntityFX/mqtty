@@ -100,6 +100,12 @@ namespace EntityFX.MqttY.Mqtt
             //TODO: get response
             var response = await WaitResponse(subscribeId);
 
+            if (response == null)
+            {
+                //No Subscribe Ack (timeout)
+                return;
+            }
+
             var subscribeAck = response.Payload.BytesToPacket<SubscribeAckPacket>();
 
             if (subscribeAck == null)

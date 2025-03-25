@@ -68,7 +68,7 @@ public class Client : NodeBase, IClient
         var scope = NetworkGraph.Monitoring.WithBeginScope(ref connectPacket!, $"Connect {connectPacket.From} to {connectPacket.To}");
         NetworkGraph.Monitoring.Push(connectPacket, MonitoringType.Connect, $"Client {connectPacket.From} connects to server {connectPacket.To}", ProtocolType, "Connect");
 
-        await SendAsync(connectPacket, false);
+        await SendImplementationAsync(connectPacket, false);
 
         var response = await WaitResponse(connectPacket.Id);
 
@@ -137,25 +137,24 @@ public class Client : NodeBase, IClient
     }
 
 
-    public override async Task SendAsync(Packet packet)
+    protected async Task SendImplementationAsync(Packet packet, bool checkConnection)
     {
-        await SendAsync(packet, true);
+        if (checkConnection && !IsConnected)
+            throw new InvalidOperationException("Not Connected To server");
+        await SendAsync(packet);
     }
 
-    protected virtual async Task SendAsync(Packet packet, bool checkConnection)
+    protected override async Task SendImplementationAsync(Packet packet)
     {
-        if (checkConnection && !IsConnected) 
-            throw new InvalidOperationException("Not Connected To server");
-
         BeforeSend(packet);
-        Tick();
+
         await Network!.SendAsync(packet);
         AfterSend(packet);
     }
 
     public async Task SendAsync(byte[] payload, string? category = null)
     {
-        await SendAsync(
+        await SendImplementationAsync(
             new Packet(Name, serverName, NodeType.Client, NodeType.Server, payload, ProtocolType, category), true);
     }
 
@@ -166,7 +165,6 @@ public class Client : NodeBase, IClient
 
     protected override async Task ReceiveImplementationAsync(Packet packet)
     {
-        Tick();
         BeforeReceive(packet);
         await OnReceivedAsync(packet);
         AfterReceive(packet);

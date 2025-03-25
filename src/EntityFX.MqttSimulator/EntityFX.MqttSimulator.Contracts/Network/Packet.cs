@@ -13,8 +13,6 @@ namespace EntityFX.MqttY.Contracts.Network
 
         public Guid Id { get; set; } = Guid.NewGuid();
 
-        //CreateTick?
-
         public int DecrementTtl()
         {
             Interlocked.Decrement(ref ttl);

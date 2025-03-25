@@ -54,9 +54,9 @@ namespace EntityFX.MqttY.Application
             Options = options;
         }
 
-        public void Refresh()
+        public virtual void Refresh()
         {
-            Tick();
+
         }
 
         public bool AddClient(IClient client)
@@ -138,11 +138,6 @@ namespace EntityFX.MqttY.Application
             IsStarted = result != true;
 
             return Task.CompletedTask;
-        }
-
-        public void Tick()
-        {
-            NetworkGraph.Tick(this);
         }
     }
 }

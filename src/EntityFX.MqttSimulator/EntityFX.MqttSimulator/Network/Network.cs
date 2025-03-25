@@ -15,7 +15,7 @@ public class Network : NodeBase, INetwork
     /// <summary>
     /// TODO: Add max size limit
     /// </summary>
-    private readonly ConcurrentQueue<NetworkPacket> _networkPackets = new();
+    private readonly ConcurrentBag<NetworkPacket> _networkPackets = new();
 
     public IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks => _linkedNetworks.ToImmutableDictionary();
 
@@ -142,11 +142,11 @@ public class Network : NodeBase, INetwork
     //TODO: If queue limit is exceeded then reject Send
     //bool?
     //timeout?
-    public override Task SendAsync(Packet packet)
+    protected override Task SendImplementationAsync(Packet packet)
     {
         var networkPacket = GetNetworkPacketType(packet);
 
-        _networkPackets.Enqueue(networkPacket);
+        _networkPackets.Add(networkPacket);
 
         return Task.CompletedTask;
     }
@@ -192,7 +192,6 @@ public class Network : NodeBase, INetwork
             return false;
         }
 
-        Tick();
 
         NetworkGraph.Monitoring.Push(network, networkPacket.DestionationNode, packet.Payload, MonitoringType.Receive,
             $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}", 
@@ -225,7 +224,6 @@ public class Network : NodeBase, INetwork
             return false;
         }
 
-        Tick();
         packet.DecrementTtl();
 
         if (packet.Ttl == 0)
@@ -256,21 +254,17 @@ public class Network : NodeBase, INetwork
     //TODO: add tick reaction
     public override void Refresh()
     {
-        while (_networkPackets.Count > 0)
+        foreach (var pendingPacket in _networkPackets.ToArray())
         {
-            NetworkPacket? networkPacket = null;
-            while (!_networkPackets.TryDequeue(out networkPacket))
-            {
+            pendingPacket.ReduceWaitTime();
 
-            }
-            if (networkPacket == null)
+            if (pendingPacket.WaitTime <= 0)
             {
-                continue;
-            }
+                while (_networkPackets.TryTake(out var pending))
+                {
+                    var result = ProcessTransferPacket(pending!).Result;
+                }
 
-            if (!ProcessTransferPacket(networkPacket!).Result)
-            {
-                continue;
             }
         }
     }
