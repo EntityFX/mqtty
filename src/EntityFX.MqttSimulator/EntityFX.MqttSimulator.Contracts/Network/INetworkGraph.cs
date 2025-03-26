@@ -13,7 +13,7 @@ namespace EntityFX.MqttY.Contracts.Network
 
         public IImmutableDictionary<string, INetwork> Networks { get; }
 
-        INetwork? BuildNetwork(int index, string name, string address);
+        INetwork? BuildNetwork(int index, string name, string address, TicksOptions ticks);
 
         IClient? BuildClient(int index, string name, string protocolType, string specification,
             INetwork network, string? group = null, int? groupAmount = null, 

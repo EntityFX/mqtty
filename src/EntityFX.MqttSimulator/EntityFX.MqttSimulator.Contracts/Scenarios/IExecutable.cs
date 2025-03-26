@@ -1,6 +1,6 @@
 ﻿namespace EntityFX.MqttY.Contracts.Scenarios
 {
-    public interface IExecutable
+    public interface IExecutable : IDisposable
     {
         public string Name { get; init; }
 

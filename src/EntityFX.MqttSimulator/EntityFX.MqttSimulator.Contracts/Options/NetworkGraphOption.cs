@@ -12,5 +12,7 @@ namespace EntityFX.MqttY.Contracts.Options
 
         public SortedDictionary<string, NodeOption> Nodes { get; set; } = new();
 
+        public TicksOptions Ticks { get; set; } = new();
+
     }
 }

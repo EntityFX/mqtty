@@ -1,5 +1,7 @@
 ﻿using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Network;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 
 public abstract class NodeBase : ISender
 {
@@ -7,7 +9,7 @@ public abstract class NodeBase : ISender
 
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
-    private readonly Dictionary<Guid, NodePacket> monitorMessages = new Dictionary<Guid, NodePacket>();
+    private readonly ConcurrentDictionary<Guid, NodePacket> monitorMessages = new ConcurrentDictionary<Guid, NodePacket>();
 
     public Guid Id { get; private set; }
 
@@ -39,11 +41,11 @@ public abstract class NodeBase : ISender
             return;
         }
 
-        monitorMessages.Add(packet.Id, new NodePacket()
+        monitorMessages.AddOrUpdate(packet.Id, new NodePacket()
         {
             Packet = packet,
             ResetEventSlim = new ManualResetEventSlim(false),
-        });
+        }, (id, packet) => packet);
     }
 
     //Добавляем и Снимаем ManualResetEventSlim 
@@ -95,6 +97,11 @@ public abstract class NodeBase : ISender
         foreach (var packet in monitorMessages.Values.ToArray())
         {
             packet.ReduceWaitTime();
+
+            if (packet.WaitTime <= 0)
+            {
+                packet.ResetEventSlim?.Set();
+            }
         }
     }
 
@@ -114,16 +121,12 @@ public abstract class NodeBase : ISender
                     continue;
                 }
 
-                if (monitorPacket.WaitTime <= 0)
-                {
-                    //expired, timeout
-                    monitorMessages.Remove(packetId);
-                    return null;
-                }
-
                 if (monitorPacket?.ResetEventSlim?.IsSet == true)
                 {
-                    monitorMessages.Remove(packetId);
+                    if (!monitorMessages.TryRemove(packetId, out monitorPacket))
+                    {
+                        continue;
+                    }
                     return monitorPacket.Packet;
                 }
             }

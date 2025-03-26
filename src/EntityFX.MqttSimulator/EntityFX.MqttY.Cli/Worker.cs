@@ -21,7 +21,7 @@ internal class Worker : BackgroundService
     private readonly IFactory<IScenario?, (string Scenario, IDictionary<string, ScenarioOption> Options)> _scenariosFactory;
     private readonly PlantUmlGraphGenerator _plantUmlGraphGenerator;
 
-    public Worker(IServiceProvider serviceProvider, IConfiguration configuration, 
+    public Worker(IServiceProvider serviceProvider, IConfiguration configuration,
         IOptions<MqttYOptions> options, IFactory<IScenario?, (string Scenario, IDictionary<string, ScenarioOption> Options)> scenariosFactory,
         PlantUmlGraphGenerator plantUmlGraphGenerator)
     {
@@ -34,30 +34,35 @@ internal class Worker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var scenario = _scenariosFactory.Create(
-            new (_options.Value.StartScenario, _options.Value.Scenarios));
-        if (scenario == null)
+        using (var scenario = _scenariosFactory.Create(
+            new(_options.Value.StartScenario, _options.Value.Scenarios)))
         {
-            return; 
+            if (scenario == null)
+            {
+                return;
+            }
+
+            await scenario.ExecuteAsync();
+
+
+            var context = scenario.Context as NetworkSimulation;
+
+            var items = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter()
+            {
+                ByMonitoringType = new[] { MonitoringType.Link }
+            });
+
+            var byProtocol = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter()
+            {
+                ByProtocol = "mqtt"
+            });
         }
-
-        await scenario.ExecuteAsync();
-
-        var context = scenario.Context as NetworkSimulation;
-
-        var items = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter() { 
-            ByMonitoringType = new[] { MonitoringType.Link } });
-
-        var byProtocol = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter()
-        {
-            ByProtocol = "mqtt"
-        });
 
         //var plantGraph = _plantUmlGraphGenerator.Generate(_networkGraph);
         //File.WriteAllText("graph.puml", plantGraph);
 
         await Task.Delay(1000);
-        
+
 
     }
 }

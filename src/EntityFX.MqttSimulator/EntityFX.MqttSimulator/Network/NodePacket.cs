@@ -4,6 +4,8 @@ internal class NodePacket
 {
     public Packet? Packet { get; set; }
 
+    public Guid Id { get; set; } = Guid.NewGuid();
+
     public ManualResetEventSlim? ResetEventSlim { get; set; }
 
     internal long WaitTime => _waitTime;

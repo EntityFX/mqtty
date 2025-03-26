@@ -21,7 +21,7 @@ namespace EntityFX.MqttY.Contracts.Monitoring
         void Push(INode from, INode to, byte[]? packet, MonitoringType type, string message, string protocol, string? category, 
             MonitoringScope? scope = null, int? ttl = null, int? queueLength = null);
 
-        MonitoringScope BeginScope(string scopeMessage, MonitoringScope? parent = null);
+        MonitoringScope? BeginScope(string scopeMessage, MonitoringScope? parent = null);
 
         void BeginScope(ref Packet packet, string scope);
 

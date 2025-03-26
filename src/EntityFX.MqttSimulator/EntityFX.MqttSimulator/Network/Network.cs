@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.Options;
 using MonitoringType = EntityFX.MqttY.Contracts.Monitoring.MonitoringType;
 
 namespace EntityFX.MqttY.Network;
@@ -16,6 +17,7 @@ public class Network : NodeBase, INetwork
     /// TODO: Add max size limit
     /// </summary>
     private readonly ConcurrentBag<NetworkPacket> _networkPackets = new();
+    private readonly TicksOptions ticksOptions;
 
     public IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks => _linkedNetworks.ToImmutableDictionary();
 
@@ -28,9 +30,10 @@ public class Network : NodeBase, INetwork
 
     public override NodeType NodeType => NodeType.Network;
 
-    public Network(int index, string name, string address, INetworkGraph networkGraph)
+    public Network(int index, string name, string address, INetworkGraph networkGraph, TicksOptions ticksOptions)
         : base(index, name, address, networkGraph)
     {
+        this.ticksOptions = ticksOptions;
     }
 
     public bool AddClient(IClient client)
@@ -175,7 +178,10 @@ public class Network : NodeBase, INetwork
 
         var pathQueue = new Queue<INetwork>(pathToRemote);
         destionationNode = (toNetwork as Network)?.GetDestinationNode(packet.To!, packet.ToType);
-        return new NetworkPacket(packet, pathQueue, NetworkPacketType.Remote, destionationNode);
+        return new NetworkPacket(packet, pathQueue, NetworkPacketType.Remote, destionationNode)
+        {
+            WaitTime = ticksOptions.NetworkTicks
+        };
     }
 
 

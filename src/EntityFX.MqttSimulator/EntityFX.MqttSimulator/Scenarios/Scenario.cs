@@ -1,16 +1,18 @@
-﻿using System.Collections.Immutable;
+﻿using EntityFX.MqttY.Contracts.Scenarios;
+using System.Collections.Immutable;
 
-namespace EntityFX.MqttY.Contracts.Scenarios
+namespace EntityFX.MqttY.Scenarios
 {
     public class Scenario<TContext> : IScenario<TContext>
     {
         protected readonly IServiceProvider serviceProvider;
+        private bool disposedValue;
 
         public TContext Context { get; init; }
 
         object? IExecutable.Context => Context;
 
-        public IImmutableDictionary<int, IAction<TContext>> Actions { get; init; } 
+        public IImmutableDictionary<int, IAction<TContext>> Actions { get; init; }
             = new Dictionary<int, IAction<TContext>>().ToImmutableDictionary();
 
         public IScenario? Next { get; set; }
@@ -44,7 +46,7 @@ namespace EntityFX.MqttY.Contracts.Scenarios
                 {
                     await ExecuteTimeoutIterationsAsync(action.Value, action.Value.IterationsTimeout.Value);
                 }
-                else 
+                else
                 {
                     await ExecuteIterationsAsync(action.Value, action.Value.Iterations);
                 }
@@ -81,6 +83,36 @@ namespace EntityFX.MqttY.Contracts.Scenarios
                 actionTask.Wait();
 
             }
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    FinishActions();
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override finalizer
+                // TODO: set large fields to null
+                disposedValue = true;
+            }
+        }
+
+        protected void FinishActions()
+        {
+            foreach (var action in Actions)
+            {
+                action.Value.Dispose();
+            }
+        }
+
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }

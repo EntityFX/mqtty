@@ -15,7 +15,7 @@ internal class NetworkPacket
 
     public Packet Packet { get; }
 
-    internal long WaitTime => _waitTime;
+    internal long WaitTime { get => _waitTime; init => _waitTime = value; }
 
     private long _waitTime = 2;
 

@@ -1,4 +1,5 @@
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 
 namespace EntityFX.MqttY.Factories;
@@ -8,7 +9,7 @@ internal class NetworkBuilder : INetworkBuilder
     public NetworkBuilder(
         IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>> clientFactory,
         IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>> serverFactory,
-        IFactory<INetwork?, NodeBuildOptions<Dictionary<string, string[]>>> networkFactory,
+        IFactory<INetwork?, NodeBuildOptions<(TicksOptions TicksOptions, Dictionary<string, string[]> Additional)>> networkFactory,
         IFactory<IApplication?, NodeBuildOptions<object>> applicationFactory)
     {
         ClientFactory = clientFactory;
@@ -25,7 +26,7 @@ internal class NetworkBuilder : INetworkBuilder
 
     public IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>> ServerFactory { get; }
 
-    public IFactory<INetwork?, NodeBuildOptions<Dictionary<string, string[]>>> NetworkFactory { get; }
+    public IFactory<INetwork?, NodeBuildOptions<(TicksOptions TicksOptions, Dictionary<string, string[]> Additional)>> NetworkFactory { get; }
 
     public IFactory<IApplication?, NodeBuildOptions<object>> ApplicationFactory { get; }
 

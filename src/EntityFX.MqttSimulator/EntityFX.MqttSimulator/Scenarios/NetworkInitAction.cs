@@ -43,5 +43,10 @@ namespace EntityFX.MqttY.Scenarios
 
             return Task.CompletedTask;
         }
+
+        protected override void Finish()
+        {
+            Context!.NetworkGraph!.StopPeriodicRefresh();
+        }
     }
 }

@@ -80,8 +80,10 @@ public class Monitoring : IMonitoring
             type, message, protocol, category, packet?.Scope ?? scope, packet?.Ttl);
     }
 
-    public MonitoringScope BeginScope(string scope, MonitoringScope? parent = null)
+    public MonitoringScope? BeginScope(string scope, MonitoringScope? parent = null)
     {
+        if (!scopesEnabled) return null;
+
         var scopeItem = new MonitoringScope()
         {
             Id = Guid.NewGuid(),

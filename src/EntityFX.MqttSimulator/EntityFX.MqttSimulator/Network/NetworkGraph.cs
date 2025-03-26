@@ -76,7 +76,7 @@ public class NetworkGraph : INetworkGraph
         return (TClient?)BuildClient(index, name, protocolType, specification, network, group, groupAmount, additional);
     }
 
-    public INetwork? BuildNetwork(int index, string name, string address)
+    public INetwork? BuildNetwork(int index, string name, string address, TicksOptions ticks)
     {
         if (_networks.ContainsKey(address))
         {
@@ -85,8 +85,9 @@ public class NetworkGraph : INetworkGraph
 
         var network = _networkBuilder
             .NetworkFactory.Create(
-                new NodeBuildOptions<Dictionary<string, string[]>>(this, null, index, name, address, null, null, "IP",
-                    String.Empty, null, new()));
+                new NodeBuildOptions<(TicksOptions TicksOptions, Dictionary<string, string[]> Additional)>(
+                    this, null, index, name, address, null, null, "IP",
+                    String.Empty, null, (ticks, new Dictionary<string, string[]>())));
 
         if (network == null)
         {
@@ -141,7 +142,7 @@ public class NetworkGraph : INetworkGraph
 
         foreach (var networkOption in option.Networks)
         {
-            BuildNetwork(networkOption.Value.Index, networkOption.Key, networkOption.Key);
+            BuildNetwork(networkOption.Value.Index, networkOption.Key, networkOption.Key, option.Ticks);
         }
 
         ConfigureLinks(option);
@@ -398,9 +399,10 @@ public class NetworkGraph : INetworkGraph
 
     public void Refresh()
     {
+
         var scope = Monitoring.BeginScope("Refresh sourceNetwork graph");
         Monitoring.Push(MonitoringType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
-
+        Tick();
         var bytes = Array.Empty<byte>();
 
         foreach (var network in _networks)
@@ -432,14 +434,10 @@ public class NetworkGraph : INetworkGraph
         {
             while (true)
             {
-                //increment GLOBAL tick
-                //await Task.Delay(1);
-                //if (Monitoring.Ticks - previousTicks < ticksForRefresh)
-                //{
-                //    continue;
-                //}
-                //previousTicks = Monitoring.Ticks;
-                Tick();
+                if (cancelTokenSource.Token.IsCancellationRequested)
+                {
+                    return;
+                }
                 Refresh();
             }
         }, cancelTokenSource.Token);

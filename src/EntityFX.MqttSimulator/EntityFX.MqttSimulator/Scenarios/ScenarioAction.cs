@@ -1,7 +1,11 @@
-﻿namespace EntityFX.MqttY.Contracts.Scenarios
+﻿using EntityFX.MqttY.Contracts.Scenarios;
+
+namespace EntityFX.MqttY.Scenarios
 {
     public class ScenarioAction<TContext, TConfig> : IAction<TContext, TConfig>
     {
+        private bool disposedValue;
+
         public int Index { get; init; }
 
         public string Name { get; init; } = "ScenarioAction";
@@ -29,6 +33,32 @@
         public virtual Task ExecuteAsync()
         {
             return Task.CompletedTask;
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    Finish();
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override finalizer
+                // TODO: set large fields to null
+                disposedValue = true;
+            }
+        }
+
+        protected virtual void Finish()
+        {
+        }
+
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }
