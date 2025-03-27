@@ -47,7 +47,9 @@ namespace EntityFX.MqttY.Mqtt
             }
 
             var scope = NetworkGraph.Monitoring.WithBeginScope(ref payload!, $"MQTT Client {ClientId} connects to broker {server}");
+
             NetworkGraph.Monitoring.Push(payload, MonitoringType.Connect, $"MQTT Client {ClientId} connects to broker {server}", ProtocolType, "MQTT Connect");
+
             var response = await ConnectImplementationAsync(server, payload);
             NetworkGraph.Monitoring.WithEndScope(ref response!);
 
@@ -93,7 +95,9 @@ namespace EntityFX.MqttY.Mqtt
             var subscribeId = Guid.NewGuid();
             var payload = GetPacket(subscribeId, serverName, NodeType.Server, subscribe.PacketToBytes(), "MQTT Subscribe");
             var scope = NetworkGraph.Monitoring.WithBeginScope(ref payload!, $"Subscribe {Name} to {payload.To} using topic {topicFilter}");
+
             NetworkGraph.Monitoring.Push(payload, MonitoringType.Send, $"MQTT Client {ClientId} subscribes to broker {payload.To} using topic {topicFilter}", ProtocolType, "MQTT Subscribe");
+
             var subscribeTimeout = TimeSpan.FromSeconds(60);
 
             await SendAsync(payload);
@@ -144,6 +148,7 @@ namespace EntityFX.MqttY.Mqtt
             var packetPayload = GetPacket(Guid.NewGuid(), serverName, NodeType.Server, publish.PacketToBytes(), "MQTT Publish");
             var scope = NetworkGraph.Monitoring.WithBeginScope(ref packetPayload!,
                 $"Publish {Name} to {packetPayload.To} with topic {topic}");
+
             NetworkGraph.Monitoring.Push(packetPayload, MonitoringType.Send, 
                 $"MQTT Client {ClientId} publishes to broker {packetPayload.To} using topic {topic}", ProtocolType, "MQTT Publish");
 
@@ -201,8 +206,9 @@ namespace EntityFX.MqttY.Mqtt
             {
                 return;
             }
+
             NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, 
-                $"MQTT Client {ClientId} receives Publish message from {packet.From} broker by topic {publishPacket.Topic}", ProtocolType, Specification);
+                $"MQTT Client {ClientId} receives Publish message from {packet.From} broker by topic {publishPacket.Topic}", ProtocolType, "MQTT Publish");
 
             NetworkGraph.Monitoring.WithEndScope(ref packet);
             await SendPublishAck(packet, ClientId, publishPacket.QualityOfService, publishPacket);
@@ -217,6 +223,8 @@ namespace EntityFX.MqttY.Mqtt
             var ackPayload = ack.PacketToBytes() ?? Array.Empty<byte>();
 
             var reversePacket = NetworkGraph.GetReversePacket(packet, ackPayload.ToArray(), "MQTT PubAck");
+            NetworkGraph.Monitoring.Push(packet, MonitoringType.Send,
+                $"Send MQTT publish ack {packet.From} to {packet.To} with {publishPacket.Topic} (QoS={publishPacket.QualityOfService})", ProtocolType, "MQTT PubAck");
             await SendAsync(reversePacket);
         }
 

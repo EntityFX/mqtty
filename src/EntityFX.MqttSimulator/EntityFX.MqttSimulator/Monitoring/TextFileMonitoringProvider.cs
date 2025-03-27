@@ -19,7 +19,7 @@ internal class TextFileMonitoringProvider : MonitoringProviderBase, IMonitoringP
 
         if (scope?.Items?.Any() == true)
         {
-            foreach (var item in scope.Items)
+            foreach (var item in scope.Items.ToArray())
             {
                 if (item.MonitoringItemType == MonitoringItemType.Scope)
                 {

@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Mqtt;
+﻿using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Mqtt.Internals;
@@ -219,6 +220,8 @@ namespace EntityFX.MqttY.Mqtt
             var reversePacket = NetworkGraph.GetReversePacket(packet, ackPayload.ToArray(), "MQTT PubAck");
             var scope = NetworkGraph.Monitoring.WithBeginScope(ref reversePacket,
                 $"Publish Ack {packet.From} to {packet.To} with topic {publishPacket.Topic}");
+            NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, 
+                $"Send MQTT publish ack {packet.From} to {packet.To} with {publishPacket.Topic} (QoS={publishPacket.QualityOfService})", ProtocolType, "MQTT PubAck");
             await SendAsync(reversePacket);
             NetworkGraph.Monitoring.WithEndScope(ref reversePacket);
         }
@@ -299,6 +302,8 @@ namespace EntityFX.MqttY.Mqtt
 
             var subscribeAck = new SubscribeAckPacket(subscribePacket.PacketId, returnCodes.ToArray());
             var packetPayload = GetPacket(packet.Id, clientId, NodeType.Client, subscribeAck.PacketToBytes(), "MQTT SubAck");
+            NetworkGraph.Monitoring.Push(packet, MonitoringType.Send,
+                $"Send MQTT subscribe ack {packet.From} to {packet.To}", ProtocolType, "MQTT SubAck");
             await SendAsync(packetPayload);
 
             return true;
@@ -329,6 +334,10 @@ namespace EntityFX.MqttY.Mqtt
 
             var connecktAck = new ConnectAckPacket(MqttConnectionStatus.Accepted, sessionPresent);
             var packetPayload = GetPacket(packet.Id, clientId, NodeType.Client, connecktAck.PacketToBytes(), "MQTT ConnAck");
+
+            NetworkGraph.Monitoring.Push(packet, MonitoringType.Send,
+                $"Send MQTT connect ack {packet.From} to {packet.To} with Status={connecktAck.Status}", ProtocolType, "MQTT ConnAck");
+
             await SendAsync(packetPayload);
 
             return true;

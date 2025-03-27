@@ -66,7 +66,7 @@ public class Client : NodeBase, IClient
         }
 
         var scope = NetworkGraph.Monitoring.WithBeginScope(ref connectPacket!, $"Connect {connectPacket.From} to {connectPacket.To}");
-        NetworkGraph.Monitoring.Push(connectPacket, MonitoringType.Connect, $"Client {connectPacket.From} connects to server {connectPacket.To}", ProtocolType, "Connect");
+        NetworkGraph.Monitoring.Push(connectPacket, MonitoringType.Connect, $"Client {connectPacket.From} connects to server {connectPacket.To}", ProtocolType, "NET Connect");
 
         await SendImplementationAsync(connectPacket, false);
 
@@ -179,7 +179,7 @@ public class Client : NodeBase, IClient
 
     protected override void BeforeReceive(Packet packet)
     {
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, $"Recieve message from {packet.From} to {packet.To}", ProtocolType, packet.Category);
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, $"Recieve message from {packet.From} to {packet.To}", ProtocolType, "Net Receive");
     }
 
     protected override void AfterReceive(Packet packet)

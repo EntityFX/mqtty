@@ -1,4 +1,5 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
+using System.Collections.Immutable;
 
 namespace EntityFX.MqttY.Contracts.Monitoring
 {
@@ -13,6 +14,10 @@ namespace EntityFX.MqttY.Contracts.Monitoring
         IEnumerable<MonitoringItem> Items { get; }
 
         IEnumerable<MonitoringItem> GetByFilter(MonitoringFilter filter);
+
+        IImmutableDictionary<string, long> GetCountersByCategory();
+
+        IImmutableDictionary<MonitoringType, long> GetCountersByMonitoringType();
 
         void Push(MonitoringType type, string message, string? category, string protocol, MonitoringScope? scope = null, int? ttl = null, int? queueLength = null);
 

@@ -112,7 +112,7 @@ public class Server : NodeBase, IServer
         BeforeSend(packet);
 
         var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Send packet {packet.From} to {packet.To}");
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, $"Send packet {packet.From} to {packet.To}", ProtocolType, packet.Category, scope);
+        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, $"Send packet {packet.From} to {packet.To}", ProtocolType, "Net Send", scope);
         await Network.SendAsync(packet);
 
         //NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, $"Send packet {packet.From} to {packet.To}", packet.Category);

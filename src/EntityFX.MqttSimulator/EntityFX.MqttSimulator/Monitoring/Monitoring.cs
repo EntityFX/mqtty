@@ -2,7 +2,9 @@
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Network;
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reflection.Emit;
@@ -14,9 +16,14 @@ public class Monitoring : IMonitoring
     public event EventHandler<MonitoringScope>? ScopeStarted;
     public event EventHandler<MonitoringScope>? ScopeEnded;
 
-    private readonly ConcurrentDictionary<DateTimeOffset, MonitoringItem> _storage = new();
+    private readonly ConcurrentDictionary<Guid, MonitoringItem> _storage = new();
 
     private readonly ConcurrentDictionary<Guid, MonitoringScope> _scopes = new();
+
+    private readonly Dictionary<string, long> _countersByCategory = new();
+
+    private readonly long[] _countersByMonitoringType = new long[Enum.GetNames(typeof(MonitoringType)).Length];
+
     private readonly bool scopesEnabled;
 
     public IEnumerable<MonitoringItem> Items => _storage.Values.Take(10000);
@@ -29,23 +36,18 @@ public class Monitoring : IMonitoring
 
     private long _tick = 0;
 
+    private object _stdLock = new object();
+
     public Monitoring(bool scopesEnabled)
     {
         this.scopesEnabled = scopesEnabled;
     }
 
-    public void Push(MonitoringType type, string message, string protocol, string? category, MonitoringScope? scope = null, int? ttl = null, int? queueLength = null)
+    public void Push(MonitoringType type, string message, string protocol, string? category,
+        MonitoringScope? scope = null, int? ttl = null, int? queueLength = null)
     {
-        var item = new MonitoringItem(
-            Guid.NewGuid(), _tick, DateTimeOffset.Now, string.Empty,
-                NodeType.Other, string.Empty, NodeType.Other,
-            0, type, string.Empty, message, scope, category, ttl, queueLength);
-
-        _storage.TryAdd(item.Date, item);
-
-        scope?.Items.Add(item);
-
-        Added?.Invoke(this, item);
+        Push(string.Empty, NodeType.Other, string.Empty, NodeType.Other,
+            Array.Empty<byte>(), type, message, protocol, category, scope, ttl, queueLength);
     }
 
     private void Push(string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
@@ -56,7 +58,22 @@ public class Monitoring : IMonitoring
             fromType, to, toType,
             (uint)(packet?.Length ?? 0), type, protocol, message, scope, category, ttl, queueLength);
 
-        _storage.TryAdd(item.Date, item);
+        _storage.AddOrUpdate(item.Id, item, (id, item) => item);
+
+        Interlocked.Increment(ref _countersByMonitoringType[(int)type]);
+
+        if (category != null)
+        {
+            lock (_stdLock)
+            {
+                if (!_countersByCategory.ContainsKey(category))
+                {
+                    _countersByCategory[category] = 0;
+                }
+                _countersByCategory[category]++;
+            }
+
+        }
 
         scope?.Items.Add(item);
 
@@ -210,7 +227,7 @@ public class Monitoring : IMonitoring
 
         if (filter.ByNodeType?.Any() == true)
         {
-            result = result.Where(mi => filter.ByNodeType.Contains(mi.SourceType) 
+            result = result.Where(mi => filter.ByNodeType.Contains(mi.SourceType)
             || filter.ByNodeType.Contains(mi.DestinationType));
         }
 
@@ -225,5 +242,17 @@ public class Monitoring : IMonitoring
         }
 
         return result.Take(filter.Limit).ToArray();
+    }
+
+    public IImmutableDictionary<string, long> GetCountersByCategory()
+    {
+        return _countersByCategory.ToImmutableDictionary();
+    }
+
+    public IImmutableDictionary<MonitoringType, long> GetCountersByMonitoringType()
+    {
+        return _countersByMonitoringType
+            .Select((v, i) => new KeyValuePair<MonitoringType, long>((MonitoringType)i, v))
+            .ToImmutableDictionary();
     }
 }

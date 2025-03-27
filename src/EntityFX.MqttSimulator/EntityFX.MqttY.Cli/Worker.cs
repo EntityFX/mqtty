@@ -56,6 +56,8 @@ internal class Worker : BackgroundService
             {
                 ByProtocol = "mqtt"
             });
+
+            var categoryCounters = context?.NetworkGraph?.Monitoring.GetCountersByCategory();
         }
 
         //var plantGraph = _plantUmlGraphGenerator.Generate(_networkGraph);
