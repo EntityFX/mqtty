@@ -62,7 +62,7 @@ public abstract class NodeBase : ISender
 
         monitorMessage.ResetEventSlim?.Set();
     }
-    
+
 
     protected abstract Task ReceiveImplementationAsync(Packet packet);
 
@@ -107,29 +107,25 @@ public abstract class NodeBase : ISender
 
 
     //подписываемся на ManualResetEventSlim и ждём его
-    //убрать цикл, ждёт N тиков (600,000?)
     protected Task<Packet?> WaitResponse(Guid packetId)
     {
         return Task.Run(() =>
         {
-            while (true)
+            var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
+
+            if (monitorPacket == null)
             {
-                var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
-
-                if (monitorPacket == null)
-                {
-                    continue;
-                }
-
-                if (monitorPacket?.ResetEventSlim?.IsSet == true)
-                {
-                    if (!monitorMessages.TryRemove(packetId, out monitorPacket))
-                    {
-                        continue;
-                    }
-                    return monitorPacket.Packet;
-                }
+                return Task.FromResult<Packet?>(null);
             }
+
+            monitorPacket?.ResetEventSlim?.Wait();
+
+
+            if (!monitorMessages.TryRemove(packetId, out monitorPacket))
+            {
+                return Task.FromResult<Packet?>(null);
+            }
+            return Task.FromResult(monitorPacket.Packet);
         });
     }
 }
