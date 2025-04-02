@@ -1,4 +1,5 @@
 using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Mqtt;
@@ -32,9 +33,10 @@ internal class ServerFactory : IFactory<IServer?, NodeBuildOptions<Dictionary<st
 
         if (options.Protocol == "mqtt")
         {
+            var mqttPacketManager = options.ServiceProvider.GetRequiredService<IMqttPacketManager>();
             return new MqttBroker
-            (options.Index, options.Name, options.Address ?? options.Name,
-                options.Protocol, options.Specification, options.Network, options.NetworkGraph, mqttTopicEvaluator);
+            (mqttPacketManager, options.Network, options.NetworkGraph, mqttTopicEvaluator, options.Index, options.Name, options.Address ?? options.Name,
+                options.Protocol, options.Specification);
         }
 
         return new Server(options.Index, options.Name, options.Address ?? options.Name,

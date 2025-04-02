@@ -2,7 +2,7 @@
 
 namespace EntityFX.MqttY.Contracts.Network
 {
-    public record Packet(
+    public record NetworkPacket(
         string From, string To, 
         NodeType FromType, NodeType ToType, byte[] Payload, string Protocol, string? Category = null, 
         MonitoringScope? Scope = null)
@@ -11,7 +11,9 @@ namespace EntityFX.MqttY.Contracts.Network
 
         public int Ttl => ttl;
 
-        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid Id { get; set; }
+
+        public Guid? RequestId { get; set; }
 
         public int DecrementTtl()
         {

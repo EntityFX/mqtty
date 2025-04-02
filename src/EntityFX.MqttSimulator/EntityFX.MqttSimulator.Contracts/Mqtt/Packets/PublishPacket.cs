@@ -23,7 +23,7 @@
 
         public ushort? PacketId { get; }
 
-        public byte[] Payload { get; init; } = Array.Empty<byte>();
+        public byte[] Payload { get; set; } = Array.Empty<byte>();
 
         public bool Equals(PublishPacket? other)
         {

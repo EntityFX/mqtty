@@ -21,7 +21,7 @@ public class Server : NodeBase, IServer
 
     public string Specification { get; }
 
-    public event EventHandler<Packet>? PacketReceived;
+    public event EventHandler<NetworkPacket>? PacketReceived;
     public event EventHandler<IClient>? ClientConnected;
     public event EventHandler<string>? ClientDisconnected;
 
@@ -89,7 +89,7 @@ public class Server : NodeBase, IServer
         return true;
     }
 
-    public override async Task ReceiveAsync(Packet packet)
+    public override async Task ReceiveAsync(NetworkPacket packet)
     {
         BeforeReceive(packet);
         //NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category, packet.Scope);
@@ -100,14 +100,14 @@ public class Server : NodeBase, IServer
     }
 
 
-    protected virtual Task OnReceived(Packet packet)
+    protected virtual Task OnReceived(NetworkPacket packet)
     {
         PacketReceived?.Invoke(this, packet);
 
         return Task.CompletedTask;
     }
 
-    protected override async Task SendImplementationAsync(Packet packet)
+    protected override async Task SendImplementationAsync(NetworkPacket packet)
     {
         BeforeSend(packet);
 
@@ -139,25 +139,25 @@ public class Server : NodeBase, IServer
         IsStarted = !result;
     }
 
-    protected override void BeforeReceive(Packet packet)
+    protected override void BeforeReceive(NetworkPacket packet)
     {
        // NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category);
     }
 
-    protected override void AfterReceive(Packet packet)
+    protected override void AfterReceive(NetworkPacket packet)
     {
  
     }
 
-    protected override void BeforeSend(Packet packet)
+    protected override void BeforeSend(NetworkPacket packet)
     {
     }
 
-    protected override void AfterSend(Packet packet)
+    protected override void AfterSend(NetworkPacket packet)
     {
     }
 
-    protected override Task ReceiveImplementationAsync(Packet packet)
+    protected override Task ReceiveImplementationAsync(NetworkPacket packet)
     {
         return Task.CompletedTask;
     }

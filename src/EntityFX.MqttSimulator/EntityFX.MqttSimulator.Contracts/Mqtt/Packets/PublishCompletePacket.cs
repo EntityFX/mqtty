@@ -1,6 +1,6 @@
 ﻿namespace EntityFX.MqttY.Contracts.Mqtt.Packets
 {
-    public class PublishCompletePacket : PacketBase, IPacket, IEquatable<PublishCompletePacket>
+    public class PublishCompletePacket : PacketBase, IFlowPacket, IEquatable<PublishCompletePacket>
     {
         public PublishCompletePacket(ushort packetId)
         {

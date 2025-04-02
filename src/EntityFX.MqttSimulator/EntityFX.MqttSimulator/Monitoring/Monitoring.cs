@@ -1,6 +1,7 @@
 ﻿using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Network;
 using System;
 using System.Collections.Concurrent;
@@ -20,11 +21,12 @@ public class Monitoring : IMonitoring
 
     private readonly ConcurrentDictionary<Guid, MonitoringScope> _scopes = new();
 
-    private readonly Dictionary<string, long> _countersByCategory = new();
+    private readonly ConcurrentDictionary<string, long> _countersByCategory = new();
 
     private readonly long[] _countersByMonitoringType = new long[Enum.GetNames(typeof(MonitoringType)).Length];
 
     private readonly bool scopesEnabled;
+    private readonly MonitoringIgnoreOption ignore;
 
     public IEnumerable<MonitoringItem> Items => _storage.Values.Take(10000);
 
@@ -38,9 +40,10 @@ public class Monitoring : IMonitoring
 
     private object _stdLock = new object();
 
-    public Monitoring(bool scopesEnabled)
+    public Monitoring(bool scopesEnabled, MonitoringIgnoreOption ignore)
     {
         this.scopesEnabled = scopesEnabled;
+        this.ignore = ignore;
     }
 
     public void Push(MonitoringType type, string message, string protocol, string? category,
@@ -53,6 +56,11 @@ public class Monitoring : IMonitoring
     private void Push(string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
         MonitoringType type, string message, string protocol, string? category, MonitoringScope? scope = null, int? ttl = null, int? queueLength = null)
     {
+        if (ValidateIgnore(protocol, category))
+        {
+            return;
+        }
+
         var item = new MonitoringItem(
             Guid.NewGuid(), _tick, DateTimeOffset.Now, from,
             fromType, to, toType,
@@ -80,6 +88,24 @@ public class Monitoring : IMonitoring
         Added?.Invoke(this, item);
     }
 
+    private bool ValidateIgnore(string protocol, string? category)
+    {
+        if (ignore.Protocol?.Contains(protocol) == true)
+        {
+            return true;
+        }
+
+        if (category != null)
+        {
+            if (ignore.Category?.Contains(category) == true)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public void Push(INode from, INode to, byte[]? packet, MonitoringType type, string message,
         string protocol, string? category, MonitoringScope? scope = null, int? ttl = null, int? queueLength = null)
     {
@@ -89,7 +115,7 @@ public class Monitoring : IMonitoring
     }
 
 
-    public void Push(Packet packet, MonitoringType type, string message,
+    public void Push(EntityFX.MqttY.Contracts.Network.NetworkPacket packet, MonitoringType type, string message,
         string protocol, string? category, MonitoringScope? scope = null)
     {
         Push(packet.From,
@@ -120,7 +146,7 @@ public class Monitoring : IMonitoring
         return scopeItem!;
     }
 
-    public void BeginScope(ref Packet packet, string scope)
+    public void BeginScope(ref EntityFX.MqttY.Contracts.Network.NetworkPacket packet, string scope)
     {
         if (!scopesEnabled) return;
 
@@ -156,7 +182,7 @@ public class Monitoring : IMonitoring
         return;
     }
 
-    public void EndScope(ref Packet packet)
+    public void EndScope(ref EntityFX.MqttY.Contracts.Network.NetworkPacket packet)
     {
         if (!scopesEnabled) return;
 

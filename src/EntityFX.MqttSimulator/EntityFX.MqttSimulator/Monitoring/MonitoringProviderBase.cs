@@ -53,9 +53,11 @@ internal abstract class MonitoringProviderBase : IMonitoringProvider
 
     protected string GetMonitoringLine(MonitoringItem item) => $"{new string(' ', (item.Scope?.Level + 1 ?? 0) * 4)}<{item.Date:u}> " +
             $"(Tick={item.Tick}) " +
-            $"{(item.Ttl != null ? $"{{Ttl={item.Ttl}}}" : "")} " +
-            $"{(item.QueueLength != null ? $"{{Queue={item.QueueLength}}}" : "")} " +
-            $"{{{item.Type}}} {item.SourceType}[\"{item.From}\"] -> {item.DestinationType}[\"{item.To}\"]" +
-            $"{(item.PacketSize > 0 ? $", Packet Size = {item.PacketSize}" : "")}" +
-            $"{(!string.IsNullOrEmpty(item.Category) ? $", Category = {item.Category}" : "")}.";
+            $"{{{item.Type}}} " +
+            $"{(!string.IsNullOrEmpty(item.Category) ? $"[Category={item.Category}] " : "")}" +
+            $"{(item.Ttl != null ? $"{{Ttl={item.Ttl}}} " : "")} " +
+            $"{(item.QueueLength != null ? $"{{Queue={item.QueueLength}}} " : "")} " +
+            $"{item.SourceType}[\"{item.From}\"] -> {item.DestinationType}[\"{item.To}\"]" +
+            $"{(item.PacketSize > 0 ? $", NetworkMonitoringPacket Size={item.PacketSize}" : "")}" +
+            $"{(!string.IsNullOrEmpty(item.Message) ? $", Message={item.Message}" : "")}";
 }

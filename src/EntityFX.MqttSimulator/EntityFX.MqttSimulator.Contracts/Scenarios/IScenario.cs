@@ -21,6 +21,6 @@ namespace EntityFX.MqttY.Contracts.Scenarios
     {
         public IImmutableDictionary<int, IAction<TContext>> Actions { get; init; }
 
-        public TContext Context { get; init; }
+        public new TContext Context { get; init; }
     }
 }

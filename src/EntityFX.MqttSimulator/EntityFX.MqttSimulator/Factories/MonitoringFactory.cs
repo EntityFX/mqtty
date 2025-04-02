@@ -13,7 +13,7 @@ internal class MonitoringFactory : IFactory<IMonitoring, MonitoringOption>
 
     public IMonitoring Create(MonitoringOption options)
     {
-        var monitoring = new Monitoring(options.ScopesEnabled);
+        var monitoring = new Monitoring(options.ScopesEnabled, options.Ignore);
 
         IMonitoringProvider? monitoringProvider = null;
         if (options.Type == "console")

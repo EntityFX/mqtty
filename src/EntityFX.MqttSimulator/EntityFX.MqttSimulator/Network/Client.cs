@@ -19,7 +19,7 @@ public class Client : NodeBase, IClient
 
     public INode? Parent { get; set; }
 
-    public event EventHandler<Packet>? PacketReceived;
+    public event EventHandler<NetworkPacket>? PacketReceived;
 
     protected string serverName = string.Empty;
 
@@ -38,14 +38,14 @@ public class Client : NodeBase, IClient
         if (IsConnected) return true;
 
         var response = await ConnectImplementationAsync(server,
-            GetPacket(Guid.NewGuid(), server, NodeType.Server, new byte[] { 0xFF }, "Connect"));
+            GetPacket(Guid.NewGuid(), server, NodeType.Server, new byte[] { 0xFF }, "Net", "Connect"));
 
         if (response == null) return false;
 
         return true;
     }
 
-    protected async Task<Packet?> ConnectImplementationAsync(string server, Packet connectPacket)
+    protected async Task<NetworkPacket?> ConnectImplementationAsync(string server, NetworkPacket connectPacket)
     {
         if (Network == null) return null;
 
@@ -77,13 +77,15 @@ public class Client : NodeBase, IClient
             return null;
         }
 
-        NetworkGraph.Monitoring.WithEndScope(ref response!);
+        var responsePacket = response.Packet;
+
+        NetworkGraph.Monitoring.WithEndScope(ref responsePacket!);
 
         serverName = server;
 
         IsConnected = true;
 
-        return response;
+        return responsePacket;
     }
 
     private INode? AttachClientToServer(string server)
@@ -137,14 +139,14 @@ public class Client : NodeBase, IClient
     }
 
 
-    protected async Task SendImplementationAsync(Packet packet, bool checkConnection)
+    protected async Task SendImplementationAsync(NetworkPacket packet, bool checkConnection)
     {
         if (checkConnection && !IsConnected)
             throw new InvalidOperationException("Not Connected To server");
         await SendAsync(packet);
     }
 
-    protected override async Task SendImplementationAsync(Packet packet)
+    protected override async Task SendImplementationAsync(NetworkPacket packet)
     {
         BeforeSend(packet);
 
@@ -155,7 +157,7 @@ public class Client : NodeBase, IClient
     public async Task SendAsync(byte[] payload, string? category = null)
     {
         await SendImplementationAsync(
-            new Packet(Name, serverName, NodeType.Client, NodeType.Server, payload, ProtocolType, category), true);
+            new NetworkPacket(Name, serverName, NodeType.Client, NodeType.Server, payload, ProtocolType, category), true);
     }
 
     public void Send(byte[] payload, string? category = null)
@@ -163,35 +165,35 @@ public class Client : NodeBase, IClient
         SendAsync(payload, category).Wait();
     }
 
-    protected override async Task ReceiveImplementationAsync(Packet packet)
+    protected override async Task ReceiveImplementationAsync(NetworkPacket packet)
     {
         BeforeReceive(packet);
         await OnReceivedAsync(packet);
         AfterReceive(packet);
     }
 
-    protected virtual Task OnReceivedAsync(Packet packet)
+    protected virtual Task OnReceivedAsync(NetworkPacket packet)
     {
         PacketReceived?.Invoke(this, packet);
 
         return Task.CompletedTask;
     }
 
-    protected override void BeforeReceive(Packet packet)
+    protected override void BeforeReceive(NetworkPacket packet)
     {
         NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, $"Recieve message from {packet.From} to {packet.To}", ProtocolType, "Net Receive");
     }
 
-    protected override void AfterReceive(Packet packet)
+    protected override void AfterReceive(NetworkPacket packet)
     {
     }
 
-    protected override void BeforeSend(Packet packet)
+    protected override void BeforeSend(NetworkPacket packet)
     {
 
     }
 
-    protected override void AfterSend(Packet packet)
+    protected override void AfterSend(NetworkPacket packet)
     {
     }
 }

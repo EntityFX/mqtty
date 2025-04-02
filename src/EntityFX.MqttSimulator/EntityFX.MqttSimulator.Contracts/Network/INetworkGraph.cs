@@ -13,6 +13,8 @@ namespace EntityFX.MqttY.Contracts.Network
 
         public IImmutableDictionary<string, INetwork> Networks { get; }
 
+        public event EventHandler<Exception>? OnError;
+
         INetwork? BuildNetwork(int index, string name, string address, TicksOptions ticks);
 
         IClient? BuildClient(int index, string name, string protocolType, string specification,
@@ -50,9 +52,11 @@ namespace EntityFX.MqttY.Contracts.Network
 
         void Configure(NetworkGraphOption value);
 
-        Packet GetReversePacket(Packet packet, byte[] payload, string? category);
+        NetworkPacket GetReversePacket(NetworkPacket packet, byte[] payload, string? category);
 
-        void Refresh();
+        bool Refresh();
+
+        bool Reset();
 
         Task StartPeriodicRefreshAsync();
 

@@ -16,7 +16,7 @@ public class Network : NodeBase, INetwork
     /// <summary>
     /// TODO: Add max size limit
     /// </summary>
-    private readonly ConcurrentBag<NetworkPacket> _networkPackets = new();
+    private readonly ConcurrentBag<NetworkMonitoringPacket> _networkPackets = new();
     private readonly TicksOptions ticksOptions;
 
     public IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks => _linkedNetworks.ToImmutableDictionary();
@@ -145,7 +145,7 @@ public class Network : NodeBase, INetwork
     //TODO: If queue limit is exceeded then reject Send
     //bool?
     //timeout?
-    protected override Task SendImplementationAsync(Packet packet)
+    protected override Task SendImplementationAsync(Contracts.Network.NetworkPacket packet)
     {
         var networkPacket = GetNetworkPacketType(packet);
 
@@ -154,13 +154,13 @@ public class Network : NodeBase, INetwork
         return Task.CompletedTask;
     }
 
-    private NetworkPacket GetNetworkPacketType(Packet packet)
+    private NetworkMonitoringPacket GetNetworkPacketType(Contracts.Network.NetworkPacket packet)
     {
         var destionationNode = GetDestinationNode(packet.To!, packet.ToType);
 
         if (destionationNode != null)
         {
-            return new NetworkPacket(packet, new Queue<INetwork>(), NetworkPacketType.Local, destionationNode);
+            return new NetworkMonitoringPacket(packet, new Queue<INetwork>(), NetworkPacketType.Local, destionationNode);
         }
 
         var sourceNode = NetworkGraph.GetNode(packet.From, packet.FromType);
@@ -171,21 +171,21 @@ public class Network : NodeBase, INetwork
 
         if (sourceNode == null || fromNetwork == null || toNetwork == null)
         {
-            return new NetworkPacket(packet, new Queue<INetwork>(), NetworkPacketType.Unreachable, null);
+            return new NetworkMonitoringPacket(packet, new Queue<INetwork>(), NetworkPacketType.Unreachable, null);
         }
 
         var pathToRemote = NetworkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
 
         var pathQueue = new Queue<INetwork>(pathToRemote);
         destionationNode = (toNetwork as Network)?.GetDestinationNode(packet.To!, packet.ToType);
-        return new NetworkPacket(packet, pathQueue, NetworkPacketType.Remote, destionationNode)
+        return new NetworkMonitoringPacket(packet, pathQueue, NetworkPacketType.Remote, destionationNode)
         {
             WaitTime = ticksOptions.NetworkTicks
         };
     }
 
 
-    private async Task<bool> SendToLocalAsync(INetwork network, NetworkPacket networkPacket)
+    private async Task<bool> SendToLocalAsync(INetwork network, NetworkMonitoringPacket networkPacket)
     {
         var packet = networkPacket.Packet;
         if (string.IsNullOrEmpty(packet.From))
@@ -209,7 +209,7 @@ public class Network : NodeBase, INetwork
     }
 
 
-    private async Task<bool> SendToRemoteAsync(NetworkPacket networkPacket)
+    private async Task<bool> SendToRemoteAsync(NetworkMonitoringPacket networkPacket)
     {
         var packet = networkPacket.Packet;
         if (packet == null)
@@ -235,7 +235,7 @@ public class Network : NodeBase, INetwork
         if (packet.Ttl == 0)
         {
             NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Unreachable,
-                $"Packet unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope);
+                $"NetworkMonitoringPacket unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope);
             //destination uneachable
             return false;
         }
@@ -252,7 +252,7 @@ public class Network : NodeBase, INetwork
         return result;
     }
 
-    protected override Task ReceiveImplementationAsync(Packet packet)
+    protected override Task ReceiveImplementationAsync(Contracts.Network.NetworkPacket packet)
     {
         return Task.CompletedTask;
     }
@@ -276,7 +276,7 @@ public class Network : NodeBase, INetwork
     }
 
     //TODO: need VIRTUAL wait 
-    private async Task<bool> ProcessTransferPacket(NetworkPacket networkPacket)
+    private async Task<bool> ProcessTransferPacket(NetworkMonitoringPacket networkPacket)
     {
         var result = false;
         var packet = networkPacket.Packet;
@@ -327,19 +327,19 @@ public class Network : NodeBase, INetwork
         return result;
     }
 
-    protected override void BeforeReceive(Packet packet)
+    protected override void BeforeReceive(Contracts.Network.NetworkPacket packet)
     {
     }
 
-    protected override void AfterReceive(Packet packet)
+    protected override void AfterReceive(Contracts.Network.NetworkPacket packet)
     {
     }
 
-    protected override void BeforeSend(Packet packet)
+    protected override void BeforeSend(Contracts.Network.NetworkPacket packet)
     {
     }
 
-    protected override void AfterSend(Packet packet)
+    protected override void AfterSend(Contracts.Network.NetworkPacket packet)
     {
     }
 

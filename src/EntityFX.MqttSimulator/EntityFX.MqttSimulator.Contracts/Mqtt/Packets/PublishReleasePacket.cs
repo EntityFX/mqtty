@@ -1,8 +1,6 @@
 ﻿namespace EntityFX.MqttY.Contracts.Mqtt.Packets
 {
-
-
-    public class PublishReleasePacket : PacketBase, IPacket, IEquatable<PublishReleasePacket>
+    public class PublishReleasePacket : PacketBase, IFlowPacket, IEquatable<PublishReleasePacket>
     {
         public PublishReleasePacket(ushort packetId)
         {

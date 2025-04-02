@@ -16,17 +16,24 @@ namespace EntityFX.MqttY.Network;
 
 public class NetworkGraph : INetworkGraph
 {
+    private readonly IServiceProvider serviceProvider;
     private readonly INetworkBuilder _networkBuilder;
     private readonly ConcurrentDictionary<(string Address, NodeType NodeType), ILeafNode> _nodes = new();
     private readonly ConcurrentDictionary<string, INetwork> _networks = new();
 
     private CancellationTokenSource? cancelTokenSource;
 
+    internal Exception? SimulationException;
+
+    public event EventHandler<Exception>? OnError;
+
     public NetworkGraph(
+        IServiceProvider serviceProvider,
         INetworkBuilder networkBuilder,
         IPathFinder pathFinder,
         IMonitoring monitoring)
     {
+        this.serviceProvider = serviceProvider;
         _networkBuilder = networkBuilder;
         PathFinder = pathFinder;
         Monitoring = monitoring;
@@ -54,7 +61,7 @@ public class NetworkGraph : INetworkGraph
 
         var client = _networkBuilder
             .ClientFactory.Create(
-                new NodeBuildOptions<Dictionary<string, string[]>>(
+                new NodeBuildOptions<Dictionary<string, string[]>>(serviceProvider,
                     this, network, index, name, clientAddressFull, group, groupAmount, protocolType,
                     specification, null, additional));
 
@@ -86,7 +93,7 @@ public class NetworkGraph : INetworkGraph
         var network = _networkBuilder
             .NetworkFactory.Create(
                 new NodeBuildOptions<(TicksOptions TicksOptions, Dictionary<string, string[]> Additional)>(
-                    this, null, index, name, address, null, null, "IP",
+                    serviceProvider, this, null, index, name, address, null, null, "IP",
                     String.Empty, null, (ticks, new Dictionary<string, string[]>())));
 
         if (network == null)
@@ -119,7 +126,8 @@ public class NetworkGraph : INetworkGraph
 
         var server = _networkBuilder
             .ServerFactory.Create(
-                new NodeBuildOptions<Dictionary<string, string[]>>(this, network, index, name, serverAddressFull, group,
+                new NodeBuildOptions<Dictionary<string, string[]>>(
+                    serviceProvider, this, network, index, name, serverAddressFull, group,
                     groupAmount, protocolType,
                     specification, null, additional));
 
@@ -170,6 +178,7 @@ public class NetworkGraph : INetworkGraph
             if (nodeApplication == null) continue;
 
             var bo = new NodeBuildOptions<object>(
+                serviceProvider,
                 this, nodeApplication.Network, nodeApplication.Index, nodeApplication.Name, nodeApplication.Address,
                 nodeApplication.Group, nodeApplication.GroupAmount, nodeApplication.ProtocolType,
                 nodeApplication.Specification ?? string.Empty,
@@ -188,6 +197,7 @@ public class NetworkGraph : INetworkGraph
             if (nodeServer == null) continue;
 
             var bo = new NodeBuildOptions<Dictionary<string, string[]>>(
+                serviceProvider,
                 this, nodeServer.Network, nodeServer.Index, nodeServer.Name, nodeServer.Address,
                 nodeServer.Group, nodeServer.GroupAmount, nodeServer.ProtocolType,
                 nodeServer.Specification, node.Value.ConnectsToServer, node.Value.Additional);
@@ -207,7 +217,7 @@ public class NetworkGraph : INetworkGraph
                     .ForEach(
                         (nc) =>
                         {
-                            var nodeClient = GetNode($"{node.Key}_{nc}", NodeType.Client) as IClient;
+                            var nodeClient = GetNode($"{node.Key}{nc}", NodeType.Client) as IClient;
 
                             if (nodeClient == null)
                             {
@@ -215,6 +225,7 @@ public class NetworkGraph : INetworkGraph
                             }
 
                             var bo = new NodeBuildOptions<Dictionary<string, string[]>>(
+                                serviceProvider,
                                 this, nodeClient.Network, nodeClient.Index, nodeClient.Name, nodeClient.Address,
                                 nodeClient.Group, nodeClient.GroupAmount, nodeClient.ProtocolType,
                                 node.Value.Specification ?? string.Empty,
@@ -229,6 +240,7 @@ public class NetworkGraph : INetworkGraph
                 if (nodeClient == null) continue;
 
                 var bo = new NodeBuildOptions<Dictionary<string, string[]>>(
+                    serviceProvider,
                     this, nodeClient.Network, nodeClient.Index, nodeClient.Name, nodeClient.Address,
                     nodeClient.Group, nodeClient.GroupAmount, nodeClient.ProtocolType,
                     node.Value.Specification ?? string.Empty, node.Value.ConnectsToServer, node.Value.Additional);
@@ -261,7 +273,7 @@ public class NetworkGraph : INetworkGraph
                         Enumerable.Range(1, node.Value.Quantity.Value).ToList()
                             .ForEach(
                                 (nc) => BuildClient(
-                                    index, $"{node.Key}_{nc}",
+                                    index, $"{node.Key}{nc}",
                                     node.Value.Protocol ?? "tcp",
                                     node.Value.Specification ?? "tcp-client",
                                     linkNetwork, node.Key, node.Value.Quantity, node.Value.Additional));
@@ -329,9 +341,9 @@ public class NetworkGraph : INetworkGraph
         return _nodes[(address, nodeType)];
     }
 
-    public Packet GetReversePacket(Packet packet, byte[] payload, string? category)
+    public Contracts.Network.NetworkPacket GetReversePacket(Contracts.Network.NetworkPacket packet, byte[] payload, string? category)
     {
-        return new Packet(
+        return new Contracts.Network.NetworkPacket(
             To: packet.From,
             From: packet.To,
             Payload: payload,
@@ -397,48 +409,109 @@ public class NetworkGraph : INetworkGraph
         _nodes.Remove((serverAddress, NodeType.Client), out _);
     }
 
-    public void Refresh()
+    public bool Refresh()
     {
-
-        var scope = Monitoring.BeginScope("Refresh sourceNetwork graph");
-        Monitoring.Push(MonitoringType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
-        Tick();
-        var bytes = Array.Empty<byte>();
-
-        foreach (var network in _networks)
+        try
         {
-            Monitoring.Push(
-                network.Value, network.Value, bytes, MonitoringType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                "Network", "Refresh", scope);
-            network.Value.Refresh();
-        }
+            var scope = Monitoring.BeginScope("Refresh sourceNetwork graph");
+            Monitoring.Push(MonitoringType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
+            Tick();
+            var bytes = Array.Empty<byte>();
 
-        foreach (var node in _nodes)
+            foreach (var network in _networks)
+            {
+                Monitoring.Push(
+                    network.Value, network.Value, bytes, MonitoringType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                    "Network", "Refresh", scope);
+                network.Value.Refresh();
+            }
+
+            foreach (var node in _nodes)
+            {
+                Monitoring.Push(
+                    node.Value, node.Value, bytes, MonitoringType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                    scope);
+                node.Value.Refresh();
+            }
+
+            Monitoring.EndScope(scope);
+
+            return true;
+        }
+        catch (Exception ex)
         {
-            Monitoring.Push(
-                node.Value, node.Value, bytes, MonitoringType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
-                scope);
-            node.Value.Refresh();
+            SimulationException = ex;
+            return false;
         }
+    }
 
-        Monitoring.EndScope(scope);
+    public bool Reset()
+    {
+        try
+        {
+            var scope = Monitoring.BeginScope("Reset sourceNetwork graph");
+            Monitoring.Push(MonitoringType.Refresh, $"Reset whole sourceNetwork", "Network", "Reset", scope);
+            Tick();
+            var bytes = Array.Empty<byte>();
+
+            foreach (var network in _networks)
+            {
+                Monitoring.Push(
+                    network.Value, network.Value, bytes, MonitoringType.Refresh, $"Reset sourceNetwork {network.Key}",
+                    "Network", "Refresh", scope);
+                network.Value.Reset();
+            }
+
+            foreach (var node in _nodes)
+            {
+                Monitoring.Push(
+                    node.Value, node.Value, bytes, MonitoringType.Refresh, $"RefrResetesh node {node.Key}", "Network", "Reset",
+                    scope);
+                node.Value.Reset();
+            }
+
+            Monitoring.EndScope(scope);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            SimulationException = ex;
+            return false;
+        }
     }
 
     public Task StartPeriodicRefreshAsync()
     {
-        //var ticksForRefresh = 50;
+        if (cancelTokenSource != null && cancelTokenSource.IsCancellationRequested)
+        {
+            return Task.CompletedTask;
+        }
 
         cancelTokenSource = new CancellationTokenSource();
 
         return Task.Run(() =>
         {
+            bool refreshResult = true;
+
             while (true)
             {
                 if (cancelTokenSource.Token.IsCancellationRequested)
                 {
                     return;
                 }
-                Refresh();
+
+                refreshResult = Refresh();
+
+                if (!refreshResult)
+                {
+                    Reset();
+
+                    cancelTokenSource.Cancel();
+
+                    OnError?.Invoke(this, SimulationException!);
+                    break;
+                }
             }
         }, cancelTokenSource.Token);
     }
@@ -461,7 +534,8 @@ public class NetworkGraph : INetworkGraph
 
         var server = _networkBuilder
             .ApplicationFactory.Create(
-                new NodeBuildOptions<object>(this, network, index, name, serverAddressFull,
+                new NodeBuildOptions<object>(
+                    serviceProvider, this, network, index, name, serverAddressFull,
                     group, groupAmount, protocolType, specification, null, applicationConfig)
                 {
                     OptionsPath = OptionsPath

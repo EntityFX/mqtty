@@ -7,4 +7,6 @@ public class MonitoringOption
     public bool ScopesEnabled { get; set; }
 
     public string? Path { get; set; }
+
+    public MonitoringIgnoreOption Ignore { get; set; } = new MonitoringIgnoreOption();
 }

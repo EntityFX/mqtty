@@ -1,7 +1,9 @@
 using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Mqtt;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EntityFX.MqttY.Factories;
 
@@ -52,9 +54,10 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<Dictionary<st
 
         if (options.Protocol == "mqtt")
         {
-            var mqttClient = new MqttClient(options.Index,
+            var mqttPacketManager = options.ServiceProvider.GetRequiredService<IMqttPacketManager>();
+            var mqttClient = new MqttClient(mqttPacketManager, options.Network, options.NetworkGraph, options.Index,
                 options.Name, options.Address ?? options.Name,
-                options.Protocol, options.Specification, options.Network, options.NetworkGraph, options.Name)
+                options.Protocol, options.Specification, options.Name)
             {
                 Group = options.Group,
                 GroupAmount = options.GroupAmount

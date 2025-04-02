@@ -20,9 +20,9 @@ namespace EntityFX.MqttY.Scenarios
         public TContext? Context { get; set; }
         public TConfig? Config { get; set; }
 
-        object? IExecutable.Context => Context;
-
         public IScenario<TContext> Scenario { get; init; }
+
+        object? IExecutable.Context => Context;
 
         public ScenarioAction(IScenario<TContext> scenario)
         {

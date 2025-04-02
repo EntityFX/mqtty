@@ -59,6 +59,11 @@ namespace EntityFX.MqttY.Application
 
         }
 
+        public virtual void Reset()
+        {
+            IsStarted = false;
+        }
+
         public bool AddClient(IClient client)
         {
             if (client == null) throw new ArgumentNullException("client");

@@ -3,17 +3,18 @@ using System.Net.Sockets;
 
 namespace EntityFX.MqttY.Network;
 
-internal class NetworkPacket
+internal class NetworkMonitoringPacket
 {
-    public NetworkPacket(Packet packet, Queue<INetwork> path, NetworkPacketType type, ISender? destionationNode)
+    public NetworkMonitoringPacket(Contracts.Network.NetworkPacket packet, Queue<INetwork> path, NetworkPacketType type, ISender? destionationNode)
     {
         Packet = packet;
         Path = path;
         Type = type;
         DestionationNode = destionationNode;
+        Marker = packet.Category ?? string.Empty;
     }
 
-    public Packet Packet { get; }
+    public NetworkPacket Packet { get; }
 
     internal long WaitTime { get => _waitTime; init => _waitTime = value; }
 
@@ -21,6 +22,7 @@ internal class NetworkPacket
 
     public Queue<INetwork> Path { get; }
     public NetworkPacketType Type { get; }
+    public string Marker { get; }
     public ISender? DestionationNode { get; }
 
     internal void ReduceWaitTime()

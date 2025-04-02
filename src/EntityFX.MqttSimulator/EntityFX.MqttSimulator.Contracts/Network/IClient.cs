@@ -9,7 +9,7 @@
         bool Disconnect();
 
 
-        event EventHandler<Packet>? PacketReceived;
+        event EventHandler<NetworkPacket>? PacketReceived;
 
         Task SendAsync(byte[] packet, string? category = null);
 

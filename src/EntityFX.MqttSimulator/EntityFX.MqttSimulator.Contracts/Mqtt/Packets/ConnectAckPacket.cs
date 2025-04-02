@@ -4,14 +4,14 @@
     {
         public ConnectAckPacket()
         {
-            
+            Type = MqttPacketType.ConnectAck;
         }
 
         public ConnectAckPacket(MqttConnectionStatus status, bool existingSession)
+            : this()
         {
             Status = status;
             SessionPresent = existingSession;
-            Type = MqttPacketType.ConnectAck;
         }
 
         public MqttConnectionStatus Status { get; internal set;  }

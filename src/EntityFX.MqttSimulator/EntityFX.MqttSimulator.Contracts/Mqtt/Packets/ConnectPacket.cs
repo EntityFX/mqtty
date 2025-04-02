@@ -16,12 +16,6 @@
             Type = MqttPacketType.Connect;
         }
 
-        public ConnectPacket()
-        {
-            CleanSession = true;
-            KeepAlive = 0;
-            Type = MqttPacketType.Connect;
-        }
 
         public string? ClientId { get; set; }
 

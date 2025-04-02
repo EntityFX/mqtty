@@ -15,7 +15,7 @@
 
         ActionType Type { get; init; }
 
-        public TContext? Context { get; set; }
+        public new TContext? Context { get; set; }
 
         IScenario<TContext> Scenario { get; init; }
     }

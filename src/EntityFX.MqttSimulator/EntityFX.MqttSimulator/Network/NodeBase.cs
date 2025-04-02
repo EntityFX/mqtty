@@ -3,13 +3,13 @@ using EntityFX.MqttY.Contracts.Network;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
-public abstract class NodeBase : ISender
+public abstract partial class NodeBase : ISender
 {
     protected readonly INetworkGraph NetworkGraph;
 
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
-    private readonly ConcurrentDictionary<Guid, NodePacket> monitorMessages = new ConcurrentDictionary<Guid, NodePacket>();
+    private readonly ConcurrentDictionary<Guid, NodeMonitoringPacket> monitorMessages = new ConcurrentDictionary<Guid, NodeMonitoringPacket>();
 
     public Guid Id { get; private set; }
 
@@ -27,53 +27,63 @@ public abstract class NodeBase : ISender
 
 
     //Создаём ManualResetEventSlim 
-    public async Task SendAsync(Packet packet)
+    public async Task SendAsync(NetworkPacket packet)
     {
         PreSend(packet);
 
         await SendImplementationAsync(packet);
     }
 
-    private void PreSend(Packet packet)
+    private void PreSend(NetworkPacket packet)
     {
         if (monitorMessages.ContainsKey(packet.Id))
         {
             return;
         }
 
-        monitorMessages.AddOrUpdate(packet.Id, new NodePacket()
+        monitorMessages.AddOrUpdate(packet.Id, new NodeMonitoringPacket()
         {
-            Packet = packet,
+            RequestPacket = packet,
+            RequestTick = NetworkGraph.Monitoring.Ticks,
+            Marker = packet.Category ?? string.Empty,
+            Id = packet.Id,
             ResetEventSlim = new ManualResetEventSlim(false),
         }, (id, packet) => packet);
     }
 
     //Добавляем и Снимаем ManualResetEventSlim 
-    public virtual async Task ReceiveAsync(Packet packet)
+    public virtual async Task ReceiveAsync(NetworkPacket packet)
     {
         await ReceiveImplementationAsync(packet);
 
-        var monitorMessage = monitorMessages.GetValueOrDefault(packet.Id);
+        if (packet.RequestId == null)
+        {
+            return;
+        }
+
+        var monitorMessage = monitorMessages.GetValueOrDefault(packet.RequestId.Value);
 
         if (monitorMessage == null)
         {
             return;
         }
 
+        monitorMessage.ResponsePacket = packet;
+        monitorMessage.ResponseTick = NetworkGraph.Monitoring.Ticks;
         monitorMessage.ResetEventSlim?.Set();
     }
 
 
-    protected abstract Task ReceiveImplementationAsync(Packet packet);
+    protected abstract Task ReceiveImplementationAsync(NetworkPacket packet);
 
-    protected abstract Task SendImplementationAsync(Packet packet);
+    protected abstract Task SendImplementationAsync(NetworkPacket packet);
 
 
-    protected abstract void BeforeReceive(Packet packet);
-    protected abstract void AfterReceive(Packet packet);
+    protected abstract void BeforeReceive(NetworkPacket packet);
+    protected abstract void AfterReceive(NetworkPacket packet);
 
-    protected abstract void BeforeSend(Packet packet);
-    protected abstract void AfterSend(Packet packet);
+    protected abstract void BeforeSend(NetworkPacket packet);
+    protected abstract void AfterSend(NetworkPacket packet);
 
     public NodeBase(int index, string name, string address, INetworkGraph networkGraph)
     {
@@ -84,10 +94,12 @@ public abstract class NodeBase : ISender
         this.NetworkGraph = networkGraph;
     }
 
-    protected Packet GetPacket(Guid guid, string to, NodeType toType, byte[] payload, string protocol, string? category = null)
-        => new Packet(Name, to, NodeType, toType, payload, protocol, category)
+    protected NetworkPacket GetPacket(Guid guid, string to, NodeType toType, byte[] payload,
+        string protocol, string? category = null, Guid? requestId = null)
+        => new NetworkPacket(Name, to, NodeType, toType, payload, protocol, category)
         {
-            Id = guid
+            Id = guid,
+            RequestId = requestId
         };
 
 
@@ -96,18 +108,28 @@ public abstract class NodeBase : ISender
     {
         foreach (var packet in monitorMessages.Values.ToArray())
         {
-            packet.ReduceWaitTime();
+            packet.ReduceWaitTicks();
 
-            if (packet.WaitTime <= 0)
+            if (packet.WaitTicks <= 0)
             {
                 packet.ResetEventSlim?.Set();
             }
         }
     }
 
+    public virtual void Reset()
+    {
+
+        foreach (var packet in monitorMessages.Values.ToArray())
+        {
+            packet.ResetEventSlim?.Set();
+        }
+        monitorMessages.Clear();
+    }
+
 
     //подписываемся на ManualResetEventSlim и ждём его
-    protected Task<Packet?> WaitResponse(Guid packetId)
+    protected Task<ResponsePacket?> WaitResponse(Guid packetId)
     {
         return Task.Run(() =>
         {
@@ -115,17 +137,23 @@ public abstract class NodeBase : ISender
 
             if (monitorPacket == null)
             {
-                return Task.FromResult<Packet?>(null);
+                return Task.FromResult<ResponsePacket?>(null);
             }
 
-            monitorPacket?.ResetEventSlim?.Wait();
-
+            var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
 
             if (!monitorMessages.TryRemove(packetId, out monitorPacket))
             {
-                return Task.FromResult<Packet?>(null);
+                return Task.FromResult<ResponsePacket?>(null);
             }
-            return Task.FromResult(monitorPacket.Packet);
+
+            if (isSet != true)
+            {
+                return Task.FromResult<ResponsePacket?>(null);
+            }
+
+            return Task.FromResult<ResponsePacket?>(new ResponsePacket(
+                monitorPacket.ResponsePacket!, monitorPacket.RequestTick, monitorPacket.ResponseTick ?? 0));
         });
     }
 }

@@ -30,7 +30,7 @@ internal class NetworkGraphFactory : IFactory<INetworkGraph, NetworkGraphFactory
 
         var mf = serviceProvider.GetRequiredService<IFactory<IMonitoring, MonitoringOption>>();
         var monitoring = mf.Create(options.MonitoringOption);
-        var ng = new NetworkGraph(nb, pf, monitoring)
+        var ng = new NetworkGraph(serviceProvider, nb, pf, monitoring)
         {
             OptionsPath = options.OptionsPath
         };

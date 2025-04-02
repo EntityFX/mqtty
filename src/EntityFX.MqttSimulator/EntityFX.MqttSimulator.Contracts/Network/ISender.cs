@@ -2,8 +2,8 @@
 {
     public interface ISender : INode
     {
-        Task SendAsync(Packet packet);
+        Task SendAsync(NetworkPacket packet);
 
-        Task ReceiveAsync(Packet packet);
+        Task ReceiveAsync(NetworkPacket packet);
     }
 }
