@@ -27,12 +27,12 @@ namespace EntityFX.MqttY.Application.Mqtt
 
         public override async Task StartAsync()
         {
-            await AddMqttClients(Options?.ListenTopics.ToDictionary(kv => kv.Key, kv => kv.Value.Server), $"{Name}_listen");
-            await AddMqttClients(Options?.RelayTopics.ToDictionary(kv => kv.Key, kv => kv.Value.Server), $"{Name}_relay");
+            await AddMqttClients(Options?.ListenTopics.ToDictionary(kv => kv.Key, kv => kv.Value.Server), $"{Name}listen");
+            await AddMqttClients(Options?.RelayTopics.ToDictionary(kv => kv.Key, kv => kv.Value.Server), $"{Name}relay");
 
             await base.StartAsync();
 
-            await SubscribeListenTopics(Options?.ListenTopics, $"{Name}_listen");
+            await SubscribeListenTopics(Options?.ListenTopics, $"{Name}listen");
 
 
         }
@@ -91,7 +91,7 @@ namespace EntityFX.MqttY.Application.Mqtt
 
             if (mqttClient.Server != e.Broker) return;
 
-            PublishToRelayed(e, Options?.RelayTopics, $"{Name}_relay").Wait();
+            PublishToRelayed(e, Options?.RelayTopics, $"{Name}relay").Wait();
         }
 
         private async Task PublishToRelayed(MqttMessage mqttMessage, Dictionary<string, MqttRelayConfigurationItem>? relayServers, string group)
@@ -141,6 +141,6 @@ namespace EntityFX.MqttY.Application.Mqtt
             }
         }
 
-        private string GetNodeName(string group, string key) => $"{group}_{key}";
+        private string GetNodeName(string group, string key) => $"{group}{key}";
     }
 }

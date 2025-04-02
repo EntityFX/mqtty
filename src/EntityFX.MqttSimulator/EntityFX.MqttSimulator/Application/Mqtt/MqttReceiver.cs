@@ -69,6 +69,6 @@ namespace EntityFX.MqttY.Application.Mqtt
                 $"Mqtt Application {Name} receives message by topic {e.Topic} from broker {e.Broker}", Specification, "MQTT Receiver Application");
         }
 
-        private string GetNodeName(string group, string key) => $"{group}_{key}";
+        private string GetNodeName(string group, string key) => $"{group}{key}";
     }
 }
