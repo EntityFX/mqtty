@@ -12,6 +12,7 @@ using System.Collections.Immutable;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Scenarios;
 using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Helper;
 
 internal class Worker : BackgroundService
 {
@@ -46,24 +47,28 @@ internal class Worker : BackgroundService
             await scenario.ExecuteAsync();
 
             context = scenario.Context as NetworkSimulation;
+
+            Console.Write(context!.NetworkGraph!.Counters.Dump());
         }
 
          
 
-        var items = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter()
-        {
-            ByMonitoringType = new[] { MonitoringType.Link }
-        });
+        //var items = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter()
+        //{
+        //    ByMonitoringType = new[] { MonitoringType.Link }
+        //});
 
-        var byProtocol = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter()
-        {
-            ByProtocol = "mqtt"
-        });
+        //var byProtocol = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter()
+        //{
+        //    ByProtocol = "mqtt"
+        //});
 
-        var categoryCounters = context?.NetworkGraph?.Monitoring.GetCountersByCategory();
+        //var categoryCounters = context?.NetworkGraph?.Monitoring.GetCountersByCategory();
 
         //var plantGraph = _plantUmlGraphGenerator.Generate(_networkGraph);
         //File.WriteAllText("graph.puml", plantGraph);
+
+
 
         await Task.Delay(1000);
 

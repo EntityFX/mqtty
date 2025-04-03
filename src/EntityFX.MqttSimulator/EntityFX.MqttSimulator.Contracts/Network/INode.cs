@@ -1,8 +1,9 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
+﻿using EntityFX.MqttY.Contracts.Counters;
+using EntityFX.MqttY.Contracts.Monitoring;
 
 namespace EntityFX.MqttY.Contracts.Network
 {
-    public interface INode
+    public interface INode : IWithCounters
     {
         public Guid Id { get; }
         

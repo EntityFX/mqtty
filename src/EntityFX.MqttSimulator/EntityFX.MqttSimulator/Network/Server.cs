@@ -4,7 +4,7 @@ using EntityFX.MqttY.Contracts.Network;
 using System.Net;
 using static System.Formats.Asn1.AsnWriter;
 
-public class Server : NodeBase, IServer
+public class Server : Node, IServer
 {
     private readonly Dictionary<string, IClient> _serverClients = new();
 
@@ -146,7 +146,7 @@ public class Server : NodeBase, IServer
 
     protected override void AfterReceive(NetworkPacket packet)
     {
- 
+        base.AfterReceive(packet);
     }
 
     protected override void BeforeSend(NetworkPacket packet)
@@ -155,6 +155,7 @@ public class Server : NodeBase, IServer
 
     protected override void AfterSend(NetworkPacket packet)
     {
+        base.AfterSend(packet);
     }
 
     protected override Task ReceiveImplementationAsync(NetworkPacket packet)

@@ -52,7 +52,7 @@ internal abstract class MonitoringProviderBase : IMonitoringProvider
     protected abstract void WriteItem(MonitoringItem item);
 
     protected string GetMonitoringLine(MonitoringItem item) => $"{new string(' ', (item.Scope?.Level + 1 ?? 0) * 4)}<{item.Date:u}> " +
-            $"(Tick={item.Tick}) " +
+            $"(Tick={item.Tick}, Time={item.SimulationTime}) " +
             $"{{{item.Type}}} " +
             $"{(!string.IsNullOrEmpty(item.Category) ? $"[Category={item.Category}] " : "")}" +
             $"{(item.Ttl != null ? $"{{Ttl={item.Ttl}}} " : "")} " +

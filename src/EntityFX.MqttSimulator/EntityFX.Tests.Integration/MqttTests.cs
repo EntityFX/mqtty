@@ -4,12 +4,14 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Factories;
+using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Mqtt.Internals;
 using EntityFX.MqttY.Mqtt.Internals.Formatters;
 using EntityFX.MqttY.Network;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Text.Json;
 using static System.Net.Mime.MediaTypeNames;
 
 namespace EntityFX.Tests.Integration
@@ -41,7 +43,7 @@ namespace EntityFX.Tests.Integration
             serviceProvider = serviceCollection.BuildServiceProvider();
 
 
-            monitoring = new Monitoring(false, new MonitoringIgnoreOption()
+            monitoring = new Monitoring(false, TimeSpan.FromMilliseconds(0.1), new MonitoringIgnoreOption()
             {
                 Category = new string[] { "Refresh" }
             });
@@ -83,6 +85,8 @@ namespace EntityFX.Tests.Integration
             {
                 Assert.Fail(testException.Message);
             }
+
+            Console.WriteLine(graph!.Counters.Dump());
         }
 
         [TestMethod]
@@ -142,7 +146,6 @@ namespace EntityFX.Tests.Integration
             };
 
             await Task.Delay(1000);
-
         }
     }
 }

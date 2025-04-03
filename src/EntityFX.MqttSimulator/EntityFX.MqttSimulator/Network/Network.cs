@@ -1,7 +1,9 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Counter;
 using MonitoringType = EntityFX.MqttY.Contracts.Monitoring.MonitoringType;
 
 namespace EntityFX.MqttY.Network;
@@ -19,6 +21,24 @@ public class Network : NodeBase, INetwork
     private readonly ConcurrentBag<NetworkMonitoringPacket> _networkPackets = new();
     private readonly TicksOptions ticksOptions;
 
+    private readonly NetworkCounters counters;
+
+    public override CounterGroup Counters => new CounterGroup(Name)
+    {
+        Counters = new ICounter[]
+        {
+            counters,
+            new CounterGroup("Servers")
+            {
+                Counters = _servers.Select(s =>s.Value.Counters).ToArray()
+            },
+            new CounterGroup("Clients")
+            {
+                Counters = _clients.Select(s =>s.Value.Counters).ToArray()
+            },
+        }
+    };
+
     public IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks => _linkedNetworks.ToImmutableDictionary();
 
     public IReadOnlyDictionary<string, IServer> Servers => _servers.ToImmutableDictionary();
@@ -34,6 +54,7 @@ public class Network : NodeBase, INetwork
         : base(index, name, address, networkGraph)
     {
         this.ticksOptions = ticksOptions;
+        counters = new NetworkCounters("Network");
     }
 
     public bool AddClient(IClient client)
@@ -200,10 +221,12 @@ public class Network : NodeBase, INetwork
 
 
         NetworkGraph.Monitoring.Push(network, networkPacket.DestionationNode, packet.Payload, MonitoringType.Receive,
-            $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}", 
+            $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
         NetworkGraph.Monitoring.WithEndScope(ref packet);
         await networkPacket.DestionationNode!.ReceiveAsync(packet);
+
+        counters.TransferCounter.Increment();
 
         return true;
     }
@@ -246,6 +269,7 @@ public class Network : NodeBase, INetwork
 
         if (!result)
         {
+            counters.TransferCounter.Increment();
             result = await next.SendToRemoteAsync(networkPacket);
         }
 

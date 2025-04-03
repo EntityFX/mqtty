@@ -1,5 +1,7 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
+﻿using EntityFX.MqttY.Contracts.Counters;
+using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Counter;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
@@ -53,6 +55,9 @@ namespace EntityFX.MqttY.Application
             NetworkGraph = networkGraph;
             Options = options;
         }
+
+        public virtual CounterGroup Counters => new CounterGroup("Invokes");
+
 
         public virtual void Refresh()
         {

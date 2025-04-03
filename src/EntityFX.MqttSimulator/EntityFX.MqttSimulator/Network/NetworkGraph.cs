@@ -5,11 +5,13 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Xml.Linq;
+using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
+using EntityFX.MqttY.Counter;
 using Microsoft.Extensions.Configuration;
 
 namespace EntityFX.MqttY.Network;
@@ -47,6 +49,19 @@ public class NetworkGraph : INetworkGraph
     public IMonitoring Monitoring { get; }
 
     public IImmutableDictionary<string, INetwork> Networks => _networks.ToImmutableDictionary();
+
+    public CounterGroup Counters
+    {
+        get
+        {
+            var counters = new CounterGroup("NetworkGraph")
+            {
+                Counters = _networks.Select(n => n.Value.Counters).ToArray()
+            };
+
+            return counters;
+        }
+    }
 
     public IClient? BuildClient(int index, string name, string protocolType, string specification,
         INetwork network, string? group = null, int? groupAmount = null,

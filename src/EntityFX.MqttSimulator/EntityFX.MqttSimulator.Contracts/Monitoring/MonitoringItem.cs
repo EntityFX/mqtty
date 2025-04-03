@@ -6,6 +6,7 @@ namespace EntityFX.MqttY.Contracts.Monitoring
     public record MonitoringItem(
         Guid Id,
         long Tick,
+        TimeSpan SimulationTime,
         DateTimeOffset Date,
         string From,
         NodeType SourceType,

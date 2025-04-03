@@ -24,7 +24,7 @@ public static class Container
     {
         return serviceCollection
             .AddScoped<PlantUmlGraphGenerator>()
-            .AddScoped<IFactory<IMonitoring, MonitoringOption>, MonitoringFactory>()
+            .AddScoped<IFactory<IMonitoring, NetworkGraphFactoryOption>, MonitoringFactory>()
             .AddScoped<IFactory<INetworkGraph, NetworkGraphFactoryOption>, NetworkGraphFactory>()
             .AddScoped<IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>>, ClientFactory>()
             .AddScoped<IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>>, ServerFactory>()

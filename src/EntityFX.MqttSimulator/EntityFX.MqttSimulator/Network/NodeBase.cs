@@ -1,9 +1,10 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
+﻿using EntityFX.MqttY.Contracts.Counters;
+using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Network;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
-public abstract partial class NodeBase : ISender
+public abstract class NodeBase : ISender
 {
     protected readonly INetworkGraph NetworkGraph;
 
@@ -11,19 +12,45 @@ public abstract partial class NodeBase : ISender
     //храним только Guid, ManualResetEventSlim
     private readonly ConcurrentDictionary<Guid, NodeMonitoringPacket> monitorMessages = new ConcurrentDictionary<Guid, NodeMonitoringPacket>();
 
+
+
     public Guid Id { get; private set; }
 
     public int Index { get; private set; }
 
     public string Address { get; private set; }
 
-    public string Name { get; private set; }
+    public string Name { get; private set; } = string.Empty;
 
     public string? Group { get; set; }
 
     public abstract NodeType NodeType { get; }
     public int? GroupAmount { get; set; }
     public MonitoringScope? Scope { get; set; }
+
+    public abstract CounterGroup Counters { get; }
+
+
+    protected abstract Task ReceiveImplementationAsync(NetworkPacket packet);
+
+    protected abstract Task SendImplementationAsync(NetworkPacket packet);
+
+
+    protected abstract void BeforeReceive(NetworkPacket packet);
+    protected abstract void AfterReceive(NetworkPacket packet);
+
+    protected abstract void BeforeSend(NetworkPacket packet);
+    protected abstract void AfterSend(NetworkPacket packet);
+
+
+    public NodeBase(int index, string name, string address, INetworkGraph networkGraph)
+    {
+        Address = address;
+        Name = name;
+        Id = Guid.NewGuid();
+        Index = index;
+        this.NetworkGraph = networkGraph;
+    }
 
 
     //Создаём ManualResetEventSlim 
@@ -71,27 +98,6 @@ public abstract partial class NodeBase : ISender
         monitorMessage.ResponsePacket = packet;
         monitorMessage.ResponseTick = NetworkGraph.Monitoring.Ticks;
         monitorMessage.ResetEventSlim?.Set();
-    }
-
-
-    protected abstract Task ReceiveImplementationAsync(NetworkPacket packet);
-
-    protected abstract Task SendImplementationAsync(NetworkPacket packet);
-
-
-    protected abstract void BeforeReceive(NetworkPacket packet);
-    protected abstract void AfterReceive(NetworkPacket packet);
-
-    protected abstract void BeforeSend(NetworkPacket packet);
-    protected abstract void AfterSend(NetworkPacket packet);
-
-    public NodeBase(int index, string name, string address, INetworkGraph networkGraph)
-    {
-        Address = address;
-        Name = name;
-        Id = Guid.NewGuid();
-        Index = index;
-        this.NetworkGraph = networkGraph;
     }
 
     protected NetworkPacket GetPacket(Guid guid, string to, NodeType toType, byte[] payload,

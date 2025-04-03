@@ -3,7 +3,7 @@ using EntityFX.MqttY.Contracts.Network;
 using System.Collections.ObjectModel;
 using System.Net;
 
-public class Client : NodeBase, IClient
+public class Client : Node, IClient
 {
 
     public bool IsConnected { get; internal set; }
@@ -184,8 +184,9 @@ public class Client : NodeBase, IClient
         NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, $"Recieve message from {packet.From} to {packet.To}", ProtocolType, "Net Receive");
     }
 
-    protected override void AfterReceive(NetworkPacket packet)
+    protected override void AfterReceive(NetworkPacket packet) 
     {
+        base.AfterReceive(packet);
     }
 
     protected override void BeforeSend(NetworkPacket packet)
@@ -195,5 +196,6 @@ public class Client : NodeBase, IClient
 
     protected override void AfterSend(NetworkPacket packet)
     {
+        base.AfterSend(packet);
     }
 }

@@ -26,6 +26,7 @@ public class Monitoring : IMonitoring
     private readonly long[] _countersByMonitoringType = new long[Enum.GetNames(typeof(MonitoringType)).Length];
 
     private readonly bool scopesEnabled;
+    private readonly TimeSpan simulationTickTime;
     private readonly MonitoringIgnoreOption ignore;
 
     public IEnumerable<MonitoringItem> Items => _storage.Values.Take(10000);
@@ -40,9 +41,10 @@ public class Monitoring : IMonitoring
 
     private object _stdLock = new object();
 
-    public Monitoring(bool scopesEnabled, MonitoringIgnoreOption ignore)
+    public Monitoring(bool scopesEnabled, TimeSpan simulationTickTime, MonitoringIgnoreOption ignore)
     {
         this.scopesEnabled = scopesEnabled;
+        this.simulationTickTime = simulationTickTime;
         this.ignore = ignore;
     }
 
@@ -62,7 +64,9 @@ public class Monitoring : IMonitoring
         }
 
         var item = new MonitoringItem(
-            Guid.NewGuid(), _tick, DateTimeOffset.Now, from,
+            Guid.NewGuid(), _tick,
+            TimeSpan.FromTicks(simulationTickTime.Ticks * _tick),
+            DateTimeOffset.Now, from,
             fromType, to, toType,
             (uint)(packet?.Length ?? 0), type, protocol, message, scope, category, ttl, queueLength);
 

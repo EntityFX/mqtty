@@ -7,5 +7,7 @@ internal class NetworkGraphFactoryOption
     public NetworkGraphOption NetworkGraphOption { get; init; } = new();
 
     public MonitoringOption MonitoringOption { get; init; } = new();
+    public TicksOptions TicksOption { get; init; } = new();
+
     public string OptionsPath { get; internal set; }
 }

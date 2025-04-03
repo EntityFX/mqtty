@@ -1,10 +1,11 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
+﻿using EntityFX.MqttY.Contracts.Counters;
+using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Options;
 using System.Collections.Immutable;
 
 namespace EntityFX.MqttY.Contracts.Network
 {
-    public interface INetworkGraph
+    public interface INetworkGraph : IWithCounters
     {
         public string? OptionsPath { get; set; }
         
