@@ -3,19 +3,8 @@ using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Counter;
 using EntityFX.MqttY.Mqtt.Internals;
-using EntityFX.MqttY.Mqtt.Internals.Formatters;
-using Microsoft.VisualBasic;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading.Channels;
-using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace EntityFX.MqttY.Mqtt
 {
@@ -31,6 +20,8 @@ namespace EntityFX.MqttY.Mqtt
 
         private readonly PacketIdProvider _packetIdProvider = new();
 
+        protected readonly MqttCounters mqttCounters = new MqttCounters("Mqtt");
+
         public MqttBroker(IMqttPacketManager packetManager, INetwork network, INetworkGraph networkGraph, IMqttTopicEvaluator mqttTopicEvaluator,
             int index, string name, string address, string protocolType, 
             string specification
@@ -40,6 +31,7 @@ namespace EntityFX.MqttY.Mqtt
             this.PacketReceived += MqttBroker_PacketReceived;
             this.packetManager = packetManager;
             this.topicEvaluator = mqttTopicEvaluator;
+            counters.AddCounter(mqttCounters);
         }
 
         protected override async Task OnReceived(NetworkPacket packet)
@@ -64,7 +56,6 @@ namespace EntityFX.MqttY.Mqtt
                 case MqttPacketType.PublishAck:
                     await ProcessToClientPublishAck(packet, await packetManager.BytesToPacket<PublishAckPacket>(packet.Payload));
                     break;
-
                 case MqttPacketType.Connect:
                     await ProcessConnect(packet, await packetManager.BytesToPacket<ConnectPacket>(packet.Payload));
                     break;
@@ -76,8 +67,10 @@ namespace EntityFX.MqttY.Mqtt
                 case MqttPacketType.Unsubscribe:
                     break;
                 default:
-                    break;
+                    return;
             }
+
+            mqttCounters.PacketTypeCounters[payload.Type].Increment();
         }
 
         private async Task ProcessFromClientPublish(NetworkPacket packet, PublishPacket? publishPacket)
@@ -153,6 +146,7 @@ namespace EntityFX.MqttY.Mqtt
             }
 
             var scope = NetworkGraph.Monitoring.WithBeginScope(ref packetPayload, $"Publish {Name} to  Subscriber {packetPayload.To} with topic {publishPacket.Topic}");
+            mqttCounters.PacketTypeCounters[subscriptionPublish.Type].Increment();
             await SendAsync(packetPayload);
             return true;
         }
@@ -227,6 +221,7 @@ namespace EntityFX.MqttY.Mqtt
                 $"Send MQTT publish ack {packet.From} to {packet.To} with {publishPacket.Topic} (QoS={publishPacket.QualityOfService})", ProtocolType, "MQTT PubAck");
             await SendAsync(reversePacket);
             NetworkGraph.Monitoring.WithEndScope(ref reversePacket);
+            mqttCounters.PacketTypeCounters[ack.Type].Increment();
         }
 
         private void ValidatePublish(string clientId, PublishPacket publishPacket)
@@ -309,7 +304,7 @@ namespace EntityFX.MqttY.Mqtt
             NetworkGraph.Monitoring.Push(packet, MonitoringType.Send,
                 $"Send MQTT subscribe ack {packet.From} to {packet.To}", ProtocolType, "MQTT SubAck");
             await SendAsync(packetPayload);
-
+            mqttCounters.PacketTypeCounters[subscribeAck.Type].Increment();
             return true;
         }
 
@@ -344,7 +339,7 @@ namespace EntityFX.MqttY.Mqtt
                 $"Send MQTT connect ack {packet.From} to {packet.To} with Status={connecktAck.Status}", ProtocolType, "MQTT ConnAck");
 
             await SendAsync(packetPayload);
-
+            mqttCounters.PacketTypeCounters[connecktAck.Type].Increment();
             return true;
         }
 

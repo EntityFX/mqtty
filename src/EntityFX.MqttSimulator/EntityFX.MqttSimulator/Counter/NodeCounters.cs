@@ -1,4 +1,5 @@
 ﻿using EntityFX.MqttY.Contracts.Counters;
+using System.Diagnostics.Metrics;
 
 namespace EntityFX.MqttY.Counter
 {
@@ -6,8 +7,13 @@ namespace EntityFX.MqttY.Counter
     {
         private List<ICounter> _counters = new List<ICounter>();
 
-        public IIncrementable SendCounter { get; }
-        public IIncrementable ReceiveCounter { get; }
+        public IIncrementableCounter SendCounter { get; }
+        public IIncrementableCounter ReceiveCounter { get; }
+
+        public override ICounter[] Counters { 
+            get => _counters.ToArray();
+            init => _counters = value.ToList(); 
+        }
 
         public NodeCounters(string name)
             : base(name)
@@ -16,7 +22,6 @@ namespace EntityFX.MqttY.Counter
             ReceiveCounter = new GenericCounter("Receive");
             _counters.Add(SendCounter);
             _counters.Add(ReceiveCounter);
-            Counters = _counters.ToArray();
         }
 
         public void AddCounter(ICounter incrementable)

@@ -15,6 +15,10 @@ namespace EntityFX.MqttY.Contracts.Network
 
         public Guid? RequestId { get; set; }
 
+        public int HeaderBytes { get; set; }
+
+        public int PacketBytes => HeaderBytes + Payload.Length;
+
         public int DecrementTtl()
         {
             Interlocked.Decrement(ref ttl);

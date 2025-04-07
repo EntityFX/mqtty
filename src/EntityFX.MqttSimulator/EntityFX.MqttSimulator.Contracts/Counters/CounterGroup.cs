@@ -7,7 +7,7 @@
             Name = name;
         }
 
-        public ICounter[] Counters { get; init; } = Array.Empty<ICounter>();
+        public virtual ICounter[] Counters { get; init; } = Array.Empty<ICounter>();
 
         public string Name { get; init; } = string.Empty;
 

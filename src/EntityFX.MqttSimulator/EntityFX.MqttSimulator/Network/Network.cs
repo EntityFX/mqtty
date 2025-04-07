@@ -172,6 +172,8 @@ public class Network : NodeBase, INetwork
 
         _networkPackets.Add(networkPacket);
 
+        counters.InboundCounter.Add(packet.PacketBytes);
+
         return Task.CompletedTask;
     }
 
@@ -314,6 +316,8 @@ public class Network : NodeBase, INetwork
         {
             result = await SendToRemoteAsync(networkPacket);
         }
+
+        counters.OutboundCounter.Add(packet.PacketBytes);
         return result;
     }
 

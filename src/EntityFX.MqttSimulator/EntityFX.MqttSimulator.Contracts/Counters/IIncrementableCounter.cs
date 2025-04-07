@@ -1,6 +1,6 @@
 ﻿namespace EntityFX.MqttY.Contracts.Counters
 {
-    public interface IIncrementable : ICounter
+    public interface IIncrementableCounter : ICounter
     {
         void Increment();
     }

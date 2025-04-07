@@ -67,11 +67,5 @@ internal class Worker : BackgroundService
 
         //var plantGraph = _plantUmlGraphGenerator.Generate(_networkGraph);
         //File.WriteAllText("graph.puml", plantGraph);
-
-
-
-        await Task.Delay(1000);
-
-
     }
 }

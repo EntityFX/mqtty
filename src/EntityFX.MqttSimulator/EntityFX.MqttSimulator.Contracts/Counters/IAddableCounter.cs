@@ -1,6 +1,6 @@
 ﻿namespace EntityFX.MqttY.Contracts.Counters
 {
-    public interface IAddable : ICounter
+    public interface IAddableCounter : ICounter
     {
         void Add(long value);
     }

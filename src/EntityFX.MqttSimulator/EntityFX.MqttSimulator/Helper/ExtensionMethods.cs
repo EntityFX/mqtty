@@ -16,6 +16,4 @@
             Dictionary[destination] = new KeyValuePair<int, LinkedList<Path<T>>>(Cost, CompletePath);
         }
     }
-
-
 }

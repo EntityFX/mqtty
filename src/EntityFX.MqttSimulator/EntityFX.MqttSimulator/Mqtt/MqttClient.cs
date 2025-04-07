@@ -3,6 +3,7 @@ using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Counter;
 using EntityFX.MqttY.Mqtt.Internals;
 using System;
 using System.Collections.Concurrent;
@@ -25,6 +26,8 @@ namespace EntityFX.MqttY.Mqtt
 
         public event EventHandler<MqttMessage>? MessageReceived;
 
+        protected readonly MqttCounters mqttCounters = new MqttCounters("Mqtt");
+
         public MqttClient(IMqttPacketManager packetManager, INetwork network, INetworkGraph networkGraph, 
             int index, string name, string address, string protocolType,
             string specification,
@@ -33,6 +36,7 @@ namespace EntityFX.MqttY.Mqtt
         {
             this.packetManager = packetManager;
             ClientId = clientId ?? name;
+            counters.AddCounter(mqttCounters);
         }
 
         public string ClientId { get; set; }
@@ -53,7 +57,7 @@ namespace EntityFX.MqttY.Mqtt
             var scope = NetworkGraph.Monitoring.WithBeginScope(ref payload!, $"MQTT Client {ClientId} connects to broker {server}");
 
             NetworkGraph.Monitoring.Push(payload, MonitoringType.Connect, $"MQTT Client {ClientId} connects to broker {server}", ProtocolType, "MQTT Connect");
-
+            mqttCounters.PacketTypeCounters[connect.Type].Increment();
             var response = await ConnectImplementationAsync(server, payload);
 
 
@@ -85,6 +89,7 @@ namespace EntityFX.MqttY.Mqtt
                 throw new MqttConnectException(connAck.Status, connAck.Status.ToString());
             }
 
+            mqttCounters.PacketTypeCounters[connAck.Type].Increment();
 
             return connAck.SessionPresent ? SessionState.SessionPresent : SessionState.CleanSession;
         }
@@ -106,6 +111,7 @@ namespace EntityFX.MqttY.Mqtt
 
             var subscribeTimeout = TimeSpan.FromSeconds(60);
 
+            mqttCounters.PacketTypeCounters[subscribe.Type].Increment();
             await SendAsync(payload);
             //TODO: get response
             var response = await WaitResponse(subscribeId);
@@ -131,6 +137,8 @@ namespace EntityFX.MqttY.Mqtt
             }
 
             var session = _sessionRepository.Read(ClientId);
+
+            mqttCounters.PacketTypeCounters[subscribeAck.Type].Increment();
 
             if (session == null)
             {
@@ -172,6 +180,8 @@ namespace EntityFX.MqttY.Mqtt
                 SaveMessage(publish, ClientId, PendingMessageStatus.PendingToAcknowledge);
             }
 
+            mqttCounters.PacketTypeCounters[publish.Type].Increment();
+
             await SendAsync(packetPayload);
             return true;
         }
@@ -205,8 +215,10 @@ namespace EntityFX.MqttY.Mqtt
                     await ProcessPublishFromBroker(packet, await packetManager.BytesToPacket<PublishPacket>(packet.Payload));
                     break;
                 default:
-                    break;
+                    return;
             }
+
+            mqttCounters.PacketTypeCounters[payload.Type].Increment();
         }
 
         private async Task ProcessPublishFromBroker(NetworkPacket packet, PublishPacket? publishPacket)
