@@ -21,7 +21,7 @@ internal class NetworkMonitoringPacket
     private long _waitTime = 2;
 
     public Queue<INetwork> Path { get; }
-    public NetworkPacketType Type { get; }
+    public NetworkPacketType Type { get; set; }
     public string Marker { get; }
     public ISender? DestionationNode { get; }
 

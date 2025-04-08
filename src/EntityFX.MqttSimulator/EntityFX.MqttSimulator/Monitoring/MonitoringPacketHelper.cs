@@ -14,7 +14,7 @@ public static class MonitoringPacketHelper
     {
         monitoring.EndScope(ref packet);
 
-        return packet.Scope;
+        return packet?.Scope;
     }
 
 }

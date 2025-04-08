@@ -13,6 +13,8 @@
 
         public long Value => 0;
 
+        public string? UnitOfMeasure { get; init; }
+
         public override string ToString()
         {
             return $"{Name}:\n" 

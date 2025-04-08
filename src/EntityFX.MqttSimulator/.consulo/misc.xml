@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <component name="ModuleManager">
+    <modules />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="myTodoPanelSettings">
+      <TodoPanelSettings />
+    </option>
+  </component>
+  <component name="consulo.ide.impl.idea.openapi.vcs.changes.shelf.ShelveChangesManager" show_recycled="false">
+    <option name="remove_strategy" value="false" />
+  </component>
+</project>

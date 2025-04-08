@@ -10,6 +10,8 @@ namespace EntityFX.MqttY.Contracts.Counters
     {
         string Name { get; init; }
 
+        string? UnitOfMeasure { get; init; }
+
         long Value { get; }
     }
 }

@@ -1,5 +1,4 @@
 ﻿using EntityFX.MqttY.Contracts.Monitoring;
-using EntityFX.MqttY.Utils;
 
 internal class ConsoleMonitoringProvider : MonitoringProviderBase, IMonitoringProvider
 {
@@ -9,6 +8,7 @@ internal class ConsoleMonitoringProvider : MonitoringProviderBase, IMonitoringPr
     {
 
     }
+
     protected override void WriteScope(MonitoringScope scope)
     {
         if (scope?.Items?.Any() != true)
@@ -19,22 +19,24 @@ internal class ConsoleMonitoringProvider : MonitoringProviderBase, IMonitoringPr
         Console.WriteLine($"{new string(' ', (scope?.Level ?? 0) * 4)}<{scope?.Date:u}>: " +
         $"Begin Scope <{scope?.Id}> (StartTick={scope?.StartTick}, Ticks={scope?.Ticks}): \"{scope?.ScopeLabel}\"");
 
-
-
-        foreach (var item in scope.Items)
+        if (scope?.Items?.Any() == true)
         {
-            if (item.MonitoringItemType == MonitoringItemType.Scope)
+            foreach (var item in scope.Items)
             {
-                WriteScope((MonitoringScope)item);
-            }
-            else
-            {
-                WriteItem((MonitoringItem)item);
+                if (item.MonitoringItemType == MonitoringItemType.Scope)
+                {
+                    WriteScope((MonitoringScope)item);
+                }
+                else
+                {
+                    WriteItem((MonitoringItem)item);
+                }
             }
         }
 
-
-        Console.WriteLine($"{new string(' ', (scope?.Level ?? 0) * 4)}<{scope?.Date:u}>: End Scope <{scope?.Id}>: \"{scope?.ScopeLabel}\"");
+        Console.WriteLine(
+            $"{new string(' ', (scope?.Level ?? 0) * 4)}" +
+            $"<{scope?.Date:u}>: End Scope <{scope?.Id}>: \"{scope?.ScopeLabel}\"");
     }
 
     protected override void WriteItem(MonitoringItem item)

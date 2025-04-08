@@ -163,6 +163,18 @@ public class Network : NodeBase, INetwork
         return true;
     }
 
+    internal void TransferNext(NetworkMonitoringPacket networkMonitoringPacket)
+    {
+        if (networkMonitoringPacket.Path.Count == 0)
+        {
+            networkMonitoringPacket.Type = NetworkPacketType.Local;
+        }
+
+        _networkPackets.Add(networkMonitoringPacket);
+
+        counters.CountInbound(networkMonitoringPacket.Packet);
+    }
+
     //TODO: If queue limit is exceeded then reject Send
     //bool?
     //timeout?
@@ -172,7 +184,7 @@ public class Network : NodeBase, INetwork
 
         _networkPackets.Add(networkPacket);
 
-        counters.InboundCounter.Add(packet.PacketBytes);
+        counters.CountInbound(packet);
 
         return Task.CompletedTask;
     }
@@ -226,33 +238,33 @@ public class Network : NodeBase, INetwork
             $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
         NetworkGraph.Monitoring.WithEndScope(ref packet);
-        await networkPacket.DestionationNode!.ReceiveAsync(packet);
 
-        counters.TransferCounter.Increment();
+        counters.CountOutbound(packet);
+        await networkPacket.DestionationNode!.ReceiveAsync(packet);
 
         return true;
     }
 
 
-    private async Task<bool> SendToRemoteAsync(NetworkMonitoringPacket networkPacket)
+    private Task<bool> SendToRemoteAsync(NetworkMonitoringPacket networkPacket)
     {
         var packet = networkPacket.Packet;
         if (packet == null)
         {
-            return false;
+            return Task.FromResult(false);
         }
 
 
         if (!networkPacket.Path.Any())
         {
-            return false;
+            return Task.FromResult(false);
         }
 
         var next = networkPacket.Path.Dequeue() as Network;
 
         if (next == null)
         {
-            return false;
+            return Task.FromResult(false);
         }
 
         packet.DecrementTtl();
@@ -262,20 +274,27 @@ public class Network : NodeBase, INetwork
             NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Unreachable,
                 $"NetworkMonitoringPacket unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope);
             //destination uneachable
-            return false;
+            return Task.FromResult(false);
         }
 
         NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push,
             $"Push packet from network {this.Name} to {next.Name}", "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
-        var result = await next.SendToLocalAsync(next, networkPacket);
+        //var result = await next.SendToLocalAsync(next, networkPacket);
 
-        if (!result)
-        {
-            counters.TransferCounter.Increment();
-            result = await next.SendToRemoteAsync(networkPacket);
-        }
+        //nex
 
-        return result;
+        //if (!result)
+        //{
+        //    counters.CountTransfers();
+        //    counters.CountOutbound(networkPacket.Packet);
+        //    await next.SendAsync(networkPacket.Packet);
+        //}
+
+        counters.CountTransfers();
+        counters.CountOutbound(networkPacket.Packet);
+        next.TransferNext(networkPacket);
+
+        return Task.FromResult(true);
     }
 
     protected override Task ReceiveImplementationAsync(Contracts.Network.NetworkPacket packet)
@@ -316,8 +335,6 @@ public class Network : NodeBase, INetwork
         {
             result = await SendToRemoteAsync(networkPacket);
         }
-
-        counters.OutboundCounter.Add(packet.PacketBytes);
         return result;
     }
 

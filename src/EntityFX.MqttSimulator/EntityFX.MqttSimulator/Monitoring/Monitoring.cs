@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
+﻿using EntityFX.MqttY.Collections;
+using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
@@ -17,7 +18,7 @@ public class Monitoring : IMonitoring
     public event EventHandler<MonitoringScope>? ScopeStarted;
     public event EventHandler<MonitoringScope>? ScopeEnded;
 
-    private readonly ConcurrentDictionary<Guid, MonitoringItem> _storage = new();
+    private readonly FixedSizedQueue<MonitoringItem> _storage = new(10000);
 
     private readonly ConcurrentDictionary<Guid, MonitoringScope> _scopes = new();
 
@@ -29,7 +30,7 @@ public class Monitoring : IMonitoring
     private readonly TimeSpan simulationTickTime;
     private readonly MonitoringIgnoreOption ignore;
 
-    public IEnumerable<MonitoringItem> Items => _storage.Values.Take(10000);
+    public IEnumerable<MonitoringItem> Items => _storage;
 
     public long Ticks => _tick;
 
@@ -70,7 +71,7 @@ public class Monitoring : IMonitoring
             fromType, to, toType,
             (uint)(packet?.Length ?? 0), type, protocol, message, scope, category, ttl, queueLength);
 
-        _storage.AddOrUpdate(item.Id, item, (id, item) => item);
+        _storage.Enqueue(item);
 
         Interlocked.Increment(ref _countersByMonitoringType[(int)type]);
 

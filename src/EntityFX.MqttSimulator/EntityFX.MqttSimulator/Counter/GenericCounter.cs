@@ -7,11 +7,13 @@ using System.Threading.Tasks;
 
 namespace EntityFX.MqttY.Counter
 {
-    internal class GenericCounter : INodeCounter
+    internal class GenericCounter : INodeCounter, IWriteableCounter
     {
         public string Name { get; init; }
 
         public long Value => _value;
+
+        public string? UnitOfMeasure { get; init; }
 
         private long _value = 0;
 
@@ -33,6 +35,11 @@ namespace EntityFX.MqttY.Counter
         public override string ToString()
         {
             return $"[{Name} = {Value}]";
+        }
+
+        public void Set(long value)
+        {
+            _value = value;
         }
     }
 }

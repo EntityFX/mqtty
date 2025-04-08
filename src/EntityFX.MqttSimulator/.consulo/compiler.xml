@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <component name="CompilerManager">
+    <module name="EntityFX.Tests.Integration">
+      <output url="file://$PROJECT_DIR$/EntityFX.Tests.Integration/bin/Debug/net6.0" type="PRODUCTION" />
+      <output url="file://$PROJECT_DIR$/EntityFX.Tests.Integration/bin/Debug/net6.0" type="PRODUCTION_RESOURCE" />
+      <output url="file://$PROJECT_DIR$/EntityFX.Tests.Integration/bin/Debug/net6.0" type="TEST" />
+      <output url="file://$PROJECT_DIR$/EntityFX.Tests.Integration/bin/Debug/net6.0" type="TEST_RESOURCE" />
+    </module>
+    <module name="EntityFX.MqttY.Cli">
+      <output url="file://$PROJECT_DIR$/EntityFX.MqttY.Cli/bin/Debug/net6.0" type="PRODUCTION" />
+      <output url="file://$PROJECT_DIR$/EntityFX.MqttY.Cli/bin/Debug/net6.0" type="PRODUCTION_RESOURCE" />
+      <output url="file://$PROJECT_DIR$/EntityFX.MqttY.Cli/bin/Debug/net6.0" type="TEST" />
+      <output url="file://$PROJECT_DIR$/EntityFX.MqttY.Cli/bin/Debug/net6.0" type="TEST_RESOURCE" />
+    </module>
+    <module name="EntityFX.MqttY">
+      <output url="file://$PROJECT_DIR$/EntityFX.MqttSimulator/bin/Debug/net6.0" type="PRODUCTION" />
+      <output url="file://$PROJECT_DIR$/EntityFX.MqttSimulator/bin/Debug/net6.0" type="PRODUCTION_RESOURCE" />
+      <output url="file://$PROJECT_DIR$/EntityFX.MqttSimulator/bin/Debug/net6.0" type="TEST" />
+      <output url="file://$PROJECT_DIR$/EntityFX.MqttSimulator/bin/Debug/net6.0" type="TEST_RESOURCE" />
+    </module>
+    <module name="EntityFX.MqttY.Contracts">
+      <output url="file://$PROJECT_DIR$/EntityFX.MqttSimulator.Contracts/bin/Debug/net6.0" type="PRODUCTION" />
+      <output url="file://$PROJECT_DIR$/EntityFX.MqttSimulator.Contracts/bin/Debug/net6.0" type="PRODUCTION_RESOURCE" />
+      <output url="file://$PROJECT_DIR$/EntityFX.MqttSimulator.Contracts/bin/Debug/net6.0" type="TEST" />
+      <output url="file://$PROJECT_DIR$/EntityFX.MqttSimulator.Contracts/bin/Debug/net6.0" type="TEST_RESOURCE" />
+    </module>
+  </component>
+</project>
