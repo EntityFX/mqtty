@@ -66,8 +66,9 @@ namespace EntityFX.MqttY.Application.Mqtt
 
         private void ListenerMqttClient_MessageReceived(object? sender, MqttMessage e)
         {
-            NetworkGraph.Monitoring.Push(NetworkLoggerType.Receive,
-                $"Mqtt Application {Name} receives message by topic {e.Topic} from broker {e.Broker}", Specification, "MQTT Receiver Application");
+            NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, NetworkLoggerType.Receive,
+                $"Mqtt Application {Name} receives message by topic {e.Topic} from broker {e.Broker}", 
+                Specification, "MQTT Receiver Application");
         }
 
         private string GetNodeName(string group, string key) => $"{group}{key}";

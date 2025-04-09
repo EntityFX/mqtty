@@ -3,16 +3,16 @@ using EntityFX.MqttY.Contracts.NetworkLogger;
 
 public static class NetworkLoggerHelper
 {
-    public static NetworkLoggerScope? WithBeginScope(this INetworkLogger monitoring, ref NetworkPacket packet, string message)
+    public static NetworkLoggerScope? WithBeginScope(this INetworkLogger monitoring, long tick, ref NetworkPacket packet, string message)
     {
-        monitoring.BeginScope(ref packet, message);
+        monitoring.BeginScope(tick, ref packet, message);
 
         return packet.Scope;
     }
 
-    public static NetworkLoggerScope? WithEndScope(this INetworkLogger monitoring, ref NetworkPacket packet)
+    public static NetworkLoggerScope? WithEndScope(this INetworkLogger monitoring, long tick, ref NetworkPacket packet)
     {
-        monitoring.EndScope(ref packet);
+        monitoring.EndScope(tick, ref packet);
 
         return packet?.Scope;
     }

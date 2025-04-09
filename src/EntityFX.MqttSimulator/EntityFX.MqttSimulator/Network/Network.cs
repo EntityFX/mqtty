@@ -99,7 +99,8 @@ public class Network : NodeBase, INetwork
 
         var result = network.Link(this);
 
-        NetworkGraph.Monitoring.Push(this, network, null, NetworkLoggerType.Link, $"Link network {this.Name} to {network.Name}", "Network", "Link", Scope);
+        NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, this, network, null, NetworkLoggerType.Link, 
+            $"Link network {this.Name} to {network.Name}", "Network", "Link", Scope);
 
         return true;
     }
@@ -119,7 +120,8 @@ public class Network : NodeBase, INetwork
             _linkedNetworks[network.Name] = network;
         }
 
-        NetworkGraph.Monitoring.Push(this, network, null, NetworkLoggerType.Unlink, $"Unlink network {this.Name} from {network.Name}", "Network", "Unlink");
+        NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, this, network, null, NetworkLoggerType.Unlink, 
+            $"Unlink network {this.Name} from {network.Name}", "Network", "Unlink");
 
         return true;
     }
@@ -234,10 +236,10 @@ public class Network : NodeBase, INetwork
         }
 
 
-        NetworkGraph.Monitoring.Push(network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
+        NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
             $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
-        NetworkGraph.Monitoring.WithEndScope(ref packet);
+        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.Ticks, ref packet);
 
         counters.CountOutbound(packet);
         await networkPacket.DestionationNode!.ReceiveAsync(packet);
@@ -271,24 +273,16 @@ public class Network : NodeBase, INetwork
 
         if (packet.Ttl == 0)
         {
-            NetworkGraph.Monitoring.Push(this, next, packet.Payload, NetworkLoggerType.Unreachable,
+            NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, this, next, packet.Payload, NetworkLoggerType.Unreachable,
                 $"NetworkMonitoringPacket unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope);
             //destination uneachable
             return Task.FromResult(false);
         }
 
-        NetworkGraph.Monitoring.Push(this, next, packet.Payload, NetworkLoggerType.Push,
-            $"Push packet from network {this.Name} to {next.Name}", "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
-        //var result = await next.SendToLocalAsync(next, networkPacket);
+        NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, this, next, packet.Payload, NetworkLoggerType.Push,
+            $"Push packet from network {this.Name} to {next.Name}", 
+            "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
 
-        //nex
-
-        //if (!result)
-        //{
-        //    counters.CountTransfers();
-        //    counters.CountOutbound(networkPacket.Packet);
-        //    await next.SendAsync(networkPacket.Packet);
-        //}
 
         counters.CountTransfers();
         counters.CountOutbound(networkPacket.Packet);
@@ -325,7 +319,7 @@ public class Network : NodeBase, INetwork
     {
         var result = false;
         var packet = networkPacket.Packet;
-        var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Transfer packet {packet.From} to {packet.To}");
+        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.Ticks, ref packet!, $"Transfer packet {packet.From} to {packet.To}");
 
         if (networkPacket.Type == NetworkPacketType.Local)
         {

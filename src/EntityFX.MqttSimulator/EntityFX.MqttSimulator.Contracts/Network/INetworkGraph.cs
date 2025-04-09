@@ -64,5 +64,7 @@ namespace EntityFX.MqttY.Contracts.Network
         void StopPeriodicRefresh();
 
         void Tick();
+
+        public long Ticks { get; }
     }
 }

@@ -19,23 +19,20 @@ namespace EntityFX.MqttY.Contracts.NetworkLogger
 
         IImmutableDictionary<NetworkLoggerType, long> GetCountersByMonitoringType();
 
-        void Push(NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null);
+        void Push(long tick, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null);
 
-        void Push(NetworkPacket packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null);
+        void Push(long tick, NetworkPacket packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null);
 
-        void Push(INode from, INode to, byte[]? packet, NetworkLoggerType type, string message, string protocol, string? category,
+        void Push(long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message, string protocol, string? category,
             NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null);
 
-        NetworkLoggerScope? BeginScope(string scopeMessage, NetworkLoggerScope? parent = null);
+        NetworkLoggerScope? BeginScope(long tick, string scopeMessage, NetworkLoggerScope? parent = null);
 
-        void BeginScope(ref NetworkPacket packet, string scope);
+        void BeginScope(long tick, ref NetworkPacket packet, string scope);
 
-        void EndScope(ref NetworkPacket packet);
+        void EndScope(long tick, ref NetworkPacket packet);
 
-        void EndScope(NetworkLoggerScope? scope);
+        void EndScope(long tick, NetworkLoggerScope? scope);
 
-        void Tick();
-
-        public long Ticks { get; }
     }
 }

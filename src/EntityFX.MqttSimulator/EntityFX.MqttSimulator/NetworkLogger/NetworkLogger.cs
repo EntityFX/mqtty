@@ -32,13 +32,9 @@ public class NetworkLogger : INetworkLogger
 
     public IEnumerable<NetworkLoggerItem> Items => _storage;
 
-    public long Ticks => _tick;
-
     private int _scopesStarted = 0;
 
     private int _scopesEnded = 0;
-
-    private long _tick = 0;
 
     private object _stdLock = new object();
 
@@ -49,14 +45,14 @@ public class NetworkLogger : INetworkLogger
         this.ignore = ignore;
     }
 
-    public void Push(NetworkLoggerType type, string message, string protocol, string? category,
+    public void Push(long tick, NetworkLoggerType type, string message, string protocol, string? category,
         NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
-        Push(string.Empty, NodeType.Other, string.Empty, NodeType.Other,
+        Push(tick, string.Empty, NodeType.Other, string.Empty, NodeType.Other,
             Array.Empty<byte>(), type, message, protocol, category, scope, ttl, queueLength);
     }
 
-    private void Push(string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
+    private void Push(long tick, string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
         NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
         if (ValidateIgnore(protocol, category))
@@ -65,8 +61,8 @@ public class NetworkLogger : INetworkLogger
         }
 
         var item = new NetworkLoggerItem(
-            Guid.NewGuid(), _tick,
-            TimeSpan.FromTicks(simulationTickTime.Ticks * _tick),
+            Guid.NewGuid(), tick,
+            TimeSpan.FromTicks(simulationTickTime.Ticks * tick),
             DateTimeOffset.Now, from,
             fromType, to, toType,
             (uint)(packet?.Length ?? 0), type, protocol, message, scope, category, ttl, queueLength);
@@ -111,24 +107,24 @@ public class NetworkLogger : INetworkLogger
         return false;
     }
 
-    public void Push(INode from, INode to, byte[]? packet, NetworkLoggerType type, string message,
+    public void Push(long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message,
         string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
-        Push(from.Name,
+        Push(tick, from.Name,
             from.NodeType, to.Name, to.NodeType, packet,
             type, message, protocol, category, scope, ttl, queueLength);
     }
 
 
-    public void Push(EntityFX.MqttY.Contracts.Network.NetworkPacket packet, NetworkLoggerType type, string message,
+    public void Push(long tick, NetworkPacket packet, NetworkLoggerType type, string message,
         string protocol, string? category, NetworkLoggerScope? scope = null)
     {
-        Push(packet.From,
+        Push(tick, packet.From,
             packet.FromType, packet.To, packet.ToType, packet.Payload,
             type, message, protocol, category, packet?.Scope ?? scope, packet?.Ttl);
     }
 
-    public NetworkLoggerScope? BeginScope(string scope, NetworkLoggerScope? parent = null)
+    public NetworkLoggerScope? BeginScope(long tick, string scope, NetworkLoggerScope? parent = null)
     {
         if (!scopesEnabled) return null;
 
@@ -139,7 +135,7 @@ public class NetworkLogger : INetworkLogger
             Level = parent?.Level + 1 ?? 0,
             Date = DateTimeOffset.Now,
             Parent = parent,
-            StartTick = _tick,
+            StartTick = tick,
             Source = parent?.Source,
             Destination = parent?.Destination
         };
@@ -151,13 +147,13 @@ public class NetworkLogger : INetworkLogger
         return scopeItem!;
     }
 
-    public void BeginScope(ref EntityFX.MqttY.Contracts.Network.NetworkPacket packet, string scope)
+    public void BeginScope(long tick, ref NetworkPacket packet, string scope)
     {
         if (!scopesEnabled) return;
 
         if (packet.Scope == null)
         {
-            var newScope = BeginScope(scope, null);
+            var newScope = BeginScope(tick, scope, null);
 
             if (newScope == null) return;
 
@@ -174,7 +170,7 @@ public class NetworkLogger : INetworkLogger
 
         if (existingScope == null)
         {
-            existingScope = BeginScope(scope, null);
+            existingScope = BeginScope(tick, scope, null);
             packet = packet with
             {
                 Scope = existingScope
@@ -182,7 +178,7 @@ public class NetworkLogger : INetworkLogger
             return;
         }
 
-        var linkedScope = BeginScope(scope, existingScope);
+        var linkedScope = BeginScope(tick, scope, existingScope);
         packet = packet with
         {
             Scope = linkedScope
@@ -190,7 +186,7 @@ public class NetworkLogger : INetworkLogger
         return;
     }
 
-    public void EndScope(ref EntityFX.MqttY.Contracts.Network.NetworkPacket packet)
+    public void EndScope(long tick, ref NetworkPacket packet)
     {
         if (!scopesEnabled) return;
 
@@ -202,7 +198,7 @@ public class NetworkLogger : INetworkLogger
         var scope = packet.Scope;
         if (scope != null)
         {
-            EndScope(scope!);
+            EndScope(tick, scope!);
         }
         packet = packet with
         {
@@ -211,7 +207,7 @@ public class NetworkLogger : INetworkLogger
         return;
     }
 
-    public void EndScope(NetworkLoggerScope? scope)
+    public void EndScope(long tick, NetworkLoggerScope? scope)
     {
         if (!scopesEnabled) return;
 
@@ -221,18 +217,13 @@ public class NetworkLogger : INetworkLogger
         }
 
         scope.ScopeStatus = ScopeStatus.End;
-        scope.EndTick = _tick;
+        scope.EndTick = tick;
         scope.Ticks = scope.EndTick - scope.StartTick;
 
         Interlocked.Increment(ref _scopesEnded);
         ScopeEnded?.Invoke(this, scope);
 
         return;
-    }
-
-    public void Tick()
-    {
-        Interlocked.Increment(ref _tick);
     }
 
     public IEnumerable<NetworkLoggerItem> GetByFilter(NetworkLoggerFilter filter)

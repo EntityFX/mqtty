@@ -23,6 +23,8 @@ public class NetworkGraph : INetworkGraph
     private readonly ConcurrentDictionary<(string Address, NodeType NodeType), ILeafNode> _nodes = new();
     private readonly ConcurrentDictionary<string, INetwork> _networks = new();
 
+    private long _tick = 0;
+
     private CancellationTokenSource? cancelTokenSource;
 
     internal Exception? SimulationException;
@@ -49,6 +51,8 @@ public class NetworkGraph : INetworkGraph
     public INetworkLogger Monitoring { get; }
 
     public IImmutableDictionary<string, INetwork> Networks => _networks.ToImmutableDictionary();
+
+    public long Ticks => _tick;
 
     public CounterGroup Counters
     {
@@ -314,7 +318,7 @@ public class NetworkGraph : INetworkGraph
 
     private void ConfigureLinks(NetworkGraphOption option)
     {
-        var scope = Monitoring.BeginScope("Configure sourceNetwork links");
+        var scope = Monitoring.BeginScope(Ticks, "Configure sourceNetwork links");
         foreach (var networkOption in option.Networks)
         {
             if (networkOption.Value?.Links?.Any() != true) continue;
@@ -333,7 +337,7 @@ public class NetworkGraph : INetworkGraph
             }
         }
 
-        Monitoring.EndScope(scope);
+        Monitoring.EndScope(Ticks, scope);
     }
 
     public string GetAddress(string name, string protocolType, string networkAddress)
@@ -428,14 +432,14 @@ public class NetworkGraph : INetworkGraph
     {
         try
         {
-            var scope = Monitoring.BeginScope("Refresh sourceNetwork graph");
-            Monitoring.Push(NetworkLoggerType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
+            var scope = Monitoring.BeginScope(Ticks, "Refresh sourceNetwork graph");
+            Monitoring.Push(Ticks, NetworkLoggerType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
             Tick();
             var bytes = Array.Empty<byte>();
 
             foreach (var network in _networks)
             {
-                Monitoring.Push(
+                Monitoring.Push(Ticks,
                     network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
                     "Network", "Refresh", scope);
                 network.Value.Refresh();
@@ -443,13 +447,13 @@ public class NetworkGraph : INetworkGraph
 
             foreach (var node in _nodes)
             {
-                Monitoring.Push(
+                Monitoring.Push(Ticks,
                     node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
                     scope);
                 node.Value.Refresh();
             }
 
-            Monitoring.EndScope(scope);
+            Monitoring.EndScope(Ticks, scope);
 
             return true;
         }
@@ -464,14 +468,15 @@ public class NetworkGraph : INetworkGraph
     {
         try
         {
-            var scope = Monitoring.BeginScope("Reset sourceNetwork graph");
-            Monitoring.Push(NetworkLoggerType.Refresh, $"Reset whole sourceNetwork", "Network", "Reset", scope);
             Tick();
+            var scope = Monitoring.BeginScope(Ticks, "Reset sourceNetwork graph");
+            Monitoring.Push(Ticks, NetworkLoggerType.Refresh, $"Reset whole sourceNetwork", "Network", "Reset", scope);
+
             var bytes = Array.Empty<byte>();
 
             foreach (var network in _networks)
             {
-                Monitoring.Push(
+                Monitoring.Push(Ticks,
                     network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Reset sourceNetwork {network.Key}",
                     "Network", "Refresh", scope);
                 network.Value.Reset();
@@ -479,13 +484,13 @@ public class NetworkGraph : INetworkGraph
 
             foreach (var node in _nodes)
             {
-                Monitoring.Push(
+                Monitoring.Push(Ticks,
                     node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"RefrResetesh node {node.Key}", "Network", "Reset",
                     scope);
                 node.Value.Reset();
             }
 
-            Monitoring.EndScope(scope);
+            Monitoring.EndScope(Ticks, scope);
 
             return true;
         }
@@ -533,7 +538,7 @@ public class NetworkGraph : INetworkGraph
 
     public void Tick()
     {
-        Monitoring.Tick();
+        Interlocked.Increment(ref _tick);
     }
 
     public IApplication? BuildApplication<TConfiguration>(

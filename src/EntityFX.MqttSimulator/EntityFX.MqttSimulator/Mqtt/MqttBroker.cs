@@ -41,7 +41,7 @@ namespace EntityFX.MqttY.Mqtt
             {
                 await base.OnReceived(packet);
             }
-            NetworkGraph.Monitoring.WithEndScope(ref packet);
+            NetworkGraph.Monitoring.WithEndScope(NetworkGraph.Ticks, ref packet);
             switch (payload!.Type)
             {
                 case MqttPacketType.Publish:
@@ -80,7 +80,7 @@ namespace EntityFX.MqttY.Mqtt
                 return;
             }
 
-            NetworkGraph.Monitoring.WithEndScope(ref packet);
+            NetworkGraph.Monitoring.WithEndScope(NetworkGraph.Ticks, ref packet);
 
             var clientId = packet.From;
 
@@ -145,7 +145,7 @@ namespace EntityFX.MqttY.Mqtt
                 SaveMessage(subscriptionPublish, subscription.ClientId, PendingMessageStatus.PendingToAcknowledge);
             }
 
-            var scope = NetworkGraph.Monitoring.WithBeginScope(ref packetPayload, $"Publish {Name} to  Subscriber {packetPayload.To} with topic {publishPacket.Topic}");
+            var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.Ticks, ref packetPayload, $"Publish {Name} to  Subscriber {packetPayload.To} with topic {publishPacket.Topic}");
             mqttCounters.PacketTypeCounters[subscriptionPublish.Type].Increment();
             await SendAsync(packetPayload);
             return true;
@@ -175,7 +175,7 @@ namespace EntityFX.MqttY.Mqtt
 
             _sessionRepository.Update(session);
 
-            NetworkGraph.Monitoring.WithEndScope(ref packet);
+            NetworkGraph.Monitoring.WithEndScope(NetworkGraph.Ticks, ref packet);
 
             return Task.CompletedTask;
         }
@@ -215,12 +215,12 @@ namespace EntityFX.MqttY.Mqtt
             var ack = new PublishAckPacket(publishPacket.PacketId ?? 0);
             var ackPayload = await packetManager.PacketToBytes(ack) ?? Array.Empty<byte>();
             var reversePacket = NetworkGraph.GetReversePacket(packet, ackPayload.ToArray(), "MQTT PubAck");
-            var scope = NetworkGraph.Monitoring.WithBeginScope(ref reversePacket,
+            var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.Ticks, ref reversePacket,
                 $"Publish Ack {packet.From} to {packet.To} with topic {publishPacket.Topic}");
-            NetworkGraph.Monitoring.Push(packet, NetworkLoggerType.Send, 
+            NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, packet, NetworkLoggerType.Send, 
                 $"Send MQTT publish ack {packet.From} to {packet.To} with {publishPacket.Topic} (QoS={publishPacket.QualityOfService})", ProtocolType, "MQTT PubAck");
             await SendAsync(reversePacket);
-            NetworkGraph.Monitoring.WithEndScope(ref reversePacket);
+            NetworkGraph.Monitoring.WithEndScope(NetworkGraph.Ticks, ref reversePacket);
             mqttCounters.PacketTypeCounters[ack.Type].Increment();
         }
 
@@ -301,7 +301,7 @@ namespace EntityFX.MqttY.Mqtt
             var subscribeAck = new SubscribeAckPacket(subscribePacket.PacketId, returnCodes.ToArray());
             var packetPayload = GetPacket(Guid.NewGuid(), clientId, NodeType.Client, await packetManager.PacketToBytes(subscribeAck),
                 ProtocolType, "MQTT SubAck", packet.Id);
-            NetworkGraph.Monitoring.Push(packet, NetworkLoggerType.Send,
+            NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, packet, NetworkLoggerType.Send,
                 $"Send MQTT subscribe ack {packet.From} to {packet.To}", ProtocolType, "MQTT SubAck");
             await SendAsync(packetPayload);
             mqttCounters.PacketTypeCounters[subscribeAck.Type].Increment();
@@ -335,7 +335,7 @@ namespace EntityFX.MqttY.Mqtt
             var packetPayload = GetPacket(Guid.NewGuid(), clientId, NodeType.Client, 
                 await packetManager.PacketToBytes(connecktAck), ProtocolType, "MQTT ConnAck", packet.Id);
 
-            NetworkGraph.Monitoring.Push(packet, NetworkLoggerType.Send,
+            NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, packet, NetworkLoggerType.Send,
                 $"Send MQTT connect ack {packet.From} to {packet.To} with Status={connecktAck.Status}", ProtocolType, "MQTT ConnAck");
 
             await SendAsync(packetPayload);

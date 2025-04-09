@@ -92,8 +92,8 @@ public class Server : Node, IServer
     public override async Task ReceiveAsync(NetworkPacket packet)
     {
         BeforeReceive(packet);
-        //NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category, packet.Scope);
-        NetworkGraph.Monitoring.WithEndScope(ref packet);
+
+        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.Ticks, ref packet);
 
         await OnReceived(packet);
         AfterReceive(packet);
@@ -111,12 +111,13 @@ public class Server : Node, IServer
     {
         BeforeSend(packet);
 
-        var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Send packet {packet.From} to {packet.To}");
-        NetworkGraph.Monitoring.Push(packet, NetworkLoggerType.Send, $"Send packet {packet.From} to {packet.To}", ProtocolType, "Net Send", scope);
+        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.Ticks, ref packet!, 
+            $"Send packet {packet.From} to {packet.To}");
+        NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, packet, NetworkLoggerType.Send, 
+            $"Send packet {packet.From} to {packet.To}", ProtocolType, "Net Send", scope);
         await Network.SendAsync(packet);
 
-        //NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, $"Send packet {packet.From} to {packet.To}", packet.Category);
-        NetworkGraph.Monitoring.WithEndScope(ref packet);
+        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.Ticks, ref packet);
 
         AfterSend(packet);
     }

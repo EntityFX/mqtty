@@ -3,7 +3,7 @@ using EntityFX.MqttY.Contracts.Utils;
 
 namespace EntityFX.MqttY.Factories;
 
-internal class MonitoringFactory : IFactory<INetworkLogger, NetworkGraphFactoryOption>
+internal class NetworkLoggerFactory : IFactory<INetworkLogger, NetworkGraphFactoryOption>
 {
     public INetworkLogger Configure(NetworkGraphFactoryOption options, INetworkLogger service)
     {

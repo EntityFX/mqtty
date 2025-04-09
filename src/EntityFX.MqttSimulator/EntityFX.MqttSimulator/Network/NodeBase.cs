@@ -71,7 +71,7 @@ public abstract class NodeBase : ISender
         monitorMessages.AddOrUpdate(packet.Id, new NodeMonitoringPacket()
         {
             RequestPacket = packet,
-            RequestTick = NetworkGraph.Monitoring.Ticks,
+            RequestTick = NetworkGraph.Ticks,
             Marker = packet.Category ?? string.Empty,
             Id = packet.Id,
             ResetEventSlim = new ManualResetEventSlim(false),
@@ -96,7 +96,7 @@ public abstract class NodeBase : ISender
         }
 
         monitorMessage.ResponsePacket = packet;
-        monitorMessage.ResponseTick = NetworkGraph.Monitoring.Ticks;
+        monitorMessage.ResponseTick = NetworkGraph.Ticks;
         monitorMessage.ResetEventSlim?.Set();
     }
 
