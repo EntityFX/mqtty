@@ -47,10 +47,14 @@ internal class Worker : BackgroundService
 
             context = scenario.Context as NetworkSimulation;
 
-            Console.Write(context!.NetworkGraph!.Counters.Dump());
-        }
+            while (true)
+            {
+                await Task.Delay(2000);
 
-         
+                Console.Write(context!.NetworkGraph!.Counters.Dump());
+            }
+
+        }
 
         //var items = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter()
         //{

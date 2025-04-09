@@ -26,28 +26,20 @@ namespace EntityFX.MqttY.Helper
             {
                 sb.AppendLine($"{indent}{counter.Name}:");
 
-                counterVal = DumpCountersValues(counterGroup.Counters);
+                counterVal = DumpCountersValues(counterGroup.Counters.ToArray());
                 if (!string.IsNullOrEmpty(counterVal))
                 {
                     sb.AppendLine($"{indentn}{counterVal}");
                 }
 
-                if (counterGroup.Value == 0)
+                if (counterGroup.Value?.ToString() == string.Empty)
                 {
-                    foreach (var counterItem in counterGroup.Counters)
+                    foreach (var counterItem in counterGroup.Counters.ToArray())
                     {
                         DumpCounter(counterItem, sb, level);
                     }
                 }
             }
-            //else
-            //{
-            //    counterVal = DumpCountersValues(new[] { counter });
-            //    if (!string.IsNullOrEmpty(counterVal))
-            //    {
-            //        sb.AppendLine($"{indentn}{counterVal}");
-            //    }
-            //}
         }
 
         private static string DumpCountersValues(ICounter[] counters)
@@ -57,20 +49,20 @@ namespace EntityFX.MqttY.Helper
             {
                 foreach (var counterItem in counters)
                 {
-                    if (counterItem.Value == 0)
+                    if (counterItem.Value is long and 0 || string.IsNullOrEmpty(counterItem.Value?.ToString()))
                     {
                         continue;
                     }
-                    sb.Append($"{counterItem.Name}={counterItem.Value}, ");
+                    sb.Append($"{counterItem}, ");
                 }
             }
             else if (counters.Length == 1)
             {
-                if (counters[0].Value == 0)
+                if (counters[0].Value?.ToString() == string.Empty)
                 {
                     return string.Empty;
                 }
-                sb.Append($"{counters[0].Name}={counters[0].Value}");
+                sb.Append($"{counters[0]}");
             }
 
             var result = sb.ToString();

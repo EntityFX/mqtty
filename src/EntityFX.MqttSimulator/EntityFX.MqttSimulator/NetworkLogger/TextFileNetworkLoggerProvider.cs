@@ -14,7 +14,7 @@ internal class TextFileNetworkLoggerProvider : NetworkLoggerBase, IINetworkLogge
     protected override void WriteScope(NetworkLoggerScope scope)
     {
         textWriter.WriteLine($"{new string(' ', (scope?.Level ?? 0) * 4)}<{scope?.Date:u}>: " +
-            $"Begin Scope <{scope?.Id}> (StartTick={scope?.StartTick}, Ticks={scope?.Ticks}): \"{scope?.ScopeLabel}\"");
+            $"Begin Scope <{scope?.Id}> (StartTick={scope?.StartTick}, TotalTicks={scope?.Ticks}): \"{scope?.ScopeLabel}\"");
 
 
         if (scope?.Items?.Any() == true)

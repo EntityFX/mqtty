@@ -61,7 +61,7 @@ namespace EntityFX.MqttY.Application
 
         public virtual void Refresh()
         {
-
+            Counters.Refresh(NetworkGraph.TotalTicks);
         }
 
         public virtual void Reset()

@@ -13,6 +13,8 @@ namespace EntityFX.MqttY.Contracts.Network
         public INetworkLogger Monitoring { get; }
 
         public IImmutableDictionary<string, INetwork> Networks { get; }
+        public IImmutableDictionary<string, IClient> Clients { get; }
+        public IImmutableDictionary<string, IServer> Servers { get; }
 
         public event EventHandler<Exception>? OnError;
 
@@ -65,6 +67,6 @@ namespace EntityFX.MqttY.Contracts.Network
 
         void Tick();
 
-        public long Ticks { get; }
+        public long TotalTicks { get; }
     }
 }

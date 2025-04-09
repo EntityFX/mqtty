@@ -38,8 +38,6 @@ namespace EntityFX.MqttY.Scenarios
 
             Context!.NetworkGraph.Configure(Config.NetworkGraphOption);
 
-            Context!.NetworkGraph.Refresh();
-
             return Task.CompletedTask;
         }
 

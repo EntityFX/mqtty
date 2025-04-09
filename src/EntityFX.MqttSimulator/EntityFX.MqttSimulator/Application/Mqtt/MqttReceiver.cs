@@ -1,12 +1,18 @@
-﻿using EntityFX.MqttY.Contracts.Mqtt;
+﻿using EntityFX.MqttY.Contracts.Counters;
+using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
+using EntityFX.MqttY.Counter;
 
 namespace EntityFX.MqttY.Application.Mqtt
 {
     public class MqttReceiver : Application<MqttReceiverConfiguration>
     {
         private IMqttClient? _mqttClient;
+
+        private MqttReceiverCounters counters = new MqttReceiverCounters("Receiver");
+
+        public override CounterGroup Counters => counters;
 
         public MqttReceiver(int index, string name, string address, string protocolType, string specification, 
             INetwork network, INetworkGraph networkGraph, MqttReceiverConfiguration? options) 
@@ -66,9 +72,10 @@ namespace EntityFX.MqttY.Application.Mqtt
 
         private void ListenerMqttClient_MessageReceived(object? sender, MqttMessage e)
         {
-            NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, NetworkLoggerType.Receive,
+            NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, NetworkLoggerType.Receive,
                 $"Mqtt Application {Name} receives message by topic {e.Topic} from broker {e.Broker}", 
                 Specification, "MQTT Receiver Application");
+            counters.Receive();
         }
 
         private string GetNodeName(string group, string key) => $"{group}{key}";

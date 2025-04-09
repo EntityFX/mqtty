@@ -65,9 +65,9 @@ public class Client : Node, IClient
             return null;
         }
 
-        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.Ticks, ref connectPacket!, 
+        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref connectPacket!, 
             $"Connect {connectPacket.From} to {connectPacket.To}");
-        NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, connectPacket, NetworkLoggerType.Connect, 
+        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, connectPacket, NetworkLoggerType.Connect, 
             $"Client {connectPacket.From} connects to server {connectPacket.To}", ProtocolType, "NET Connect");
 
         await SendImplementationAsync(connectPacket, false);
@@ -76,12 +76,13 @@ public class Client : Node, IClient
 
         if (response == null)
         {
+            counters.Error();
             return null;
         }
 
         var responsePacket = response.Packet;
 
-        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.Ticks, ref responsePacket!);
+        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref responsePacket!);
 
         serverName = server;
 
@@ -183,7 +184,7 @@ public class Client : Node, IClient
 
     protected override void BeforeReceive(NetworkPacket packet)
     {
-        NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, packet, NetworkLoggerType.Receive, 
+        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, packet, NetworkLoggerType.Receive, 
             $"Recieve message from {packet.From} to {packet.To}", ProtocolType, "Net Receive");
     }
 

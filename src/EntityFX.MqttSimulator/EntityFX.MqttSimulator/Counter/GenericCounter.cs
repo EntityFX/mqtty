@@ -1,13 +1,9 @@
 ﻿using EntityFX.MqttY.Contracts.Counters;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using EntityFX.MqttY.Helper;
 
 namespace EntityFX.MqttY.Counter
 {
-    internal class GenericCounter : INodeCounter, IWriteableCounter
+    internal class GenericCounter : INodeCounter<long>
     {
         public string Name { get; init; }
 
@@ -15,11 +11,16 @@ namespace EntityFX.MqttY.Counter
 
         public string? UnitOfMeasure { get; init; }
 
-        private long _value = 0;
+        object ICounter.Value => Value;
 
-        public GenericCounter(string name)
+        private long _value = 0;
+        private readonly NormalizeUnits? normalizeUnits;
+
+        public GenericCounter(string name, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
         {
             Name = name;
+            UnitOfMeasure = unitOfMeasure;
+            this.normalizeUnits = normalizeUnits;
         }
 
         public void Increment()
@@ -34,12 +35,16 @@ namespace EntityFX.MqttY.Counter
 
         public override string ToString()
         {
-            return $"[{Name} = {Value}]";
-        }
-
-        public void Set(long value)
-        {
-            _value = value;
+            var doubleValue = Convert.ToDouble(Value);
+            var stringValue = normalizeUnits switch
+            {
+                NormalizeUnits.Bit => doubleValue.ToHumanBits(),
+                NormalizeUnits.Byte => doubleValue.ToHumanBytes(),
+                NormalizeUnits.BiBit => doubleValue.ToHumanBiBits(),
+                NormalizeUnits.BiByte => doubleValue.ToHumanBiBytes(),
+                _ => $"{doubleValue}{(string.IsNullOrEmpty(UnitOfMeasure) ? string.Empty : $" {UnitOfMeasure}")}"
+            };
+            return $"{Name}={stringValue}";
         }
 
         public void Refresh(long totalTicks)

@@ -1,9 +1,10 @@
-﻿using System.Collections.Concurrent;
-using System.Collections.Immutable;
-using EntityFX.MqttY.Contracts.Counters;
+﻿using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
+using System.Collections.Concurrent;
+using System.Collections.Immutable;
+using System.Xml.Linq;
 using NetworkLoggerType = EntityFX.MqttY.Contracts.NetworkLogger.NetworkLoggerType;
 
 namespace EntityFX.MqttY.Network;
@@ -23,21 +24,35 @@ public class Network : NodeBase, INetwork
 
     private readonly NetworkCounters counters;
 
-    public override CounterGroup Counters => new CounterGroup(Name)
+    private readonly object _countersLock = new object();
+
+    public override CounterGroup Counters
     {
-        Counters = new ICounter[]
+        get
         {
-            counters,
-            new CounterGroup("Servers")
+
+            return new CounterGroup(Name)
             {
-                Counters = _servers.Select(s =>s.Value.Counters).ToArray()
-            },
-            new CounterGroup("Clients")
-            {
-                Counters = _clients.Select(s =>s.Value.Counters).ToArray()
-            },
+                Counters = new ICounter[]
+                {
+                    counters,
+                    new CounterGroup("Servers")
+                    {
+                        Counters = _servers.Values.ToArray().Select(s =>s.Counters)
+                    },
+                    new CounterGroup("Clients")
+                    {
+                        Counters = _clients.Values.ToArray().Select(s =>s.Counters).ToArray()
+                    },
+                    new CounterGroup("Applications")
+                    {
+                        Counters = _applications.Values.ToArray().Select(s =>s.Counters).ToArray()
+                    },
+                }
+            };
+
         }
-    };
+    }
 
     public IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks => _linkedNetworks.ToImmutableDictionary();
 
@@ -54,7 +69,7 @@ public class Network : NodeBase, INetwork
         : base(index, name, address, networkGraph)
     {
         this.ticksOptions = ticksOptions;
-        counters = new NetworkCounters("Network");
+        counters = new NetworkCounters("Network", ticksOptions);
     }
 
     public bool AddClient(IClient client)
@@ -99,7 +114,7 @@ public class Network : NodeBase, INetwork
 
         var result = network.Link(this);
 
-        NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, this, network, null, NetworkLoggerType.Link, 
+        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, this, network, null, NetworkLoggerType.Link,
             $"Link network {this.Name} to {network.Name}", "Network", "Link", Scope);
 
         return true;
@@ -120,7 +135,7 @@ public class Network : NodeBase, INetwork
             _linkedNetworks[network.Name] = network;
         }
 
-        NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, this, network, null, NetworkLoggerType.Unlink, 
+        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, this, network, null, NetworkLoggerType.Unlink,
             $"Unlink network {this.Name} from {network.Name}", "Network", "Unlink");
 
         return true;
@@ -236,10 +251,10 @@ public class Network : NodeBase, INetwork
         }
 
 
-        NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
+        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
             $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
-        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.Ticks, ref packet);
+        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
 
         counters.CountOutbound(packet);
         await networkPacket.DestionationNode!.ReceiveAsync(packet);
@@ -273,14 +288,14 @@ public class Network : NodeBase, INetwork
 
         if (packet.Ttl == 0)
         {
-            NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, this, next, packet.Payload, NetworkLoggerType.Unreachable,
+            NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Unreachable,
                 $"NetworkMonitoringPacket unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope);
             //destination uneachable
             return Task.FromResult(false);
         }
 
-        NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, this, next, packet.Payload, NetworkLoggerType.Push,
-            $"Push packet from network {this.Name} to {next.Name}", 
+        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Push,
+            $"Push packet from network {this.Name} to {next.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
 
 
@@ -299,19 +314,23 @@ public class Network : NodeBase, INetwork
     //TODO: add tick reaction
     public override void Refresh()
     {
-        foreach (var pendingPacket in _networkPackets.ToArray())
+        var packets = _networkPackets.ToArray();
+        foreach (var pendingPacket in packets)
         {
             pendingPacket.ReduceWaitTime();
 
-            if (pendingPacket.WaitTime <= 0)
+            if (pendingPacket.WaitTime > 0)
             {
-                while (_networkPackets.TryTake(out var pending))
-                {
-                    var result = ProcessTransferPacket(pending!).Result;
-                }
+                continue;
+            }
 
+            if (_networkPackets.TryTake(out var pending))
+            {
+                var result = ProcessTransferPacket(pending!).Result;
             }
         }
+
+        Counters.Refresh(NetworkGraph.TotalTicks);
     }
 
     //TODO: need VIRTUAL wait 
@@ -319,7 +338,7 @@ public class Network : NodeBase, INetwork
     {
         var result = false;
         var packet = networkPacket.Packet;
-        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.Ticks, ref packet!, $"Transfer packet {packet.From} to {packet.To}");
+        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!, $"Transfer packet {packet.From} to {packet.To}");
 
         if (networkPacket.Type == NetworkPacketType.Local)
         {

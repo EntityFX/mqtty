@@ -16,7 +16,6 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace EntityFX.Tests.Integration
 {
-
     [TestClass]
     public class MqttTests
     {

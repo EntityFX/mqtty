@@ -93,7 +93,7 @@ public class Server : Node, IServer
     {
         BeforeReceive(packet);
 
-        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.Ticks, ref packet);
+        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
 
         await OnReceived(packet);
         AfterReceive(packet);
@@ -111,13 +111,13 @@ public class Server : Node, IServer
     {
         BeforeSend(packet);
 
-        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.Ticks, ref packet!, 
+        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!, 
             $"Send packet {packet.From} to {packet.To}");
-        NetworkGraph.Monitoring.Push(NetworkGraph.Ticks, packet, NetworkLoggerType.Send, 
+        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, packet, NetworkLoggerType.Send, 
             $"Send packet {packet.From} to {packet.To}", ProtocolType, "Net Send", scope);
         await Network.SendAsync(packet);
 
-        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.Ticks, ref packet);
+        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
 
         AfterSend(packet);
     }

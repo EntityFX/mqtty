@@ -6,13 +6,19 @@ using System.Threading.Tasks;
 
 namespace EntityFX.MqttY.Contracts.Counters
 {
+    public interface ICounter<TValue> : ICounter
+        where TValue: struct, IEquatable<TValue>
+    {
+        new TValue Value { get; }
+    }
+
     public interface ICounter
     {
         string Name { get; init; }
 
         string? UnitOfMeasure { get; init; }
 
-        long Value { get; }
+        object Value { get; }
 
         void Refresh(long totalTicks);
     }

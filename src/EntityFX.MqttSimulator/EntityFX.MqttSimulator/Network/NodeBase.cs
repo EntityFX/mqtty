@@ -12,8 +12,6 @@ public abstract class NodeBase : ISender
     //храним только Guid, ManualResetEventSlim
     private readonly ConcurrentDictionary<Guid, NodeMonitoringPacket> monitorMessages = new ConcurrentDictionary<Guid, NodeMonitoringPacket>();
 
-
-
     public Guid Id { get; private set; }
 
     public int Index { get; private set; }
@@ -71,7 +69,7 @@ public abstract class NodeBase : ISender
         monitorMessages.AddOrUpdate(packet.Id, new NodeMonitoringPacket()
         {
             RequestPacket = packet,
-            RequestTick = NetworkGraph.Ticks,
+            RequestTick = NetworkGraph.TotalTicks,
             Marker = packet.Category ?? string.Empty,
             Id = packet.Id,
             ResetEventSlim = new ManualResetEventSlim(false),
@@ -96,7 +94,7 @@ public abstract class NodeBase : ISender
         }
 
         monitorMessage.ResponsePacket = packet;
-        monitorMessage.ResponseTick = NetworkGraph.Ticks;
+        monitorMessage.ResponseTick = NetworkGraph.TotalTicks;
         monitorMessage.ResetEventSlim?.Set();
     }
 
@@ -121,6 +119,8 @@ public abstract class NodeBase : ISender
                 packet.ResetEventSlim?.Set();
             }
         }
+
+        Counters.Refresh(NetworkGraph.TotalTicks);
     }
 
     public virtual void Reset()
@@ -137,29 +137,52 @@ public abstract class NodeBase : ISender
     //подписываемся на ManualResetEventSlim и ждём его
     protected Task<ResponsePacket?> WaitResponse(Guid packetId)
     {
-        return Task.Run(() =>
+        var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
+
+        if (monitorPacket == null)
         {
-            var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
+            return Task.FromResult<ResponsePacket?>(null);
+        }
 
-            if (monitorPacket == null)
-            {
-                return Task.FromResult<ResponsePacket?>(null);
-            }
+        var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
 
-            var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
+        if (!monitorMessages.TryRemove(packetId, out monitorPacket))
+        {
+            return Task.FromResult<ResponsePacket?>(null);
+        }
 
-            if (!monitorMessages.TryRemove(packetId, out monitorPacket))
-            {
-                return Task.FromResult<ResponsePacket?>(null);
-            }
+        if (isSet != true)
+        {
+            return Task.FromResult<ResponsePacket?>(null);
+        }
 
-            if (isSet != true)
-            {
-                return Task.FromResult<ResponsePacket?>(null);
-            }
+        return Task.FromResult<ResponsePacket?>(new ResponsePacket(
+            monitorPacket.ResponsePacket!, monitorPacket.RequestTick, monitorPacket.ResponseTick ?? 0));
 
-            return Task.FromResult<ResponsePacket?>(new ResponsePacket(
-                monitorPacket.ResponsePacket!, monitorPacket.RequestTick, monitorPacket.ResponseTick ?? 0));
-        });
+
+        //return Task.Run(() =>
+        //{
+        //    var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
+
+        //    if (monitorPacket == null)
+        //    {
+        //        return Task.FromResult<ResponsePacket?>(null);
+        //    }
+
+        //    var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
+
+        //    if (!monitorMessages.TryRemove(packetId, out monitorPacket))
+        //    {
+        //        return Task.FromResult<ResponsePacket?>(null);
+        //    }
+
+        //    if (isSet != true)
+        //    {
+        //        return Task.FromResult<ResponsePacket?>(null);
+        //    }
+
+        //    return Task.FromResult<ResponsePacket?>(new ResponsePacket(
+        //        monitorPacket.ResponsePacket!, monitorPacket.RequestTick, monitorPacket.ResponseTick ?? 0));
+        //});
     }
 }

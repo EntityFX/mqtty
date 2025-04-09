@@ -1,8 +1,9 @@
 ﻿namespace EntityFX.MqttY.Contracts.Counters
 {
-    public interface IWriteableCounter
+    public interface IWriteableCounter<TValue>
+        where TValue : struct, IEquatable<TValue>
     {
-        void Set(long Value);
+        void Set(TValue Value);
     }
 
 

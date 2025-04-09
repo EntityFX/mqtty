@@ -7,11 +7,11 @@
             Name = name;
         }
 
-        public virtual ICounter[] Counters { get; init; } = Array.Empty<ICounter>();
+        public virtual IEnumerable<ICounter> Counters { get; init; } = Enumerable.Empty<ICounter>();
 
         public string Name { get; init; } = string.Empty;
 
-        public long Value => 0;
+        public object Value => string.Empty;
 
         public string? UnitOfMeasure { get; init; }
 

@@ -7,10 +7,11 @@ namespace EntityFX.MqttY.Counter
     {
         private List<ICounter> _counters = new List<ICounter>();
 
-        public IIncrementableCounter SendCounter { get; }
-        public IIncrementableCounter ReceiveCounter { get; }
+        public GenericCounter SendCounter { get; }
+        public GenericCounter ReceiveCounter { get; }
+        public GenericCounter ErrorCounter { get; }
 
-        public override ICounter[] Counters { 
+        public override IEnumerable<ICounter> Counters { 
             get => _counters.ToArray();
             init => _counters = value.ToList(); 
         }
@@ -20,13 +21,20 @@ namespace EntityFX.MqttY.Counter
         {
             SendCounter = new GenericCounter("Send");
             ReceiveCounter = new GenericCounter("Receive");
+            ErrorCounter = new GenericCounter("Error");
             _counters.Add(SendCounter);
             _counters.Add(ReceiveCounter);
+            _counters.Add(ErrorCounter);
         }
 
         public void AddCounter(ICounter incrementable)
         {
             _counters.Add(incrementable);
+        }
+
+        public void Error()
+        {
+            ErrorCounter.Increment();
         }
     }
 }

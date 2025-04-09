@@ -52,7 +52,12 @@ public class NetworkGraph : INetworkGraph
 
     public IImmutableDictionary<string, INetwork> Networks => _networks.ToImmutableDictionary();
 
-    public long Ticks => _tick;
+    public IImmutableDictionary<string, IClient> Clients => _nodes.Where(n => n.Key.NodeType == NodeType.Client)
+        .ToDictionary(k => k.Key.Address, v => (IClient)v.Value).ToImmutableDictionary();
+    public IImmutableDictionary<string, IServer> Servers => _nodes.Where(n => n.Key.NodeType == NodeType.Server)
+        .ToDictionary(k => k.Key.Address, v => (IServer)v.Value).ToImmutableDictionary();
+
+    public long TotalTicks => _tick;
 
     public CounterGroup Counters
     {
@@ -318,7 +323,7 @@ public class NetworkGraph : INetworkGraph
 
     private void ConfigureLinks(NetworkGraphOption option)
     {
-        var scope = Monitoring.BeginScope(Ticks, "Configure sourceNetwork links");
+        var scope = Monitoring.BeginScope(TotalTicks, "Configure sourceNetwork links");
         foreach (var networkOption in option.Networks)
         {
             if (networkOption.Value?.Links?.Any() != true) continue;
@@ -337,7 +342,7 @@ public class NetworkGraph : INetworkGraph
             }
         }
 
-        Monitoring.EndScope(Ticks, scope);
+        Monitoring.EndScope(TotalTicks, scope);
     }
 
     public string GetAddress(string name, string protocolType, string networkAddress)
@@ -432,14 +437,14 @@ public class NetworkGraph : INetworkGraph
     {
         try
         {
-            var scope = Monitoring.BeginScope(Ticks, "Refresh sourceNetwork graph");
-            Monitoring.Push(Ticks, NetworkLoggerType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
+            var scope = Monitoring.BeginScope(TotalTicks, "Refresh sourceNetwork graph");
+            Monitoring.Push(TotalTicks, NetworkLoggerType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
             Tick();
             var bytes = Array.Empty<byte>();
 
             foreach (var network in _networks)
             {
-                Monitoring.Push(Ticks,
+                Monitoring.Push(TotalTicks,
                     network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
                     "Network", "Refresh", scope);
                 network.Value.Refresh();
@@ -447,13 +452,13 @@ public class NetworkGraph : INetworkGraph
 
             foreach (var node in _nodes)
             {
-                Monitoring.Push(Ticks,
+                Monitoring.Push(TotalTicks,
                     node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
                     scope);
                 node.Value.Refresh();
             }
 
-            Monitoring.EndScope(Ticks, scope);
+            Monitoring.EndScope(TotalTicks, scope);
 
             return true;
         }
@@ -469,14 +474,14 @@ public class NetworkGraph : INetworkGraph
         try
         {
             Tick();
-            var scope = Monitoring.BeginScope(Ticks, "Reset sourceNetwork graph");
-            Monitoring.Push(Ticks, NetworkLoggerType.Refresh, $"Reset whole sourceNetwork", "Network", "Reset", scope);
+            var scope = Monitoring.BeginScope(TotalTicks, "Reset sourceNetwork graph");
+            Monitoring.Push(TotalTicks, NetworkLoggerType.Refresh, $"Reset whole sourceNetwork", "Network", "Reset", scope);
 
             var bytes = Array.Empty<byte>();
 
             foreach (var network in _networks)
             {
-                Monitoring.Push(Ticks,
+                Monitoring.Push(TotalTicks,
                     network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Reset sourceNetwork {network.Key}",
                     "Network", "Refresh", scope);
                 network.Value.Reset();
@@ -484,13 +489,13 @@ public class NetworkGraph : INetworkGraph
 
             foreach (var node in _nodes)
             {
-                Monitoring.Push(Ticks,
+                Monitoring.Push(TotalTicks,
                     node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"RefrResetesh node {node.Key}", "Network", "Reset",
                     scope);
                 node.Value.Reset();
             }
 
-            Monitoring.EndScope(Ticks, scope);
+            Monitoring.EndScope(TotalTicks, scope);
 
             return true;
         }
