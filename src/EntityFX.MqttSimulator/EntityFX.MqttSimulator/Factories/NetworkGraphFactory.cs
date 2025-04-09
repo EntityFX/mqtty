@@ -1,5 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
-using EntityFX.MqttY.Contracts.Network;
+﻿using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Network;
@@ -28,7 +28,7 @@ internal class NetworkGraphFactory : IFactory<INetworkGraph, NetworkGraphFactory
         var nb = serviceProvider.GetRequiredService<INetworkBuilder>();
         var pf = serviceProvider.GetRequiredService<IPathFinder>();
 
-        var mf = serviceProvider.GetRequiredService<IFactory<IMonitoring, NetworkGraphFactoryOption>>();
+        var mf = serviceProvider.GetRequiredService<IFactory<INetworkLogger, NetworkGraphFactoryOption>>();
         var monitoring = mf.Create(options);
         var ng = new NetworkGraph(serviceProvider, nb, pf, monitoring)
         {

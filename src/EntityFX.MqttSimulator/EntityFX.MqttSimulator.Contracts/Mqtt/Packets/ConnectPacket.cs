@@ -17,7 +17,7 @@
         }
 
 
-        public string? ClientId { get; set; }
+        public string ClientId { get; set; } = string.Empty;
 
         public bool CleanSession { get; set; }
 

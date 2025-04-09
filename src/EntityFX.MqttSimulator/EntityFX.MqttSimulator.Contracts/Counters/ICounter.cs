@@ -13,5 +13,7 @@ namespace EntityFX.MqttY.Contracts.Counters
         string? UnitOfMeasure { get; init; }
 
         long Value { get; }
+
+        void Refresh(long totalTicks);
     }
 }

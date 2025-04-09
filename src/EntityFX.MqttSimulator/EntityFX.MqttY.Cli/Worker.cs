@@ -11,7 +11,6 @@ using System.Collections.ObjectModel;
 using System.Collections.Immutable;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Scenarios;
-using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Helper;
 
 internal class Worker : BackgroundService

@@ -1,35 +1,35 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
+﻿using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Utils;
 
 namespace EntityFX.MqttY.Factories;
 
-internal class MonitoringFactory : IFactory<IMonitoring, NetworkGraphFactoryOption>
+internal class MonitoringFactory : IFactory<INetworkLogger, NetworkGraphFactoryOption>
 {
-    public IMonitoring Configure(NetworkGraphFactoryOption options, IMonitoring service)
+    public INetworkLogger Configure(NetworkGraphFactoryOption options, INetworkLogger service)
     {
         return service;
     }
 
-    public IMonitoring Create(NetworkGraphFactoryOption options)
+    public INetworkLogger Create(NetworkGraphFactoryOption options)
     {
-        var monitoring = new Monitoring(
+        var monitoring = new NetworkLogger(
             options.MonitoringOption.ScopesEnabled, options.TicksOption.TickPeriod, options.MonitoringOption.Ignore);
 
-        IMonitoringProvider? monitoringProvider = null;
+        IINetworkLoggerProvider? monitoringProvider = null;
 
         if (string.IsNullOrEmpty(options.MonitoringOption.Type) || options.MonitoringOption.Type == "null")
         {
-            monitoringProvider = new NullMonitoringProvider(monitoring);
+            monitoringProvider = new NullNetworkLoggerProvider(monitoring);
         }
 
         if (options.MonitoringOption.Type == "console")
         {
-            monitoringProvider = new ConsoleMonitoringProvider(monitoring);
+            monitoringProvider = new ConsoleNetworkLoggerProvider(monitoring);
         }
 
         if (options.MonitoringOption.Type == "text-file")
         {
-            monitoringProvider = new TextFileMonitoringProvider(
+            monitoringProvider = new TextFileNetworkLoggerProvider(
                 monitoring, options.MonitoringOption.Path ?? string.Empty);
         }
 

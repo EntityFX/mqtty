@@ -1,7 +1,7 @@
 ﻿using EntityFX.MqttY.Collections;
-using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Network;
 using System;
@@ -12,25 +12,25 @@ using System.Net.Sockets;
 using System.Reflection.Emit;
 using System.Xml.Linq;
 
-public class Monitoring : IMonitoring
+public class NetworkLogger : INetworkLogger
 {
-    public event EventHandler<MonitoringItem>? Added;
-    public event EventHandler<MonitoringScope>? ScopeStarted;
-    public event EventHandler<MonitoringScope>? ScopeEnded;
+    public event EventHandler<NetworkLoggerItem>? Added;
+    public event EventHandler<NetworkLoggerScope>? ScopeStarted;
+    public event EventHandler<NetworkLoggerScope>? ScopeEnded;
 
-    private readonly FixedSizedQueue<MonitoringItem> _storage = new(10000);
+    private readonly FixedSizedQueue<NetworkLoggerItem> _storage = new(10000);
 
-    private readonly ConcurrentDictionary<Guid, MonitoringScope> _scopes = new();
+    private readonly ConcurrentDictionary<Guid, NetworkLoggerScope> _scopes = new();
 
     private readonly ConcurrentDictionary<string, long> _countersByCategory = new();
 
-    private readonly long[] _countersByMonitoringType = new long[Enum.GetNames(typeof(MonitoringType)).Length];
+    private readonly long[] _countersByMonitoringType = new long[Enum.GetNames(typeof(NetworkLoggerType)).Length];
 
     private readonly bool scopesEnabled;
     private readonly TimeSpan simulationTickTime;
     private readonly MonitoringIgnoreOption ignore;
 
-    public IEnumerable<MonitoringItem> Items => _storage;
+    public IEnumerable<NetworkLoggerItem> Items => _storage;
 
     public long Ticks => _tick;
 
@@ -42,29 +42,29 @@ public class Monitoring : IMonitoring
 
     private object _stdLock = new object();
 
-    public Monitoring(bool scopesEnabled, TimeSpan simulationTickTime, MonitoringIgnoreOption ignore)
+    public NetworkLogger(bool scopesEnabled, TimeSpan simulationTickTime, MonitoringIgnoreOption ignore)
     {
         this.scopesEnabled = scopesEnabled;
         this.simulationTickTime = simulationTickTime;
         this.ignore = ignore;
     }
 
-    public void Push(MonitoringType type, string message, string protocol, string? category,
-        MonitoringScope? scope = null, int? ttl = null, int? queueLength = null)
+    public void Push(NetworkLoggerType type, string message, string protocol, string? category,
+        NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
         Push(string.Empty, NodeType.Other, string.Empty, NodeType.Other,
             Array.Empty<byte>(), type, message, protocol, category, scope, ttl, queueLength);
     }
 
     private void Push(string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
-        MonitoringType type, string message, string protocol, string? category, MonitoringScope? scope = null, int? ttl = null, int? queueLength = null)
+        NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
         if (ValidateIgnore(protocol, category))
         {
             return;
         }
 
-        var item = new MonitoringItem(
+        var item = new NetworkLoggerItem(
             Guid.NewGuid(), _tick,
             TimeSpan.FromTicks(simulationTickTime.Ticks * _tick),
             DateTimeOffset.Now, from,
@@ -111,8 +111,8 @@ public class Monitoring : IMonitoring
         return false;
     }
 
-    public void Push(INode from, INode to, byte[]? packet, MonitoringType type, string message,
-        string protocol, string? category, MonitoringScope? scope = null, int? ttl = null, int? queueLength = null)
+    public void Push(INode from, INode to, byte[]? packet, NetworkLoggerType type, string message,
+        string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
         Push(from.Name,
             from.NodeType, to.Name, to.NodeType, packet,
@@ -120,19 +120,19 @@ public class Monitoring : IMonitoring
     }
 
 
-    public void Push(EntityFX.MqttY.Contracts.Network.NetworkPacket packet, MonitoringType type, string message,
-        string protocol, string? category, MonitoringScope? scope = null)
+    public void Push(EntityFX.MqttY.Contracts.Network.NetworkPacket packet, NetworkLoggerType type, string message,
+        string protocol, string? category, NetworkLoggerScope? scope = null)
     {
         Push(packet.From,
             packet.FromType, packet.To, packet.ToType, packet.Payload,
             type, message, protocol, category, packet?.Scope ?? scope, packet?.Ttl);
     }
 
-    public MonitoringScope? BeginScope(string scope, MonitoringScope? parent = null)
+    public NetworkLoggerScope? BeginScope(string scope, NetworkLoggerScope? parent = null)
     {
         if (!scopesEnabled) return null;
 
-        var scopeItem = new MonitoringScope()
+        var scopeItem = new NetworkLoggerScope()
         {
             Id = Guid.NewGuid(),
             ScopeLabel = scope,
@@ -158,6 +158,9 @@ public class Monitoring : IMonitoring
         if (packet.Scope == null)
         {
             var newScope = BeginScope(scope, null);
+
+            if (newScope == null) return;
+
             newScope.Source = packet.From;
             newScope.Destination = packet.To;
             packet = packet with
@@ -208,7 +211,7 @@ public class Monitoring : IMonitoring
         return;
     }
 
-    public void EndScope(MonitoringScope? scope)
+    public void EndScope(NetworkLoggerScope? scope)
     {
         if (!scopesEnabled) return;
 
@@ -232,7 +235,7 @@ public class Monitoring : IMonitoring
         Interlocked.Increment(ref _tick);
     }
 
-    public IEnumerable<MonitoringItem> GetByFilter(MonitoringFilter filter)
+    public IEnumerable<NetworkLoggerItem> GetByFilter(NetworkLoggerFilter filter)
     {
         var result = Items;
 
@@ -267,9 +270,9 @@ public class Monitoring : IMonitoring
             result = result.Where(mi => filter.ByProtocol.Contains(mi.Protocol));
         }
 
-        if (filter.ByMonitoringType?.Any() == true)
+        if (filter.ByType?.Any() == true)
         {
-            result = result.Where(mi => filter.ByMonitoringType.Contains(mi.Type));
+            result = result.Where(mi => filter.ByType.Contains(mi.Type));
         }
 
         return result.Take(filter.Limit).ToArray();
@@ -280,10 +283,10 @@ public class Monitoring : IMonitoring
         return _countersByCategory.ToImmutableDictionary();
     }
 
-    public IImmutableDictionary<MonitoringType, long> GetCountersByMonitoringType()
+    public IImmutableDictionary<NetworkLoggerType, long> GetCountersByMonitoringType()
     {
         return _countersByMonitoringType
-            .Select((v, i) => new KeyValuePair<MonitoringType, long>((MonitoringType)i, v))
+            .Select((v, i) => new KeyValuePair<NetworkLoggerType, long>((NetworkLoggerType)i, v))
             .ToImmutableDictionary();
     }
 }

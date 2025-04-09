@@ -1,16 +1,16 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
+﻿using EntityFX.MqttY.Contracts.NetworkLogger;
 
-internal abstract class MonitoringProviderBase : IMonitoringProvider
+internal abstract class NetworkLoggerBase : IINetworkLoggerProvider
 {
-    private readonly IMonitoring monitoring;
+    private readonly INetworkLogger monitoring;
     private static object _lock = new object();
 
-    public MonitoringProviderBase(IMonitoring monitoring)
+    public NetworkLoggerBase(INetworkLogger monitoring)
     {
         this.monitoring = monitoring;
     }
 
-    public void ItemAdded(MonitoringItem item)
+    public void ItemAdded(NetworkLoggerItem item)
     {
         lock (_lock)
         {
@@ -20,7 +20,7 @@ internal abstract class MonitoringProviderBase : IMonitoringProvider
         }
     }
 
-    public void ScopeEnded(MonitoringScope scope)
+    public void ScopeEnded(NetworkLoggerScope scope)
     {
         lock (_lock)
         {
@@ -28,7 +28,7 @@ internal abstract class MonitoringProviderBase : IMonitoringProvider
         }
     }
 
-    public void ScopeStarted(MonitoringScope scope)
+    public void ScopeStarted(NetworkLoggerScope scope)
     {
 
     }
@@ -47,11 +47,11 @@ internal abstract class MonitoringProviderBase : IMonitoringProvider
         };
     }
 
-    protected abstract void WriteScope(MonitoringScope scope);
+    protected abstract void WriteScope(NetworkLoggerScope scope);
 
-    protected abstract void WriteItem(MonitoringItem item);
+    protected abstract void WriteItem(NetworkLoggerItem item);
 
-    protected string GetMonitoringLine(MonitoringItem item) => $"{new string(' ', (item.Scope?.Level + 1 ?? 0) * 4)}<{item.Date:u}> " +
+    protected string GetMonitoringLine(NetworkLoggerItem item) => $"{new string(' ', (item.Scope?.Level + 1 ?? 0) * 4)}<{item.Date:u}> " +
             $"(Tick={item.Tick}, Time={item.SimulationTime}) " +
             $"{{{item.Type}}} " +
             $"{(!string.IsNullOrEmpty(item.Category) ? $"[Category={item.Category}] " : "")}" +

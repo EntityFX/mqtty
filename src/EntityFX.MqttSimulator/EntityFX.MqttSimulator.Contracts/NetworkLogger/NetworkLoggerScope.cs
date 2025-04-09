@@ -1,6 +1,6 @@
-namespace EntityFX.MqttY.Contracts.Monitoring;
+namespace EntityFX.MqttY.Contracts.NetworkLogger;
 
-public class MonitoringScope : IMonitoringItem
+public class NetworkLoggerScope : INetworkLoggerItem
 {
     public Guid Id { get; init; }
 
@@ -10,11 +10,11 @@ public class MonitoringScope : IMonitoringItem
 
     public DateTimeOffset Date { get; init; }
 
-    public MonitoringScope? Parent { get; init; } = null;
+    public NetworkLoggerScope? Parent { get; init; } = null;
 
-    public List<IMonitoringItem> Items { get; init; } = new List<IMonitoringItem>();
+    public List<INetworkLoggerItem> Items { get; init; } = new List<INetworkLoggerItem>();
 
-    public MonitoringItemType MonitoringItemType => MonitoringItemType.Scope;
+    public NetworkLoggerItemType ItemType => NetworkLoggerItemType.Scope;
 
     public ScopeStatus ScopeStatus { get; set; } = ScopeStatus.Begin;
 

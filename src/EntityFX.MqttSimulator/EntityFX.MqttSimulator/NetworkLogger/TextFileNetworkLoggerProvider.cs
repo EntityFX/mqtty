@@ -1,17 +1,17 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
+﻿using EntityFX.MqttY.Contracts.NetworkLogger;
 
-internal class TextFileMonitoringProvider : MonitoringProviderBase, IMonitoringProvider, IDisposable
+internal class TextFileNetworkLoggerProvider : NetworkLoggerBase, IINetworkLoggerProvider, IDisposable
 {
     private bool disposedValue;
     private readonly StreamWriter textWriter;
 
-    public TextFileMonitoringProvider(IMonitoring monitoring, string filePath)
+    public TextFileNetworkLoggerProvider(INetworkLogger monitoring, string filePath)
         : base(monitoring)
     {
         textWriter = new StreamWriter(filePath, true, System.Text.Encoding.UTF8, 4096);
     }
 
-    protected override void WriteScope(MonitoringScope scope)
+    protected override void WriteScope(NetworkLoggerScope scope)
     {
         textWriter.WriteLine($"{new string(' ', (scope?.Level ?? 0) * 4)}<{scope?.Date:u}>: " +
             $"Begin Scope <{scope?.Id}> (StartTick={scope?.StartTick}, Ticks={scope?.Ticks}): \"{scope?.ScopeLabel}\"");
@@ -21,13 +21,13 @@ internal class TextFileMonitoringProvider : MonitoringProviderBase, IMonitoringP
         {
             foreach (var item in scope.Items.ToArray())
             {
-                if (item.MonitoringItemType == MonitoringItemType.Scope)
+                if (item.ItemType == NetworkLoggerItemType.Scope)
                 {
-                    WriteScope((MonitoringScope)item);
+                    WriteScope((NetworkLoggerScope)item);
                 }
                 else
                 {
-                    WriteItem((MonitoringItem)item);
+                    WriteItem((NetworkLoggerItem)item);
                 }
             }
         }
@@ -36,7 +36,7 @@ internal class TextFileMonitoringProvider : MonitoringProviderBase, IMonitoringP
         textWriter.WriteLine();
     }
 
-    protected override void WriteItem(MonitoringItem item)
+    protected override void WriteItem(NetworkLoggerItem item)
     {
         textWriter.WriteLine(GetMonitoringLine(item));
     }

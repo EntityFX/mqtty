@@ -1,6 +1,6 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
-using EntityFX.MqttY.Contracts.Mqtt.Packets;
+﻿using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 using System.Net;
 using static System.Formats.Asn1.AsnWriter;
 
@@ -112,7 +112,7 @@ public class Server : Node, IServer
         BeforeSend(packet);
 
         var scope = NetworkGraph.Monitoring.WithBeginScope(ref packet!, $"Send packet {packet.From} to {packet.To}");
-        NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, $"Send packet {packet.From} to {packet.To}", ProtocolType, "Net Send", scope);
+        NetworkGraph.Monitoring.Push(packet, NetworkLoggerType.Send, $"Send packet {packet.From} to {packet.To}", ProtocolType, "Net Send", scope);
         await Network.SendAsync(packet);
 
         //NetworkGraph.Monitoring.Push(packet, MonitoringType.Send, $"Send packet {packet.From} to {packet.To}", packet.Category);

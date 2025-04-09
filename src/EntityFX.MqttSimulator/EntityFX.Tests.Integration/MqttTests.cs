@@ -21,8 +21,8 @@ namespace EntityFX.Tests.Integration
     public class MqttTests
     {
         private ServiceProvider? serviceProvider;
-        private Monitoring? monitoring;
-        private ConsoleMonitoringProvider? monitoringProvider;
+        private NetworkLogger? monitoring;
+        private ConsoleNetworkLoggerProvider? monitoringProvider;
         private NetworkGraph? graph;
 
         private Exception? testException;
@@ -43,11 +43,11 @@ namespace EntityFX.Tests.Integration
             serviceProvider = serviceCollection.BuildServiceProvider();
 
 
-            monitoring = new Monitoring(false, TimeSpan.FromMilliseconds(0.1), new MonitoringIgnoreOption()
+            monitoring = new NetworkLogger(false, TimeSpan.FromMilliseconds(0.1), new MonitoringIgnoreOption()
             {
                 Category = new string[] { "Refresh" }
             });
-            monitoringProvider = new ConsoleMonitoringProvider(monitoring);
+            monitoringProvider = new ConsoleNetworkLoggerProvider(monitoring);
 
             monitoringProvider.Start();
 

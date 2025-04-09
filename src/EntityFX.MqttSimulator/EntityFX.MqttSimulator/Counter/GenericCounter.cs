@@ -41,5 +41,9 @@ namespace EntityFX.MqttY.Counter
         {
             _value = value;
         }
+
+        public void Refresh(long totalTicks)
+        {
+        }
     }
 }

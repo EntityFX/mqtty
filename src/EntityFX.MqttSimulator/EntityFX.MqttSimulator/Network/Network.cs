@@ -4,7 +4,7 @@ using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
-using MonitoringType = EntityFX.MqttY.Contracts.Monitoring.MonitoringType;
+using NetworkLoggerType = EntityFX.MqttY.Contracts.NetworkLogger.NetworkLoggerType;
 
 namespace EntityFX.MqttY.Network;
 
@@ -99,7 +99,7 @@ public class Network : NodeBase, INetwork
 
         var result = network.Link(this);
 
-        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Link, $"Link network {this.Name} to {network.Name}", "Network", "Link", Scope);
+        NetworkGraph.Monitoring.Push(this, network, null, NetworkLoggerType.Link, $"Link network {this.Name} to {network.Name}", "Network", "Link", Scope);
 
         return true;
     }
@@ -119,7 +119,7 @@ public class Network : NodeBase, INetwork
             _linkedNetworks[network.Name] = network;
         }
 
-        NetworkGraph.Monitoring.Push(this, network, null, MonitoringType.Unlink, $"Unlink network {this.Name} from {network.Name}", "Network", "Unlink");
+        NetworkGraph.Monitoring.Push(this, network, null, NetworkLoggerType.Unlink, $"Unlink network {this.Name} from {network.Name}", "Network", "Unlink");
 
         return true;
     }
@@ -234,7 +234,7 @@ public class Network : NodeBase, INetwork
         }
 
 
-        NetworkGraph.Monitoring.Push(network, networkPacket.DestionationNode, packet.Payload, MonitoringType.Receive,
+        NetworkGraph.Monitoring.Push(network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
             $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
         NetworkGraph.Monitoring.WithEndScope(ref packet);
@@ -271,13 +271,13 @@ public class Network : NodeBase, INetwork
 
         if (packet.Ttl == 0)
         {
-            NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Unreachable,
+            NetworkGraph.Monitoring.Push(this, next, packet.Payload, NetworkLoggerType.Unreachable,
                 $"NetworkMonitoringPacket unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope);
             //destination uneachable
             return Task.FromResult(false);
         }
 
-        NetworkGraph.Monitoring.Push(this, next, packet.Payload, MonitoringType.Push,
+        NetworkGraph.Monitoring.Push(this, next, packet.Payload, NetworkLoggerType.Push,
             $"Push packet from network {this.Name} to {next.Name}", "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
         //var result = await next.SendToLocalAsync(next, networkPacket);
 

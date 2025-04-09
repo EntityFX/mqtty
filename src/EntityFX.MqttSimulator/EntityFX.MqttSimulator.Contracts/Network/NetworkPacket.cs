@@ -1,11 +1,11 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
+﻿using EntityFX.MqttY.Contracts.NetworkLogger;
 
 namespace EntityFX.MqttY.Contracts.Network
 {
     public record NetworkPacket(
         string From, string To, 
         NodeType FromType, NodeType ToType, byte[] Payload, string Protocol, string? Category = null, 
-        MonitoringScope? Scope = null)
+        NetworkLoggerScope? Scope = null)
     {
         private int ttl = 64;
 

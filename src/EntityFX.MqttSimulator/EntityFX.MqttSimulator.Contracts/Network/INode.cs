@@ -1,5 +1,5 @@
 ﻿using EntityFX.MqttY.Contracts.Counters;
-using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 
 namespace EntityFX.MqttY.Contracts.Network
 {
@@ -17,7 +17,7 @@ namespace EntityFX.MqttY.Contracts.Network
 
         int? GroupAmount { get; set; }
 
-        public MonitoringScope? Scope { get; set; }
+        public NetworkLoggerScope? Scope { get; set; }
 
         NodeType NodeType { get; }
 

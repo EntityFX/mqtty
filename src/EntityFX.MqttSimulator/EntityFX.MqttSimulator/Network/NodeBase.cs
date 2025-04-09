@@ -1,6 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.Counters;
-using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
@@ -26,7 +26,7 @@ public abstract class NodeBase : ISender
 
     public abstract NodeType NodeType { get; }
     public int? GroupAmount { get; set; }
-    public MonitoringScope? Scope { get; set; }
+    public NetworkLoggerScope? Scope { get; set; }
 
     public abstract CounterGroup Counters { get; }
 

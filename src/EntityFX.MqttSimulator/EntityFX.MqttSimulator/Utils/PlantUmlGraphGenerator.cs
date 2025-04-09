@@ -1,13 +1,13 @@
 using System.Text;
-using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Network;
 
 namespace EntityFX.MqttY.Utils;
 
 public class PlantUmlGraphGenerator
 {
-    public string GenerateSequence(IMonitoring monitoring, MonitoringScope monitoringScope)
+    public string GenerateSequence(INetworkLogger monitoring, NetworkLoggerScope monitoringScope)
     {
         var plantUmlBuilder = new StringBuilder();
         plantUmlBuilder.AppendLine("@startuml");
@@ -28,13 +28,13 @@ public class PlantUmlGraphGenerator
         return plantUmlBuilder.ToString();
     }
 
-    private static void VisitItemsForSequence(MonitoringScope monitoringScope, HashSet<string> visitedNodes, LinkedList<string> items, int level)
+    private static void VisitItemsForSequence(NetworkLoggerScope monitoringScope, HashSet<string> visitedNodes, LinkedList<string> items, int level)
     {
-        MonitoringItem? destination = null;
+        NetworkLoggerItem? destination = null;
 
         foreach (var item in monitoringScope.Items)
         {
-            if (item is MonitoringItem monitoringItem)
+            if (item is NetworkLoggerItem monitoringItem)
             {
                 var nodeType = GetNodeType(monitoringItem.SourceType);
 
@@ -61,7 +61,7 @@ public class PlantUmlGraphGenerator
                 //nodeType = GetNodeType(monitoringItem.DestinationType);
                 //items.AddLast($"{nodeType} {monitoringItem.To}");
             }
-            else if (item is MonitoringScope itemScope)
+            else if (item is NetworkLoggerScope itemScope)
             {
                 VisitItemsForSequence(itemScope, visitedNodes, items, level++);
             }
@@ -79,23 +79,23 @@ public class PlantUmlGraphGenerator
         }
     }
 
-    private static void GenerateGroupSequence(MonitoringScope monitoringScope, StringBuilder plantUmlBuilder)
+    private static void GenerateGroupSequence(NetworkLoggerScope monitoringScope, StringBuilder plantUmlBuilder)
     {
         plantUmlBuilder.AppendLine($"group {monitoringScope.ScopeLabel}");
 
         foreach (var item in monitoringScope.Items)
         {
-            if (item is MonitoringItem monitoringItem)
+            if (item is NetworkLoggerItem monitoringItem)
             {
                 if (string.IsNullOrEmpty(monitoringItem.From) || string.IsNullOrEmpty(monitoringItem.To))
                     continue;
 
-                var arrow = monitoringItem.Type == MonitoringType.Push ? "->" : "-->";
+                var arrow = monitoringItem.Type == NetworkLoggerType.Push ? "->" : "-->";
 
                 plantUmlBuilder.AppendLine($"{monitoringItem.From} {arrow} {monitoringItem.To} " +
                     $": {{{monitoringItem.Type}}} {monitoringItem.Category} [Tick={monitoringItem.Tick}]");
             }
-            else if (item is MonitoringScope innerScope)
+            else if (item is NetworkLoggerScope innerScope)
             {
                 GenerateGroupSequence(innerScope, plantUmlBuilder);
             }

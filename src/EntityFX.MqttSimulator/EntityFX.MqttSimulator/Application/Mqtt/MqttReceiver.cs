@@ -1,5 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 
 namespace EntityFX.MqttY.Application.Mqtt
 {
@@ -65,7 +66,7 @@ namespace EntityFX.MqttY.Application.Mqtt
 
         private void ListenerMqttClient_MessageReceived(object? sender, MqttMessage e)
         {
-            NetworkGraph.Monitoring.Push(Contracts.Monitoring.MonitoringType.Receive,
+            NetworkGraph.Monitoring.Push(NetworkLoggerType.Receive,
                 $"Mqtt Application {Name} receives message by topic {e.Topic} from broker {e.Broker}", Specification, "MQTT Receiver Application");
         }
 

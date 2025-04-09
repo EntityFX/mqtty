@@ -1,7 +1,7 @@
-using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Scenarios;
 using EntityFX.MqttY.Contracts.Utils;
@@ -24,7 +24,7 @@ public static class Container
     {
         return serviceCollection
             .AddScoped<PlantUmlGraphGenerator>()
-            .AddScoped<IFactory<IMonitoring, NetworkGraphFactoryOption>, MonitoringFactory>()
+            .AddScoped<IFactory<INetworkLogger, NetworkGraphFactoryOption>, MonitoringFactory>()
             .AddScoped<IFactory<INetworkGraph, NetworkGraphFactoryOption>, NetworkGraphFactory>()
             .AddScoped<IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>>, ClientFactory>()
             .AddScoped<IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>>, ServerFactory>()

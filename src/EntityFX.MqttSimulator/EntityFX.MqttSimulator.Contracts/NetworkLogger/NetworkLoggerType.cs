@@ -1,6 +1,6 @@
-﻿namespace EntityFX.MqttY.Contracts.Monitoring
+﻿namespace EntityFX.MqttY.Contracts.NetworkLogger
 {
-    public enum MonitoringType
+    public enum NetworkLoggerType
     {
         Send,
         Receive,

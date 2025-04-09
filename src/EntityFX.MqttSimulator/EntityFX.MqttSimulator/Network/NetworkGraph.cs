@@ -6,9 +6,9 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Xml.Linq;
 using EntityFX.MqttY.Contracts.Counters;
-using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Counter;
@@ -33,7 +33,7 @@ public class NetworkGraph : INetworkGraph
         IServiceProvider serviceProvider,
         INetworkBuilder networkBuilder,
         IPathFinder pathFinder,
-        IMonitoring monitoring)
+        INetworkLogger monitoring)
     {
         this.serviceProvider = serviceProvider;
         _networkBuilder = networkBuilder;
@@ -46,7 +46,7 @@ public class NetworkGraph : INetworkGraph
 
     public IPathFinder PathFinder { get; }
 
-    public IMonitoring Monitoring { get; }
+    public INetworkLogger Monitoring { get; }
 
     public IImmutableDictionary<string, INetwork> Networks => _networks.ToImmutableDictionary();
 
@@ -429,14 +429,14 @@ public class NetworkGraph : INetworkGraph
         try
         {
             var scope = Monitoring.BeginScope("Refresh sourceNetwork graph");
-            Monitoring.Push(MonitoringType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
+            Monitoring.Push(NetworkLoggerType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
             Tick();
             var bytes = Array.Empty<byte>();
 
             foreach (var network in _networks)
             {
                 Monitoring.Push(
-                    network.Value, network.Value, bytes, MonitoringType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
                     "Network", "Refresh", scope);
                 network.Value.Refresh();
             }
@@ -444,7 +444,7 @@ public class NetworkGraph : INetworkGraph
             foreach (var node in _nodes)
             {
                 Monitoring.Push(
-                    node.Value, node.Value, bytes, MonitoringType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                    node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
                     scope);
                 node.Value.Refresh();
             }
@@ -465,14 +465,14 @@ public class NetworkGraph : INetworkGraph
         try
         {
             var scope = Monitoring.BeginScope("Reset sourceNetwork graph");
-            Monitoring.Push(MonitoringType.Refresh, $"Reset whole sourceNetwork", "Network", "Reset", scope);
+            Monitoring.Push(NetworkLoggerType.Refresh, $"Reset whole sourceNetwork", "Network", "Reset", scope);
             Tick();
             var bytes = Array.Empty<byte>();
 
             foreach (var network in _networks)
             {
                 Monitoring.Push(
-                    network.Value, network.Value, bytes, MonitoringType.Refresh, $"Reset sourceNetwork {network.Key}",
+                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Reset sourceNetwork {network.Key}",
                     "Network", "Refresh", scope);
                 network.Value.Reset();
             }
@@ -480,7 +480,7 @@ public class NetworkGraph : INetworkGraph
             foreach (var node in _nodes)
             {
                 Monitoring.Push(
-                    node.Value, node.Value, bytes, MonitoringType.Refresh, $"RefrResetesh node {node.Key}", "Network", "Reset",
+                    node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"RefrResetesh node {node.Key}", "Network", "Reset",
                     scope);
                 node.Value.Reset();
             }

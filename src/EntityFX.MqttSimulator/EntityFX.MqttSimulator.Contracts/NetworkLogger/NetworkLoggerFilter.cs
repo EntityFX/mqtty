@@ -1,8 +1,8 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
 
-namespace EntityFX.MqttY.Contracts.Monitoring
+namespace EntityFX.MqttY.Contracts.NetworkLogger
 {
-    public class MonitoringFilter
+    public class NetworkLoggerFilter
     {
         public record Criteria<TType>(TType? From, TType? To);
 
@@ -12,7 +12,7 @@ namespace EntityFX.MqttY.Contracts.Monitoring
 
         public string? ByProtocol { get; init; }
 
-        public MonitoringType[]? ByMonitoringType { get; init; }
+        public NetworkLoggerType[]? ByType { get; init; }
         public NodeType[]? ByNodeType { get; init; }
 
         public int Limit { get; init; } = 500;

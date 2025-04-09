@@ -1,15 +1,15 @@
-﻿using EntityFX.MqttY.Contracts.Monitoring;
+﻿using EntityFX.MqttY.Contracts.NetworkLogger;
 
-internal class ConsoleMonitoringProvider : MonitoringProviderBase, IMonitoringProvider
+internal class ConsoleNetworkLoggerProvider : NetworkLoggerBase, IINetworkLoggerProvider
 {
 
-    public ConsoleMonitoringProvider(IMonitoring monitoring)
+    public ConsoleNetworkLoggerProvider(INetworkLogger monitoring)
         : base(monitoring)
     {
 
     }
 
-    protected override void WriteScope(MonitoringScope scope)
+    protected override void WriteScope(NetworkLoggerScope scope)
     {
         if (scope?.Items?.Any() != true)
         {
@@ -23,13 +23,13 @@ internal class ConsoleMonitoringProvider : MonitoringProviderBase, IMonitoringPr
         {
             foreach (var item in scope.Items)
             {
-                if (item.MonitoringItemType == MonitoringItemType.Scope)
+                if (item.ItemType == NetworkLoggerItemType.Scope)
                 {
-                    WriteScope((MonitoringScope)item);
+                    WriteScope((NetworkLoggerScope)item);
                 }
                 else
                 {
-                    WriteItem((MonitoringItem)item);
+                    WriteItem((NetworkLoggerItem)item);
                 }
             }
         }
@@ -39,7 +39,7 @@ internal class ConsoleMonitoringProvider : MonitoringProviderBase, IMonitoringPr
             $"<{scope?.Date:u}>: End Scope <{scope?.Id}>: \"{scope?.ScopeLabel}\"");
     }
 
-    protected override void WriteItem(MonitoringItem item)
+    protected override void WriteItem(NetworkLoggerItem item)
     {
         Console.WriteLine(GetMonitoringLine(item));
     }

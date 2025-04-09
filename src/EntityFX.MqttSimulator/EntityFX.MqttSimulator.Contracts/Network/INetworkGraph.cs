@@ -1,5 +1,5 @@
 ﻿using EntityFX.MqttY.Contracts.Counters;
-using EntityFX.MqttY.Contracts.Monitoring;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
 using System.Collections.Immutable;
 
@@ -10,7 +10,7 @@ namespace EntityFX.MqttY.Contracts.Network
         public string? OptionsPath { get; set; }
         
         public IPathFinder PathFinder { get; }
-        public IMonitoring Monitoring { get; }
+        public INetworkLogger Monitoring { get; }
 
         public IImmutableDictionary<string, INetwork> Networks { get; }
 

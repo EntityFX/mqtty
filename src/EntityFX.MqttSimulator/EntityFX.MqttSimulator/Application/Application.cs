@@ -1,6 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.Counters;
-using EntityFX.MqttY.Contracts.Monitoring;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Counter;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -38,7 +38,7 @@ namespace EntityFX.MqttY.Application
         public IReadOnlyDictionary<string, IClient> Clients => _clients.ToImmutableDictionary();
 
         public INode? Parent {  get; set; }
-        public MonitoringScope? Scope { get; set; }
+        public NetworkLoggerScope? Scope { get; set; }
 
         protected readonly INetworkGraph NetworkGraph;
 

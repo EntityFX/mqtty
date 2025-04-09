@@ -15,6 +15,14 @@
 
         public string? UnitOfMeasure { get; init; }
 
+        public virtual void Refresh(long totalTicks)
+        {
+            foreach (var counter in Counters)
+            {
+                counter.Refresh(totalTicks);
+            }
+        }
+
         public override string ToString()
         {
             return $"{Name}:\n" 
