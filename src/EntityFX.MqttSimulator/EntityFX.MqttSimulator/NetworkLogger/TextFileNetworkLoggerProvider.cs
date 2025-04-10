@@ -1,6 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.NetworkLogger;
 
-internal class TextFileNetworkLoggerProvider : NetworkLoggerBase, IINetworkLoggerProvider, IDisposable
+internal class TextFileNetworkLoggerProvider : NetworkLoggerBase, INetworkLoggerProvider, IDisposable
 {
     private bool disposedValue;
     private readonly StreamWriter textWriter;

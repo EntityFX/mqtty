@@ -8,7 +8,9 @@ namespace EntityFX.MqttY.Counter
     {
         private readonly List<ICounter> _counters = new List<ICounter>();
         private readonly double ticksPerSecond;
+
         private readonly GenericCounter _transferPacketsCounter;
+        private readonly ValueCounter<long> _queueCounter;
 
         private readonly GenericCounter _outboundCounter;
         private readonly GenericCounter _outboundPacketsCounter;
@@ -27,6 +29,8 @@ namespace EntityFX.MqttY.Counter
 
             _transferPacketsCounter = new GenericCounter("TransferPackets");
 
+            _queueCounter = new ValueCounter<long>("Queue");
+
             _inboundPacketsCounter = new GenericCounter("InboundPackets");
             _inboundThroughput = new ValueCounter<double>("InboundThroughput", "b/s", NormalizeUnits.Bit);
             _inboundCounter = new GenericCounter("Inbound", "B", NormalizeUnits.Byte);
@@ -36,6 +40,7 @@ namespace EntityFX.MqttY.Counter
             _outboundCounter = new GenericCounter("Outbound", "B", NormalizeUnits.Byte);
 
             _counters.Add(_transferPacketsCounter);
+            _counters.Add(_queueCounter);
             _counters.Add(_inboundPacketsCounter);
             _counters.Add(_inboundCounter);
             _counters.Add(_inboundThroughput);
@@ -66,6 +71,11 @@ namespace EntityFX.MqttY.Counter
         public void CountTransfers()
         {
             _transferPacketsCounter!.Increment();
+        }
+
+        public void SetQueueLength(long queueLength)
+        {
+            _queueCounter.Set(queueLength);
         }
 
         public override void Refresh(long totalTicks)

@@ -8,10 +8,6 @@ public abstract class NodeBase : ISender
 {
     protected readonly INetworkGraph NetworkGraph;
 
-    //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
-    //храним только Guid, ManualResetEventSlim
-    private readonly ConcurrentDictionary<Guid, NodeMonitoringPacket> monitorMessages = new ConcurrentDictionary<Guid, NodeMonitoringPacket>();
-
     public Guid Id { get; private set; }
 
     public int Index { get; private set; }
@@ -54,48 +50,28 @@ public abstract class NodeBase : ISender
     //Создаём ManualResetEventSlim 
     public async Task SendAsync(NetworkPacket packet)
     {
-        PreSend(packet);
+        BeforeSend(packet);
 
         await SendImplementationAsync(packet);
+
+        AfterSend(packet);
     }
 
-    private void PreSend(NetworkPacket packet)
-    {
-        if (monitorMessages.ContainsKey(packet.Id))
-        {
-            return;
-        }
 
-        monitorMessages.AddOrUpdate(packet.Id, new NodeMonitoringPacket()
-        {
-            RequestPacket = packet,
-            RequestTick = NetworkGraph.TotalTicks,
-            Marker = packet.Category ?? string.Empty,
-            Id = packet.Id,
-            ResetEventSlim = new ManualResetEventSlim(false),
-        }, (id, packet) => packet);
-    }
 
     //Добавляем и Снимаем ManualResetEventSlim 
-    public virtual async Task ReceiveAsync(NetworkPacket packet)
+    public async Task ReceiveAsync(NetworkPacket packet)
     {
+        BeforeReceive(packet);
+
         await ReceiveImplementationAsync(packet);
+
+        AfterReceive(packet);
 
         if (packet.RequestId == null)
         {
             return;
         }
-
-        var monitorMessage = monitorMessages.GetValueOrDefault(packet.RequestId.Value);
-
-        if (monitorMessage == null)
-        {
-            return;
-        }
-
-        monitorMessage.ResponsePacket = packet;
-        monitorMessage.ResponseTick = NetworkGraph.TotalTicks;
-        monitorMessage.ResetEventSlim?.Set();
     }
 
     protected NetworkPacket GetPacket(Guid guid, string to, NodeType toType, byte[] payload,
@@ -108,81 +84,12 @@ public abstract class NodeBase : ISender
 
 
     //Здесь обновляем время ождидания и триггерим ManualResetEventSlim
-    public virtual void Refresh()
+    public virtual Task Refresh()
     {
-        foreach (var packet in monitorMessages.Values.ToArray())
-        {
-            packet.ReduceWaitTicks();
-
-            if (packet.WaitTicks <= 0)
-            {
-                packet.ResetEventSlim?.Set();
-            }
-        }
-
         Counters.Refresh(NetworkGraph.TotalTicks);
+
+        return Task.CompletedTask;
     }
 
-    public virtual void Reset()
-    {
-
-        foreach (var packet in monitorMessages.Values.ToArray())
-        {
-            packet.ResetEventSlim?.Set();
-        }
-        monitorMessages.Clear();
-    }
-
-
-    //подписываемся на ManualResetEventSlim и ждём его
-    protected Task<ResponsePacket?> WaitResponse(Guid packetId)
-    {
-        var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
-
-        if (monitorPacket == null)
-        {
-            return Task.FromResult<ResponsePacket?>(null);
-        }
-
-        var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
-
-        if (!monitorMessages.TryRemove(packetId, out monitorPacket))
-        {
-            return Task.FromResult<ResponsePacket?>(null);
-        }
-
-        if (isSet != true)
-        {
-            return Task.FromResult<ResponsePacket?>(null);
-        }
-
-        return Task.FromResult<ResponsePacket?>(new ResponsePacket(
-            monitorPacket.ResponsePacket!, monitorPacket.RequestTick, monitorPacket.ResponseTick ?? 0));
-
-
-        //return Task.Run(() =>
-        //{
-        //    var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
-
-        //    if (monitorPacket == null)
-        //    {
-        //        return Task.FromResult<ResponsePacket?>(null);
-        //    }
-
-        //    var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
-
-        //    if (!monitorMessages.TryRemove(packetId, out monitorPacket))
-        //    {
-        //        return Task.FromResult<ResponsePacket?>(null);
-        //    }
-
-        //    if (isSet != true)
-        //    {
-        //        return Task.FromResult<ResponsePacket?>(null);
-        //    }
-
-        //    return Task.FromResult<ResponsePacket?>(new ResponsePacket(
-        //        monitorPacket.ResponsePacket!, monitorPacket.RequestTick, monitorPacket.ResponseTick ?? 0));
-        //});
-    }
+    public abstract void Reset();
 }

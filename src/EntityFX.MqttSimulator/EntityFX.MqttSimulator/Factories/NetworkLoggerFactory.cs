@@ -12,29 +12,31 @@ internal class NetworkLoggerFactory : IFactory<INetworkLogger, NetworkGraphFacto
 
     public INetworkLogger Create(NetworkGraphFactoryOption options)
     {
-        var monitoring = new NetworkLogger(
-            options.MonitoringOption.ScopesEnabled, options.TicksOption.TickPeriod, options.MonitoringOption.Ignore);
-
-        IINetworkLoggerProvider? monitoringProvider = null;
+        INetworkLoggerProvider? monitoringProvider = null;
+        INetworkLogger? logger = null;
 
         if (string.IsNullOrEmpty(options.MonitoringOption.Type) || options.MonitoringOption.Type == "null")
         {
-            monitoringProvider = new NullNetworkLoggerProvider(monitoring);
+            logger = new NullNetworkLogger();
         }
 
         if (options.MonitoringOption.Type == "console")
         {
-            monitoringProvider = new ConsoleNetworkLoggerProvider(monitoring);
+            logger = new NetworkLogger(
+            options.MonitoringOption.ScopesEnabled, options.TicksOption.TickPeriod, options.MonitoringOption.Ignore);
+            monitoringProvider = new ConsoleNetworkLoggerProvider(logger);
         }
 
         if (options.MonitoringOption.Type == "text-file")
         {
+            logger = new NetworkLogger(
+            options.MonitoringOption.ScopesEnabled, options.TicksOption.TickPeriod, options.MonitoringOption.Ignore);
             monitoringProvider = new TextFileNetworkLoggerProvider(
-                monitoring, options.MonitoringOption.Path ?? string.Empty);
+                logger, options.MonitoringOption.Path ?? string.Empty);
         }
 
         monitoringProvider?.Start();
 
-        return monitoring;
+        return logger;
     }
 }

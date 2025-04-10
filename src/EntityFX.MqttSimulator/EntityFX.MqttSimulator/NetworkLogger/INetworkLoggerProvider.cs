@@ -1,6 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.NetworkLogger;
 
-internal interface IINetworkLoggerProvider
+internal interface INetworkLoggerProvider
 {
     void Start();
 
@@ -8,3 +8,4 @@ internal interface IINetworkLoggerProvider
     void ScopeEnded(NetworkLoggerScope scope);
     void ScopeStarted(NetworkLoggerScope scope);
 }
+

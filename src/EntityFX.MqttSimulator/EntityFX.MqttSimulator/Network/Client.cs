@@ -170,9 +170,8 @@ public class Client : Node, IClient
 
     protected override async Task ReceiveImplementationAsync(NetworkPacket packet)
     {
-        BeforeReceive(packet);
+        await base.ReceiveImplementationAsync(packet);
         await OnReceivedAsync(packet);
-        AfterReceive(packet);
     }
 
     protected virtual Task OnReceivedAsync(NetworkPacket packet)
@@ -195,7 +194,7 @@ public class Client : Node, IClient
 
     protected override void BeforeSend(NetworkPacket packet)
     {
-
+        base.BeforeSend(packet);
     }
 
     protected override void AfterSend(NetworkPacket packet)

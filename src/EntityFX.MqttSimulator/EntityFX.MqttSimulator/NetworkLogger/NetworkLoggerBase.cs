@@ -1,6 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.NetworkLogger;
 
-internal abstract class NetworkLoggerBase : IINetworkLoggerProvider
+internal abstract class NetworkLoggerBase : INetworkLoggerProvider
 {
     private readonly INetworkLogger monitoring;
     private static object _lock = new object();
@@ -51,7 +51,7 @@ internal abstract class NetworkLoggerBase : IINetworkLoggerProvider
 
     protected abstract void WriteItem(NetworkLoggerItem item);
 
-    protected string GetMonitoringLine(NetworkLoggerItem item) => $"{new string(' ', (item.Scope?.Level + 1 ?? 0) * 4)}<{item.Date:u}> " +
+    protected string GetMonitoringLine(NetworkLoggerItem item) => $"{new string(' ', (item.Scope?.Level + 1 ?? 0) * 4)}<{item.Date:O}> " +
             $"(Tick={item.Tick}, Time={item.SimulationTime}) " +
             $"{{{item.Type}}} " +
             $"{(!string.IsNullOrEmpty(item.Category) ? $"[Category={item.Category}] " : "")}" +

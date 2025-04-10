@@ -21,7 +21,7 @@ namespace EntityFX.MqttY.Contracts.Network
 
         NodeType NodeType { get; }
 
-        void Refresh();
+        Task Refresh();
         void Reset();
 
     }

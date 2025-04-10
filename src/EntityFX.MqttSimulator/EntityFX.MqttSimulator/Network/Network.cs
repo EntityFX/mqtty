@@ -19,7 +19,9 @@ public class Network : NodeBase, INetwork
     /// <summary>
     /// TODO: Add max size limit
     /// </summary>
-    private readonly ConcurrentBag<NetworkMonitoringPacket> _networkPackets = new();
+    private readonly List<NetworkMonitoringPacket> _monitoringPacketsQueue = new();
+    //private Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
+
     private readonly TicksOptions ticksOptions;
 
     private readonly NetworkCounters counters;
@@ -187,7 +189,8 @@ public class Network : NodeBase, INetwork
             networkMonitoringPacket.Type = NetworkPacketType.Local;
         }
 
-        _networkPackets.Add(networkMonitoringPacket);
+        //_monitoringPacketsQueue.Add(networkMonitoringPacket.Packet.Id, networkMonitoringPacket);
+        _monitoringPacketsQueue.Add(networkMonitoringPacket);
 
         counters.CountInbound(networkMonitoringPacket.Packet);
     }
@@ -195,18 +198,19 @@ public class Network : NodeBase, INetwork
     //TODO: If queue limit is exceeded then reject Send
     //bool?
     //timeout?
-    protected override Task SendImplementationAsync(Contracts.Network.NetworkPacket packet)
+    protected override Task SendImplementationAsync(NetworkPacket packet)
     {
         var networkPacket = GetNetworkPacketType(packet);
 
-        _networkPackets.Add(networkPacket);
+       // _monitoringPacketsQueue.Add(packet.Id, networkPacket);
+        _monitoringPacketsQueue.Add(networkPacket);
 
         counters.CountInbound(packet);
 
         return Task.CompletedTask;
     }
 
-    private NetworkMonitoringPacket GetNetworkPacketType(Contracts.Network.NetworkPacket packet)
+    private NetworkMonitoringPacket GetNetworkPacketType(NetworkPacket packet)
     {
         var destionationNode = GetDestinationNode(packet.To!, packet.ToType);
 
@@ -253,7 +257,7 @@ public class Network : NodeBase, INetwork
 
         NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
             $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}",
-            "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
+            "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
         NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
 
         counters.CountOutbound(packet);
@@ -296,7 +300,7 @@ public class Network : NodeBase, INetwork
 
         NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Push,
             $"Push packet from network {this.Name} to {next.Name}",
-            "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _networkPackets.Count);
+            "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
 
 
         counters.CountTransfers();
@@ -312,9 +316,26 @@ public class Network : NodeBase, INetwork
     }
 
     //TODO: add tick reaction
-    public override void Refresh()
+    public override async Task Refresh()
     {
-        var packets = _networkPackets.ToArray();
+        //_monitoringPacketsQueue = _monitoringPacketsQueue.Where(p => p.Value.WaitTime > 0)
+        //    .ToDictionary(k => k.Key, v => v.Value);
+
+        //foreach (var pendingPacket in _monitoringPacketsQueue.ToArray())
+        //{
+        //    pendingPacket.Value.ReduceWaitTime();
+
+        //    if (pendingPacket.Value.WaitTime > 0)
+        //    {
+        //        continue;
+        //    }
+
+        //    var result = await ProcessTransferPacket(pendingPacket.Value!);
+        //}
+        //counters.SetQueueLength(_monitoringPacketsQueue.Count);
+        //Counters.Refresh(NetworkGraph.TotalTicks);
+
+        var packets = _monitoringPacketsQueue.ToArray();
         foreach (var pendingPacket in packets)
         {
             pendingPacket.ReduceWaitTime();
@@ -323,13 +344,14 @@ public class Network : NodeBase, INetwork
             {
                 continue;
             }
+            _monitoringPacketsQueue.Remove(pendingPacket);
+            var result = ProcessTransferPacket(pendingPacket).Result;
+            //if (_monitoringPacketsQueue.TryTake(out var pending))
+            //{
 
-            if (_networkPackets.TryTake(out var pending))
-            {
-                var result = ProcessTransferPacket(pending!).Result;
-            }
+            //}
         }
-
+        counters.SetQueueLength(_monitoringPacketsQueue.Count);
         Counters.Refresh(NetworkGraph.TotalTicks);
     }
 
@@ -424,5 +446,10 @@ public class Network : NodeBase, INetwork
         _applications.Remove(application);
 
         return true;
+    }
+
+    public override void Reset()
+    {
+        throw new NotImplementedException();
     }
 }

@@ -1,6 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.NetworkLogger;
 
-internal class NullNetworkLoggerProvider : NetworkLoggerBase, IINetworkLoggerProvider
+internal class NullNetworkLoggerProvider : NetworkLoggerBase, INetworkLoggerProvider
 {
     public NullNetworkLoggerProvider(INetworkLogger monitoring)
     : base(monitoring)

@@ -59,9 +59,11 @@ namespace EntityFX.MqttY.Application
         public virtual CounterGroup Counters => new CounterGroup("Invokes");
 
 
-        public virtual void Refresh()
+        public virtual Task Refresh()
         {
             Counters.Refresh(NetworkGraph.TotalTicks);
+
+            return Task.CompletedTask;
         }
 
         public virtual void Reset()

@@ -89,17 +89,6 @@ public class Server : Node, IServer
         return true;
     }
 
-    public override async Task ReceiveAsync(NetworkPacket packet)
-    {
-        BeforeReceive(packet);
-
-        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
-
-        await OnReceived(packet);
-        AfterReceive(packet);
-    }
-
-
     protected virtual Task OnReceived(NetworkPacket packet)
     {
         PacketReceived?.Invoke(this, packet);
@@ -152,6 +141,7 @@ public class Server : Node, IServer
 
     protected override void BeforeSend(NetworkPacket packet)
     {
+        base.BeforeSend(packet);
     }
 
     protected override void AfterSend(NetworkPacket packet)
@@ -159,8 +149,10 @@ public class Server : Node, IServer
         base.AfterSend(packet);
     }
 
-    protected override Task ReceiveImplementationAsync(NetworkPacket packet)
+    protected override async Task ReceiveImplementationAsync(NetworkPacket packet)
     {
-        return Task.CompletedTask;
+        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
+
+        await OnReceived(packet);
     }
 }

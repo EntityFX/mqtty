@@ -376,7 +376,11 @@ public class NetworkGraph : INetworkGraph
             Protocol: packet.Protocol,
             Category: category ?? packet.Category,
             Scope: packet.Scope
-        );
+        )
+        {
+            Id = Guid.NewGuid(),
+            RequestId = packet.Id
+        };
     }
 
     public void RemoveClient(string clientAddress)
@@ -433,7 +437,7 @@ public class NetworkGraph : INetworkGraph
         _nodes.Remove((serverAddress, NodeType.Client), out _);
     }
 
-    public bool Refresh()
+    public async Task<bool> Refresh()
     {
         try
         {
@@ -447,7 +451,7 @@ public class NetworkGraph : INetworkGraph
                 Monitoring.Push(TotalTicks,
                     network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
                     "Network", "Refresh", scope);
-                network.Value.Refresh();
+                await network.Value.Refresh();
             }
 
             foreach (var node in _nodes)
@@ -455,7 +459,7 @@ public class NetworkGraph : INetworkGraph
                 Monitoring.Push(TotalTicks,
                     node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
                     scope);
-                node.Value.Refresh();
+                await node.Value.Refresh();
             }
 
             Monitoring.EndScope(TotalTicks, scope);
@@ -515,7 +519,7 @@ public class NetworkGraph : INetworkGraph
 
         cancelTokenSource = new CancellationTokenSource();
 
-        return Task.Run(() =>
+        return Task.Run(async () =>
         {
             bool refreshResult = true;
 
@@ -526,7 +530,7 @@ public class NetworkGraph : INetworkGraph
                     return;
                 }
 
-                refreshResult = Refresh();
+                refreshResult = await Refresh();
 
                 if (!refreshResult)
                 {
