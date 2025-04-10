@@ -146,7 +146,7 @@ public class Client : Node, IClient
     {
         if (checkConnection && !IsConnected)
             throw new InvalidOperationException("Not Connected To server");
-        await SendAsync(packet);
+        await SendImplementationAsync(packet);
     }
 
     protected override async Task SendImplementationAsync(NetworkPacket packet)

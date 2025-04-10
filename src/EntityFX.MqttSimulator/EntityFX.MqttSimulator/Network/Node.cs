@@ -29,13 +29,13 @@ public abstract class Node : NodeBase
 
     public override Task Refresh()
     {
-        foreach (var packet in monitorMessages.Values.ToArray())
+        foreach (var packet in monitorMessages)
         {
-            packet.ReduceWaitTicks();
+            packet.Value.ReduceWaitTicks();
 
-            if (packet.WaitTicks <= 0)
+            if (packet.Value.WaitTicks <= 0)
             {
-                packet.ResetEventSlim?.Set();
+                packet.Value.ResetEventSlim?.Set();
             }
         }
         return base.Refresh();

@@ -98,8 +98,6 @@ public class Server : Node, IServer
 
     protected override async Task SendImplementationAsync(NetworkPacket packet)
     {
-        BeforeSend(packet);
-
         var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!, 
             $"Send packet {packet.From} to {packet.To}");
         NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, packet, NetworkLoggerType.Send, 
@@ -107,8 +105,6 @@ public class Server : Node, IServer
         await Network.SendAsync(packet);
 
         NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
-
-        AfterSend(packet);
     }
 
     public void Start()

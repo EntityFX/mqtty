@@ -345,7 +345,7 @@ public class Network : NodeBase, INetwork
                 continue;
             }
             _monitoringPacketsQueue.Remove(pendingPacket);
-            var result = ProcessTransferPacket(pendingPacket).Result;
+            var result = await ProcessTransferPacket(pendingPacket);
             //if (_monitoringPacketsQueue.TryTake(out var pending))
             //{
 
