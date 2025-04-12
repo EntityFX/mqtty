@@ -9,12 +9,14 @@ namespace EntityFX.MqttY.Scenarios
 {
     internal class NetworkInitAction : ScenarioAction<NetworkSimulation, NetworkGraphFactoryOption>
     {
-        private readonly IFactory<INetworkGraph, NetworkGraphFactoryOption> networkGraphFactory;
+        private readonly INetworkSimulatorBuilder networkSimulatorBuilder;
+        private readonly IFactory<INetworkSimulator, NetworkGraphFactoryOption> networkGraphFactory;
 
-        public NetworkInitAction(IScenario<NetworkSimulation> scenario, 
-            IFactory<INetworkGraph, NetworkGraphFactoryOption> networkGraphFactory)
+        public NetworkInitAction(INetworkSimulatorBuilder networkSimulatorBuilder, IScenario<NetworkSimulation> scenario, 
+            IFactory<INetworkSimulator, NetworkGraphFactoryOption> networkGraphFactory)
             : base(scenario)
         {
+            this.networkSimulatorBuilder = networkSimulatorBuilder;
             this.networkGraphFactory = networkGraphFactory;
         }
 
@@ -36,7 +38,7 @@ namespace EntityFX.MqttY.Scenarios
 
             Context!.NetworkGraph!.StartPeriodicRefreshAsync();
 
-            Context!.NetworkGraph.Configure(Config.NetworkGraphOption);
+            networkSimulatorBuilder.Configure(Context!.NetworkGraph, Config.NetworkGraphOption);
 
             return Task.CompletedTask;
         }

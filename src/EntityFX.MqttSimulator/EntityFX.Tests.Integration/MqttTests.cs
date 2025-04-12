@@ -37,7 +37,8 @@ namespace EntityFX.Tests.Integration
             .AddScoped<IMqttPacketManager, MqttNativePacketManager>()
             //.AddScoped<IMqttPacketManager, MqttJsonPacketManager>()
             .AddScoped<IMqttTopicEvaluator, MqttTopicEvaluator>((serviceProvider) => new MqttTopicEvaluator(true))
-            .AddScoped<INetworkBuilder, NetworkBuilder>();
+            .AddScoped<INetworkBuilder, NetworkBuilder>()
+            .AddScoped<INetworkSimulatorBuilder, NetworkSimulatorBuilder>();
 
             serviceProvider = serviceCollection.BuildServiceProvider();
 
@@ -51,10 +52,11 @@ namespace EntityFX.Tests.Integration
             monitoringProvider.Start();
 
             var networkBuilder = serviceProvider?.GetRequiredService<INetworkBuilder>();
+            var networkSimulatorBuilder = serviceProvider?.GetRequiredService<INetworkSimulatorBuilder>();
 
             graph = new NetworkGraph(serviceProvider!, networkBuilder!, new DijkstraPathFinder(), monitoring!);
 
-            graph.Configure(new NetworkGraphOption()
+            networkSimulatorBuilder!.Configure(graph, new NetworkGraphOption()
             {
                 Networks = new SortedDictionary<string, NetworkNodeOption>()
                 {

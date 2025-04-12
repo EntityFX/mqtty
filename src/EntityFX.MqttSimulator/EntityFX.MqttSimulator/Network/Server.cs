@@ -27,7 +27,7 @@ public class Server : Node, IServer
 
     public Server(int index, string name, string address, string protocolType,
         string specification,
-        INetwork network, INetworkGraph networkGraph) : base(index, name, address, networkGraph)
+        INetwork network, INetworkSimulator networkGraph) : base(index, name, address, networkGraph)
     {
         ProtocolType = protocolType;
         Specification = specification;

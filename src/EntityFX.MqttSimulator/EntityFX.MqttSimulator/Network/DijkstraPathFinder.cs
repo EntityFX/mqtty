@@ -3,7 +3,7 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Helper;
 public class DijkstraPathFinder : IPathFinder
 {
-    public INetworkGraph? NetworkGraph { get; set; }
+    public INetworkSimulator? NetworkGraph { get; set; }
 
     private Path<string>[] paths = new Path<string>[0];
 

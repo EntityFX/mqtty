@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 public abstract class NodeBase : ISender
 {
-    protected readonly INetworkGraph NetworkGraph;
+    protected readonly INetworkSimulator NetworkGraph;
 
     public Guid Id { get; private set; }
 
@@ -37,7 +37,7 @@ public abstract class NodeBase : ISender
     protected abstract void AfterSend(NetworkPacket packet);
 
 
-    public NodeBase(int index, string name, string address, INetworkGraph networkGraph)
+    public NodeBase(int index, string name, string address, INetworkSimulator networkGraph)
     {
         Address = address;
         Name = name;

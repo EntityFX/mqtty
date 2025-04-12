@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -9,14 +11,15 @@ using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
-using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Counter;
+using EntityFX.MqttY.Factories;
+using EntityFX.MqttY.Scenarios;
 using Microsoft.Extensions.Configuration;
 
 namespace EntityFX.MqttY.Network;
 
-public class NetworkGraph : INetworkGraph
+public class NetworkGraph : INetworkSimulator
 {
     private readonly IServiceProvider serviceProvider;
     private readonly INetworkBuilder _networkBuilder;
@@ -70,279 +73,6 @@ public class NetworkGraph : INetworkGraph
 
             return counters;
         }
-    }
-
-    public IClient? BuildClient(int index, string name, string protocolType, string specification,
-        INetwork network, string? group = null, int? groupAmount = null,
-        Dictionary<string, string[]>? additional = default)
-    {
-        if (_nodes.ContainsKey((name, NodeType.Client)))
-        {
-            return null;
-        }
-
-        var clientAddressFull = GetAddress(name, protocolType, network.Address);
-
-        var client = _networkBuilder
-            .ClientFactory.Create(
-                new NodeBuildOptions<Dictionary<string, string[]>>(serviceProvider,
-                    this, network, index, name, clientAddressFull, group, groupAmount, protocolType,
-                    specification, null, additional));
-
-        if (client == null)
-        {
-            return null;
-        }
-
-        _nodes.TryAdd((name, NodeType.Client), client);
-
-        return client;
-    }
-
-    public TClient? BuildClient<TClient>(int index, string name, string protocolType, string specification,
-        INetwork network,
-        string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = default)
-        where TClient : IClient
-    {
-        return (TClient?)BuildClient(index, name, protocolType, specification, network, group, groupAmount, additional);
-    }
-
-    public INetwork? BuildNetwork(int index, string name, string address, TicksOptions ticks)
-    {
-        if (_networks.ContainsKey(address))
-        {
-            return null;
-        }
-
-        var network = _networkBuilder
-            .NetworkFactory.Create(
-                new NodeBuildOptions<(TicksOptions TicksOptions, Dictionary<string, string[]> Additional)>(
-                    serviceProvider, this, null, index, name, address, null, null, "IP",
-                    String.Empty, null, (ticks, new Dictionary<string, string[]>())));
-
-        if (network == null)
-        {
-            return null;
-        }
-
-        _networks.TryAdd(name, network);
-
-        return network;
-    }
-
-    public ILeafNode? BuildNode(int index, string name, string address, NodeType nodeType, string? group = null,
-        int? groupAmount = null,
-        Dictionary<string, string[]>? additional = null)
-    {
-        return null;
-    }
-
-    public IServer? BuildServer(int index, string name, string protocolType, string specification,
-        INetwork network,
-        string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = null)
-    {
-        if (_nodes.ContainsKey((name, NodeType.Server)))
-        {
-            return null;
-        }
-
-        var serverAddressFull = GetAddress(name, protocolType, network.Address);
-
-        var server = _networkBuilder
-            .ServerFactory.Create(
-                new NodeBuildOptions<Dictionary<string, string[]>>(
-                    serviceProvider, this, network, index, name, serverAddressFull, group,
-                    groupAmount, protocolType,
-                    specification, null, additional));
-
-        if (server == null)
-        {
-            return null;
-        }
-
-        _nodes.TryAdd((name, NodeType.Server), server);
-
-        return server;
-    }
-
-    public void Configure(NetworkGraphOption option)
-    {
-        if (option.Networks.Any() != true)
-        {
-            return;
-        }
-
-        foreach (var networkOption in option.Networks)
-        {
-            BuildNetwork(networkOption.Value.Index, networkOption.Key, networkOption.Key, option.Ticks);
-        }
-
-        ConfigureLinks(option);
-
-        PathFinder.Build();
-
-        BuildNodes(option);
-
-        ConfigureNodes(option);
-    }
-
-    private void ConfigureNodes(NetworkGraphOption option)
-    {
-        ConfigureServers(option);
-        ConfigureClients(option);
-        ConfigureApplications(option);
-    }
-
-    private void ConfigureApplications(NetworkGraphOption option)
-    {
-        var applications = option.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Application).ToArray();
-        foreach (var application in applications)
-        {
-            var nodeApplication = GetNode(application.Key, NodeType.Application) as IApplication;
-            if (nodeApplication == null) continue;
-
-            var bo = new NodeBuildOptions<object>(
-                serviceProvider,
-                this, nodeApplication.Network, nodeApplication.Index, nodeApplication.Name, nodeApplication.Address,
-                nodeApplication.Group, nodeApplication.GroupAmount, nodeApplication.ProtocolType,
-                nodeApplication.Specification ?? string.Empty,
-                null, application.Value.Configuration);
-
-            _networkBuilder.ApplicationFactory.Configure(bo, nodeApplication);
-        }
-    }
-
-    private void ConfigureServers(NetworkGraphOption option)
-    {
-        var servers = option.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Server).ToArray();
-        foreach (var node in servers)
-        {
-            var nodeServer = GetNode(node.Key, NodeType.Server) as IServer;
-            if (nodeServer == null) continue;
-
-            var bo = new NodeBuildOptions<Dictionary<string, string[]>>(
-                serviceProvider,
-                this, nodeServer.Network, nodeServer.Index, nodeServer.Name, nodeServer.Address,
-                nodeServer.Group, nodeServer.GroupAmount, nodeServer.ProtocolType,
-                nodeServer.Specification, node.Value.ConnectsToServer, node.Value.Additional);
-
-            _networkBuilder.ServerFactory.Configure(bo, nodeServer);
-        }
-    }
-
-    private void ConfigureClients(NetworkGraphOption option)
-    {
-        var clients = option.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Client).ToArray();
-        foreach (var node in clients)
-        {
-            if (node.Value.Quantity > 1)
-            {
-                Enumerable.Range(1, node.Value.Quantity.Value).ToList()
-                    .ForEach(
-                        (nc) =>
-                        {
-                            var nodeClient = GetNode($"{node.Key}{nc}", NodeType.Client) as IClient;
-
-                            if (nodeClient == null)
-                            {
-                                return;
-                            }
-
-                            var bo = new NodeBuildOptions<Dictionary<string, string[]>>(
-                                serviceProvider,
-                                this, nodeClient.Network, nodeClient.Index, nodeClient.Name, nodeClient.Address,
-                                nodeClient.Group, nodeClient.GroupAmount, nodeClient.ProtocolType,
-                                node.Value.Specification ?? string.Empty,
-                                node.Value.ConnectsToServer, node.Value.Additional);
-
-                            _networkBuilder.ClientFactory.Configure(bo, nodeClient);
-                        });
-            }
-            else
-            {
-                var nodeClient = GetNode(node.Key, NodeType.Client) as IClient;
-                if (nodeClient == null) continue;
-
-                var bo = new NodeBuildOptions<Dictionary<string, string[]>>(
-                    serviceProvider,
-                    this, nodeClient.Network, nodeClient.Index, nodeClient.Name, nodeClient.Address,
-                    nodeClient.Group, nodeClient.GroupAmount, nodeClient.ProtocolType,
-                    node.Value.Specification ?? string.Empty, node.Value.ConnectsToServer, node.Value.Additional);
-                _networkBuilder.ClientFactory.Configure(bo, nodeClient);
-            }
-        }
-    }
-
-    private void BuildNodes(NetworkGraphOption option)
-    {
-        var index = 0;
-        foreach (var node in option.Nodes)
-        {
-            var linkNetwork = _networks.GetValueOrDefault(node.Value.Network ?? string.Empty);
-            if (linkNetwork == null) continue;
-
-            switch (node.Value.Type)
-            {
-                case NodeOptionType.Server:
-
-                    BuildServer(index, node.Key, node.Value.Protocol ?? "tcp",
-                        node.Value.Specification ?? "tcp-server",
-                        linkNetwork, null, null, node.Value.Additional);
-                    break;
-
-                case NodeOptionType.Client:
-
-                    if (node.Value.Quantity > 1)
-                    {
-                        Enumerable.Range(1, node.Value.Quantity.Value).ToList()
-                            .ForEach(
-                                (nc) => BuildClient(
-                                    index, $"{node.Key}{nc}",
-                                    node.Value.Protocol ?? "tcp",
-                                    node.Value.Specification ?? "tcp-client",
-                                    linkNetwork, node.Key, node.Value.Quantity, node.Value.Additional));
-                    }
-                    else
-                    {
-                        BuildClient(index, node.Key, node.Value.Protocol ?? "tcp",
-                            node.Value.Specification ?? "tcp-client",
-                            linkNetwork, null, null, node.Value.Additional);
-                    }
-
-                    break;
-                case NodeOptionType.Application:
-                    BuildApplication(index, node.Key, node.Value.Protocol ?? "tcp",
-                        node.Value.Specification ?? "tcp-app",
-                        linkNetwork, null, null, node.Value.Configuration);
-                    break;
-            }
-
-            index++;
-        }
-    }
-
-    private void ConfigureLinks(NetworkGraphOption option)
-    {
-        var scope = Monitoring.BeginScope(TotalTicks, "Configure sourceNetwork links");
-        foreach (var networkOption in option.Networks)
-        {
-            if (networkOption.Value?.Links?.Any() != true) continue;
-
-            foreach (var link in networkOption.Value.Links)
-            {
-                if (link?.Network == null || !_networks.ContainsKey(link.Network)) continue;
-
-                var sourceNetwork = _networks[networkOption.Key];
-                var destinationNetwork = _networks[link.Network];
-                sourceNetwork.Scope = scope;
-                destinationNetwork.Scope = scope;
-                sourceNetwork.Link(destinationNetwork);
-                sourceNetwork.Scope = null;
-                destinationNetwork.Scope = null;
-            }
-        }
-
-        Monitoring.EndScope(TotalTicks, scope);
     }
 
     public string GetAddress(string name, string protocolType, string networkAddress)
@@ -417,6 +147,8 @@ public class NetworkGraph : INetworkGraph
         network.UnlinkAll();
 
         _networks.Remove(networkAddress, out _);
+
+        UpdateRoutes();
     }
 
     public void RemoveServer(string serverAddress)
@@ -550,38 +282,80 @@ public class NetworkGraph : INetworkGraph
         Interlocked.Increment(ref _tick);
     }
 
-    public IApplication? BuildApplication<TConfiguration>(
-        int index, string name, string protocolType, string specification, INetwork network,
-        string? group = null, int? groupAmount = null, TConfiguration? applicationConfig = default)
-    {
-        if (_nodes.ContainsKey((name, NodeType.Application)))
-        {
-            return null;
-        }
-
-        var serverAddressFull = GetAddress(name, protocolType, network.Address);
-
-        var server = _networkBuilder
-            .ApplicationFactory.Create(
-                new NodeBuildOptions<object>(
-                    serviceProvider, this, network, index, name, serverAddressFull,
-                    group, groupAmount, protocolType, specification, null, applicationConfig)
-                {
-                    OptionsPath = OptionsPath
-                });
-
-        if (server == null)
-        {
-            return null;
-        }
-
-        _nodes.TryAdd((name, NodeType.Application), server);
-
-        return server;
-    }
 
     public void StopPeriodicRefresh()
     {
         cancelTokenSource?.Cancel();
+    }
+
+    public bool AddClient(IClient client)
+    {
+        if (_nodes.ContainsKey((client.Name, NodeType.Client)))
+        {
+            return false;
+        }
+
+        return _nodes.TryAdd((client.Name, NodeType.Client), client);
+    }
+
+    public bool AddServer(IServer server)
+    {
+        if (_nodes.ContainsKey((server.Name, NodeType.Server)))
+        {
+            return false;
+        }
+
+        return _nodes.TryAdd((server.Name, NodeType.Server), server);
+    }
+
+    public bool AddApplication(IApplication application)
+    {
+        if (_nodes.ContainsKey((application.Name, NodeType.Application)))
+        {
+            return false;
+        }
+
+        return _nodes.TryAdd((application.Name, NodeType.Application), application);
+    }
+
+    public bool AddNetwork(INetwork network)
+    {
+        if (_networks.ContainsKey(network.Name))
+        {
+            return false;
+        }
+
+        var result = _networks.TryAdd(network.Name, network);
+
+        if (!result)
+        {
+            return false;
+        }
+
+        UpdateRoutes();
+
+        return result;
+    }
+
+    public void UpdateRoutes()
+    {
+        PathFinder.Build();
+    }
+
+    public bool Link(string sourceNetwork, string destinationNetwork)
+    {
+        var source = _networks.GetValueOrDefault(sourceNetwork);
+        if (source == null)
+        {
+            return false;
+        }
+
+        var destination = _networks.GetValueOrDefault(destinationNetwork);
+        if (destination == null)
+        {
+            return false;
+        }
+
+        return source.Link(destination);
     }
 }

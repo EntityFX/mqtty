@@ -3,6 +3,7 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Scenarios;
 using EntityFX.MqttY.Contracts.Utils;
+using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Scenarios;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -66,9 +67,10 @@ internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDiction
                     var networkGraphOption = configurationSection.GetSection("graph").Get<NetworkGraphOption>();
                     var monitoringOption = configurationSection.GetSection("monitoring").Get<MonitoringOption>();
 
-                    var networkGraph = _serviceProvider.GetRequiredService<IFactory<INetworkGraph, NetworkGraphFactoryOption>>();
+                    var networkGraph = _serviceProvider.GetRequiredService<IFactory<INetworkSimulator, NetworkGraphFactoryOption>>();
+                    var networkSimulatorBuilder = _serviceProvider.GetRequiredService<INetworkSimulatorBuilder>();
 
-                    var networkInitAction = new NetworkInitAction(s, networkGraph)
+                    var networkInitAction = new NetworkInitAction(networkSimulatorBuilder, s, networkGraph)
                     {
                         Config = new NetworkGraphFactoryOption() {
                             MonitoringOption = monitoringOption ?? new MonitoringOption(), 

@@ -43,10 +43,11 @@ internal class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<obj
                 .Get<MqttRelayConfiguration>();
 
             var mqttTopicEvaluator = _serviceProvider.GetRequiredService<IMqttTopicEvaluator>();
+            var networkSimulatorBuilder = _serviceProvider.GetRequiredService<INetworkSimulatorBuilder>();
 
             return new MqttRelay
                 (options.Index, options.Name, options.Address ?? options.Name,
-                options.Protocol, options.Specification, options.Network, options.NetworkGraph, mqttTopicEvaluator, mqttRelayConf)
+                options.Protocol, options.Specification, options.Network, networkSimulatorBuilder, mqttTopicEvaluator, mqttRelayConf)
             {
                 Group = options.Group,
                 GroupAmount = options.GroupAmount
@@ -58,8 +59,10 @@ internal class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<obj
             var mqttReceiverConf = configurationSection
                 .Get<MqttReceiverConfiguration>();
 
+            var networkSimulatorBuilder = _serviceProvider.GetRequiredService<INetworkSimulatorBuilder>();
+
             return new MqttReceiver
-                (options.Index, options.Name, options.Address ?? options.Name,
+                (networkSimulatorBuilder, options.Index, options.Name, options.Address ?? options.Name,
                 options.Protocol, options.Specification, options.Network, options.NetworkGraph, mqttReceiverConf)
             {
                 Group = options.Group,

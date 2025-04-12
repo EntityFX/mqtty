@@ -114,7 +114,7 @@ public class PlantUmlGraphGenerator
         };
     }
 
-    public string Generate(INetworkGraph networkGraph)
+    public string Generate(INetworkSimulator networkGraph)
     {
         var plantUmlBuilder = new StringBuilder();
         plantUmlBuilder.AppendLine("@startuml");

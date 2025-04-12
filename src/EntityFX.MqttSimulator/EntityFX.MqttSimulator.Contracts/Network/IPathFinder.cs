@@ -2,7 +2,7 @@
 {
     public interface IPathFinder
     {
-        INetworkGraph? NetworkGraph { get; set; }
+        INetworkSimulator? NetworkGraph { get; set; }
 
         void Build();
 

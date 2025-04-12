@@ -4,7 +4,7 @@ using EntityFX.MqttY.Contracts.Options;
 namespace EntityFX.MqttY.Contracts.Utils;
 
 public interface INetworkBuilder
-{
+{ 
     IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>> ClientFactory { get; }
     
     IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>> ServerFactory { get; }

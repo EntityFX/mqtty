@@ -10,6 +10,6 @@ namespace EntityFX.MqttY.Scenarios
 {
     public class NetworkSimulation
     {
-        public INetworkGraph? NetworkGraph { get; set; }
+        public INetworkSimulator? NetworkGraph { get; set; }
     }
 }

@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace EntityFX.MqttY.Factories;
 
-internal class NetworkGraphFactory : IFactory<INetworkGraph, NetworkGraphFactoryOption>
+internal class NetworkGraphFactory : IFactory<INetworkSimulator, NetworkGraphFactoryOption>
 {
     private readonly IServiceProvider serviceProvider;
 
@@ -16,14 +16,14 @@ internal class NetworkGraphFactory : IFactory<INetworkGraph, NetworkGraphFactory
         this.serviceProvider = serviceProvider;
     }
 
-    public INetworkGraph Configure(NetworkGraphFactoryOption options, INetworkGraph service)
+    public INetworkSimulator Configure(NetworkGraphFactoryOption options, INetworkSimulator service)
     {
-        service.Configure(options.NetworkGraphOption);
+        //service.Configure(options.NetworkGraphOption);
 
         return service;
     }
 
-    public INetworkGraph Create(NetworkGraphFactoryOption options)
+    public INetworkSimulator Create(NetworkGraphFactoryOption options)
     {
         var nb = serviceProvider.GetRequiredService<INetworkBuilder>();
         var pf = serviceProvider.GetRequiredService<IPathFinder>();

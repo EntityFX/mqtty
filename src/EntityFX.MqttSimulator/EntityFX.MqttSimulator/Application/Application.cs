@@ -40,10 +40,10 @@ namespace EntityFX.MqttY.Application
         public INode? Parent {  get; set; }
         public NetworkLoggerScope? Scope { get; set; }
 
-        protected readonly INetworkGraph NetworkGraph;
+        protected readonly INetworkSimulator NetworkGraph;
 
         public Application(int index, string name, string address, string protocolType, string specification,
-            INetwork network, INetworkGraph networkGraph, TOptions? options)
+            INetwork network, INetworkSimulator networkGraph, TOptions? options)
         {
             Address = address;
             Network = network;

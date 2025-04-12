@@ -67,7 +67,7 @@ public class Network : NodeBase, INetwork
 
     public override NodeType NodeType => NodeType.Network;
 
-    public Network(int index, string name, string address, INetworkGraph networkGraph, TicksOptions ticksOptions)
+    public Network(int index, string name, string address, INetworkSimulator networkGraph, TicksOptions ticksOptions)
         : base(index, name, address, networkGraph)
     {
         this.ticksOptions = ticksOptions;
@@ -360,7 +360,8 @@ public class Network : NodeBase, INetwork
     {
         var result = false;
         var packet = networkPacket.Packet;
-        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!, $"Transfer packet {packet.From} to {packet.To}");
+        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!, 
+            $"Transfer packet {packet.From} to {packet.To}");
 
         if (networkPacket.Type == NetworkPacketType.Local)
         {

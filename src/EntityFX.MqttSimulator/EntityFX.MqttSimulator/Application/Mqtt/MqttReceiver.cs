@@ -2,6 +2,7 @@
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
+using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Counter;
 
 namespace EntityFX.MqttY.Application.Mqtt
@@ -11,13 +12,15 @@ namespace EntityFX.MqttY.Application.Mqtt
         private IMqttClient? _mqttClient;
 
         private MqttReceiverCounters counters = new MqttReceiverCounters("Receiver");
+        private readonly INetworkSimulatorBuilder networkSimulatorBuilder;
 
         public override CounterGroup Counters => counters;
 
-        public MqttReceiver(int index, string name, string address, string protocolType, string specification, 
-            INetwork network, INetworkGraph networkGraph, MqttReceiverConfiguration? options) 
+        public MqttReceiver(INetworkSimulatorBuilder networkSimulatorBuilder, int index, string name, string address, string protocolType, string specification, 
+            INetwork network, INetworkSimulator networkGraph, MqttReceiverConfiguration? options) 
             : base(index, name, address, protocolType, specification, network, networkGraph, options)
         {
+            this.networkSimulatorBuilder = networkSimulatorBuilder;
         }
 
         public override async Task StartAsync()
@@ -51,7 +54,7 @@ namespace EntityFX.MqttY.Application.Mqtt
         {
             var nodeName = GetNodeName(Name, serverOption);
 
-            var listenerMqttClient = NetworkGraph.BuildClient<IMqttClient>(0, nodeName, ProtocolType,
+            var listenerMqttClient = networkSimulatorBuilder.BuildClient<IMqttClient>(0, nodeName, ProtocolType,
                 "mqtt-client",
                     Network!, null);
 

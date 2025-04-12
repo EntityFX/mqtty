@@ -4,7 +4,7 @@ using EntityFX.MqttY.Contracts.Network;
 public class SimplePathFinder : IPathFinder
 {
 
-    public INetworkGraph? NetworkGraph { get; set; }
+    public INetworkSimulator? NetworkGraph { get; set; }
 
     public void Build()
     {

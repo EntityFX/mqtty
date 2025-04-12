@@ -4,7 +4,7 @@ public class NodeBuildOptions<TOptions>
 {
     public NodeBuildOptions(
         IServiceProvider serviceProvider,
-        INetworkGraph networkGraph, INetwork? network,
+        INetworkSimulator networkGraph, INetwork? network,
         int index,
         string name, string address, string? group, int? groupAmount, 
         string protocol, string specification, string? connectsTo, TOptions? additional)
@@ -23,7 +23,7 @@ public class NodeBuildOptions<TOptions>
         Additional = additional;
     }
 
-    public INetworkGraph NetworkGraph { get; init; }
+    public INetworkSimulator NetworkGraph { get; init; }
     public IServiceProvider ServiceProvider { get; init; }
     public INetwork? Network { get; init;}
     public int Index { get; }

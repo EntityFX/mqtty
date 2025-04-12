@@ -22,7 +22,7 @@ namespace EntityFX.MqttY.Mqtt
 
         protected readonly MqttCounters mqttCounters = new MqttCounters("Mqtt");
 
-        public MqttBroker(IMqttPacketManager packetManager, INetwork network, INetworkGraph networkGraph, IMqttTopicEvaluator mqttTopicEvaluator,
+        public MqttBroker(IMqttPacketManager packetManager, INetwork network, INetworkSimulator networkGraph, IMqttTopicEvaluator mqttTopicEvaluator,
             int index, string name, string address, string protocolType, 
             string specification
            )

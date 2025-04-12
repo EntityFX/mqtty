@@ -20,7 +20,7 @@ internal class NetworkBuilder : INetworkBuilder
 
     private INetwork? _network;
 
-    private INetworkGraph? _networkGraph;
+    private INetworkSimulator? _networkGraph;
 
     public IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>> ClientFactory { get; }
 
@@ -36,7 +36,7 @@ internal class NetworkBuilder : INetworkBuilder
         return this;
     }
 
-    public INetworkBuilder WithNetworkGraph(INetworkGraph networkGraph)
+    public INetworkBuilder WithNetworkGraph(INetworkSimulator networkGraph)
     {
         _networkGraph = networkGraph;
         return this;

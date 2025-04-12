@@ -13,7 +13,7 @@ public abstract class Node : NodeBase
 
     public override CounterGroup Counters => counters;
 
-    public Node(int index, string name, string address, INetworkGraph networkGraph) : base(index, name, address, networkGraph)
+    public Node(int index, string name, string address, INetworkSimulator networkGraph) : base(index, name, address, networkGraph)
     {
         counters = new NodeCounters(Name ?? string.Empty);
     }
