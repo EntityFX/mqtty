@@ -1,4 +1,5 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
+using System.Diagnostics;
 
 internal class NodeMonitoringPacket
 {
@@ -14,6 +15,8 @@ internal class NodeMonitoringPacket
 
     public ManualResetEventSlim? ResetEventSlim { get; set; }
 
+    public bool IsSet { get; set; }
+
     internal long WaitTicks => _waitTicks;
 
     private long _waitTicks = 600000;
@@ -27,6 +30,24 @@ internal class NodeMonitoringPacket
         if (_waitTicks <= 0)
         {
             ResetEventSlim?.Set();
+        }
+    }
+
+    public bool WaitIsSet(TimeSpan timeout)
+    {
+        var sw = new Stopwatch();
+        sw.Start();
+        while (true)
+        {
+            if (IsSet)
+            {
+                return true;
+            }
+
+            if (sw.Elapsed >= timeout)
+            {
+                return false;
+            }
         }
     }
 

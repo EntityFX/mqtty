@@ -4,7 +4,7 @@ using EntityFX.MqttY.Contracts.Options;
 
 namespace EntityFX.MqttY.Counter
 {
-    internal class NetworkCounters: CounterGroup
+    internal class NetworkCounters : CounterGroup
     {
         private readonly List<ICounter> _counters = new List<ICounter>();
         private readonly double ticksPerSecond;

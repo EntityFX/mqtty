@@ -8,7 +8,6 @@ using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Factories;
 using EntityFX.MqttY.Mqtt.Internals;
 using EntityFX.MqttY.Mqtt.Internals.Formatters;
-using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Utils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

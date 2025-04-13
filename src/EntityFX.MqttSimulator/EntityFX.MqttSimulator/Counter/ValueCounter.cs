@@ -48,6 +48,11 @@ namespace EntityFX.MqttY.Counter
 
         public override string ToString()
         {
+            if (!Value.IsNumericType())
+            {
+                return Value.ToString() ?? string.Empty;
+            }
+
             var doubleValue = Convert.ToDouble(Value);
             var stringValue = normalizeUnits switch {
                 NormalizeUnits.Bit => doubleValue.ToHumanBits(UnitOfMeasure),

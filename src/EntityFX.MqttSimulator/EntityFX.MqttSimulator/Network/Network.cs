@@ -338,6 +338,11 @@ public class Network : NodeBase, INetwork
         var packets = _monitoringPacketsQueue.ToArray();
         foreach (var pendingPacket in packets)
         {
+            if (pendingPacket == null)
+            {
+                return;
+            }
+
             pendingPacket.ReduceWaitTime();
 
             if (pendingPacket.WaitTime > 0)

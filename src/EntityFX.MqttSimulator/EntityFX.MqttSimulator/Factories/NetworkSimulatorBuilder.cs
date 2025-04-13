@@ -3,7 +3,7 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 
-namespace EntityFX.MqttY.Network;
+namespace EntityFX.MqttY.Factories;
 
 public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 {
@@ -97,7 +97,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
             .NetworkFactory.Create(
                 new NodeBuildOptions<(TicksOptions TicksOptions, Dictionary<string, string[]> Additional)>(
                     serviceProvider, NetworkSimulator, null, index, name, address, null, null, "IP",
-                    String.Empty, null, (ticks, new Dictionary<string, string[]>())));
+                    string.Empty, null, (ticks, new Dictionary<string, string[]>())));
 
         if (network == null)
         {

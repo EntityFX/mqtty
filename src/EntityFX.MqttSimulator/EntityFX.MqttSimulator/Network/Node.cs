@@ -73,6 +73,7 @@ public abstract class Node : NodeBase
         monitorMessage.ResponsePacket = packet;
         monitorMessage.ResponseTick = NetworkGraph.TotalTicks;
         monitorMessage.ResetEventSlim?.Set();
+        monitorMessage.IsSet = true;
 
         return Task.CompletedTask;
     }
@@ -98,52 +99,30 @@ public abstract class Node : NodeBase
     //подписываемся на ManualResetEventSlim и ждём его
     protected Task<ResponsePacket?> WaitResponse(Guid packetId)
     {
-        var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
-
-        if (monitorPacket == null)
+        return Task.Run(() =>
         {
-            return Task.FromResult<ResponsePacket?>(null);
-        }
+            var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
 
-        var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
+            if (monitorPacket == null)
+            {
+                return Task.FromResult<ResponsePacket?>(null);
+            }
 
-        if (!monitorMessages.TryRemove(packetId, out monitorPacket))
-        {
-            return Task.FromResult<ResponsePacket?>(null);
-        }
+            //var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
+            var isSet = monitorPacket?.WaitIsSet(TimeSpan.FromMinutes(1));
 
-        if (isSet != true)
-        {
-            return Task.FromResult<ResponsePacket?>(null);
-        }
+            if (!monitorMessages.TryRemove(packetId, out monitorPacket))
+            {
+                return Task.FromResult<ResponsePacket?>(null);
+            }
 
-        return Task.FromResult<ResponsePacket?>(new ResponsePacket(
-            monitorPacket.ResponsePacket!, monitorPacket.RequestTick, monitorPacket.ResponseTick ?? 0));
+            if (isSet != true)
+            {
+                return Task.FromResult<ResponsePacket?>(null);
+            }
 
-
-        //return Task.Run(() =>
-        //{
-        //    var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
-
-        //    if (monitorPacket == null)
-        //    {
-        //        return Task.FromResult<ResponsePacket?>(null);
-        //    }
-
-        //    var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
-
-        //    if (!monitorMessages.TryRemove(packetId, out monitorPacket))
-        //    {
-        //        return Task.FromResult<ResponsePacket?>(null);
-        //    }
-
-        //    if (isSet != true)
-        //    {
-        //        return Task.FromResult<ResponsePacket?>(null);
-        //    }
-
-        //    return Task.FromResult<ResponsePacket?>(new ResponsePacket(
-        //        monitorPacket.ResponsePacket!, monitorPacket.RequestTick, monitorPacket.ResponseTick ?? 0));
-        //});
+            return Task.FromResult<ResponsePacket?>(new ResponsePacket(
+                monitorPacket.ResponsePacket!, monitorPacket.RequestTick, monitorPacket.ResponseTick ?? 0));
+        });
     }
 }

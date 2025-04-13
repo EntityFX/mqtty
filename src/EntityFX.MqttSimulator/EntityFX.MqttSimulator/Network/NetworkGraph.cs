@@ -11,6 +11,7 @@ using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Counter;
 using EntityFX.MqttY.Factories;
@@ -34,17 +35,23 @@ public class NetworkGraph : INetworkSimulator
 
     public event EventHandler<Exception>? OnError;
 
+    private readonly NetworkSimulatorCounters counters;
+
+    public CounterGroup Counters => counters;
+
     public NetworkGraph(
         IServiceProvider serviceProvider,
         INetworkBuilder networkBuilder,
         IPathFinder pathFinder,
-        INetworkLogger monitoring)
+        INetworkLogger monitoring, TicksOptions ticksOptions)
     {
         this.serviceProvider = serviceProvider;
         _networkBuilder = networkBuilder;
         PathFinder = pathFinder;
         Monitoring = monitoring;
         PathFinder.NetworkGraph = this;
+
+        counters = new NetworkSimulatorCounters("NetworkSimulator", ticksOptions);
     }
 
     public string? OptionsPath { get; set; }
@@ -61,19 +68,6 @@ public class NetworkGraph : INetworkSimulator
         .ToDictionary(k => k.Key.Address, v => (IServer)v.Value).ToImmutableDictionary();
 
     public long TotalTicks => _tick;
-
-    public CounterGroup Counters
-    {
-        get
-        {
-            var counters = new CounterGroup("NetworkGraph")
-            {
-                Counters = _networks.Select(n => n.Value.Counters).ToArray()
-            };
-
-            return counters;
-        }
-    }
 
     public string GetAddress(string name, string protocolType, string networkAddress)
     {
@@ -178,6 +172,7 @@ public class NetworkGraph : INetworkSimulator
             Tick();
             var bytes = Array.Empty<byte>();
 
+            counters.Refresh(TotalTicks);
             foreach (var network in _networks)
             {
                 Monitoring.Push(TotalTicks,
@@ -340,6 +335,7 @@ public class NetworkGraph : INetworkSimulator
     public void UpdateRoutes()
     {
         PathFinder.Build();
+        counters.WithNetworks(_networks.Values);
     }
 
     public bool Link(string sourceNetwork, string destinationNetwork)

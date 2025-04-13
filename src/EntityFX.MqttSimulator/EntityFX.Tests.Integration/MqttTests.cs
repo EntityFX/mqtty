@@ -54,7 +54,9 @@ namespace EntityFX.Tests.Integration
             var networkBuilder = serviceProvider?.GetRequiredService<INetworkBuilder>();
             var networkSimulatorBuilder = serviceProvider?.GetRequiredService<INetworkSimulatorBuilder>();
 
-            graph = new NetworkGraph(serviceProvider!, networkBuilder!, new DijkstraPathFinder(), monitoring!);
+            graph = new NetworkGraph(serviceProvider!, networkBuilder!, new DijkstraPathFinder(), monitoring!, 
+                new TicksOptions() {  
+                    ReceiveWaitPeriod = TimeSpan.FromMilliseconds(0.1)});
 
             networkSimulatorBuilder!.Configure(graph, new NetworkGraphOption()
             {
