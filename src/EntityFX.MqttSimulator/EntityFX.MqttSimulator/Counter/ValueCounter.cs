@@ -15,7 +15,17 @@ namespace EntityFX.MqttY.Counter
 
         object ICounter.Value => Value;
 
+        public TValue PreviousValue => _previousValue;
+
+        object ICounter.PreviousValue => PreviousValue;
+
+        public long LastTicks { get; private set; }
+
         private TValue _value = default;
+
+        private TValue _previousValue = default;
+
+
         private readonly NormalizeUnits? normalizeUnits;
 
         public ValueCounter(string name, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
@@ -27,10 +37,12 @@ namespace EntityFX.MqttY.Counter
 
         public void Refresh(long totalTicks)
         {
+            LastTicks = totalTicks;
         }
 
         public void Set(TValue Value)
         {
+            _previousValue = Value;
             _value = Value;
         }
 

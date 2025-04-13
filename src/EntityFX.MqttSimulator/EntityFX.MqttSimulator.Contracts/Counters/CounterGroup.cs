@@ -15,12 +15,17 @@
 
         public string? UnitOfMeasure { get; init; }
 
+        public object PreviousValue => string.Empty;
+
+        public long LastTicks { get; private set; }
+
         public virtual void Refresh(long totalTicks)
         {
             foreach (var counter in Counters)
             {
                 counter.Refresh(totalTicks);
             }
+            LastTicks = totalTicks;
         }
 
         public override string ToString()

@@ -38,6 +38,7 @@ namespace EntityFX.MqttY.Scenarios
 
             Context!.NetworkGraph!.StartPeriodicRefreshAsync();
 
+            networkSimulatorBuilder.OptionsPath = Config.OptionsPath;
             networkSimulatorBuilder.Configure(Context!.NetworkGraph, Config.NetworkGraphOption);
 
             return Task.CompletedTask;

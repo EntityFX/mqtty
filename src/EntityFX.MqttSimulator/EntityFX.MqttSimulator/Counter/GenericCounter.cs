@@ -13,7 +13,15 @@ namespace EntityFX.MqttY.Counter
 
         object ICounter.Value => Value;
 
+        public long PreviousValue => _privateValue;
+
+        object ICounter.PreviousValue => PreviousValue;
+
+        public long LastTicks { get; private set; }
+
         private long _value = 0;
+        private long _privateValue = 0;
+
         private readonly NormalizeUnits? normalizeUnits;
 
         public GenericCounter(string name, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
@@ -49,6 +57,7 @@ namespace EntityFX.MqttY.Counter
 
         public void Refresh(long totalTicks)
         {
+            LastTicks = totalTicks;
         }
     }
 }

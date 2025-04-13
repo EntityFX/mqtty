@@ -22,6 +22,8 @@ namespace EntityFX.MqttY.Counter
 
         private readonly TicksOptions ticksOptions;
 
+        private long _lastTicks;
+
         public NetworkCounters(string name, TicksOptions ticksOptions)
             : base(name)
         {
@@ -82,10 +84,16 @@ namespace EntityFX.MqttY.Counter
         {
             base.Refresh(totalTicks);
 
-            if (totalTicks == 0) return;
+            var ticksDiff = totalTicks - _lastTicks;
 
-            _inboundThroughput.Set((double)_inboundCounter.Value / totalTicks * ticksPerSecond);
-            _outboundThroughput.Set((double)_outboundCounter.Value / totalTicks * ticksPerSecond);
+            if (ticksDiff == 0) return;
+
+            var tickRps = ticksPerSecond / ticksDiff;
+
+            _inboundThroughput.Set(_inboundCounter.Value * tickRps);
+            _outboundThroughput.Set(_outboundCounter.Value * tickRps);
+
+            _lastTicks = totalTicks;
         }
     }
 }

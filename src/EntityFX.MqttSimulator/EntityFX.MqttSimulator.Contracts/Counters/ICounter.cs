@@ -10,6 +10,8 @@ namespace EntityFX.MqttY.Contracts.Counters
         where TValue: struct, IEquatable<TValue>
     {
         new TValue Value { get; }
+
+        new TValue PreviousValue { get; }
     }
 
     public interface ICounter
@@ -19,6 +21,10 @@ namespace EntityFX.MqttY.Contracts.Counters
         string? UnitOfMeasure { get; init; }
 
         object Value { get; }
+
+        object PreviousValue { get; }
+
+        long LastTicks { get; }
 
         void Refresh(long totalTicks);
     }
