@@ -13,6 +13,8 @@ namespace EntityFX.MqttY.Contracts.Network
         IReadOnlyDictionary<string, IClient> Clients { get; }
         IReadOnlyDictionary<string, IApplication> Applications { get; }
 
+        long QueueSize {  get; }
+
         bool Link(INetwork network);
 
         bool Unlink(INetwork network);

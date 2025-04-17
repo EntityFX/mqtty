@@ -34,7 +34,6 @@ internal class Worker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        NetworkSimulation? context = null;
         using (var scenario = _scenariosFactory.Create(
             new(_options.Value.StartScenario, _options.Value.Scenarios)))
         {
@@ -44,31 +43,6 @@ internal class Worker : BackgroundService
             }
 
             await scenario.ExecuteAsync();
-
-            context = scenario.Context as NetworkSimulation;
-
-            while (true)
-            {
-                await Task.Delay(2000);
-
-                Console.Write(context!.NetworkGraph!.Counters.Dump());
-            }
-
         }
-
-        //var items = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter()
-        //{
-        //    ByMonitoringType = new[] { MonitoringType.Link }
-        //});
-
-        //var byProtocol = context?.NetworkGraph?.Monitoring.GetByFilter(new MonitoringFilter()
-        //{
-        //    ByProtocol = "mqtt"
-        //});
-
-        //var categoryCounters = context?.NetworkGraph?.Monitoring.GetCountersByCategory();
-
-        //var plantGraph = _plantUmlGraphGenerator.Generate(_networkGraph);
-        //File.WriteAllText("graph.puml", plantGraph);
     }
 }

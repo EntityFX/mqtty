@@ -10,13 +10,6 @@ namespace EntityFX.MqttY.Scenarios
 
     internal class MqttPublishAction : ScenarioAction<NetworkSimulation, MqttPublishOptions>
     {
-        public MqttPublishAction(IScenario<NetworkSimulation> scenario)
-            : base(scenario)
-        {
-            
-        }
-
-
         public override async Task ExecuteAsync()
         {
             if (Config == null)

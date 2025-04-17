@@ -17,7 +17,7 @@
 
         public new TContext? Context { get; set; }
 
-        IScenario<TContext> Scenario { get; init; }
+        IScenario<TContext>? Scenario { get; init; }
     }
 
     public interface IAction<TContext, TConfig> : IAction<TContext>

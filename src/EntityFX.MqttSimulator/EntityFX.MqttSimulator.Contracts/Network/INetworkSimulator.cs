@@ -16,6 +16,8 @@ namespace EntityFX.MqttY.Contracts.Network
 
         public event EventHandler<Exception>? OnError;
 
+        public event EventHandler<long>? OnRefresh;
+
         string GetAddress(string name, string protocolType, string network);
 
         bool AddClient(IClient client);

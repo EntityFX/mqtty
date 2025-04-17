@@ -67,6 +67,8 @@ public class Network : NodeBase, INetwork
 
     public override NodeType NodeType => NodeType.Network;
 
+    public long QueueSize => _monitoringPacketsQueue.Count;
+
     public Network(int index, string name, string address, INetworkSimulator networkGraph, TicksOptions ticksOptions)
         : base(index, name, address, networkGraph)
     {

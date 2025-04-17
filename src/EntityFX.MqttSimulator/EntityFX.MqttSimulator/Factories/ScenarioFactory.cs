@@ -60,46 +60,7 @@ internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDiction
 
             var actionOptionValue = actionOption.Value;
 
-            IAction<TContext>? action = null;
-            switch (actionOption.Value.Type)
-            {
-                case "network-init":
-                    var networkGraphOption = configurationSection.GetSection("graph").Get<NetworkGraphOption>();
-                    var monitoringOption = configurationSection.GetSection("monitoring").Get<MonitoringOption>();
-
-                    var networkGraph = _serviceProvider.GetRequiredService<IFactory<INetworkSimulator, NetworkGraphFactoryOption>>();
-                    var networkSimulatorBuilder = _serviceProvider.GetRequiredService<INetworkSimulatorBuilder>();
-
-                    var networkInitAction = new NetworkInitAction(networkSimulatorBuilder, s, networkGraph)
-                    {
-                        Config = new NetworkGraphFactoryOption() {
-                            MonitoringOption = monitoringOption ?? new MonitoringOption(), 
-                            NetworkGraphOption = networkGraphOption ?? new NetworkGraphOption(), 
-                            OptionsPath = configurationPath
-                        },
-                        Delay = actionOptionValue.Delay,
-                        Iterations = actionOptionValue.Iterations,
-                        IterationsTimeout = actionOptionValue.IterationsTimeout,
-                        ActionTimeout = actionOptionValue.ActionTimeout,
-                        Index = actionOptionValue.Index
-                    };
-                    action = (IAction<TContext>)networkInitAction;
-                    break;
-                case "mqtt-publish":
-                    var mqttPublishOptions = configurationSection.Get<MqttPublishOptions>();
-
-                    var mqttPublishAction = new MqttPublishAction(s)
-                    {
-                        Config = mqttPublishOptions,
-                        Delay = actionOptionValue.Delay,
-                        Iterations = actionOptionValue.Iterations,
-                        IterationsTimeout = actionOptionValue.IterationsTimeout,
-                        ActionTimeout = actionOptionValue.ActionTimeout,
-                        Index = actionOption.Value.Index
-                    };
-                    action = (IAction<TContext>)mqttPublishAction;
-                    break;
-            }
+            var action = BuildAction<TContext>(s, actionOption, configurationPath, configurationSection, actionOptionValue);
 
             if (action == null) continue;
 
@@ -108,6 +69,61 @@ internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDiction
 
         var actionsDictionary = actions.ToDictionary(a => a.Index, a => a);
         return actionsDictionary;
+    }
+
+    private IAction<TContext>? BuildAction<TContext>(IScenario<NetworkSimulation> s, 
+        KeyValuePair<string, ScenarioActionOption> actionOption, string configurationPath, 
+        IConfigurationSection configurationSection, ScenarioActionOption actionOptionValue)
+    {
+        switch (actionOption.Value.Type)
+        {
+            case "network-init":
+                var networkGraphOption = configurationSection.GetSection("graph").Get<NetworkGraphOption>();
+                var monitoringOption = configurationSection.GetSection("monitoring").Get<MonitoringOption>();
+
+                var networkGraph = _serviceProvider.GetRequiredService<IFactory<INetworkSimulator, NetworkGraphFactoryOption>>();
+                var networkSimulatorBuilder = _serviceProvider.GetRequiredService<INetworkSimulatorBuilder>();
+
+                var config = new NetworkGraphFactoryOption()
+                {
+                    MonitoringOption = monitoringOption ?? new MonitoringOption(),
+                    NetworkGraphOption = networkGraphOption ?? new NetworkGraphOption(),
+                    OptionsPath = configurationPath,
+                    NetworkGraphFactory = networkGraph,
+                    NetworkSimulatorBuilder = networkSimulatorBuilder
+                };
+                return (IAction<TContext>)BuildAction<NetworkSimulation, NetworkInitAction, NetworkGraphFactoryOption>(
+                    s, actionOption, configurationSection, actionOptionValue, config);
+            case "mqtt-publish":
+                return (IAction<TContext>)BuildAction<NetworkSimulation, MqttPublishAction, MqttPublishOptions>(
+                    s, actionOption, configurationSection, actionOptionValue);
+            case "wait-network-queue":
+                return (IAction<TContext>)BuildAction<NetworkSimulation, WaitNetwokQueueEmptyAction, WaitNetwokQueueEmptyOptions>(
+                    s, actionOption, configurationSection, actionOptionValue);
+        }
+
+        return null;
+    }
+
+    private static TAction BuildAction<TContext, TAction, TConfig>(
+        IScenario<TContext> s, KeyValuePair<string, ScenarioActionOption> actionOption, 
+        IConfigurationSection configurationSection, ScenarioActionOption actionOptionValue, TConfig? initConfig = default)
+        where TAction : IAction<TContext, TConfig>, new()
+        where TConfig : new()
+    {
+        var waitNetwokQueueEmptyOptions = (initConfig != null ? initConfig : configurationSection.Get<TConfig>()) ?? new TConfig();
+        var waitNetwokQueueEmptyAction = new TAction()
+        {
+            Config = waitNetwokQueueEmptyOptions,
+            Delay = actionOptionValue.Delay,
+            Iterations = actionOptionValue.Iterations,
+            IterationsTimeout = actionOptionValue.IterationsTimeout,
+            ActionTimeout = actionOptionValue.ActionTimeout,
+            Index = actionOption.Value.Index,
+            Scenario = s
+        };
+
+        return waitNetwokQueueEmptyAction;
     }
 
     public IScenario? Configure((string Scenario, IDictionary<string, ScenarioOption> Options) options, IScenario? service)

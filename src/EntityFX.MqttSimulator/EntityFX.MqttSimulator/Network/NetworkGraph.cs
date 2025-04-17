@@ -35,9 +35,13 @@ public class NetworkGraph : INetworkSimulator
 
     public event EventHandler<Exception>? OnError;
 
+    public event EventHandler<long>? OnRefresh;
+
     private readonly NetworkSimulatorCounters counters;
 
     public CounterGroup Counters => counters;
+
+    private Timer? _timer;
 
     public NetworkGraph(
         IServiceProvider serviceProvider,
@@ -250,6 +254,8 @@ public class NetworkGraph : INetworkSimulator
 
         cancelTokenSource = new CancellationTokenSource();
 
+        _timer = new Timer(Refreshed, this, 0, 1000);
+
         return Task.Run(async () =>
         {
             bool refreshResult = true;
@@ -276,6 +282,11 @@ public class NetworkGraph : INetworkSimulator
         }, cancelTokenSource.Token);
     }
 
+    private void Refreshed(object? state)
+    {
+        OnRefresh?.Invoke(this, TotalTicks);
+    }
+
     public void Tick()
     {
         Interlocked.Increment(ref _tick);
@@ -284,6 +295,8 @@ public class NetworkGraph : INetworkSimulator
 
     public void StopPeriodicRefresh()
     {
+        _timer?.Change(0, 0);
+        _timer?.Dispose();
         cancelTokenSource?.Cancel();
     }
 
