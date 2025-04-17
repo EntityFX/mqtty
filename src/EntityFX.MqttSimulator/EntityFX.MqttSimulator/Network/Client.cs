@@ -72,7 +72,7 @@ public class Client : Node, IClient
 
         await SendImplementationAsync(connectPacket, false);
 
-        var response = await WaitResponse(connectPacket.Id);
+        var response = WaitResponse(connectPacket.Id);
 
         if (response == null)
         {

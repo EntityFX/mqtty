@@ -17,6 +17,8 @@ internal class NodeMonitoringPacket
 
     public bool IsSet { get; set; }
 
+    public bool IsExpired { get; set; } = false;
+
     internal long WaitTicks => _waitTicks;
 
     private long _waitTicks = 600000;
@@ -35,20 +37,22 @@ internal class NodeMonitoringPacket
 
     public bool WaitIsSet(TimeSpan timeout)
     {
-        var sw = new Stopwatch();
-        sw.Start();
-        while (true)
-        {
-            if (IsSet)
-            {
-                return true;
-            }
+        return ResetEventSlim?.Wait(TimeSpan.FromMinutes(1)) ?? false;
 
-            if (sw.Elapsed >= timeout)
-            {
-                return false;
-            }
-        }
+        //var sw = new Stopwatch();
+        //sw.Start();
+        //while (true)
+        //{
+        //    if (IsSet)
+        //    {
+        //        return true;
+        //    }
+
+        //    if (sw.Elapsed >= timeout)
+        //    {
+        //        return false;
+        //    }
+        //}
     }
 
 

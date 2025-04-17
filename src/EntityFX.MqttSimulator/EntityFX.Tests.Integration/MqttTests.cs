@@ -120,7 +120,7 @@ namespace EntityFX.Tests.Integration
 
             await mqClient2.SubscribeAsync("/test/#", MqttQos.AtLeastOnce);
 
-            graph.Refresh();
+            await graph.Refresh();
         }
 
         [TestMethod]

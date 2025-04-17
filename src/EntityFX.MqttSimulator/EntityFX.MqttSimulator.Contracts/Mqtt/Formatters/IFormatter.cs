@@ -6,9 +6,9 @@ namespace EntityFX.MqttY.Contracts.Mqtt.Formatters
     {
         MqttPacketType PacketType { get; }
 
-        Task<IPacket> FormatAsync(byte[] bytes);
+        IPacket Format(byte[] bytes);
 
-        Task<byte[]> FormatAsync(IPacket packet);
+        byte[] Format(IPacket packet);
     }
 
 

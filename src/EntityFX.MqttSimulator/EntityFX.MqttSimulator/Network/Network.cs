@@ -19,7 +19,7 @@ public class Network : NodeBase, INetwork
     /// <summary>
     /// TODO: Add max size limit
     /// </summary>
-    private readonly List<NetworkMonitoringPacket> _monitoringPacketsQueue = new();
+    private readonly ConcurrentBag<NetworkMonitoringPacket> _monitoringPacketsQueue = new();
     //private Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
 
     private readonly TicksOptions ticksOptions;
@@ -202,7 +202,7 @@ public class Network : NodeBase, INetwork
     {
         var networkPacket = GetNetworkPacketType(packet);
 
-       // _monitoringPacketsQueue.Add(packet.Id, networkPacket);
+        // _monitoringPacketsQueue.Add(packet.Id, networkPacket);
         _monitoringPacketsQueue.Add(networkPacket);
 
         counters.CountInbound(packet);
@@ -234,9 +234,13 @@ public class Network : NodeBase, INetwork
 
         var pathQueue = new Queue<INetwork>(pathToRemote);
         destionationNode = (toNetwork as Network)?.GetDestinationNode(packet.To!, packet.ToType);
+
+        var waitTime = _monitoringPacketsQueue.Count <= 5000 ? ticksOptions.NetworkTicks :
+                _monitoringPacketsQueue.Count / 5000 * ticksOptions.NetworkTicks;
+
         return new NetworkMonitoringPacket(packet, pathQueue, NetworkPacketType.Remote, destionationNode)
         {
-            WaitTime = ticksOptions.NetworkTicks
+            WaitTime = waitTime
         };
     }
 
@@ -316,67 +320,81 @@ public class Network : NodeBase, INetwork
     }
 
     //TODO: add tick reaction
-    public override async Task Refresh()
+    public override Task Refresh()
     {
-        //_monitoringPacketsQueue = _monitoringPacketsQueue.Where(p => p.Value.WaitTime > 0)
-        //    .ToDictionary(k => k.Key, v => v.Value);
-
-        //foreach (var pendingPacket in _monitoringPacketsQueue.ToArray())
-        //{
-        //    pendingPacket.Value.ReduceWaitTime();
-
-        //    if (pendingPacket.Value.WaitTime > 0)
-        //    {
-        //        continue;
-        //    }
-
-        //    var result = await ProcessTransferPacket(pendingPacket.Value!);
-        //}
-        //counters.SetQueueLength(_monitoringPacketsQueue.Count);
-        //Counters.Refresh(NetworkGraph.TotalTicks);
-
-        var packets = _monitoringPacketsQueue.ToArray();
-        foreach (var pendingPacket in packets)
+        return Task.Run(async () =>
         {
-            if (pendingPacket == null)
+
+            //var packets = _monitoringPacketsQueue.ToArray();
+
+            foreach (var pendingPacket in _monitoringPacketsQueue)
             {
-                return;
+                //if (pendingPacket == null)
+                //{
+                //    continue;
+                //}
+
+                pendingPacket.ReduceWaitTime();
+
+                if (pendingPacket.WaitTime > 0)
+                {
+                    continue;
+                }
+                _monitoringPacketsQueue.TryTake(out var t);
+                var result = await ProcessTransferPacket(t);
+                //if (_monitoringPacketsQueue.TryTake(out var pending))
+                //{
+
+                //}
             }
 
-            pendingPacket.ReduceWaitTime();
 
-            if (pendingPacket.WaitTime > 0)
-            {
-                continue;
-            }
-            _monitoringPacketsQueue.Remove(pendingPacket);
-            var result = await ProcessTransferPacket(pendingPacket);
-            //if (_monitoringPacketsQueue.TryTake(out var pending))
+
+            //foreach (var pendingPacket in _monitoringPacketsQueue)
             //{
+            //    //if (pendingPacket == null)
+            //    //{
+            //    //    continue;
+            //    //}
 
+            //    pendingPacket.ReduceWaitTime();
+
+            //    if (pendingPacket.WaitTime > 0)
+            //    {
+            //        continue;
+            //    }
+            //    _monitoringPacketsQueue.TryTake(pendingPacket);
+            //    var result = await ProcessTransferPacket(pendingPacket);
+            //    //if (_monitoringPacketsQueue.TryTake(out var pending))
+            //    //{
+
+            //    //}
             //}
-        }
-        counters.SetQueueLength(_monitoringPacketsQueue.Count);
-        Counters.Refresh(NetworkGraph.TotalTicks);
+            counters.SetQueueLength(_monitoringPacketsQueue.Count);
+            Counters.Refresh(NetworkGraph.TotalTicks);
+        });
     }
 
     //TODO: need VIRTUAL wait 
-    private async Task<bool> ProcessTransferPacket(NetworkMonitoringPacket networkPacket)
+    private Task<bool> ProcessTransferPacket(NetworkMonitoringPacket networkPacket)
     {
-        var result = false;
-        var packet = networkPacket.Packet;
-        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!, 
-            $"Transfer packet {packet.From} to {packet.To}");
+        return Task.Run(async () =>
+        {
+            var result = false;
+            var packet = networkPacket.Packet;
+            var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!,
+                $"Transfer packet {packet.From} to {packet.To}");
 
-        if (networkPacket.Type == NetworkPacketType.Local)
-        {
-            result = await SendToLocalAsync(this, networkPacket);
-        }
-        else if (networkPacket.Type == NetworkPacketType.Remote)
-        {
-            result = await SendToRemoteAsync(networkPacket);
-        }
-        return result;
+            if (networkPacket.Type == NetworkPacketType.Local)
+            {
+                result = await SendToLocalAsync(this, networkPacket);
+            }
+            else if (networkPacket.Type == NetworkPacketType.Remote)
+            {
+                result = await SendToRemoteAsync(networkPacket);
+            }
+            return result;
+        });
     }
 
     public INode? FindNode(string address, NodeType type)

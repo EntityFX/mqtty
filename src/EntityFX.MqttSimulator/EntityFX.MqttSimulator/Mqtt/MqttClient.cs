@@ -119,7 +119,7 @@ namespace EntityFX.MqttY.Mqtt
             mqttCounters.PacketTypeCounters[subscribe.Type].Increment();
             await SendAsync(payload);
             //TODO: get response
-            var response = await WaitResponse(subscribeId);
+            var response = WaitResponse(subscribeId);
 
             if (response == null)
             {
@@ -231,6 +231,11 @@ namespace EntityFX.MqttY.Mqtt
             if (publishPacket == null)
             {
                 return;
+            }
+
+            if (Name == "mgx11")
+            {
+
             }
 
             NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, packet, NetworkLoggerType.Receive, 

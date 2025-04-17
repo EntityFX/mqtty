@@ -50,7 +50,7 @@ namespace EntityFX.MqttY.Counter
         {
             if (!Value.IsNumericType())
             {
-                return Value.ToString() ?? string.Empty;
+                return $"{Name}={(Value.ToString() ?? string.Empty)}";
             }
 
             var doubleValue = Convert.ToDouble(Value);

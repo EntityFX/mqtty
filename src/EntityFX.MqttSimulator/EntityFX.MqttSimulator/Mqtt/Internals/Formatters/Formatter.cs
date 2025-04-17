@@ -25,7 +25,7 @@ namespace EntityFX.MqttY.Mqtt.Internals.Formatters
         Guid.NewGuid().ToString().Replace("-", string.Empty).Substring(0, 10)
     );
 
-        public async Task<IPacket> FormatAsync(byte[] bytes)
+        public IPacket Format(byte[] bytes)
         {
             var actualType = (MqttPacketType)bytes.Byte(0).Bits(4);
 
@@ -36,13 +36,12 @@ namespace EntityFX.MqttY.Mqtt.Internals.Formatters
                 throw new MqttException(error);
             }
 
-            var packet = await Task.Run(() => Read(bytes))
-                .ConfigureAwait(continueOnCapturedContext: false);
+            var packet = Read(bytes);
 
             return packet;
         }
 
-        public async Task<byte[]> FormatAsync(IPacket packet)
+        public byte[] Format(IPacket packet)
         {
             if (packet.Type != PacketType)
             {
@@ -59,8 +58,7 @@ namespace EntityFX.MqttY.Mqtt.Internals.Formatters
                 throw new MqttException(error);
             }
 
-            var bytes = await Task.Run(() => Write(packetTyped))
-                .ConfigureAwait(continueOnCapturedContext: false);
+            var bytes = Write(packetTyped);
 
             return bytes;
         }

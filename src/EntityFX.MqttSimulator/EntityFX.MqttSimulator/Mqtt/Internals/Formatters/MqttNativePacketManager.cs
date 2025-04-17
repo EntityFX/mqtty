@@ -27,7 +27,7 @@ namespace EntityFX.MqttY.Mqtt.Internals.Formatters
             };
         }
 
-        public async Task<TPacket?> BytesToPacket<TPacket>(byte[] bytes)
+        public Task<TPacket?> BytesToPacket<TPacket>(byte[] bytes)
             where TPacket : IPacket
         {
             var packetType = (MqttPacketType)bytes.Byte(0).Bits(4);
@@ -36,13 +36,12 @@ namespace EntityFX.MqttY.Mqtt.Internals.Formatters
             if (!formatters.TryGetValue(packetType, out formatter))
                 throw new MqttException("PacketUnknown");
 
-            var packet = await formatter.FormatAsync(bytes)
-                .ConfigureAwait(continueOnCapturedContext: false);
+            var packet = formatter.Format(bytes);
 
-            return (TPacket?)packet;
+            return Task.FromResult((TPacket?)packet);
         }
 
-        public async Task<byte[]> PacketToBytes<TPacket>(TPacket packet)
+        public Task<byte[]> PacketToBytes<TPacket>(TPacket packet)
             where TPacket : IPacket
         {
             var formatter = default(IFormatter);
@@ -50,10 +49,9 @@ namespace EntityFX.MqttY.Mqtt.Internals.Formatters
             if (!formatters.TryGetValue(packet.Type, out formatter))
                 throw new MqttException("PacketUnknown");
 
-            var bytes = await formatter.FormatAsync(packet)
-                .ConfigureAwait(continueOnCapturedContext: false);
+            var bytes = formatter.Format(packet);
 
-            return bytes;
+            return Task.FromResult(bytes);
         }
     }
 

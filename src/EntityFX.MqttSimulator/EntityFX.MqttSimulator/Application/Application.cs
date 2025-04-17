@@ -42,6 +42,10 @@ namespace EntityFX.MqttY.Application
 
         protected readonly INetworkSimulator NetworkGraph;
 
+        internal readonly ApplicationCounters counters;
+
+        public CounterGroup Counters => counters;
+
         public Application(int index, string name, string address, string protocolType, string specification,
             INetwork network, INetworkSimulator networkGraph, TOptions? options)
         {
@@ -54,9 +58,9 @@ namespace EntityFX.MqttY.Application
             Index = index;
             NetworkGraph = networkGraph;
             Options = options;
-        }
 
-        public virtual CounterGroup Counters => new CounterGroup("Invokes");
+            counters = new ApplicationCounters(Name ?? string.Empty);
+        }
 
 
         public virtual Task Refresh()

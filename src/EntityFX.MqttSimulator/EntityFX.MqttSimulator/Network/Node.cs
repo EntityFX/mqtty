@@ -36,6 +36,7 @@ public abstract class Node : NodeBase
             if (packet.Value.WaitTicks <= 0)
             {
                 packet.Value.ResetEventSlim?.Set();
+                packet.Value.IsExpired = true;  
             }
         }
         return base.Refresh();
@@ -97,32 +98,37 @@ public abstract class Node : NodeBase
     }
 
     //подписываемся на ManualResetEventSlim и ждём его
-    protected Task<ResponsePacket?> WaitResponse(Guid packetId)
+    protected ResponsePacket? WaitResponse(Guid packetId)
     {
-        return Task.Run(() =>
+        /*return Task.Run(() =>
+        {*/
+        var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
+
+        if (monitorPacket == null)
         {
-            var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
+            return null;
+        }
 
-            if (monitorPacket == null)
-            {
-                return Task.FromResult<ResponsePacket?>(null);
-            }
+        //var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
+        var isSet = monitorPacket?.WaitIsSet(TimeSpan.FromMinutes(1));
 
-            //var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
-            var isSet = monitorPacket?.WaitIsSet(TimeSpan.FromMinutes(1));
+        if (!monitorMessages.TryRemove(packetId, out monitorPacket))
+        {
+            return null;
+        }
 
-            if (!monitorMessages.TryRemove(packetId, out monitorPacket))
-            {
-                return Task.FromResult<ResponsePacket?>(null);
-            }
+        if (isSet != true)
+        {
+            return null;
+        }
 
-            if (isSet != true)
-            {
-                return Task.FromResult<ResponsePacket?>(null);
-            }
+        if (monitorPacket.IsExpired == true)
+        {
+            return null;
+        }
 
-            return Task.FromResult<ResponsePacket?>(new ResponsePacket(
-                monitorPacket.ResponsePacket!, monitorPacket.RequestTick, monitorPacket.ResponseTick ?? 0));
-        });
+        return new ResponsePacket(
+            monitorPacket.ResponsePacket!, monitorPacket.RequestTick, monitorPacket.ResponseTick ?? 0);
+        /* });*/
     }
 }

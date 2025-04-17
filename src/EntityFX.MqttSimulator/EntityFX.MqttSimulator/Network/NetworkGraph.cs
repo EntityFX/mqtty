@@ -173,13 +173,17 @@ public class NetworkGraph : INetworkSimulator
             var bytes = Array.Empty<byte>();
 
             counters.Refresh(TotalTicks);
+
+            var networksRefresh = new List<Task>();
             foreach (var network in _networks)
             {
                 Monitoring.Push(TotalTicks,
                     network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
                     "Network", "Refresh", scope);
-                await network.Value.Refresh();
+                networksRefresh.Add(network.Value.Refresh());
             }
+
+            Task.WaitAll(networksRefresh.ToArray());
 
             foreach (var node in _nodes)
             {
