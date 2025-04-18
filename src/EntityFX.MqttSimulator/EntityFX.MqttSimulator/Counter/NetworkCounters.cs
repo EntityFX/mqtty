@@ -89,7 +89,7 @@ namespace EntityFX.MqttY.Counter
             if (ticksDiff == 0) return;
 
             var tickRps = ticksPerSecond / ticksDiff;
-
+            //считаем за дельту тиков.
             _inboundThroughput.Set(_inboundCounter.Value * tickRps);
             _outboundThroughput.Set(_outboundCounter.Value * tickRps);
 

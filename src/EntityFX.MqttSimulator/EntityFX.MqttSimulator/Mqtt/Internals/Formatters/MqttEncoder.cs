@@ -92,6 +92,32 @@ namespace EntityFX.MqttY.Mqtt.Internals.Formatters
 
             return value;
         }
+
+        internal int DecodeRemainingLength(byte[] packet, out int arrayLength, out byte[] bytes)
+        {
+            var multiplier = 1;
+            var value = 0;
+            var index = 0;
+            var encodedByte = default(byte);
+
+            do
+            {
+                index++;
+                encodedByte = packet[index];
+                value += (encodedByte & 127) * multiplier;
+
+                if (multiplier > 128 * 128 * 128 || index > 4)
+                    throw new MqttException("MalformedRemainingLength");
+
+                multiplier *= 128;
+            } while ((encodedByte & 128) != 0);
+
+            arrayLength = index;
+
+            bytes = packet.AsSpan(1, arrayLength).ToArray();
+
+            return value;
+        }
     }
 
 
