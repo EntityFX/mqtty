@@ -187,8 +187,7 @@ namespace EntityFX.MqttY.Mqtt
 
             mqttCounters.PacketTypeCounters[publish.Type].Increment();
 
-            await SendAsync(packetPayload);
-            return true;
+            return await SendAsync(packetPayload);
         }
 
         public Task<bool> UnsubscribeAsync(string topicFilter)

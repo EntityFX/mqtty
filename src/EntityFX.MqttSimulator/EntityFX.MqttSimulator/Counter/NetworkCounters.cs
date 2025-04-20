@@ -11,6 +11,7 @@ namespace EntityFX.MqttY.Counter
 
         private readonly GenericCounter _transferPacketsCounter;
         private readonly ValueCounter<long> _queueCounter;
+        private readonly GenericCounter _refusedCounter;
 
         private readonly GenericCounter _outboundCounter;
         private readonly GenericCounter _outboundPacketsCounter;
@@ -32,6 +33,7 @@ namespace EntityFX.MqttY.Counter
             _transferPacketsCounter = new GenericCounter("TransferPackets");
 
             _queueCounter = new ValueCounter<long>("Queue");
+            _refusedCounter = new GenericCounter("Refused");
 
             _inboundPacketsCounter = new GenericCounter("InboundPackets");
             _inboundThroughput = new ValueCounter<double>("InboundThroughput", "b/s", NormalizeUnits.Bit);
@@ -43,6 +45,7 @@ namespace EntityFX.MqttY.Counter
 
             _counters.Add(_transferPacketsCounter);
             _counters.Add(_queueCounter);
+            _counters.Add(_refusedCounter);
             _counters.Add(_inboundPacketsCounter);
             _counters.Add(_inboundCounter);
             _counters.Add(_inboundThroughput);
@@ -80,6 +83,11 @@ namespace EntityFX.MqttY.Counter
             _queueCounter.Set(queueLength);
         }
 
+        public void Refuse()
+        {
+            _refusedCounter.Increment();
+        }
+
         public override void Refresh(long totalTicks)
         {
             base.Refresh(totalTicks);
@@ -89,9 +97,13 @@ namespace EntityFX.MqttY.Counter
             if (ticksDiff == 0) return;
 
             var tickRps = ticksPerSecond / ticksDiff;
+
+            var inboundDiff = _inboundCounter.Value - _inboundCounter.PreviousValue;
+            var outboundDiff = _outboundCounter.Value - _outboundCounter.PreviousValue;
+
             //считаем за дельту тиков.
-            _inboundThroughput.Set(_inboundCounter.Value * tickRps);
-            _outboundThroughput.Set(_outboundCounter.Value * tickRps);
+            _inboundThroughput.Set(inboundDiff * tickRps);
+            _outboundThroughput.Set(outboundDiff * tickRps);
 
             _lastTicks = totalTicks;
         }

@@ -96,15 +96,17 @@ public class Server : Node, IServer
         return Task.CompletedTask;
     }
 
-    protected override async Task SendImplementationAsync(NetworkPacket packet)
+    protected override async Task<bool> SendImplementationAsync(NetworkPacket packet)
     {
         var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!, 
             $"Send packet {packet.From} to {packet.To}");
         NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, packet, NetworkLoggerType.Send, 
             $"Send packet {packet.From} to {packet.To}", ProtocolType, "Net Send", scope);
-        await Network.SendAsync(packet);
+        var result = await Network.SendAsync(packet);
 
         NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
+
+        return result;
     }
 
     public void Start()

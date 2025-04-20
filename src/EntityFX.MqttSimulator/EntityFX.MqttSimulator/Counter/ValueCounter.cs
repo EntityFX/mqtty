@@ -1,4 +1,6 @@
-﻿using EntityFX.MqttY.Contracts.Counters;
+﻿using EntityFX.MqttY.Collections;
+using EntityFX.MqttY.Contracts.Counters;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Helper;
 
 namespace EntityFX.MqttY.Counter
@@ -25,6 +27,8 @@ namespace EntityFX.MqttY.Counter
 
         private TValue _previousValue = default;
 
+        private readonly FixedSizedQueue<KeyValuePair<long, TValue>> _valueHistory = new(1000);
+
 
         private readonly NormalizeUnits? normalizeUnits;
 
@@ -44,6 +48,7 @@ namespace EntityFX.MqttY.Counter
         {
             _previousValue = Value;
             _value = Value;
+            _valueHistory.Enqueue(new KeyValuePair<long, TValue>(LastTicks, Value));
         }
 
         public override string ToString()

@@ -200,16 +200,22 @@ public class Network : NodeBase, INetwork
     //TODO: If queue limit is exceeded then reject Send
     //bool?
     //timeout?
-    protected override Task SendImplementationAsync(NetworkPacket packet)
+    protected override Task<bool> SendImplementationAsync(NetworkPacket packet)
     {
         var networkPacket = GetNetworkPacketType(packet);
+
+        if (_monitoringPacketsQueue.Count > 5000)
+        {
+            counters.Refuse();
+            return Task.FromResult(false);
+        }
 
         // _monitoringPacketsQueue.Add(packet.Id, networkPacket);
         _monitoringPacketsQueue.Add(networkPacket);
 
         counters.CountInbound(packet);
 
-        return Task.CompletedTask;
+        return Task.FromResult(true);
     }
 
     private NetworkMonitoringPacket GetNetworkPacketType(NetworkPacket packet)

@@ -149,12 +149,14 @@ public class Client : Node, IClient
         await SendImplementationAsync(packet);
     }
 
-    protected override async Task SendImplementationAsync(NetworkPacket packet)
+    protected override async Task<bool> SendImplementationAsync(NetworkPacket packet)
     {
         BeforeSend(packet);
 
-        await Network!.SendAsync(packet);
+        var result = await Network!.SendAsync(packet);
         AfterSend(packet);
+
+        return result;
     }
 
     public async Task SendAsync(byte[] payload, string? category = null)

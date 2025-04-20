@@ -27,7 +27,7 @@ public abstract class NodeBase : ISender
 
     protected abstract Task ReceiveImplementationAsync(NetworkPacket packet);
 
-    protected abstract Task SendImplementationAsync(NetworkPacket packet);
+    protected abstract Task<bool> SendImplementationAsync(NetworkPacket packet);
 
 
     protected abstract void BeforeReceive(NetworkPacket packet);
@@ -48,11 +48,11 @@ public abstract class NodeBase : ISender
 
 
     //Создаём ManualResetEventSlim 
-    public async Task SendAsync(NetworkPacket packet)
+    public async Task<bool> SendAsync(NetworkPacket packet)
     {
         BeforeSend(packet);
 
-        await SendImplementationAsync(packet);
+        return await SendImplementationAsync(packet);
 
         AfterSend(packet);
     }
