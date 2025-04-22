@@ -35,5 +35,9 @@ namespace EntityFX.MqttY.Contracts.Network
 
         INode? FindNode(string nodeAddress, NodeType type);
 
+        Task StartPeriodicRefreshAsync();
+
+        void StopPeriodicRefresh();
+
     }
 }

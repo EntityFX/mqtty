@@ -9,9 +9,16 @@ public abstract class Node : NodeBase
     //храним только Guid, ManualResetEventSlim
     private readonly ConcurrentDictionary<Guid, NodeMonitoringPacket> monitorMessages = new ConcurrentDictionary<Guid, NodeMonitoringPacket>();
 
-    internal readonly NodeCounters counters;
+    internal NodeCounters counters;
 
-    public override CounterGroup Counters => counters;
+    public override CounterGroup Counters
+    {
+        get => counters;
+        set
+        {
+            counters = (NodeCounters)value;
+        }
+    }
 
     public Node(int index, string name, string address, INetworkSimulator networkGraph) : base(index, name, address, networkGraph)
     {
@@ -36,7 +43,7 @@ public abstract class Node : NodeBase
             if (packet.Value.WaitTicks <= 0)
             {
                 packet.Value.ResetEventSlim?.Set();
-                packet.Value.IsExpired = true;  
+                packet.Value.IsExpired = true;
             }
         }
         return base.Refresh();

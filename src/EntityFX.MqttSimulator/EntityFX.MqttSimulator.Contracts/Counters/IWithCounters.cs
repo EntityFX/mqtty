@@ -2,6 +2,6 @@
 {
     public interface IWithCounters
     {
-        CounterGroup Counters { get; }
+        CounterGroup Counters { get; set;  }
     }
 }

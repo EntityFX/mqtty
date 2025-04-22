@@ -25,6 +25,8 @@ namespace EntityFX.MqttY.Counter
 
         private long _lastTicks;
 
+        public double InboundThroughput => _inboundThroughput.Value;
+
         public NetworkCounters(string name, TicksOptions ticksOptions)
             : base(name)
         {

@@ -49,7 +49,7 @@ namespace EntityFX.MqttY.Counter
 
         public override IEnumerable<ICounter> Counters { 
             get => _counters.Concat(_netwotkCounters).ToArray();
-            init => base.Counters = value; 
+            set => base.Counters = value; 
         }
 
         public void WithNetworks(IEnumerable<INetwork> networks)

@@ -37,9 +37,16 @@ public class NetworkGraph : INetworkSimulator
 
     public event EventHandler<long>? OnRefresh;
 
-    private readonly NetworkSimulatorCounters counters;
+    private NetworkSimulatorCounters counters;
 
-    public CounterGroup Counters => counters;
+    public CounterGroup Counters
+    {
+        get => counters;
+        set
+        {
+            counters = (NetworkSimulatorCounters)value;
+        }
+    }
 
     private Timer? _timer;
 
@@ -178,16 +185,25 @@ public class NetworkGraph : INetworkSimulator
 
             counters.Refresh(TotalTicks);
 
-            var networksRefresh = new List<Task>();
-            foreach (var network in _networks)
-            {
-                Monitoring.Push(TotalTicks,
-                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                    "Network", "Refresh", scope);
-                networksRefresh.Add(network.Value.Refresh());
-            }
+            //var networksRefresh = new List<Task>();
+            //foreach (var network in _networks)
+            //{
+            //    Monitoring.Push(TotalTicks,
+            //        network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
+            //        "Network", "Refresh", scope);
+            //    networksRefresh.Add(network.Value.Refresh());
+            //}
 
-            Task.WaitAll(networksRefresh.ToArray());
+            //Task.WaitAll(networksRefresh.ToArray());
+
+            //var nResult = Parallel.ForEach(_nodes, async node =>
+            //{
+            //    Monitoring.Push(TotalTicks,
+            //        node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+            //        scope);
+            //    await node.Value.Refresh();
+            //});
+
 
             foreach (var node in _nodes)
             {
@@ -295,6 +311,7 @@ public class NetworkGraph : INetworkSimulator
 
     public void StopPeriodicRefresh()
     {
+        Reset();
         _timer?.Change(0, 0);
         _timer?.Dispose();
         cancelTokenSource?.Cancel();
@@ -345,6 +362,8 @@ public class NetworkGraph : INetworkSimulator
         }
 
         UpdateRoutes();
+
+        network.StartPeriodicRefreshAsync();
 
         return result;
     }

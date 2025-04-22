@@ -7,7 +7,7 @@
             Name = name;
         }
 
-        public virtual IEnumerable<ICounter> Counters { get; init; } = Enumerable.Empty<ICounter>();
+        public virtual IEnumerable<ICounter> Counters { get; set; } = Enumerable.Empty<ICounter>();
 
         public string Name { get; init; } = string.Empty;
 

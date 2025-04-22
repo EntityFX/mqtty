@@ -33,7 +33,7 @@ namespace EntityFX.Tests.Integration
             var serviceCollection = new ServiceCollection()
             .AddScoped<IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>>, ClientFactory>()
             .AddScoped<IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>>, ServerFactory>()
-            .AddScoped<IFactory<INetwork, NodeBuildOptions<(TicksOptions TicksOptions, Dictionary<string, string[]> Additional)>>, NetworkFactory>()
+            .AddScoped<IFactory<INetwork, NodeBuildOptions<NetworkBuildOption>>, NetworkFactory>()
             .AddScoped<IFactory<IApplication?, NodeBuildOptions<object>>, GenericApplicationFactiory>()
             .AddScoped<IMqttPacketManager, MqttNativePacketManager>()
             //.AddScoped<IMqttPacketManager, MqttJsonPacketManager>()

@@ -9,10 +9,12 @@ namespace EntityFX.MqttY.Counter
     {
         public Dictionary<MqttPacketType, GenericCounter> PacketTypeCounters { get; }
 
+        public Dictionary<MqttPacketType, GenericCounter> RefusedPacketTypeCounters { get; }
+
         public override IEnumerable<ICounter> Counters 
         {
             get => PacketTypeCounters.Values.ToArray(); 
-            init => base.Counters = value; 
+            set => base.Counters = value; 
         }
 
         public MqttCounters(string name)
@@ -22,6 +24,12 @@ namespace EntityFX.MqttY.Counter
                 .ToDictionary(k => k, v => new GenericCounter(
                     v.GetEnumDescription()
                 ));
+
+        }
+
+        public void Increment(MqttPacketType mqttPacketType)
+        {
+            PacketTypeCounters[mqttPacketType].Increment();
         }
     }
 }

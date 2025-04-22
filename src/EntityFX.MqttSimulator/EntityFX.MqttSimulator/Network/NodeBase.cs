@@ -22,7 +22,7 @@ public abstract class NodeBase : ISender
     public int? GroupAmount { get; set; }
     public NetworkLoggerScope? Scope { get; set; }
 
-    public abstract CounterGroup Counters { get; }
+    public abstract CounterGroup Counters { get; set;  }
 
 
     protected abstract Task ReceiveImplementationAsync(NetworkPacket packet);

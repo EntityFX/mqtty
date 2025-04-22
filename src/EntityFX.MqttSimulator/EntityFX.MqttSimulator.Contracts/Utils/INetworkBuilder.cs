@@ -1,5 +1,4 @@
 using EntityFX.MqttY.Contracts.Network;
-using EntityFX.MqttY.Contracts.Options;
 
 namespace EntityFX.MqttY.Contracts.Utils;
 
@@ -9,7 +8,7 @@ public interface INetworkBuilder
     
     IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>> ServerFactory { get; }
     
-    IFactory<INetwork?, NodeBuildOptions<(TicksOptions TicksOptions, Dictionary<string, string[]> Additional)>> NetworkFactory { get; }
+    IFactory<INetwork?, NodeBuildOptions<NetworkBuildOption>> NetworkFactory { get; }
 
     IFactory<IApplication?, NodeBuildOptions<object>> ApplicationFactory { get; }
     

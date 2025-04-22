@@ -9,7 +9,7 @@ internal class NetworkBuilder : INetworkBuilder
     public NetworkBuilder(
         IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>> clientFactory,
         IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>> serverFactory,
-        IFactory<INetwork?, NodeBuildOptions<(TicksOptions TicksOptions, Dictionary<string, string[]> Additional)>> networkFactory,
+        IFactory<INetwork?, NodeBuildOptions<NetworkBuildOption>> networkFactory,
         IFactory<IApplication?, NodeBuildOptions<object>> applicationFactory)
     {
         ClientFactory = clientFactory;
@@ -26,7 +26,7 @@ internal class NetworkBuilder : INetworkBuilder
 
     public IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>> ServerFactory { get; }
 
-    public IFactory<INetwork?, NodeBuildOptions<(TicksOptions TicksOptions, Dictionary<string, string[]> Additional)>> NetworkFactory { get; }
+    public IFactory<INetwork?, NodeBuildOptions<NetworkBuildOption>> NetworkFactory { get; }
 
     public IFactory<IApplication?, NodeBuildOptions<object>> ApplicationFactory { get; }
 

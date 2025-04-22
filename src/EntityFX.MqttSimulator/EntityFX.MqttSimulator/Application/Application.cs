@@ -42,9 +42,16 @@ namespace EntityFX.MqttY.Application
 
         protected readonly INetworkSimulator NetworkGraph;
 
-        internal readonly ApplicationCounters counters;
+        internal ApplicationCounters counters;
 
-        public CounterGroup Counters => counters;
+        public CounterGroup Counters
+        {
+            get => counters;
+            set
+            {
+                counters = (ApplicationCounters)value;
+            }
+        }
 
         public Application(int index, string name, string address, string protocolType, string specification,
             INetwork network, INetworkSimulator networkGraph, TOptions? options)

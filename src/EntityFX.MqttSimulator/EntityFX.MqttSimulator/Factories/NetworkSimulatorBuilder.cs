@@ -86,7 +86,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
         return (TClient?)BuildClient(index, name, protocolType, specification, network, group, groupAmount, additional);
     }
 
-    public INetwork? BuildNetwork(int index, string name, string address, TicksOptions ticks)
+    public INetwork? BuildNetwork(int index, string name, string address, NetworkTypeOption networkTypeOption, TicksOptions ticks)
     {
         if (NetworkSimulator == null)
         {
@@ -95,9 +95,15 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 
         var network = networkBuilder
             .NetworkFactory.Create(
-                new NodeBuildOptions<(TicksOptions TicksOptions, Dictionary<string, string[]> Additional)>(
+                new NodeBuildOptions<NetworkBuildOption>(
                     serviceProvider, NetworkSimulator, null, index, name, address, null, null, "IP",
-                    string.Empty, null, (ticks, new Dictionary<string, string[]>())));
+                    string.Empty, null, new NetworkBuildOption()
+                    {
+                        TicksOptions = ticks,
+                        NetworkTypeOption = networkTypeOption,
+                        Additional = new Dictionary<string, string[]>()
+                    }
+                    ));
 
         if (network == null)
         {
@@ -155,7 +161,14 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 
         foreach (var networkOption in option.Networks)
         {
-            BuildNetwork(networkOption.Value.Index, networkOption.Key, networkOption.Key, option.Ticks);
+            var networkType = option.NetworkTypes.GetValueOrDefault(networkOption.Value.NetworkType) ?? new NetworkTypeOption()
+            {
+                RefreshTicks = 2,
+                SendTicks = 3,
+                Speed = 125000000
+            };
+
+            BuildNetwork(networkOption.Value.Index, networkOption.Key, networkOption.Key, networkType, option.Ticks);
         }
 
         ConfigureLinks(option);

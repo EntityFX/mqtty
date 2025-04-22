@@ -27,7 +27,7 @@ public static class Container
             .AddScoped<IFactory<INetworkSimulator, NetworkGraphFactoryOption>, NetworkGraphFactory>()
             .AddScoped<IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>>, ClientFactory>()
             .AddScoped<IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>>, ServerFactory>()
-            .AddScoped<IFactory<INetwork, NodeBuildOptions<(TicksOptions TicksOptions, Dictionary<string, string[]> Additional)>>, NetworkFactory>()
+            .AddScoped<IFactory<INetwork, NodeBuildOptions<NetworkBuildOption>>, NetworkFactory>()
             .AddScoped<IFactory<IApplication?, NodeBuildOptions<object>>, ApplicationFactory>()
             .AddScoped<IFactory<IScenario?, (string Scenario, IDictionary<string, ScenarioOption> Options)>, ScenarioFactory>()
             .AddScoped<INetworkBuilder, NetworkBuilder>()

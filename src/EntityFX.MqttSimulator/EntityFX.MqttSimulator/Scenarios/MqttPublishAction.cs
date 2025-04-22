@@ -2,6 +2,7 @@
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Scenarios;
 using EntityFX.MqttY.Network;
+using System.Diagnostics;
 using System.Linq;
 
 namespace EntityFX.MqttY.Scenarios
@@ -38,10 +39,25 @@ namespace EntityFX.MqttY.Scenarios
                 return;
             }
 
-            foreach (var item in mqttClients!)
+            _ = Task.Run(async () =>
             {
-                await item.Client.PublishAsync(item.Options.Topic, item.Options.Payload, MqttQos.AtLeastOnce);
-            }
+                var sw = new Stopwatch();
+                sw.Start();
+                while (true)
+                {
+                    foreach (var item in mqttClients!)
+                    {
+                        await item.Client.PublishAsync(item.Options.Topic, item.Options.Payload, MqttQos.AtLeastOnce);
+                    }
+
+                    if (sw.Elapsed > Config.PublishPeriod)
+                    {
+                        break;
+                    }
+                }
+            });
+
+
             //Context.NetworkGraph!.Refresh();
         }
 

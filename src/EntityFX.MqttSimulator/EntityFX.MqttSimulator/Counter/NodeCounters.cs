@@ -13,7 +13,7 @@ namespace EntityFX.MqttY.Counter
 
         public override IEnumerable<ICounter> Counters { 
             get => _counters.ToArray();
-            init => _counters = value.ToList(); 
+            set => _counters = value.ToList(); 
         }
 
         public NodeCounters(string name)

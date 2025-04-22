@@ -9,7 +9,8 @@ namespace EntityFX.MqttY.Contracts.Utils
 
         INetworkSimulator? NetworkSimulator { get; }
 
-        INetwork? BuildNetwork(int index, string name, string address, TicksOptions ticks);
+        INetwork? BuildNetwork(int index, string name, string address, 
+            NetworkTypeOption networkTypeOption, TicksOptions ticks);
 
         IClient? BuildClient(int index, string name, string protocolType, string specification,
             INetwork network, string? group = null, int? groupAmount = null,

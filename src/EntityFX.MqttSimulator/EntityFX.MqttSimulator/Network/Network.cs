@@ -4,6 +4,7 @@ using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Xml.Linq;
 using NetworkLoggerType = EntityFX.MqttY.Contracts.NetworkLogger.NetworkLoggerType;
 
@@ -20,24 +21,25 @@ public class Network : NodeBase, INetwork
     /// TODO: Add max size limit
     /// </summary>
     private readonly ConcurrentBag<NetworkMonitoringPacket> _monitoringPacketsQueue = new();
+    private readonly NetworkTypeOption networkTypeOption;
+
     //private Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
 
     private readonly TicksOptions ticksOptions;
 
-    private readonly NetworkCounters counters;
+    private readonly NetworkCounters networkCounters;
+    private CounterGroup _counters;
 
     private readonly object _countersLock = new object();
+    private CancellationTokenSource? cancelTokenSource;
 
     public override CounterGroup Counters
     {
         get
         {
-
-            return new CounterGroup(Name)
-            {
-                Counters = new ICounter[]
+            _counters.Counters = new ICounter[]
                 {
-                    counters,
+                    networkCounters,
                     new CounterGroup("Servers")
                     {
                         Counters = _servers.Values.ToArray().Select(s =>s.Counters)
@@ -50,9 +52,12 @@ public class Network : NodeBase, INetwork
                     {
                         Counters = _applications.Values.ToArray().Select(s =>s.Counters).ToArray()
                     },
-                }
-            };
-
+                };
+            return _counters;
+        }
+        set
+        {
+            _counters = value;
         }
     }
 
@@ -69,11 +74,14 @@ public class Network : NodeBase, INetwork
 
     public long QueueSize => _monitoringPacketsQueue.Count;
 
-    public Network(int index, string name, string address, INetworkSimulator networkGraph, TicksOptions ticksOptions)
+    public Network(int index, string name, string address, INetworkSimulator networkGraph,
+        NetworkTypeOption networkTypeOption, TicksOptions ticksOptions)
         : base(index, name, address, networkGraph)
     {
+        this.networkTypeOption = networkTypeOption;
         this.ticksOptions = ticksOptions;
-        counters = new NetworkCounters("Network", ticksOptions);
+        networkCounters = new NetworkCounters("Network", ticksOptions);
+        _counters = new CounterGroup(Name);
     }
 
     public bool AddClient(IClient client)
@@ -194,7 +202,7 @@ public class Network : NodeBase, INetwork
         //_monitoringPacketsQueue.Add(networkMonitoringPacket.Packet.Id, networkMonitoringPacket);
         _monitoringPacketsQueue.Add(networkMonitoringPacket);
 
-        counters.CountInbound(networkMonitoringPacket.Packet);
+        networkCounters.CountInbound(networkMonitoringPacket.Packet);
     }
 
     //TODO: If queue limit is exceeded then reject Send
@@ -202,18 +210,31 @@ public class Network : NodeBase, INetwork
     //timeout?
     protected override Task<bool> SendImplementationAsync(NetworkPacket packet)
     {
+        var startTicks = NetworkGraph.TotalTicks;
+
+        while (NetworkGraph.TotalTicks - startTicks < networkTypeOption.SendTicks)
+        {
+
+        }
+
         var networkPacket = GetNetworkPacketType(packet);
 
-        if (_monitoringPacketsQueue.Count > 5000)
+        //if (networkCounters.InboundThroughput * 1.5 > networkTypeOption.Speed)
+        //{
+        //    networkCounters.Refuse();
+        //    return Task.FromResult(false);
+        //}
+
+        if (_monitoringPacketsQueue.Count > 50000)
         {
-            counters.Refuse();
+            networkCounters.Refuse();
             return Task.FromResult(false);
         }
 
         // _monitoringPacketsQueue.Add(packet.Id, networkPacket);
         _monitoringPacketsQueue.Add(networkPacket);
 
-        counters.CountInbound(packet);
+        networkCounters.CountInbound(packet);
 
         return Task.FromResult(true);
     }
@@ -243,8 +264,10 @@ public class Network : NodeBase, INetwork
         var pathQueue = new Queue<INetwork>(pathToRemote);
         destionationNode = (toNetwork as Network)?.GetDestinationNode(packet.To!, packet.ToType);
 
-        var waitTime = _monitoringPacketsQueue.Count <= 5000 ? ticksOptions.NetworkTicks :
-                _monitoringPacketsQueue.Count / 5000 * ticksOptions.NetworkTicks;
+        //var waitTime = _monitoringPacketsQueue.Count <= 5000 ? ticksOptions.NetworkTicks :
+        //        _monitoringPacketsQueue.Count / 5000 * ticksOptions.NetworkTicks;
+
+        var waitTime = networkTypeOption.RefreshTicks;
 
         return new NetworkMonitoringPacket(packet, pathQueue, NetworkPacketType.Remote, destionationNode)
         {
@@ -272,7 +295,7 @@ public class Network : NodeBase, INetwork
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
         NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
 
-        counters.CountOutbound(packet);
+        networkCounters.CountOutbound(packet);
         await networkPacket.DestionationNode!.ReceiveAsync(packet);
 
         return true;
@@ -315,8 +338,8 @@ public class Network : NodeBase, INetwork
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
 
 
-        counters.CountTransfers();
-        counters.CountOutbound(networkPacket.Packet);
+        networkCounters.CountTransfers();
+        networkCounters.CountOutbound(networkPacket.Packet);
         next.TransferNext(networkPacket);
 
         return Task.FromResult(true);
@@ -328,10 +351,11 @@ public class Network : NodeBase, INetwork
     }
 
     //TODO: add tick reaction
-    public override Task Refresh()
+    public override async Task Refresh()
     {
-        return Task.Run(async () =>
-        {
+        // var sw = new Stopwatch();
+        //return Task.Run(async () =>
+        //{
 
             //var packets = _monitoringPacketsQueue.ToArray();
 
@@ -349,7 +373,10 @@ public class Network : NodeBase, INetwork
                     continue;
                 }
                 _monitoringPacketsQueue.TryTake(out var t);
+                //sw.Start();
                 var result = await ProcessTransferPacket(t);
+                //var elp = sw.Elapsed;
+                //sw.Reset();
                 //if (_monitoringPacketsQueue.TryTake(out var pending))
                 //{
 
@@ -378,9 +405,49 @@ public class Network : NodeBase, INetwork
 
             //    //}
             //}
-            counters.SetQueueLength(_monitoringPacketsQueue.Count);
+            networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
             Counters.Refresh(NetworkGraph.TotalTicks);
-        });
+
+        //return Task.CompletedTask;
+        //});
+    }
+
+    public Task StartPeriodicRefreshAsync()
+    {
+        if (cancelTokenSource != null && cancelTokenSource.IsCancellationRequested)
+        {
+            return Task.CompletedTask;
+        }
+
+        cancelTokenSource = new CancellationTokenSource();
+
+        return Task.Run(async () =>
+        {
+            bool refreshResult = true;
+
+            while (true)
+            {
+                if (cancelTokenSource.Token.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                await Refresh();
+
+                if (!refreshResult)
+                {
+                    Reset();
+
+                    cancelTokenSource.Cancel();
+                    break;
+                }
+            }
+        }, cancelTokenSource.Token);
+    }
+
+    public void StopPeriodicRefresh()
+    {
+        cancelTokenSource?.Cancel();
     }
 
     //TODO: need VIRTUAL wait 
@@ -482,6 +549,6 @@ public class Network : NodeBase, INetwork
 
     public override void Reset()
     {
-        throw new NotImplementedException();
+        StopPeriodicRefresh();
     }
 }
