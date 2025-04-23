@@ -56,5 +56,14 @@ namespace EntityFX.MqttY.Counter
         {
             _netwotkCounters = networks.Select(n => n.Counters);
         }
+
+        public void AddCounterValue<TValue>(string name, TValue value)
+            where TValue : struct, IEquatable<TValue>
+        {
+            var valueCounter = new ValueCounter<TValue>(name);
+            valueCounter.Set(value);
+
+            _counters.Add(valueCounter);
+        }
     }
 }

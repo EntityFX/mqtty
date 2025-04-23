@@ -390,4 +390,9 @@ public class NetworkGraph : INetworkSimulator
 
         return source.Link(destination);
     }
+
+    public void AddCounterValue<TValue>(string name, TValue value) where TValue : struct, IEquatable<TValue>
+    {
+        counters.AddCounterValue(name, value);
+    }
 }

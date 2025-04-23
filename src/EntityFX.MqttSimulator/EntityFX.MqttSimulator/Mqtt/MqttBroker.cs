@@ -3,6 +3,7 @@ using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
 using EntityFX.MqttY.Mqtt.Internals;
 
@@ -20,17 +21,19 @@ namespace EntityFX.MqttY.Mqtt
 
         private readonly PacketIdProvider _packetIdProvider = new();
 
-        protected readonly MqttCounters mqttCounters = new MqttCounters("Mqtt");
+        protected readonly MqttCounters mqttCounters;
 
         public MqttBroker(IMqttPacketManager packetManager, INetwork network, INetworkSimulator networkGraph, IMqttTopicEvaluator mqttTopicEvaluator,
             int index, string name, string address, string protocolType, 
-            string specification
+            string specification, TicksOptions ticksOptions
            )
             : base(index, name, address, protocolType, specification, network, networkGraph)
         {
             this.PacketReceived += MqttBroker_PacketReceived;
             this.packetManager = packetManager;
             this.topicEvaluator = mqttTopicEvaluator;
+
+            mqttCounters = new MqttCounters("Mqtt", ticksOptions);
             counters.AddCounter(mqttCounters);
         }
 

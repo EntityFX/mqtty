@@ -7,9 +7,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace EntityFX.MqttY.Factories;
 
-internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>>
+internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<NetworkBuildOption>>
 {
-    public IClient? Configure(NodeBuildOptions<Dictionary<string, string[]>> options, IClient? service)
+    public IClient? Configure(NodeBuildOptions<NetworkBuildOption> options, IClient? service)
     {
         if (string.IsNullOrEmpty(options.ConnectsTo))
         {
@@ -20,8 +20,8 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<Dictionary<st
         {
             var connectResult = mqttClient.ConnectAsync(options.ConnectsTo, false).Result;
 
-            var subscribes = options.Additional?.GetValueOrDefault("subscribe");
-            var subscribeQos = options.Additional?.GetValueOrDefault("subscribeQos");
+            var subscribes = options.Additional?.Additional?.GetValueOrDefault("subscribe");
+            var subscribeQos = options.Additional?.Additional?.GetValueOrDefault("subscribeQos");
 
             if (subscribes?.Any() == true)
             {
@@ -45,7 +45,7 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<Dictionary<st
         return service;
     }
 
-    public IClient? Create(NodeBuildOptions<Dictionary<string, string[]>> options)
+    public IClient? Create(NodeBuildOptions<NetworkBuildOption> options)
     {
         if (options.Network == null)
         {
@@ -57,7 +57,7 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<Dictionary<st
             var mqttPacketManager = options.ServiceProvider.GetRequiredService<IMqttPacketManager>();
             var mqttClient = new MqttClient(mqttPacketManager, options.Network, options.NetworkGraph, options.Index,
                 options.Name, options.Address ?? options.Name,
-                options.Protocol, options.Specification, options.Name)
+                options.Protocol, options.Specification, options.Name, options.Additional!.TicksOptions)
             {
                 Group = options.Group,
                 GroupAmount = options.GroupAmount

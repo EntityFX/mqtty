@@ -3,15 +3,9 @@ using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
 using EntityFX.MqttY.Mqtt.Internals;
-using System;
-using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Channels;
-using static System.Formats.Asn1.AsnWriter;
 
 namespace EntityFX.MqttY.Mqtt
 {
@@ -26,16 +20,18 @@ namespace EntityFX.MqttY.Mqtt
 
         public event EventHandler<MqttMessage>? MessageReceived;
 
-        protected readonly MqttCounters mqttCounters = new MqttCounters("Mqtt");
+        protected readonly MqttCounters mqttCounters;
 
         public MqttClient(IMqttPacketManager packetManager, INetwork network, INetworkSimulator networkGraph, 
             int index, string name, string address, string protocolType,
             string specification,
-            string? clientId)
+            string? clientId, TicksOptions ticksOptions)
             : base(index, name, address, protocolType, specification, network, networkGraph)
         {
             this.packetManager = packetManager;
             ClientId = clientId ?? name;
+
+            mqttCounters = new MqttCounters("Mqtt", ticksOptions);
             counters.AddCounter(mqttCounters);
         }
 

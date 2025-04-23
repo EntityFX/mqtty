@@ -2,6 +2,7 @@
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Counter;
 using System.Diagnostics.Metrics;
@@ -14,12 +15,14 @@ namespace EntityFX.MqttY.Application.Mqtt
 
         private MqttReceiverCounters receiverCounter = new MqttReceiverCounters("Receiver");
         private readonly INetworkSimulatorBuilder networkSimulatorBuilder;
+        private readonly TicksOptions _ticksOptions;
 
         public MqttReceiver(INetworkSimulatorBuilder networkSimulatorBuilder, int index, string name, string address, string protocolType, string specification, 
-            INetwork network, INetworkSimulator networkGraph, MqttReceiverConfiguration? options) 
+            INetwork network, INetworkSimulator networkGraph, TicksOptions ticksOptions, MqttReceiverConfiguration? options) 
             : base(index, name, address, protocolType, specification, network, networkGraph, options)
         {
             this.networkSimulatorBuilder = networkSimulatorBuilder;
+            this._ticksOptions = ticksOptions;
             counters.AddCounter(receiverCounter);
         }
 
@@ -56,7 +59,7 @@ namespace EntityFX.MqttY.Application.Mqtt
 
             var listenerMqttClient = networkSimulatorBuilder.BuildClient<IMqttClient>(0, nodeName, ProtocolType,
                 "mqtt-client",
-                    Network!, null);
+                    Network!, null, _ticksOptions, null);
 
             if (listenerMqttClient == null)
             {

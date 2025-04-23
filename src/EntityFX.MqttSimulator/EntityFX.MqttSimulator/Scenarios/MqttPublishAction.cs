@@ -11,7 +11,7 @@ namespace EntityFX.MqttY.Scenarios
 
     internal class MqttPublishAction : ScenarioAction<NetworkSimulation, MqttPublishOptions>
     {
-        public override async Task ExecuteAsync()
+        public override Task ExecuteAsync()
         {
             if (Config == null)
             {
@@ -36,30 +36,46 @@ namespace EntityFX.MqttY.Scenarios
 
             if (mqttClients?.Any() != true)
             {
-                return;
+                return Task.CompletedTask;
             }
 
-            _ = Task.Run(async () =>
+            StartPublish(mqttClients);
+
+            return Task.CompletedTask;
+        }
+
+        private void StartPublish(MqttClientPair[] mqttClients)
+        {
+            Task.Run(async () =>
             {
                 var sw = new Stopwatch();
                 sw.Start();
+                var published = 0;
+                var failedPublish = 0;
                 while (true)
                 {
                     foreach (var item in mqttClients!)
                     {
-                        await item.Client.PublishAsync(item.Options.Topic, item.Options.Payload, MqttQos.AtLeastOnce);
+                        var publishResult = await item.Client.PublishAsync(item.Options.Topic, item.Options.Payload, MqttQos.AtLeastOnce);
+
+                        if (publishResult)
+                        {
+                            published++;
+                        }
+                        else
+                        {
+                            failedPublish++;
+                        }
                     }
 
-                    if (sw.Elapsed > Config.PublishPeriod)
+                    if (sw.Elapsed > Config!.PublishPeriod)
                     {
+                        Context!.NetworkGraph!.AddCounterValue<long>("TotalPublished", published);
+                        Context!.NetworkGraph!.AddCounterValue<long>("FailedPublish", failedPublish);
                         break;
                     }
                 }
             });
-
-
-            //Context.NetworkGraph!.Refresh();
         }
-
     }
 }

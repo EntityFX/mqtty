@@ -31,10 +31,10 @@ namespace EntityFX.Tests.Integration
         public void Initialize()
         {
             var serviceCollection = new ServiceCollection()
-            .AddScoped<IFactory<IClient?, NodeBuildOptions<Dictionary<string, string[]>>>, ClientFactory>()
-            .AddScoped<IFactory<IServer?, NodeBuildOptions<Dictionary<string, string[]>>>, ServerFactory>()
+            .AddScoped<IFactory<IClient?, NodeBuildOptions<NetworkBuildOption>>, ClientFactory>()
+            .AddScoped<IFactory<IServer?, NodeBuildOptions<NetworkBuildOption>>, ServerFactory>()
             .AddScoped<IFactory<INetwork, NodeBuildOptions<NetworkBuildOption>>, NetworkFactory>()
-            .AddScoped<IFactory<IApplication?, NodeBuildOptions<object>>, GenericApplicationFactiory>()
+            .AddScoped<IFactory<IApplication?, NodeBuildOptions<NetworkBuildOption>>, GenericApplicationFactiory>()
             .AddScoped<IMqttPacketManager, MqttNativePacketManager>()
             //.AddScoped<IMqttPacketManager, MqttJsonPacketManager>()
             .AddScoped<IMqttTopicEvaluator, MqttTopicEvaluator>((serviceProvider) => new MqttTopicEvaluator(true))

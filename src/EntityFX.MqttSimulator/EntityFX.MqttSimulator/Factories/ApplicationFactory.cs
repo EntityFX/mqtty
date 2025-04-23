@@ -1,6 +1,7 @@
 ﻿using EntityFX.MqttY.Application.Mqtt;
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,7 +9,7 @@ using System.Text.RegularExpressions;
 
 namespace EntityFX.MqttY.Factories;
 
-internal class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<object>>
+internal class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<NetworkBuildOption>>
 {
     private readonly IConfiguration _configuration;
     private readonly IServiceProvider _serviceProvider;
@@ -19,14 +20,14 @@ internal class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<obj
         _serviceProvider = serviceProvider;
     }
 
-    public IApplication? Configure(NodeBuildOptions<object> options, IApplication? application)
+    public IApplication? Configure(NodeBuildOptions<NetworkBuildOption> options, IApplication? application)
     {
 
         application?.StartAsync().Wait();
         return application;
     }
 
-    public IApplication? Create(NodeBuildOptions<object> options)
+    public IApplication? Create(NodeBuildOptions<NetworkBuildOption> options)
     {
         if (options.Network == null)
         {
@@ -47,7 +48,9 @@ internal class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<obj
 
             return new MqttRelay
                 (options.Index, options.Name, options.Address ?? options.Name,
-                options.Protocol, options.Specification, options.Network, networkSimulatorBuilder, mqttTopicEvaluator, mqttRelayConf)
+                options.Protocol, options.Specification, options.Network, networkSimulatorBuilder, mqttTopicEvaluator,
+                options.Additional!.TicksOptions!,
+                mqttRelayConf)
             {
                 Group = options.Group,
                 GroupAmount = options.GroupAmount
@@ -63,7 +66,8 @@ internal class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<obj
 
             return new MqttReceiver
                 (networkSimulatorBuilder, options.Index, options.Name, options.Address ?? options.Name,
-                options.Protocol, options.Specification, options.Network, options.NetworkGraph, mqttReceiverConf)
+                options.Protocol, options.Specification, options.Network, options.NetworkGraph,
+                options.Additional!.TicksOptions!, mqttReceiverConf)
             {
                 Group = options.Group,
                 GroupAmount = options.GroupAmount

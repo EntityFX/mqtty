@@ -42,7 +42,7 @@ public class Network : NodeBase, INetwork
                     networkCounters,
                     new CounterGroup("Servers")
                     {
-                        Counters = _servers.Values.ToArray().Select(s =>s.Counters)
+                        Counters = _servers.Values.ToArray().Select(s =>s.Counters).ToArray()
                     },
                     new CounterGroup("Clients")
                     {
@@ -210,33 +210,36 @@ public class Network : NodeBase, INetwork
     //timeout?
     protected override Task<bool> SendImplementationAsync(NetworkPacket packet)
     {
-        var startTicks = NetworkGraph.TotalTicks;
-
-        while (NetworkGraph.TotalTicks - startTicks < networkTypeOption.SendTicks)
+        return Task.Run(() =>
         {
+            var startTicks = NetworkGraph.TotalTicks;
 
-        }
+            while (NetworkGraph.TotalTicks - startTicks < networkTypeOption.SendTicks)
+            {
 
-        var networkPacket = GetNetworkPacketType(packet);
+            }
 
-        //if (networkCounters.InboundThroughput * 1.5 > networkTypeOption.Speed)
-        //{
-        //    networkCounters.Refuse();
-        //    return Task.FromResult(false);
-        //}
+            var networkPacket = GetNetworkPacketType(packet);
 
-        if (_monitoringPacketsQueue.Count > 50000)
-        {
-            networkCounters.Refuse();
-            return Task.FromResult(false);
-        }
+            if (networkCounters.InboundThroughput > networkTypeOption.Speed * 10)
+            {
+                networkCounters.Refuse();
+                return false;
+            }
 
-        // _monitoringPacketsQueue.Add(packet.Id, networkPacket);
-        _monitoringPacketsQueue.Add(networkPacket);
+            if (_monitoringPacketsQueue.Count > 50000)
+            {
+                networkCounters.Refuse();
+                return false;
+            }
 
-        networkCounters.CountInbound(packet);
+            // _monitoringPacketsQueue.Add(packet.Id, networkPacket);
+            _monitoringPacketsQueue.Add(networkPacket);
 
-        return Task.FromResult(true);
+            networkCounters.CountInbound(packet);
+
+            return true;
+        });
     }
 
     private NetworkMonitoringPacket GetNetworkPacketType(NetworkPacket packet)

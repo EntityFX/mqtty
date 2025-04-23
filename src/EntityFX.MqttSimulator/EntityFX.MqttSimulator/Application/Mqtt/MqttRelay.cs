@@ -1,5 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Network;
 using System;
@@ -16,15 +17,17 @@ namespace EntityFX.MqttY.Application.Mqtt
         private Dictionary<string, IMqttClient> _listenClients = new Dictionary<string, IMqttClient>();
         private readonly INetworkSimulatorBuilder networkSimulatorBuilder;
         private readonly IMqttTopicEvaluator mqttTopicEvaluator;
+        private readonly TicksOptions _ticksOptions;
 
         public MqttRelay(int index, string name, string address, string protocolType, string specification,
             INetwork network, INetworkSimulatorBuilder networkSimulatorBuilder,
-            IMqttTopicEvaluator mqttTopicEvaluator,
+            IMqttTopicEvaluator mqttTopicEvaluator, TicksOptions ticksOptions,
             MqttRelayConfiguration? mqttRelayConfiguration) 
             : base(index, name, address, protocolType, specification, network, networkSimulatorBuilder.NetworkSimulator, mqttRelayConfiguration)
         {
             this.networkSimulatorBuilder = networkSimulatorBuilder;
             this.mqttTopicEvaluator = mqttTopicEvaluator;
+            this._ticksOptions = ticksOptions;
         }
 
         public override async Task StartAsync()
@@ -72,7 +75,7 @@ namespace EntityFX.MqttY.Application.Mqtt
                 var nodeName = GetNodeName(group, listenServer.Key);
                 var listenerMqttClient = networkSimulatorBuilder.BuildClient<IMqttClient>(0, nodeName, ProtocolType,
                     "mqtt-client",
-                    Network!, group, serverTopics.Count);
+                    Network!, null, _ticksOptions, group, serverTopics.Count);
                 if (listenerMqttClient == null)
                 {
                     break;
