@@ -16,7 +16,7 @@ namespace EntityFX.MqttY.Counter
 
         public Dictionary<MqttPacketType, GenericCounter> RefusedPacketTypeCounters { get; }
 
-        public Dictionary<MqttPacketType, ValueCounter<int>> RpsPacketTypeCounters { get; }
+        public Dictionary<MqttPacketType, ValueCounter<long>> RpsPacketTypeCounters { get; }
 
         public override IEnumerable<ICounter> Counters 
         {
@@ -39,12 +39,12 @@ namespace EntityFX.MqttY.Counter
 
             RefusedPacketTypeCounters = Enum.GetValues<MqttPacketType>()
             .ToDictionary(k => k, v => new GenericCounter(
-                v.GetEnumDescription()
+                v.GetEnumDescription() + "_REFUSED"
             ));
 
             RpsPacketTypeCounters = Enum.GetValues<MqttPacketType>()
-            .ToDictionary(k => k, v => new ValueCounter<int>(
-                v.GetEnumDescription() + "_rps"
+            .ToDictionary(k => k, v => new ValueCounter<long>(
+                v.GetEnumDescription() + "_RPS"
             ));
 
             
@@ -53,6 +53,11 @@ namespace EntityFX.MqttY.Counter
         public void Increment(MqttPacketType mqttPacketType)
         {
             PacketTypeCounters[mqttPacketType].Increment();
+        }
+
+        public void Refuse(MqttPacketType mqttPacketType)
+        {
+            RefusedPacketTypeCounters[mqttPacketType].Increment();
         }
     }
 }

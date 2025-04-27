@@ -13,10 +13,12 @@ namespace EntityFX.MqttY.Counter
         private readonly ValueCounter<long> _ticksCounter;
         private readonly ValueCounter<TimeSpan> _virtualTimeCounter;
         private readonly ValueCounter<TimeSpan> _realTimeCounter;
+        private readonly ValueCounter<TimeSpan> _refreshTimeCounter;
 
         private readonly TicksOptions _ticksOptions;
 
         private readonly Stopwatch _stopwatch = new Stopwatch();
+        private readonly Stopwatch _refreshStopwatch = new Stopwatch();
 
         private IEnumerable<ICounter> _netwotkCounters = Enumerable.Empty<ICounter>();
 
@@ -29,11 +31,13 @@ namespace EntityFX.MqttY.Counter
             _ticksCounter = new ValueCounter<long>("Ticks");
             _virtualTimeCounter = new ValueCounter<TimeSpan>("VirtualTime");
             _realTimeCounter = new ValueCounter<TimeSpan>("RealTime");
+            _refreshTimeCounter = new ValueCounter<TimeSpan>("RefreshTime");
 
             _counters.AddRange(Counters);
             _counters.Add(_ticksCounter);
             _counters.Add(_virtualTimeCounter);
             _counters.Add(_realTimeCounter);
+            _counters.Add(_refreshTimeCounter);
 
             Counters = _counters.ToArray();
             _stopwatch.Start();
@@ -64,6 +68,17 @@ namespace EntityFX.MqttY.Counter
             valueCounter.Set(value);
 
             _counters.Add(valueCounter);
+        }
+
+        internal void StartRefresh()
+        {
+            _refreshStopwatch.Restart();
+        }
+
+        internal void StopRefresh()
+        {
+            _refreshTimeCounter.Set(_refreshStopwatch.Elapsed);
+            _refreshStopwatch.Reset();
         }
     }
 }

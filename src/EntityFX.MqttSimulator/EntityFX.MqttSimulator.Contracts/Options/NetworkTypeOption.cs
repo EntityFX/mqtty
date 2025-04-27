@@ -7,4 +7,6 @@ public class NetworkTypeOption
     public int RefreshTicks { get; set; }
 
     public int SendTicks { get; set; }
+
+    public string NetworkType { get; set; } = string.Empty;
 }

@@ -96,7 +96,7 @@ namespace EntityFX.MqttY.Counter
 
             var ticksDiff = totalTicks - _lastTicks;
 
-            if (ticksDiff == 0) return;
+            if (ticksDiff < 100) return;
 
             var tickRps = ticksPerSecond / ticksDiff;
 

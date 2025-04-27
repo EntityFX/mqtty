@@ -2,8 +2,8 @@
 {
     public interface ISender : INode
     {
-        Task<bool> SendAsync(NetworkPacket packet);
+        bool Send(NetworkPacket packet);
 
-        Task ReceiveAsync(NetworkPacket packet);
+        bool Receive(NetworkPacket packet);
     }
 }

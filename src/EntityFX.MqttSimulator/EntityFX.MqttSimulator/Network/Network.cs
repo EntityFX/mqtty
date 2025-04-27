@@ -20,7 +20,7 @@ public class Network : NodeBase, INetwork
     /// <summary>
     /// TODO: Add max size limit
     /// </summary>
-    private readonly ConcurrentBag<NetworkMonitoringPacket> _monitoringPacketsQueue = new();
+    private readonly ConcurrentDictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
     private readonly NetworkTypeOption networkTypeOption;
 
     //private Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
@@ -32,6 +32,8 @@ public class Network : NodeBase, INetwork
 
     private readonly object _countersLock = new object();
     private CancellationTokenSource? cancelTokenSource;
+
+    public string NetworkType { get; }
 
     public override CounterGroup Counters
     {
@@ -74,7 +76,7 @@ public class Network : NodeBase, INetwork
 
     public long QueueSize => _monitoringPacketsQueue.Count;
 
-    public Network(int index, string name, string address, INetworkSimulator networkGraph,
+    public Network(int index, string name, string address, string networkType, INetworkSimulator networkGraph,
         NetworkTypeOption networkTypeOption, TicksOptions ticksOptions)
         : base(index, name, address, networkGraph)
     {
@@ -82,6 +84,7 @@ public class Network : NodeBase, INetwork
         this.ticksOptions = ticksOptions;
         networkCounters = new NetworkCounters("Network", ticksOptions);
         _counters = new CounterGroup(Name);
+        NetworkType = networkType;
     }
 
     public bool AddClient(IClient client)
@@ -200,7 +203,7 @@ public class Network : NodeBase, INetwork
         }
 
         //_monitoringPacketsQueue.Add(networkMonitoringPacket.Packet.Id, networkMonitoringPacket);
-        _monitoringPacketsQueue.Add(networkMonitoringPacket);
+        _monitoringPacketsQueue.AddOrUpdate(networkMonitoringPacket.Packet.Id, networkMonitoringPacket, (g, p) => p);
 
         networkCounters.CountInbound(networkMonitoringPacket.Packet);
     }
@@ -208,38 +211,28 @@ public class Network : NodeBase, INetwork
     //TODO: If queue limit is exceeded then reject Send
     //bool?
     //timeout?
-    protected override Task<bool> SendImplementationAsync(NetworkPacket packet)
+    protected override bool SendImplementation(NetworkPacket packet)
     {
-        return Task.Run(() =>
+        var networkPacket = GetNetworkPacketType(packet);
+
+        if (networkCounters.InboundThroughput > networkTypeOption.Speed * 10)
         {
-            var startTicks = NetworkGraph.TotalTicks;
+            networkCounters.Refuse();
+            return false;
+        }
 
-            while (NetworkGraph.TotalTicks - startTicks < networkTypeOption.SendTicks)
-            {
+        if (_monitoringPacketsQueue.Count > 50000)
+        {
+            networkCounters.Refuse();
+            return false;
+        }
 
-            }
+        // _monitoringPacketsQueue.Add(packet.Id, networkPacket);
+        _monitoringPacketsQueue.AddOrUpdate(networkPacket.Packet.Id, networkPacket, (g, p) => p);
 
-            var networkPacket = GetNetworkPacketType(packet);
+        networkCounters.CountInbound(packet);
 
-            if (networkCounters.InboundThroughput > networkTypeOption.Speed * 10)
-            {
-                networkCounters.Refuse();
-                return false;
-            }
-
-            if (_monitoringPacketsQueue.Count > 50000)
-            {
-                networkCounters.Refuse();
-                return false;
-            }
-
-            // _monitoringPacketsQueue.Add(packet.Id, networkPacket);
-            _monitoringPacketsQueue.Add(networkPacket);
-
-            networkCounters.CountInbound(packet);
-
-            return true;
-        });
+        return true;
     }
 
     private NetworkMonitoringPacket GetNetworkPacketType(NetworkPacket packet)
@@ -279,7 +272,7 @@ public class Network : NodeBase, INetwork
     }
 
 
-    private async Task<bool> SendToLocalAsync(INetwork network, NetworkMonitoringPacket networkPacket)
+    private bool SendToLocal(INetwork network, NetworkMonitoringPacket networkPacket)
     {
         var packet = networkPacket.Packet;
         if (string.IsNullOrEmpty(packet.From))
@@ -299,31 +292,29 @@ public class Network : NodeBase, INetwork
         NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
 
         networkCounters.CountOutbound(packet);
-        await networkPacket.DestionationNode!.ReceiveAsync(packet);
-
-        return true;
+        return networkPacket.DestionationNode!.Receive(packet);
     }
 
 
-    private Task<bool> SendToRemoteAsync(NetworkMonitoringPacket networkPacket)
+    private bool SendToRemote(NetworkMonitoringPacket networkPacket)
     {
         var packet = networkPacket.Packet;
         if (packet == null)
         {
-            return Task.FromResult(false);
+            return false;
         }
 
 
         if (!networkPacket.Path.Any())
         {
-            return Task.FromResult(false);
+            return false;
         }
 
         var next = networkPacket.Path.Dequeue() as Network;
 
         if (next == null)
         {
-            return Task.FromResult(false);
+            return false;
         }
 
         packet.DecrementTtl();
@@ -333,7 +324,7 @@ public class Network : NodeBase, INetwork
             NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Unreachable,
                 $"NetworkMonitoringPacket unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope);
             //destination uneachable
-            return Task.FromResult(false);
+            return false;
         }
 
         NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Push,
@@ -345,134 +336,67 @@ public class Network : NodeBase, INetwork
         networkCounters.CountOutbound(networkPacket.Packet);
         next.TransferNext(networkPacket);
 
-        return Task.FromResult(true);
+        return true;
     }
 
-    protected override Task ReceiveImplementationAsync(Contracts.Network.NetworkPacket packet)
+    protected override bool ReceiveImplementation(NetworkPacket packet)
     {
-        return Task.CompletedTask;
+        return true;
     }
 
     //TODO: add tick reaction
-    public override async Task Refresh()
+    public override void Refresh()
     {
-        // var sw = new Stopwatch();
-        //return Task.Run(async () =>
-        //{
 
-            //var packets = _monitoringPacketsQueue.ToArray();
-
-            foreach (var pendingPacket in _monitoringPacketsQueue)
-            {
-                //if (pendingPacket == null)
-                //{
-                //    continue;
-                //}
-
-                pendingPacket.ReduceWaitTime();
-
-                if (pendingPacket.WaitTime > 0)
-                {
-                    continue;
-                }
-                _monitoringPacketsQueue.TryTake(out var t);
-                //sw.Start();
-                var result = await ProcessTransferPacket(t);
-                //var elp = sw.Elapsed;
-                //sw.Reset();
-                //if (_monitoringPacketsQueue.TryTake(out var pending))
-                //{
-
-                //}
-            }
-
-
-
-            //foreach (var pendingPacket in _monitoringPacketsQueue)
-            //{
-            //    //if (pendingPacket == null)
-            //    //{
-            //    //    continue;
-            //    //}
-
-            //    pendingPacket.ReduceWaitTime();
-
-            //    if (pendingPacket.WaitTime > 0)
-            //    {
-            //        continue;
-            //    }
-            //    _monitoringPacketsQueue.TryTake(pendingPacket);
-            //    var result = await ProcessTransferPacket(pendingPacket);
-            //    //if (_monitoringPacketsQueue.TryTake(out var pending))
-            //    //{
-
-            //    //}
-            //}
-            networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
-            Counters.Refresh(NetworkGraph.TotalTicks);
-
-        //return Task.CompletedTask;
-        //});
-    }
-
-    public Task StartPeriodicRefreshAsync()
-    {
-        if (cancelTokenSource != null && cancelTokenSource.IsCancellationRequested)
+        foreach (var pendingPacket in _monitoringPacketsQueue)
         {
-            return Task.CompletedTask;
+            pendingPacket.Value.ReduceWaitTime();
+            if (pendingPacket.Value.WaitTime > 0)
+            {
+                continue;
+            }
+            var result = ProcessTransferPacket(pendingPacket.Value);
+            //if (!result)
+            //{
+            //    pendingPacket.Value.WaitTime = 5;
+            //    continue;
+            //}
+            _monitoringPacketsQueue.Remove(pendingPacket.Key, out var t);
         }
 
-        cancelTokenSource = new CancellationTokenSource();
+        //foreach (var pendingPacket in _monitoringPacketsQueue)
+        //{
+        //    if (pendingPacket.Value.WaitTime > 0)
+        //    {
+        //        continue;
+        //    }
 
-        return Task.Run(async () =>
-        {
-            bool refreshResult = true;
+        //}
 
-            while (true)
-            {
-                if (cancelTokenSource.Token.IsCancellationRequested)
-                {
-                    return;
-                }
 
-                await Refresh();
 
-                if (!refreshResult)
-                {
-                    Reset();
-
-                    cancelTokenSource.Cancel();
-                    break;
-                }
-            }
-        }, cancelTokenSource.Token);
+        networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
+        Counters.Refresh(NetworkGraph.TotalTicks);
     }
 
-    public void StopPeriodicRefresh()
-    {
-        cancelTokenSource?.Cancel();
-    }
 
     //TODO: need VIRTUAL wait 
-    private Task<bool> ProcessTransferPacket(NetworkMonitoringPacket networkPacket)
+    private bool ProcessTransferPacket(NetworkMonitoringPacket networkPacket)
     {
-        return Task.Run(async () =>
-        {
-            var result = false;
-            var packet = networkPacket.Packet;
-            var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!,
-                $"Transfer packet {packet.From} to {packet.To}");
+        var result = false;
+        var packet = networkPacket.Packet;
+        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!,
+            $"Transfer packet {packet.From} to {packet.To}");
 
-            if (networkPacket.Type == NetworkPacketType.Local)
-            {
-                result = await SendToLocalAsync(this, networkPacket);
-            }
-            else if (networkPacket.Type == NetworkPacketType.Remote)
-            {
-                result = await SendToRemoteAsync(networkPacket);
-            }
-            return result;
-        });
+        if (networkPacket.Type == NetworkPacketType.Local)
+        {
+            result = SendToLocal(this, networkPacket);
+        }
+        else if (networkPacket.Type == NetworkPacketType.Remote)
+        {
+            result = SendToRemote(networkPacket);
+        }
+        return result;
     }
 
     public INode? FindNode(string address, NodeType type)
@@ -552,6 +476,5 @@ public class Network : NodeBase, INetwork
 
     public override void Reset()
     {
-        StopPeriodicRefresh();
     }
 }

@@ -67,7 +67,7 @@ internal class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<Net
             return new MqttReceiver
                 (networkSimulatorBuilder, options.Index, options.Name, options.Address ?? options.Name,
                 options.Protocol, options.Specification, options.Network, options.NetworkGraph,
-                options.Additional!.TicksOptions!, mqttReceiverConf)
+                options.Additional!.TicksOptions!, options.Additional.NetworkTypeOption!, mqttReceiverConf)
             {
                 Group = options.Group,
                 GroupAmount = options.GroupAmount

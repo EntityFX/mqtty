@@ -13,6 +13,8 @@ namespace EntityFX.MqttY.Contracts.Network
         IReadOnlyDictionary<string, IClient> Clients { get; }
         IReadOnlyDictionary<string, IApplication> Applications { get; }
 
+        public string NetworkType { get; }
+
         long QueueSize {  get; }
 
         bool Link(INetwork network);
@@ -34,10 +36,5 @@ namespace EntityFX.MqttY.Contracts.Network
         bool RemoveClient(string clientAddress);
 
         INode? FindNode(string nodeAddress, NodeType type);
-
-        Task StartPeriodicRefreshAsync();
-
-        void StopPeriodicRefresh();
-
     }
 }

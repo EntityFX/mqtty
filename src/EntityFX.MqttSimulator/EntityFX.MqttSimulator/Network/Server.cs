@@ -1,6 +1,7 @@
 ﻿using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
+using EntityFX.MqttY.Contracts.Options;
 using System.Net;
 using static System.Formats.Asn1.AsnWriter;
 
@@ -27,7 +28,8 @@ public class Server : Node, IServer
 
     public Server(int index, string name, string address, string protocolType,
         string specification,
-        INetwork network, INetworkSimulator networkGraph) : base(index, name, address, networkGraph)
+        INetwork network, INetworkSimulator networkGraph,
+        NetworkTypeOption networkTypeOption) : base(index, name, address, networkGraph, networkTypeOption)
     {
         ProtocolType = protocolType;
         Specification = specification;
@@ -89,20 +91,18 @@ public class Server : Node, IServer
         return true;
     }
 
-    protected virtual Task OnReceived(NetworkPacket packet)
+    protected virtual void OnReceived(NetworkPacket packet)
     {
         PacketReceived?.Invoke(this, packet);
-
-        return Task.CompletedTask;
     }
 
-    protected override async Task<bool> SendImplementationAsync(NetworkPacket packet)
+    protected override bool SendImplementation(NetworkPacket packet)
     {
         var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!, 
             $"Send packet {packet.From} to {packet.To}");
         NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, packet, NetworkLoggerType.Send, 
             $"Send packet {packet.From} to {packet.To}", ProtocolType, "Net Send", scope);
-        var result = await Network.SendAsync(packet);
+        var result = Network.Send(packet);
 
         NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
 
@@ -147,10 +147,12 @@ public class Server : Node, IServer
         base.AfterSend(packet);
     }
 
-    protected override async Task ReceiveImplementationAsync(NetworkPacket packet)
+    protected override bool ReceiveImplementation(NetworkPacket packet)
     {
         NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
 
-        await OnReceived(packet);
+        OnReceived(packet);
+
+        return true;
     }
 }

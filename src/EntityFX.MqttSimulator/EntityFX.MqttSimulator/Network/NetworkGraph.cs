@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -174,7 +175,7 @@ public class NetworkGraph : INetworkSimulator
         _nodes.Remove((serverAddress, NodeType.Client), out _);
     }
 
-    public async Task<bool> Refresh()
+    public bool Refresh()
     {
         try
         {
@@ -185,33 +186,21 @@ public class NetworkGraph : INetworkSimulator
 
             counters.Refresh(TotalTicks);
 
-            //var networksRefresh = new List<Task>();
-            //foreach (var network in _networks)
-            //{
-            //    Monitoring.Push(TotalTicks,
-            //        network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-            //        "Network", "Refresh", scope);
-            //    networksRefresh.Add(network.Value.Refresh());
-            //}
+            Parallel.ForEach(_networks, network =>
+            {
+                Monitoring.Push(TotalTicks,
+                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                    "Network", "Refresh", scope);
+                network.Value.Refresh();
+            }            );
 
-            //Task.WaitAll(networksRefresh.ToArray());
-
-            //var nResult = Parallel.ForEach(_nodes, async node =>
-            //{
-            //    Monitoring.Push(TotalTicks,
-            //        node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
-            //        scope);
-            //    await node.Value.Refresh();
-            //});
-
-
-            foreach (var node in _nodes)
+            Parallel.ForEach(_nodes, node =>
             {
                 Monitoring.Push(TotalTicks,
                     node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
                     scope);
-                await node.Value.Refresh();
-            }
+                node.Value.Refresh();
+            });
 
             Monitoring.EndScope(TotalTicks, scope);
 
@@ -272,7 +261,7 @@ public class NetworkGraph : INetworkSimulator
 
         _timer = new Timer(Refreshed, this, 0, 1000);
 
-        return Task.Run(async () =>
+        return Task.Run(() =>
         {
             bool refreshResult = true;
 
@@ -282,9 +271,11 @@ public class NetworkGraph : INetworkSimulator
                 {
                     return;
                 }
+                counters.StartRefresh();
+                refreshResult = Refresh();
+                counters.StopRefresh();
 
-                refreshResult = await Refresh();
-
+                
                 if (!refreshResult)
                 {
                     Reset();
@@ -362,8 +353,6 @@ public class NetworkGraph : INetworkSimulator
         }
 
         UpdateRoutes();
-
-        network.StartPeriodicRefreshAsync();
 
         return result;
     }

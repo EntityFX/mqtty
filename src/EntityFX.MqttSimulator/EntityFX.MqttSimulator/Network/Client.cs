@@ -1,5 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
+using EntityFX.MqttY.Contracts.Options;
 using System.Collections.ObjectModel;
 using System.Net;
 
@@ -25,19 +26,20 @@ public class Client : Node, IClient
 
     public Client(int index, string name, string address, string protocolType, 
         string specification,
-        INetwork network, INetworkSimulator networkGraph)
-        : base(index, name, address, networkGraph)
+        INetwork network, INetworkSimulator networkGraph,
+        NetworkTypeOption networkTypeOption)
+        : base(index, name, address, networkGraph, networkTypeOption)
     {
         Network = network;
         ProtocolType = protocolType;
         Specification = specification;
     }
 
-    public async Task<bool> ConnectAsync(string server)
+    public bool Connect(string server)
     {
         if (IsConnected) return true;
 
-        var response = await ConnectImplementationAsync(server,
+        var response = ConnectImplementation(server,
             GetPacket(Guid.NewGuid(), server, NodeType.Server, new byte[] { 0xFF }, "Net", "Connect"));
 
         if (response == null) return false;
@@ -45,7 +47,7 @@ public class Client : Node, IClient
         return true;
     }
 
-    protected async Task<NetworkPacket?> ConnectImplementationAsync(string server, NetworkPacket connectPacket)
+    protected NetworkPacket? ConnectImplementation(string server, NetworkPacket connectPacket)
     {
         if (Network == null) return null;
 
@@ -70,7 +72,13 @@ public class Client : Node, IClient
         NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, connectPacket, NetworkLoggerType.Connect, 
             $"Client {connectPacket.From} connects to server {connectPacket.To}", ProtocolType, "NET Connect");
 
-        await SendImplementationAsync(connectPacket, false);
+        result = Send(connectPacket, false);
+
+        if (!result)
+        {
+            IsConnected = false;
+            return null;
+        }
 
         var response = WaitResponse(connectPacket.Id);
 
@@ -142,45 +150,40 @@ public class Client : Node, IClient
     }
 
 
-    protected async Task SendImplementationAsync(NetworkPacket packet, bool checkConnection)
+    protected bool Send(NetworkPacket packet, bool checkConnection)
     {
         if (checkConnection && !IsConnected)
             throw new InvalidOperationException("Not Connected To server");
-        await SendImplementationAsync(packet);
+         
+        return Send(packet);
     }
 
-    protected override async Task<bool> SendImplementationAsync(NetworkPacket packet)
+    protected override bool SendImplementation(NetworkPacket packet)
     {
-        BeforeSend(packet);
-
-        var result = await Network!.SendAsync(packet);
-        AfterSend(packet);
+        var result = Network!.Send(packet);
 
         return result;
     }
 
-    public async Task SendAsync(byte[] payload, string? category = null)
+    public bool Send(byte[] payload, string? category = null)
     {
-        await SendImplementationAsync(
+        var result = Send(
             new NetworkPacket(Name, serverName, NodeType.Client, NodeType.Server, payload, ProtocolType, category), true);
+
+        return result;
     }
 
-    public void Send(byte[] payload, string? category = null)
+    protected override bool ReceiveImplementation(NetworkPacket packet)
     {
-        SendAsync(payload, category).Wait();
+        var result = base.ReceiveImplementation(packet);
+        OnReceived(packet);
+
+        return result;
     }
 
-    protected override async Task ReceiveImplementationAsync(NetworkPacket packet)
-    {
-        await base.ReceiveImplementationAsync(packet);
-        await OnReceivedAsync(packet);
-    }
-
-    protected virtual Task OnReceivedAsync(NetworkPacket packet)
+    protected virtual void OnReceived(NetworkPacket packet)
     {
         PacketReceived?.Invoke(this, packet);
-
-        return Task.CompletedTask;
     }
 
     protected override void BeforeReceive(NetworkPacket packet)

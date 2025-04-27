@@ -16,7 +16,7 @@ internal class NetworkMonitoringPacket
 
     public NetworkPacket Packet { get; }
 
-    internal long WaitTime { get => _waitTime; init => _waitTime = value; }
+    internal long WaitTime { get => _waitTime; set => _waitTime = value; }
 
     private long _waitTime = 2;
 

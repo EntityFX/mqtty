@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using System.Collections.Generic;
+using System.Collections.Immutable;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
@@ -40,6 +41,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                     group, groupAmount, protocolType, specification, null, new NetworkBuildOption()
                     {
                         Additional = additional,
+                        NetworkTypeOption = networkTypeOption,
                         TicksOptions = ticks
                     })
                 {
@@ -75,6 +77,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                     specification, null, new NetworkBuildOption()
                     {
                         TicksOptions = ticks,
+                        NetworkTypeOption = networkTypeOption
                     }));
 
         if (client == null)
@@ -151,7 +154,8 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                     specification, null, new NetworkBuildOption()
                     {
                         Additional = additional,
-                        TicksOptions = ticks
+                        TicksOptions = ticks,
+                        NetworkTypeOption = networkTypeOption,
                     }));
 
         if (server == null)
@@ -181,6 +185,8 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                 SendTicks = 3,
                 Speed = 125000000
             };
+
+            networkType.NetworkType = networkOption.Value.NetworkType;
 
             BuildNetwork(networkOption.Value.Index, networkOption.Key, networkOption.Key, networkType, option.Ticks);
         }
@@ -325,6 +331,8 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
             var linkNetwork = NetworkSimulator.Networks.GetValueOrDefault(node.Value.Network ?? string.Empty);
             if (linkNetwork == null) continue;
 
+            option.NetworkTypes.TryGetValue(linkNetwork.NetworkType, out var networkTypeOption);
+
             switch (node.Value.Type)
             {
                 case NodeOptionType.Server:
@@ -332,7 +340,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                     BuildServer(index, node.Key, node.Value.Protocol ?? "tcp",
                         node.Value.Specification ?? "tcp-server",
                         linkNetwork,
-                        null, option.Ticks,
+                        networkTypeOption!, option.Ticks,
                         null, null, node.Value.Additional);
                     break;
 
@@ -340,20 +348,22 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 
                     if (node.Value.Quantity > 1)
                     {
+
+
                         Enumerable.Range(1, node.Value.Quantity.Value).ToList()
                             .ForEach(
                                 (nc) => BuildClient(
                                     index, $"{node.Key}{nc}",
                                     node.Value.Protocol ?? "tcp",
                                     node.Value.Specification ?? "tcp-client",
-                                    linkNetwork, null, option.Ticks,
+                                    linkNetwork, networkTypeOption, option.Ticks,
                                     node.Key, node.Value.Quantity, node.Value.Additional));
                     }
                     else
                     {
                         BuildClient(index, node.Key, node.Value.Protocol ?? "tcp",
                             node.Value.Specification ?? "tcp-client",
-                            linkNetwork, null, option.Ticks,
+                            linkNetwork, networkTypeOption, option.Ticks,
                             null, null, node.Value.Additional);
                     }
 
@@ -361,7 +371,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                 case NodeOptionType.Application:
                     BuildApplication(index, node.Key, node.Value.Protocol ?? "tcp",
                         node.Value.Specification ?? "tcp-app",
-                        linkNetwork, null, option.Ticks,
+                        linkNetwork, networkTypeOption, option.Ticks,
                         null, null, node.Value.Additional);
                     break;
             }

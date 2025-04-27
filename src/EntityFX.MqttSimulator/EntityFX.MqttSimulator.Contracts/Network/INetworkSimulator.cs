@@ -44,7 +44,7 @@ namespace EntityFX.MqttY.Contracts.Network
 
         NetworkPacket GetReversePacket(NetworkPacket packet, byte[] payload, string? category);
 
-        Task<bool> Refresh();
+        bool Refresh();
 
         bool Reset();
 

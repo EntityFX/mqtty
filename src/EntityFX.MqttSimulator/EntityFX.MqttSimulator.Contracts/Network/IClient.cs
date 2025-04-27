@@ -4,15 +4,13 @@
     {
         bool IsConnected { get; }
 
-        Task<bool> ConnectAsync(string server);
+        bool Connect(string server);
 
         bool Disconnect();
 
 
         event EventHandler<NetworkPacket>? PacketReceived;
 
-        Task SendAsync(byte[] packet, string? category = null);
-
-        void Send(byte[] packet, string? category = null);
+        bool Send(byte[] packet, string? category = null);
     }
 }

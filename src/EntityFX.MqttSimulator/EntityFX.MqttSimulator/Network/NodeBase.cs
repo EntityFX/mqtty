@@ -25,9 +25,9 @@ public abstract class NodeBase : ISender
     public abstract CounterGroup Counters { get; set;  }
 
 
-    protected abstract Task ReceiveImplementationAsync(NetworkPacket packet);
+    protected abstract bool ReceiveImplementation(NetworkPacket packet);
 
-    protected abstract Task<bool> SendImplementationAsync(NetworkPacket packet);
+    protected abstract bool SendImplementation(NetworkPacket packet);
 
 
     protected abstract void BeforeReceive(NetworkPacket packet);
@@ -48,47 +48,45 @@ public abstract class NodeBase : ISender
 
 
     //Создаём ManualResetEventSlim 
-    public async Task<bool> SendAsync(NetworkPacket packet)
+    public bool Send(NetworkPacket packet)
     {
         BeforeSend(packet);
 
-        return await SendImplementationAsync(packet);
+        var result = SendImplementation(packet);
 
         AfterSend(packet);
+
+        return result;
     }
 
 
 
     //Добавляем и Снимаем ManualResetEventSlim 
-    public async Task ReceiveAsync(NetworkPacket packet)
+    public bool Receive(NetworkPacket packet)
     {
         BeforeReceive(packet);
 
-        await ReceiveImplementationAsync(packet);
+        var result = ReceiveImplementation(packet);
 
         AfterReceive(packet);
 
-        if (packet.RequestId == null)
-        {
-            return;
-        }
+        return result;
     }
 
     protected NetworkPacket GetPacket(Guid guid, string to, NodeType toType, byte[] payload,
-        string protocol, string? category = null, Guid? requestId = null)
+        string protocol, string? category = null, Guid? requestId = null, bool willWait = false)
         => new NetworkPacket(Name, to, NodeType, toType, payload, protocol, category)
         {
             Id = guid,
-            RequestId = requestId
+            RequestId = requestId,
+            WillWait = willWait
         };
 
 
     //Здесь обновляем время ождидания и триггерим ManualResetEventSlim
-    public virtual Task Refresh()
+    public virtual void Refresh()
     {
         Counters.Refresh(NetworkGraph.TotalTicks);
-
-        return Task.CompletedTask;
     }
 
     public abstract void Reset();

@@ -16,8 +16,11 @@ internal class NetworkFactory : IFactory<INetwork, NodeBuildOptions<NetworkBuild
         NodeBuildOptions<NetworkBuildOption> options)
     {
         return new Network.Network(options.Index, 
-            options.Name, options.Address ?? options.Name, options.NetworkGraph, 
+            options.Name, 
+            options.Address ?? options.Name,
+            options.Additional!.NetworkTypeOption!.NetworkType,
+            options.NetworkGraph, 
             options.Additional.NetworkTypeOption,
-            options.Additional.TicksOptions);
+            options.Additional!.TicksOptions!);
     }
 }

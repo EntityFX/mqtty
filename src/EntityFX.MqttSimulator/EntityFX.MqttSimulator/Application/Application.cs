@@ -70,11 +70,9 @@ namespace EntityFX.MqttY.Application
         }
 
 
-        public virtual Task Refresh()
+        public virtual void Refresh()
         {
             Counters.Refresh(NetworkGraph.TotalTicks);
-
-            return Task.CompletedTask;
         }
 
         public virtual void Reset()

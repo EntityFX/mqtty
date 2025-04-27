@@ -1,5 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
 using System.Collections.Concurrent;
 
@@ -8,7 +9,7 @@ public abstract class Node : NodeBase
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
     private readonly ConcurrentDictionary<Guid, NodeMonitoringPacket> monitorMessages = new ConcurrentDictionary<Guid, NodeMonitoringPacket>();
-
+    private readonly NetworkTypeOption _networkTypeOption;
     internal NodeCounters counters;
 
     public override CounterGroup Counters
@@ -20,9 +21,11 @@ public abstract class Node : NodeBase
         }
     }
 
-    public Node(int index, string name, string address, INetworkSimulator networkGraph) : base(index, name, address, networkGraph)
+    public Node(int index, string name, string address, INetworkSimulator networkGraph,
+        NetworkTypeOption networkTypeOption) : base(index, name, address, networkGraph)
     {
         counters = new NodeCounters(Name ?? string.Empty);
+        _networkTypeOption = networkTypeOption;
     }
 
     public override void Reset()
@@ -34,7 +37,7 @@ public abstract class Node : NodeBase
         monitorMessages.Clear();
     }
 
-    public override Task Refresh()
+    public override void Refresh()
     {
         foreach (var packet in monitorMessages)
         {
@@ -46,7 +49,8 @@ public abstract class Node : NodeBase
                 packet.Value.IsExpired = true;
             }
         }
-        return base.Refresh();
+        base.Refresh();
+        counters.SetQueueLength(monitorMessages.Count);
     }
 
     protected override void BeforeSend(NetworkPacket packet)
@@ -64,18 +68,18 @@ public abstract class Node : NodeBase
         counters.ReceiveCounter.Increment();
     }
 
-    protected override Task ReceiveImplementationAsync(NetworkPacket packet)
+    protected override bool ReceiveImplementation(NetworkPacket packet)
     {
         if (packet.RequestId == null)
         {
-            return Task.CompletedTask;
+            return false;
         }
 
         var monitorMessage = monitorMessages.GetValueOrDefault(packet.RequestId.Value);
 
         if (monitorMessage == null)
         {
-            return Task.CompletedTask;
+            return false;
         }
 
         monitorMessage.ResponsePacket = packet;
@@ -83,12 +87,24 @@ public abstract class Node : NodeBase
         monitorMessage.ResetEventSlim?.Set();
         monitorMessage.IsSet = true;
 
-        return Task.CompletedTask;
+        return true;
     }
 
 
     private void PreSend(NetworkPacket packet)
     {
+        if (!packet.WillWait)
+        {
+            return;
+        }
+
+        var startTicks = NetworkGraph.TotalTicks;
+
+        //while (NetworkGraph.TotalTicks - startTicks < _networkTypeOption.SendTicks)
+        //{
+
+        //}
+
         if (monitorMessages.ContainsKey(packet.Id))
         {
             return;

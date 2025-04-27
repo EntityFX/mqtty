@@ -63,15 +63,19 @@ namespace EntityFX.Tests.Integration
             {
                 Networks = new SortedDictionary<string, NetworkNodeOption>()
                 {
-                    ["n1"] = new NetworkNodeOption() { Index = 0, Links = new NetworkLinkOption[] { new NetworkLinkOption() { Network = "n2" } } },
-                    ["n2"] = new NetworkNodeOption() { Index = 1, Links = new NetworkLinkOption[] { new NetworkLinkOption() { Network = "n3" } } },
-                    ["n3"] = new NetworkNodeOption() { Index = 2, Links = Array.Empty<NetworkLinkOption>() },
+                    ["n1"] = new NetworkNodeOption() { Index = 0, NetworkType = "1g", Links = new NetworkLinkOption[] { new NetworkLinkOption() { Network = "n2" } } },
+                    ["n2"] = new NetworkNodeOption() { Index = 1, NetworkType = "1g", Links = new NetworkLinkOption[] { new NetworkLinkOption() { Network = "n3" } } },
+                    ["n3"] = new NetworkNodeOption() { Index = 2, NetworkType = "1g", Links = Array.Empty<NetworkLinkOption>() },
                 },
                 Nodes = new SortedDictionary<string, NodeOption>()
                 {
                     ["mqs1"] = new NodeOption() { Index = 0, Protocol = "mqtt", Type = NodeOptionType.Server, Specification = "mqtt-server", Network = "n3" },
                     ["mqc1"] = new NodeOption() { Index = 1, Protocol = "mqtt", Type = NodeOptionType.Client, Specification = "mqtt-client", Network = "n1" },
                     ["mqc2"] = new NodeOption() { Index = 2, Protocol = "mqtt", Type = NodeOptionType.Client, Specification = "mqtt-client", Network = "n2" },
+                },
+                NetworkTypes = new SortedDictionary<string, NetworkTypeOption>()
+                {
+                    ["1g"] = new NetworkTypeOption() { RefreshTicks = 2, SendTicks = 2, Speed = 125_000_000 }
                 }
             });
 
@@ -121,7 +125,7 @@ namespace EntityFX.Tests.Integration
 
             await mqClient2.SubscribeAsync("/test/#", MqttQos.AtLeastOnce);
 
-            await graph.Refresh();
+            graph.Refresh();
         }
 
         [TestMethod]

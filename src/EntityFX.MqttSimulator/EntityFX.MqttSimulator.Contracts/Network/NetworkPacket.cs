@@ -19,6 +19,8 @@ namespace EntityFX.MqttY.Contracts.Network
 
         public int PacketBytes => HeaderBytes + Payload.Length;
 
+        public bool WillWait { get; set; }
+
         public int DecrementTtl()
         {
             Interlocked.Decrement(ref ttl);

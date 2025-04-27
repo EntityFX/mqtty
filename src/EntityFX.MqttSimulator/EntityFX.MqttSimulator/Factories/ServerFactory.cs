@@ -35,12 +35,15 @@ internal class ServerFactory : IFactory<IServer?, NodeBuildOptions<NetworkBuildO
         {
             var mqttPacketManager = options.ServiceProvider.GetRequiredService<IMqttPacketManager>();
             return new MqttBroker
-            (mqttPacketManager, options.Network, options.NetworkGraph, mqttTopicEvaluator, options.Index, options.Name, options.Address ?? options.Name,
-                options.Protocol, options.Specification, options.Additional!.TicksOptions);
+            (mqttPacketManager, options.Network, options.NetworkGraph, mqttTopicEvaluator, 
+                options.Index, options.Name, options.Address ?? options.Name,
+                options.Protocol, options.Specification, 
+                options.Additional!.TicksOptions!, options.Additional!.NetworkTypeOption!);
         }
 
         return new Server(options.Index, options.Name, options.Address ?? options.Name,
-            options.Protocol, options.Specification, options.Network, options.NetworkGraph)
+            options.Protocol, options.Specification, options.Network, 
+            options.NetworkGraph, options.Additional!.NetworkTypeOption!)
         {
             Group = options.Group
         };

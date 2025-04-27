@@ -39,7 +39,7 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<NetworkBuildO
         }
         else
         {
-            service?.ConnectAsync(options.ConnectsTo);
+            service?.Connect(options.ConnectsTo);
         }
 
         return service;
@@ -57,7 +57,8 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<NetworkBuildO
             var mqttPacketManager = options.ServiceProvider.GetRequiredService<IMqttPacketManager>();
             var mqttClient = new MqttClient(mqttPacketManager, options.Network, options.NetworkGraph, options.Index,
                 options.Name, options.Address ?? options.Name,
-                options.Protocol, options.Specification, options.Name, options.Additional!.TicksOptions)
+                options.Protocol, options.Specification, options.Name, 
+                options.Additional!.TicksOptions!, options.Additional!.NetworkTypeOption!)
             {
                 Group = options.Group,
                 GroupAmount = options.GroupAmount
@@ -68,7 +69,7 @@ internal class ClientFactory : IFactory<IClient?, NodeBuildOptions<NetworkBuildO
 
         return new Client(options.Index, options.Name, options.Address ?? options.Name, options.Protocol,
             options.Specification,
-            options.Network, options.NetworkGraph)
+            options.Network, options.NetworkGraph, options.Additional!.NetworkTypeOption!)
         {
             Group = options.Group
         };
