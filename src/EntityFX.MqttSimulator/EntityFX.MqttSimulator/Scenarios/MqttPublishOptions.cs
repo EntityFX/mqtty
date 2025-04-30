@@ -7,5 +7,7 @@
         public byte[] Payload { get; init; } = Array.Empty<byte>();
 
         public TimeSpan PublishPeriod { get; init; }
+
+        public  int PublishTicks { get; set; }
     }
 }

@@ -27,6 +27,8 @@ namespace EntityFX.MqttY.Counter
 
         public double InboundThroughput => _inboundThroughput.Value;
 
+        public double AvgInboundThroughput { get; private set; }
+
         public NetworkCounters(string name, TicksOptions ticksOptions)
             : base(name)
         {
@@ -106,6 +108,8 @@ namespace EntityFX.MqttY.Counter
             //считаем за дельту тиков.
             _inboundThroughput.Set(inboundDiff * tickRps);
             _outboundThroughput.Set(outboundDiff * tickRps);
+
+            AvgInboundThroughput = _inboundThroughput.HistoryValues.Average(hv => hv.Value);
 
             _lastTicks = totalTicks;
         }

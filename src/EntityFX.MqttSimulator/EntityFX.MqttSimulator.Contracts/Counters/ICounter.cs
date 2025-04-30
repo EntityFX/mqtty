@@ -12,6 +12,8 @@ namespace EntityFX.MqttY.Contracts.Counters
         new TValue Value { get; }
 
         new TValue PreviousValue { get; }
+
+        IEnumerable<KeyValuePair<long, TValue>> HistoryValues { get; }
     }
 
     public interface ICounter

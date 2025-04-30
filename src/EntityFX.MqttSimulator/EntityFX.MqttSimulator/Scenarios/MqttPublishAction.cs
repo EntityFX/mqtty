@@ -52,8 +52,21 @@ namespace EntityFX.MqttY.Scenarios
                 sw.Start();
                 var published = 0;
                 var failedPublish = 0;
+                var publishPerTick = 0;
+                var lastTick = Context!.NetworkGraph!.TotalTicks;
                 while (true)
                 {
+                    if (Context!.NetworkGraph!.TotalTicks > lastTick)
+                    {
+                        publishPerTick = 0;
+                        lastTick = Context!.NetworkGraph!.TotalTicks;
+                    }
+
+                    if (publishPerTick > Config!.PublishTicks)
+                    {
+                        continue;
+                    }
+
                     foreach (var item in mqttClients!)
                     {
                         var publishResult = await item.Client.PublishAsync(item.Options.Topic, item.Options.Payload, MqttQos.AtLeastOnce);
@@ -66,12 +79,17 @@ namespace EntityFX.MqttY.Scenarios
                         {
                             failedPublish++;
                         }
+
+                        publishPerTick++;
                     }
+
+                    
 
                     if (sw.Elapsed > Config!.PublishPeriod)
                     {
                         Context!.NetworkGraph!.AddCounterValue<long>("TotalPublished", published);
                         Context!.NetworkGraph!.AddCounterValue<long>("FailedPublish", failedPublish);
+                        Context!.NetworkGraph!.AddCounterValue<long>("PublishPerTick", published / Context!.NetworkGraph!.TotalTicks);
                         break;
                     }
                 }

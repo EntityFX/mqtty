@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Counters;
+﻿using EntityFX.MqttY.Collections;
+using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Helper;
 
 namespace EntityFX.MqttY.Counter
@@ -19,6 +20,10 @@ namespace EntityFX.MqttY.Counter
 
         public long LastTicks { get; private set; }
 
+        public IEnumerable<KeyValuePair<long, long>> HistoryValues => throw new NotImplementedException();
+
+        private readonly FixedSizedQueue<KeyValuePair<long, long>> _valueHistory = new(1000);
+
         private long _value = 0;
         private long _privateValue = 0;
 
@@ -38,7 +43,9 @@ namespace EntityFX.MqttY.Counter
 
         public void Add(long value)
         {
+            _privateValue = Value;
             Interlocked.Add(ref _value, value);
+            _valueHistory.Enqueue(new KeyValuePair<long, long>(LastTicks, value));
         }
 
         public override string ToString()

@@ -2,6 +2,7 @@
 using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Helper;
+using System.Collections.Generic;
 
 namespace EntityFX.MqttY.Counter
 {
@@ -22,6 +23,8 @@ namespace EntityFX.MqttY.Counter
         object ICounter.PreviousValue => PreviousValue;
 
         public long LastTicks { get; private set; }
+
+        public IEnumerable<KeyValuePair<long, TValue>> HistoryValues => _valueHistory;
 
         private TValue _value = default;
 

@@ -49,7 +49,9 @@ namespace EntityFX.MqttY.Helper
             {
                 foreach (var counterItem in counters)
                 {
-                    if (counterItem.Value is long and 0 || string.IsNullOrEmpty(counterItem.Value?.ToString()))
+                    if (counterItem.Value is long and 0 
+                        || counterItem.Value is double and 0
+                        || string.IsNullOrEmpty(counterItem.Value?.ToString()))
                     {
                         continue;
                     }

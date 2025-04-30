@@ -215,7 +215,7 @@ public class Network : NodeBase, INetwork
     {
         var networkPacket = GetNetworkPacketType(packet);
 
-        if (networkCounters.InboundThroughput > networkTypeOption.Speed * 10)
+        if (networkCounters.AvgInboundThroughput > networkTypeOption.Speed * 10)
         {
             networkCounters.Refuse();
             return false;
