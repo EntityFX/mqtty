@@ -2,18 +2,18 @@
 
 internal class TextFileNetworkLoggerProvider : NetworkLoggerBase, INetworkLoggerProvider, IDisposable
 {
-    private bool disposedValue;
-    private readonly StreamWriter textWriter;
+    private bool _disposedValue;
+    private readonly StreamWriter _textWriter;
 
     public TextFileNetworkLoggerProvider(INetworkLogger monitoring, string filePath)
         : base(monitoring)
     {
-        textWriter = new StreamWriter(filePath, true, System.Text.Encoding.UTF8, 4096);
+        _textWriter = new StreamWriter(filePath, true, System.Text.Encoding.UTF8, 4096);
     }
 
     protected override void WriteScope(NetworkLoggerScope scope)
     {
-        textWriter.WriteLine($"{new string(' ', (scope?.Level ?? 0) * 4)}<{scope?.Date:u}>: " +
+        _textWriter.WriteLine($"{new string(' ', (scope?.Level ?? 0) * 4)}<{scope?.Date:u}>: " +
             $"Begin Scope <{scope?.Id}> (StartTick={scope?.StartTick}, TotalTicks={scope?.Ticks}): \"{scope?.ScopeLabel}\"");
 
 
@@ -32,18 +32,18 @@ internal class TextFileNetworkLoggerProvider : NetworkLoggerBase, INetworkLogger
             }
         }
 
-        textWriter.WriteLine($"{new string(' ', (scope?.Level ?? 0) * 4)}<{scope?.Date:u}>: End Scope <{scope?.Id}>: \"{scope?.ScopeLabel}\"");
-        textWriter.WriteLine();
+        _textWriter.WriteLine($"{new string(' ', (scope?.Level ?? 0) * 4)}<{scope?.Date:u}>: End Scope <{scope?.Id}>: \"{scope?.ScopeLabel}\"");
+        _textWriter.WriteLine();
     }
 
     protected override void WriteItem(NetworkLoggerItem item)
     {
-        textWriter.WriteLine(GetMonitoringLine(item));
+        _textWriter.WriteLine(GetMonitoringLine(item));
     }
 
     protected virtual void Dispose(bool disposing)
     {
-        if (!disposedValue)
+        if (!_disposedValue)
         {
             if (disposing)
             {
@@ -52,7 +52,7 @@ internal class TextFileNetworkLoggerProvider : NetworkLoggerBase, INetworkLogger
 
             // TODO: free unmanaged resources (unmanaged objects) and override finalizer
             // TODO: set large fields to null
-            disposedValue = true;
+            _disposedValue = true;
         }
     }
 

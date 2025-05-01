@@ -8,9 +8,10 @@ public abstract class Node : NodeBase
 {
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
-    private readonly ConcurrentDictionary<Guid, NodeMonitoringPacket> monitorMessages = new ConcurrentDictionary<Guid, NodeMonitoringPacket>();
+    private readonly ConcurrentDictionary<Guid, NodeMonitoringPacket> _monitorMessages = new ConcurrentDictionary<Guid, NodeMonitoringPacket>();
     private readonly NetworkTypeOption _networkTypeOption;
-    internal NodeCounters counters;
+    
+    protected NodeCounters counters;
 
     public override CounterGroup Counters
     {
@@ -30,16 +31,16 @@ public abstract class Node : NodeBase
 
     public override void Reset()
     {
-        foreach (var packet in monitorMessages.Values.ToArray())
+        foreach (var packet in _monitorMessages.Values.ToArray())
         {
             packet.ResetEventSlim?.Set();
         }
-        monitorMessages.Clear();
+        _monitorMessages.Clear();
     }
 
     public override void Refresh()
     {
-        foreach (var packet in monitorMessages)
+        foreach (var packet in _monitorMessages)
         {
             packet.Value.ReduceWaitTicks();
 
@@ -50,7 +51,7 @@ public abstract class Node : NodeBase
             }
         }
         base.Refresh();
-        counters.SetQueueLength(monitorMessages.Count);
+        counters.SetQueueLength(_monitorMessages.Count);
     }
 
     protected override void BeforeSend(NetworkPacket packet)
@@ -75,7 +76,7 @@ public abstract class Node : NodeBase
             return false;
         }
 
-        var monitorMessage = monitorMessages.GetValueOrDefault(packet.RequestId.Value);
+        var monitorMessage = _monitorMessages.GetValueOrDefault(packet.RequestId.Value);
 
         if (monitorMessage == null)
         {
@@ -105,12 +106,12 @@ public abstract class Node : NodeBase
 
         //}
 
-        if (monitorMessages.ContainsKey(packet.Id))
+        if (_monitorMessages.ContainsKey(packet.Id))
         {
             return;
         }
 
-        monitorMessages.AddOrUpdate(packet.Id, new NodeMonitoringPacket()
+        _monitorMessages.AddOrUpdate(packet.Id, new NodeMonitoringPacket()
         {
             RequestPacket = packet,
             RequestTick = NetworkGraph.TotalTicks,
@@ -125,7 +126,7 @@ public abstract class Node : NodeBase
     {
         /*return Task.Run(() =>
         {*/
-        var monitorPacket = monitorMessages.GetValueOrDefault(packetId);
+        var monitorPacket = _monitorMessages.GetValueOrDefault(packetId);
 
         if (monitorPacket == null)
         {
@@ -135,7 +136,7 @@ public abstract class Node : NodeBase
         //var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
         var isSet = monitorPacket?.WaitIsSet(TimeSpan.FromMinutes(1));
 
-        if (!monitorMessages.TryRemove(packetId, out monitorPacket))
+        if (!_monitorMessages.TryRemove(packetId, out monitorPacket))
         {
             return null;
         }

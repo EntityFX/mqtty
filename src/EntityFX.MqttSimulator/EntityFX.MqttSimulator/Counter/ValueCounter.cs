@@ -1,12 +1,10 @@
 ﻿using EntityFX.MqttY.Collections;
 using EntityFX.MqttY.Contracts.Counters;
-using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Helper;
-using System.Collections.Generic;
 
 namespace EntityFX.MqttY.Counter
 {
-    internal class ValueCounter<TValue> : ICounter<TValue>, IWriteableCounter<TValue>
+    public class ValueCounter<TValue> : ICounter<TValue>, IWriteableCounter<TValue>
         where TValue : struct, IEquatable<TValue>
     {
 
@@ -33,13 +31,13 @@ namespace EntityFX.MqttY.Counter
         private readonly FixedSizedQueue<KeyValuePair<long, TValue>> _valueHistory = new(1000);
 
 
-        private readonly NormalizeUnits? normalizeUnits;
+        private readonly NormalizeUnits? _normalizeUnits;
 
         public ValueCounter(string name, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
         {
             Name = name;
             UnitOfMeasure = unitOfMeasure;
-            this.normalizeUnits = normalizeUnits;
+            this._normalizeUnits = normalizeUnits;
         }
 
         public void Refresh(long totalTicks)
@@ -47,11 +45,11 @@ namespace EntityFX.MqttY.Counter
             LastTicks = totalTicks;
         }
 
-        public void Set(TValue Value)
+        public void Set(TValue value)
         {
-            _previousValue = Value;
-            _value = Value;
-            _valueHistory.Enqueue(new KeyValuePair<long, TValue>(LastTicks, Value));
+            _previousValue = value;
+            _value = value;
+            _valueHistory.Enqueue(new KeyValuePair<long, TValue>(LastTicks, value));
         }
 
         public override string ToString()
@@ -62,7 +60,7 @@ namespace EntityFX.MqttY.Counter
             }
 
             var doubleValue = Convert.ToDouble(Value);
-            var stringValue = normalizeUnits switch {
+            var stringValue = _normalizeUnits switch {
                 NormalizeUnits.Bit => doubleValue.ToHumanBits(UnitOfMeasure),
                 NormalizeUnits.Byte => doubleValue.ToHumanBytes(UnitOfMeasure),
                 NormalizeUnits.BiBit => doubleValue.ToHumanBiBits(UnitOfMeasure),

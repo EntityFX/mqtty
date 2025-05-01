@@ -1,16 +1,9 @@
 ﻿using EntityFX.MqttY.Collections;
-using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
-using EntityFX.MqttY.Network;
-using System;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Net.Sockets;
-using System.Reflection.Emit;
-using System.Xml.Linq;
 
 public class NetworkLogger : INetworkLogger
 {
@@ -26,9 +19,9 @@ public class NetworkLogger : INetworkLogger
 
     private readonly long[] _countersByMonitoringType = new long[Enum.GetNames(typeof(NetworkLoggerType)).Length];
 
-    private readonly bool scopesEnabled;
-    private readonly TimeSpan simulationTickTime;
-    private readonly MonitoringIgnoreOption ignore;
+    private readonly bool _scopesEnabled;
+    private readonly TimeSpan _simulationTickTime;
+    private readonly MonitoringIgnoreOption _ignore;
 
     public IEnumerable<NetworkLoggerItem> Items => _storage;
 
@@ -40,9 +33,9 @@ public class NetworkLogger : INetworkLogger
 
     public NetworkLogger(bool scopesEnabled, TimeSpan simulationTickTime, MonitoringIgnoreOption ignore)
     {
-        this.scopesEnabled = scopesEnabled;
-        this.simulationTickTime = simulationTickTime;
-        this.ignore = ignore;
+        this._scopesEnabled = scopesEnabled;
+        this._simulationTickTime = simulationTickTime;
+        this._ignore = ignore;
     }
 
     public void Push(long tick, NetworkLoggerType type, string message, string protocol, string? category,
@@ -62,7 +55,7 @@ public class NetworkLogger : INetworkLogger
 
         var item = new NetworkLoggerItem(
             Guid.NewGuid(), tick,
-            TimeSpan.FromTicks(simulationTickTime.Ticks * tick),
+            TimeSpan.FromTicks(_simulationTickTime.Ticks * tick),
             DateTimeOffset.Now, from,
             fromType, to, toType,
             (uint)(packet?.Length ?? 0), type, protocol, message, scope, category, ttl, queueLength);
@@ -91,14 +84,14 @@ public class NetworkLogger : INetworkLogger
 
     private bool ValidateIgnore(string protocol, string? category)
     {
-        if (ignore.Protocol?.Contains(protocol) == true)
+        if (_ignore.Protocol?.Contains(protocol) == true)
         {
             return true;
         }
 
         if (category != null)
         {
-            if (ignore.Category?.Contains(category) == true)
+            if (_ignore.Category?.Contains(category) == true)
             {
                 return true;
             }
@@ -126,7 +119,7 @@ public class NetworkLogger : INetworkLogger
 
     public NetworkLoggerScope? BeginScope(long tick, string scope, NetworkLoggerScope? parent = null)
     {
-        if (!scopesEnabled) return null;
+        if (!_scopesEnabled) return null;
 
         var scopeItem = new NetworkLoggerScope()
         {
@@ -149,7 +142,7 @@ public class NetworkLogger : INetworkLogger
 
     public void BeginScope(long tick, ref NetworkPacket packet, string scope)
     {
-        if (!scopesEnabled) return;
+        if (!_scopesEnabled) return;
 
         if (packet.Scope == null)
         {
@@ -188,7 +181,7 @@ public class NetworkLogger : INetworkLogger
 
     public void EndScope(long tick, ref NetworkPacket packet)
     {
-        if (!scopesEnabled) return;
+        if (!_scopesEnabled) return;
 
         if (packet.Scope == null)
         {
@@ -209,7 +202,7 @@ public class NetworkLogger : INetworkLogger
 
     public void EndScope(long tick, NetworkLoggerScope? scope)
     {
-        if (!scopesEnabled) return;
+        if (!_scopesEnabled) return;
 
         if (scope == null)
         {

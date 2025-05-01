@@ -2,7 +2,6 @@
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Counter;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 
 namespace EntityFX.MqttY.Application
@@ -42,15 +41,12 @@ namespace EntityFX.MqttY.Application
 
         protected readonly INetworkSimulator NetworkGraph;
 
-        internal ApplicationCounters counters;
+        protected ApplicationCounters counters;
 
         public CounterGroup Counters
         {
             get => counters;
-            set
-            {
-                counters = (ApplicationCounters)value;
-            }
+            set => counters = (ApplicationCounters)value;
         }
 
         public Application(int index, string name, string address, string protocolType, string specification,
@@ -82,7 +78,7 @@ namespace EntityFX.MqttY.Application
 
         public bool AddClient(IClient client)
         {
-            if (client == null) throw new ArgumentNullException("client");
+            if (client == null) throw new ArgumentNullException(nameof(client));
 
             if (_clients.ContainsKey(client.Address))
             {
@@ -112,7 +108,7 @@ namespace EntityFX.MqttY.Application
 
         public bool AddServer(IServer server)
         {
-            if (server == null) throw new ArgumentNullException("server");
+            if (server == null) throw new ArgumentNullException(nameof(server));
 
             if (_servers.ContainsKey(server.Name))
             {

@@ -1,8 +1,6 @@
-﻿using EntityFX.MqttY.Contracts.Scenarios;
-
-namespace EntityFX.MqttY.Scenarios
+﻿namespace EntityFX.MqttY.Scenarios
 {
-    internal class WaitNetwokQueueEmptyAction : ScenarioAction<NetworkSimulation, WaitNetwokQueueEmptyOptions>
+    public class WaitNetwokQueueEmptyAction : ScenarioAction<NetworkSimulation, WaitNetwokQueueEmptyOptions>
     {
         public WaitNetwokQueueEmptyAction()
         {

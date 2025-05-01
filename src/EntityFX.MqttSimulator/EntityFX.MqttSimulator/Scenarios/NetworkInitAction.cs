@@ -1,14 +1,9 @@
-﻿using EntityFX.MqttY.Contracts.Network;
-using EntityFX.MqttY.Contracts.Options;
-using EntityFX.MqttY.Contracts.Scenarios;
-using EntityFX.MqttY.Contracts.Utils;
-using EntityFX.MqttY.Factories;
+﻿using EntityFX.MqttY.Factories;
 using EntityFX.MqttY.Helper;
-using EntityFX.MqttY.Network;
 
 namespace EntityFX.MqttY.Scenarios
 {
-    internal class NetworkInitAction : ScenarioAction<NetworkSimulation, NetworkGraphFactoryOption>
+    public class NetworkInitAction : ScenarioAction<NetworkSimulation, NetworkGraphFactoryOption>
     {
         public override Task ExecuteAsync()
         {

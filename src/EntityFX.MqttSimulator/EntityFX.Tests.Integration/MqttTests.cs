@@ -1,18 +1,14 @@
-using EntityFX.MqttY.Contracts.Mqtt;
-using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Factories;
 using EntityFX.MqttY.Helper;
-using EntityFX.MqttY.Mqtt.Internals;
-using EntityFX.MqttY.Mqtt.Internals.Formatters;
 using EntityFX.MqttY.Network;
-using Microsoft.Extensions.Configuration;
+using EntityFX.MqttY.Plugin.Mqtt.Contracts;
+using EntityFX.MqttY.Plugin.Mqtt.Contracts.Formatters;
+using EntityFX.MqttY.Plugin.Mqtt.Internals;
+using EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Text.Json;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace EntityFX.Tests.Integration
 {
@@ -23,7 +19,7 @@ namespace EntityFX.Tests.Integration
         private ServiceProvider? serviceProvider;
         private NetworkLogger? monitoring;
         private ConsoleNetworkLoggerProvider? monitoringProvider;
-        private NetworkGraph? graph;
+        private NetworkSimulator? graph;
 
         private Exception? testException;
 
@@ -38,7 +34,7 @@ namespace EntityFX.Tests.Integration
             .AddScoped<IMqttPacketManager, MqttNativePacketManager>()
             //.AddScoped<IMqttPacketManager, MqttJsonPacketManager>()
             .AddScoped<IMqttTopicEvaluator, MqttTopicEvaluator>((serviceProvider) => new MqttTopicEvaluator(true))
-            .AddScoped<INetworkBuilder, NetworkBuilder>()
+            .AddScoped<INodesBuilder, NodesBuilder>()
             .AddScoped<INetworkSimulatorBuilder, NetworkSimulatorBuilder>();
 
             serviceProvider = serviceCollection.BuildServiceProvider();
@@ -52,10 +48,10 @@ namespace EntityFX.Tests.Integration
 
             monitoringProvider.Start();
 
-            var networkBuilder = serviceProvider?.GetRequiredService<INetworkBuilder>();
+            var networkBuilder = serviceProvider?.GetRequiredService<INodesBuilder>();
             var networkSimulatorBuilder = serviceProvider?.GetRequiredService<INetworkSimulatorBuilder>();
 
-            graph = new NetworkGraph(serviceProvider!, networkBuilder!, new DijkstraPathFinder(), monitoring!, 
+            graph = new NetworkSimulator(serviceProvider!, networkBuilder!, new DijkstraPathFinder(), monitoring!, 
                 new TicksOptions() {  
                     ReceiveWaitPeriod = TimeSpan.FromMilliseconds(0.1)});
 

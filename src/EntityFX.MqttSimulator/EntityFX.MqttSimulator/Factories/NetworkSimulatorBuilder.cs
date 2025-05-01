@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
@@ -8,18 +7,18 @@ namespace EntityFX.MqttY.Factories;
 
 public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 {
-    private readonly IServiceProvider serviceProvider;
-    private readonly INetworkBuilder networkBuilder;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly INodesBuilder _nodesBuilder;
 
     public string? OptionsPath { get; set; }
 
     public INetworkSimulator? NetworkSimulator { get; private set; }
 
     public NetworkSimulatorBuilder(IServiceProvider serviceProvider,
-        INetworkBuilder networkBuilder)
+        INodesBuilder nodesBuilder)
     {
-        this.serviceProvider = serviceProvider;
-        this.networkBuilder = networkBuilder;
+        this._serviceProvider = serviceProvider;
+        this._nodesBuilder = nodesBuilder;
     }
 
     public IApplication? BuildApplication(
@@ -34,10 +33,10 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 
         var serverAddressFull = NetworkSimulator.GetAddress(name, protocolType, network.Address);
 
-        var server = networkBuilder
-            .ApplicationFactory.Create(
+        var server = _nodesBuilder
+            .ApplicationFactory[protocolType].Create(
                 new NodeBuildOptions<NetworkBuildOption>(
-                    serviceProvider, NetworkSimulator, network, index, name, serverAddressFull,
+                    _serviceProvider, NetworkSimulator, network, index, name, serverAddressFull,
                     group, groupAmount, protocolType, specification, null, new NetworkBuildOption()
                     {
                         Additional = additional,
@@ -70,9 +69,9 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 
         var clientAddressFull = NetworkSimulator.GetAddress(name, protocolType, network.Address);
 
-        var client = networkBuilder
-            .ClientFactory.Create(
-                new NodeBuildOptions<NetworkBuildOption>(serviceProvider,
+        var client = _nodesBuilder
+            .ClientFactory[protocolType].Create(
+                new NodeBuildOptions<NetworkBuildOption>(_serviceProvider,
                     NetworkSimulator, network, index, name, clientAddressFull, group, groupAmount, protocolType,
                     specification, null, new NetworkBuildOption()
                     {
@@ -106,10 +105,10 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
             throw new ArgumentNullException(nameof(NetworkSimulator));
         }
 
-        var network = networkBuilder
+        var network = _nodesBuilder
             .NetworkFactory.Create(
                 new NodeBuildOptions<NetworkBuildOption>(
-                    serviceProvider, NetworkSimulator, null, index, name, address, null, null, "IP",
+                    _serviceProvider, NetworkSimulator, null, index, name, address, null, null, "IP",
                     string.Empty, null, new NetworkBuildOption()
                     {
                         TicksOptions = ticks,
@@ -146,10 +145,10 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 
         var serverAddressFull = NetworkSimulator.GetAddress(name, protocolType, network.Address);
 
-        var server = networkBuilder
-            .ServerFactory.Create(
+        var server = _nodesBuilder
+            .ServerFactory[protocolType].Create(
                 new NodeBuildOptions<NetworkBuildOption>(
-                    serviceProvider, NetworkSimulator, network, index, name, serverAddressFull, group,
+                    _serviceProvider, NetworkSimulator, network, index, name, serverAddressFull, group,
                     groupAmount, protocolType,
                     specification, null, new NetworkBuildOption()
                     {
@@ -221,7 +220,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
             if (nodeApplication == null) continue;
 
             var bo = new NodeBuildOptions<NetworkBuildOption>(
-                serviceProvider,
+                _serviceProvider,
                 NetworkSimulator, nodeApplication.Network, nodeApplication.Index, nodeApplication.Name, nodeApplication.Address,
                 nodeApplication.Group, nodeApplication.GroupAmount, nodeApplication.ProtocolType,
                 nodeApplication.Specification ?? string.Empty,
@@ -231,7 +230,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                     Additional = application.Value.Additional
                 });
 
-            networkBuilder.ApplicationFactory.Configure(bo, nodeApplication);
+            _nodesBuilder.ApplicationFactory[application.Value.Protocol].Configure(bo, nodeApplication);
         }
     }
 
@@ -249,7 +248,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
             if (nodeServer == null) continue;
 
             var bo = new NodeBuildOptions<NetworkBuildOption>(
-                serviceProvider,
+                _serviceProvider,
                 NetworkSimulator, nodeServer.Network, nodeServer.Index, nodeServer.Name, nodeServer.Address,
                 nodeServer.Group, nodeServer.GroupAmount, nodeServer.ProtocolType,
                 nodeServer.Specification, node.Value.ConnectsToServer, new NetworkBuildOption()
@@ -258,7 +257,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                     TicksOptions = option.Ticks
                 });
 
-            networkBuilder.ServerFactory.Configure(bo, nodeServer);
+            _nodesBuilder.ServerFactory[node.Value.Protocol].Configure(bo, nodeServer);
         }
     }
 
@@ -269,7 +268,8 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
             throw new ArgumentNullException(nameof(NetworkSimulator));
         }
 
-        var clients = option.Nodes.Where(nt => nt.Value.Type == NodeOptionType.Client).ToArray();
+        var clients = option.Nodes.Where(
+            nt => nt.Value.Type == NodeOptionType.Client).ToArray();
         foreach (var node in clients)
         {
             if (node.Value.Quantity > 1)
@@ -286,7 +286,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                             }
 
                             var bo = new NodeBuildOptions<NetworkBuildOption>(
-                                serviceProvider,
+                                _serviceProvider,
                                 NetworkSimulator, nodeClient.Network, nodeClient.Index, nodeClient.Name, nodeClient.Address,
                                 nodeClient.Group, nodeClient.GroupAmount, nodeClient.ProtocolType,
                                 node.Value.Specification ?? string.Empty,
@@ -295,8 +295,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                                     Additional = node.Value.Additional,
                                     TicksOptions = option.Ticks
                                 });
-
-                            networkBuilder.ClientFactory.Configure(bo, nodeClient);
+                            _nodesBuilder.ClientFactory[node.Value.Protocol].Configure(bo, nodeClient);
                         });
             }
             else
@@ -305,7 +304,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                 if (nodeClient == null) continue;
 
                 var bo = new NodeBuildOptions<NetworkBuildOption>(
-                    serviceProvider,
+                    _serviceProvider,
                     NetworkSimulator, nodeClient.Network, nodeClient.Index, nodeClient.Name, nodeClient.Address,
                     nodeClient.Group, nodeClient.GroupAmount, nodeClient.ProtocolType,
                     node.Value.Specification ?? string.Empty, node.Value.ConnectsToServer, new NetworkBuildOption()
@@ -313,7 +312,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                         Additional = node.Value.Additional,
                         TicksOptions = option.Ticks
                     });
-                networkBuilder.ClientFactory.Configure(bo, nodeClient);
+                _nodesBuilder.ClientFactory[node.Value.Protocol].Configure(bo, nodeClient);
             }
         }
     }

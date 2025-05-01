@@ -2,12 +2,12 @@
 
 internal abstract class NetworkLoggerBase : INetworkLoggerProvider
 {
-    private readonly INetworkLogger monitoring;
+    private readonly INetworkLogger _monitoring;
     private static object _lock = new object();
 
     public NetworkLoggerBase(INetworkLogger monitoring)
     {
-        this.monitoring = monitoring;
+        this._monitoring = monitoring;
     }
 
     public void ItemAdded(NetworkLoggerItem item)
@@ -35,13 +35,13 @@ internal abstract class NetworkLoggerBase : INetworkLoggerProvider
 
     public void Start()
     {
-        monitoring.Added += (sender, e) =>
+        _monitoring.Added += (sender, e) =>
             ItemAdded(e);
 
-        monitoring.ScopeStarted += (sender, scope) =>
+        _monitoring.ScopeStarted += (sender, scope) =>
             ScopeStarted(scope);
 
-        monitoring.ScopeEnded += (sender, scope) =>
+        _monitoring.ScopeEnded += (sender, scope) =>
         {
             ScopeEnded(scope);
         };

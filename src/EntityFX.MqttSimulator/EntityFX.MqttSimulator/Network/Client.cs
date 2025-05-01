@@ -1,8 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
-using System.Collections.ObjectModel;
-using System.Net;
 
 public class Client : Node, IClient
 {
@@ -22,7 +20,7 @@ public class Client : Node, IClient
 
     public event EventHandler<NetworkPacket>? PacketReceived;
 
-    protected string serverName = string.Empty;
+    protected string ServerName = string.Empty;
 
     public Client(int index, string name, string address, string protocolType, 
         string specification,
@@ -92,7 +90,7 @@ public class Client : Node, IClient
 
         NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref responsePacket!);
 
-        serverName = server;
+        ServerName = server;
 
         IsConnected = true;
 
@@ -121,7 +119,7 @@ public class Client : Node, IClient
 
         if (Network == null) return false;
 
-        var result = DetachClientFromServer(serverName);
+        var result = DetachClientFromServer(ServerName);
 
         result = Network.RemoveClient(Address);
 
@@ -131,7 +129,7 @@ public class Client : Node, IClient
             return false;
         }
 
-        serverName = string.Empty;
+        ServerName = string.Empty;
 
         IsConnected = false;
 
@@ -168,7 +166,7 @@ public class Client : Node, IClient
     public bool Send(byte[] payload, string? category = null)
     {
         var result = Send(
-            new NetworkPacket(Name, serverName, NodeType.Client, NodeType.Server, payload, ProtocolType, category), true);
+            new NetworkPacket(Name, ServerName, NodeType.Client, NodeType.Server, payload, ProtocolType, category), true);
 
         return result;
     }

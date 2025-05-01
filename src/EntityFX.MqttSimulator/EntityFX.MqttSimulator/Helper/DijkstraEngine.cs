@@ -1,9 +1,4 @@
-﻿using System;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace EntityFX.MqttY.Helper
+﻿namespace EntityFX.MqttY.Helper
 {
 
 
@@ -12,84 +7,84 @@ namespace EntityFX.MqttY.Helper
     /// </summary>
     public static class DijkstraEngine
     {
-        public static LinkedList<Path<T>> CalculateShortestPathBetween<T>(T source, T destination, IEnumerable<Path<T>> Paths)
+        public static LinkedList<Path<T>> CalculateShortestPathBetween<T>(T source, T destination, IEnumerable<Path<T>> paths)
             where T : notnull
         {
-            return CalculateFrom(source, Paths)[destination];
+            return CalculateFrom(source, paths)[destination];
         }
 
-        public static Dictionary<T, LinkedList<Path<T>>> CalculateShortestFrom<T>(T source, IEnumerable<Path<T>> Paths)
+        public static Dictionary<T, LinkedList<Path<T>>> CalculateShortestFrom<T>(T source, IEnumerable<Path<T>> paths)
             where T : notnull
         {
-            return CalculateFrom(source, Paths);
+            return CalculateFrom(source, paths);
         }
 
-        private static Dictionary<T, LinkedList<Path<T>>> CalculateFrom<T>(T source, IEnumerable<Path<T>> Paths)
+        private static Dictionary<T, LinkedList<Path<T>>> CalculateFrom<T>(T source, IEnumerable<Path<T>> paths)
             where T : notnull
         {
             // validate the paths
-            if (Paths.Any(p => p.Source.Equals(p.Destination) == true) == true)
+            if (paths.Any(p => p.Source.Equals(p.Destination) == true) == true)
                 throw new ArgumentException("No path can have the same source and destination");
 
             // keep track of the shortest paths identified thus far
-            Dictionary<T, KeyValuePair<int, LinkedList<Path<T>>>> ShortestPaths = new Dictionary<T, KeyValuePair<int, LinkedList<Path<T>>>>();
+            Dictionary<T, KeyValuePair<int, LinkedList<Path<T>>>> shortestPaths = new Dictionary<T, KeyValuePair<int, LinkedList<Path<T>>>>();
 
             // keep track of the locations which have been completely processed
-            List<T> LocationsProcessed = new List<T>();
+            List<T> locationsProcessed = new List<T>();
 
             // include all possible steps, with Int.MaxValue cost
-            Paths.SelectMany(p => new T[] { p.Source, p.Destination })           // union source and destinations
+            paths.SelectMany(p => new T[] { p.Source, p.Destination })           // union source and destinations
                     .Distinct()                                                  // remove duplicates
                     .ToList()                                                    // ToList exposes ForEach
-                    .ForEach(s => ShortestPaths.Set(s, Int32.MaxValue));   // add to ShortestPaths with MaxValue cost
+                    .ForEach(s => shortestPaths.Set(s, Int32.MaxValue));   // add to ShortestPaths with MaxValue cost
 
             // update cost for self-to-self as 0; no path
-            ShortestPaths.Set(source, 0);
+            shortestPaths.Set(source, 0);
 
             // keep this cached
-            var LocationCount = ShortestPaths.Keys.Count;
+            var locationCount = shortestPaths.Keys.Count;
 
-            while (LocationsProcessed.Count < LocationCount)
+            while (locationsProcessed.Count < locationCount)
             {
-                T? _locationToProcess = default;
+                T? locationToProcess = default;
 
                 //Search for the nearest location that isn't handled
-                foreach (T _location in ShortestPaths.OrderBy(p => p.Value.Key).Select(p => p.Key).ToList())
+                foreach (T location in shortestPaths.OrderBy(p => p.Value.Key).Select(p => p.Key).ToList())
                 {
-                    if (!LocationsProcessed.Contains(_location))
+                    if (!locationsProcessed.Contains(location))
                     {
-                        if (ShortestPaths[_location].Key == Int32.MaxValue)
-                            return ShortestPaths.ToDictionary(k => k.Key, v => v.Value.Value) 
+                        if (shortestPaths[location].Key == Int32.MaxValue)
+                            return shortestPaths.ToDictionary(k => k.Key, v => v.Value.Value) 
                                 ?? new Dictionary<T, LinkedList<Path<T>>>(); //ShortestPaths[destination].Value;
 
-                        _locationToProcess = _location;
+                        locationToProcess = location;
                         break;
                     }
                 } // foreach
 
-                var _selectedPaths = Paths.Where(p => p.Source.Equals(_locationToProcess));
+                var selectedPaths = paths.Where(p => p.Source.Equals(locationToProcess));
 
-                foreach (Path<T> path in _selectedPaths)
+                foreach (Path<T> path in selectedPaths)
                 {
-                    if (ShortestPaths[path.Destination].Key > path.Cost + ShortestPaths[path.Source].Key)
+                    if (shortestPaths[path.Destination].Key > path.Cost + shortestPaths[path.Source].Key)
                     {
-                        ShortestPaths.Set(
+                        shortestPaths.Set(
                             path.Destination,
-                            path.Cost + ShortestPaths[path.Source].Key,
-                            ShortestPaths[path.Source].Value.Union(new Path<T>[] { path }).ToArray());
+                            path.Cost + shortestPaths[path.Source].Key,
+                            shortestPaths[path.Source].Value.Union(new Path<T>[] { path }).ToArray());
                     }
                 }
 
-                if (_locationToProcess == null)
+                if (locationToProcess == null)
                 {
                     continue;
                 }
 
                 //Add the location to the list of processed locations
-                LocationsProcessed.Add(_locationToProcess);
+                locationsProcessed.Add(locationToProcess);
             } // while
 
-            return ShortestPaths.ToDictionary(k => k.Key, v => v.Value.Value);
+            return shortestPaths.ToDictionary(k => k.Key, v => v.Value.Value);
             //return ShortestPaths[destination].Value;
         }
     }

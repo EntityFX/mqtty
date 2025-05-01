@@ -4,7 +4,7 @@ using EntityFX.MqttY.Helper;
 
 namespace EntityFX.MqttY.Counter
 {
-    internal class GenericCounter : INodeCounter<long>
+    public class GenericCounter : INodeCounter<long>
     {
         public string Name { get; init; }
 
@@ -27,13 +27,13 @@ namespace EntityFX.MqttY.Counter
         private long _value = 0;
         private long _privateValue = 0;
 
-        private readonly NormalizeUnits? normalizeUnits;
+        private readonly NormalizeUnits? _normalizeUnits;
 
         public GenericCounter(string name, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
         {
             Name = name;
             UnitOfMeasure = unitOfMeasure;
-            this.normalizeUnits = normalizeUnits;
+            this._normalizeUnits = normalizeUnits;
         }
 
         public void Increment()
@@ -51,7 +51,7 @@ namespace EntityFX.MqttY.Counter
         public override string ToString()
         {
             var doubleValue = Convert.ToDouble(Value);
-            var stringValue = normalizeUnits switch
+            var stringValue = _normalizeUnits switch
             {
                 NormalizeUnits.Bit => doubleValue.ToHumanBits(),
                 NormalizeUnits.Byte => doubleValue.ToHumanBytes(),

@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EntityFX.MqttSimulator\EntityFX.MqttY.csproj" />
+    <ProjectReference Include="..\EntityFX.MqttY.Plugin.Mqtt\EntityFX.MqttY.Plugin.Mqtt.csproj" />
   </ItemGroup>
 
   <ItemGroup>

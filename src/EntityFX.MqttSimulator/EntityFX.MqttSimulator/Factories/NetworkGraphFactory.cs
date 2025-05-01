@@ -1,6 +1,5 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
-using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Network;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,11 +8,11 @@ namespace EntityFX.MqttY.Factories;
 
 internal class NetworkGraphFactory : IFactory<INetworkSimulator, NetworkGraphFactoryOption>
 {
-    private readonly IServiceProvider serviceProvider;
+    private readonly IServiceProvider _serviceProvider;
 
     public NetworkGraphFactory(IServiceProvider serviceProvider)
     {
-        this.serviceProvider = serviceProvider;
+        this._serviceProvider = serviceProvider;
     }
 
     public INetworkSimulator Configure(NetworkGraphFactoryOption options, INetworkSimulator service)
@@ -25,12 +24,12 @@ internal class NetworkGraphFactory : IFactory<INetworkSimulator, NetworkGraphFac
 
     public INetworkSimulator Create(NetworkGraphFactoryOption options)
     {
-        var nb = serviceProvider.GetRequiredService<INetworkBuilder>();
-        var pf = serviceProvider.GetRequiredService<IPathFinder>();
+        var nb = _serviceProvider.GetRequiredService<INodesBuilder>();
+        var pf = _serviceProvider.GetRequiredService<IPathFinder>();
 
-        var mf = serviceProvider.GetRequiredService<IFactory<INetworkLogger, NetworkGraphFactoryOption>>();
+        var mf = _serviceProvider.GetRequiredService<IFactory<INetworkLogger, NetworkGraphFactoryOption>>();
         var monitoring = mf.Create(options);
-        var ng = new NetworkGraph(serviceProvider, nb, pf, monitoring, options.TicksOption)
+        var ng = new NetworkSimulator(_serviceProvider, nb, pf, monitoring, options.TicksOption)
         {
             OptionsPath = options.OptionsPath
         };

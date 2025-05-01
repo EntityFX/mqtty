@@ -5,7 +5,7 @@ public class DijkstraPathFinder : IPathFinder
 {
     public INetworkSimulator? NetworkGraph { get; set; }
 
-    private Path<string>[] paths = new Path<string>[0];
+    private Path<string>[] _paths = new Path<string>[0];
 
     public void Build()
     {
@@ -22,7 +22,7 @@ public class DijkstraPathFinder : IPathFinder
                 pathsList.Add(new Path<string>(source.Key,destination.Key) { Cost = 1 });
             }
         }
-        paths = pathsList.ToArray();
+        _paths = pathsList.ToArray();
     }
 
 
@@ -33,7 +33,7 @@ public class DijkstraPathFinder : IPathFinder
             return Enumerable.Empty<INetwork>();
         }
 
-        var path = DijkstraEngine.CalculateShortestPathBetween(sourceNetworkAddress, destinationNetworkAddress, paths);
+        var path = DijkstraEngine.CalculateShortestPathBetween(sourceNetworkAddress, destinationNetworkAddress, _paths);
 
 
         var networks = path.Select(p => NetworkGraph.Networks.GetValueOrDefault(p.Destination))

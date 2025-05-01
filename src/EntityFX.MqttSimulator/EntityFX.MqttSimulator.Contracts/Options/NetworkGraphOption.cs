@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace EntityFX.MqttY.Contracts.Options
+﻿namespace EntityFX.MqttY.Contracts.Options
 {
     public class NetworkGraphOption
     {

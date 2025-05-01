@@ -4,7 +4,7 @@ namespace EntityFX.MqttY.Collections
 {
     public class FixedSizedQueue<T> : ConcurrentQueue<T>
     {
-        private readonly object syncObject = new object();
+        private readonly object _syncObject = new object();
 
         public int Size { get; private set; }
 
@@ -16,7 +16,7 @@ namespace EntityFX.MqttY.Collections
         public new void Enqueue(T obj)
         {
             base.Enqueue(obj);
-            lock (syncObject)
+            lock (_syncObject)
             {
                 while (base.Count > Size)
                 {

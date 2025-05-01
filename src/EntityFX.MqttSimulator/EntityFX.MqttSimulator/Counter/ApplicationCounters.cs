@@ -2,7 +2,7 @@
 
 namespace EntityFX.MqttY.Counter
 {
-    internal class ApplicationCounters : CounterGroup
+    public class ApplicationCounters : CounterGroup
     {
         private List<ICounter> _counters = new List<ICounter>();
         public GenericCounter InvokeCounter { get; }

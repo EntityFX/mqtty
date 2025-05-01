@@ -1,10 +1,10 @@
-﻿using EntityFX.MqttY.Contracts.Mqtt.Packets;
-using EntityFX.MqttY.Helper;
-using EntityFX.MqttY.Mqtt.Internals;
-using EntityFX.MqttY.Mqtt.Internals.Formatters;
+﻿using EntityFX.MqttY.Helper;
 using System.Collections;
-using System.Net.Sockets;
 using System.Text;
+using EntityFX.MqttY.Plugin.Mqtt.Contracts;
+using EntityFX.MqttY.Plugin.Mqtt.Contracts.Packets;
+using EntityFX.MqttY.Plugin.Mqtt.Internals;
+using EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters;
 
 namespace EntityFX.Tests.Integration
 {
@@ -36,7 +36,7 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void DumpMqttTest()
         {
-            var connect = new PublishPacket("aaa/bbbb/ccccc/ddddddd/eeeee/ffff", MqttY.Contracts.Mqtt.MqttQos.ExactlyOnce, true, true, 77) {
+            var connect = new PublishPacket("aaa/bbbb/ccccc/ddddddd/eeeee/ffff", MqttQos.ExactlyOnce, true, true, 77) {
                 Payload = new byte[555] };
 
             var topicEvaluator = new MqttTopicEvaluator(true);

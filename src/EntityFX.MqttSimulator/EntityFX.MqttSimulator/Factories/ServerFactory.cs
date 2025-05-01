@@ -1,13 +1,10 @@
-using EntityFX.MqttY.Contracts.Mqtt;
-using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Utils;
-using EntityFX.MqttY.Mqtt;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EntityFX.MqttY.Factories;
 
-internal class ServerFactory : IFactory<IServer?, NodeBuildOptions<NetworkBuildOption>>
+public class ServerFactory : IFactory<IServer?, NodeBuildOptions<NetworkBuildOption>>
 {
     private readonly IServiceProvider _serviceProvider;
 
@@ -28,19 +25,7 @@ internal class ServerFactory : IFactory<IServer?, NodeBuildOptions<NetworkBuildO
         {
             return null;
         }
-
-        var mqttTopicEvaluator = _serviceProvider.GetRequiredService<IMqttTopicEvaluator>();
-
-        if (options.Protocol == "mqtt")
-        {
-            var mqttPacketManager = options.ServiceProvider.GetRequiredService<IMqttPacketManager>();
-            return new MqttBroker
-            (mqttPacketManager, options.Network, options.NetworkGraph, mqttTopicEvaluator, 
-                options.Index, options.Name, options.Address ?? options.Name,
-                options.Protocol, options.Specification, 
-                options.Additional!.TicksOptions!, options.Additional!.NetworkTypeOption!);
-        }
-
+        
         return new Server(options.Index, options.Name, options.Address ?? options.Name,
             options.Protocol, options.Specification, options.Network, 
             options.NetworkGraph, options.Additional!.NetworkTypeOption!)

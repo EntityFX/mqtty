@@ -4,7 +4,7 @@ namespace EntityFX.MqttY.Scenarios
 {
     public class ScenarioAction<TContext, TConfig> : IAction<TContext, TConfig>
     {
-        private bool disposedValue;
+        private bool _disposedValue;
 
         public int Index { get; init; }
 
@@ -42,7 +42,7 @@ namespace EntityFX.MqttY.Scenarios
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposedValue)
+            if (!_disposedValue)
             {
                 if (disposing)
                 {
@@ -51,7 +51,7 @@ namespace EntityFX.MqttY.Scenarios
 
                 // TODO: free unmanaged resources (unmanaged objects) and override finalizer
                 // TODO: set large fields to null
-                disposedValue = true;
+                _disposedValue = true;
             }
         }
 

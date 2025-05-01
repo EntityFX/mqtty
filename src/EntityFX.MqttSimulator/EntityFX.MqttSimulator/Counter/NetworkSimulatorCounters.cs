@@ -7,7 +7,7 @@ namespace EntityFX.MqttY.Counter
 {
     internal class NetworkSimulatorCounters : CounterGroup
     {
-        private readonly double ticksPerSecond;
+        private readonly double _ticksPerSecond;
 
         private readonly List<ICounter> _counters = new List<ICounter>();
         private readonly ValueCounter<long> _ticksCounter;
@@ -25,7 +25,7 @@ namespace EntityFX.MqttY.Counter
         public NetworkSimulatorCounters(string name, TicksOptions ticksOptions)
             : base(name)
         {
-            ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
+            _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
             _ticksOptions = ticksOptions;
 
             _ticksCounter = new ValueCounter<long>("Ticks");

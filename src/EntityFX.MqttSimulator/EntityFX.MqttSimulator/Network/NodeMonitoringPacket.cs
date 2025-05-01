@@ -1,5 +1,4 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
-using System.Diagnostics;
 
 internal class NodeMonitoringPacket
 {

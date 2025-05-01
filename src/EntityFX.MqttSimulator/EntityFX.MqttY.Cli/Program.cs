@@ -1,7 +1,9 @@
 ﻿using EntityFX.MqttY;
-using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Cli;
 using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Contracts.Scenarios;
 using EntityFX.MqttY.Contracts.Utils;
+using EntityFX.MqttY.Plugin.Mqtt;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -17,12 +19,15 @@ builder.Configuration
     .AddJsonFile("appsettings.nodes.json", true, false)
     .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true, false);
 
-builder.Services
-    .Configure<MqttYOptions>(builder.Configuration);
 
 builder.Services
     .AddHostedService<Worker>()
-    .ConfigureServices();
+    .AddScoped<IFactory<IScenario?, (string Scenario, IDictionary<string, ScenarioOption> Options)>,
+        ScenarioFactory>()
+    .Configure<ScenariosOptions>(builder.Configuration)
+    .ConfigureNodesBuilder()
+    .ConfigureServices()
+    .ConfigureMqttServices();
 
 using IHost host = builder.Build();
 

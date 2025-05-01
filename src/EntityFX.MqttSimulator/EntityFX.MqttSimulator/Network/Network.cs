@@ -4,8 +4,6 @@ using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Xml.Linq;
 using NetworkLoggerType = EntityFX.MqttY.Contracts.NetworkLogger.NetworkLoggerType;
 
 namespace EntityFX.MqttY.Network;
@@ -21,17 +19,17 @@ public class Network : NodeBase, INetwork
     /// TODO: Add max size limit
     /// </summary>
     private readonly ConcurrentDictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
-    private readonly NetworkTypeOption networkTypeOption;
+    private readonly NetworkTypeOption _networkTypeOption;
 
     //private Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
 
-    private readonly TicksOptions ticksOptions;
+    private readonly TicksOptions _ticksOptions;
 
-    private readonly NetworkCounters networkCounters;
+    private readonly NetworkCounters _networkCounters;
     private CounterGroup _counters;
 
     private readonly object _countersLock = new object();
-    private CancellationTokenSource? cancelTokenSource;
+    private CancellationTokenSource? _cancelTokenSource;
 
     public string NetworkType { get; }
 
@@ -41,7 +39,7 @@ public class Network : NodeBase, INetwork
         {
             _counters.Counters = new ICounter[]
                 {
-                    networkCounters,
+                    _networkCounters,
                     new CounterGroup("Servers")
                     {
                         Counters = _servers.Values.ToArray().Select(s =>s.Counters).ToArray()
@@ -80,16 +78,16 @@ public class Network : NodeBase, INetwork
         NetworkTypeOption networkTypeOption, TicksOptions ticksOptions)
         : base(index, name, address, networkGraph)
     {
-        this.networkTypeOption = networkTypeOption;
-        this.ticksOptions = ticksOptions;
-        networkCounters = new NetworkCounters("Network", ticksOptions);
+        this._networkTypeOption = networkTypeOption;
+        this._ticksOptions = ticksOptions;
+        _networkCounters = new NetworkCounters("Network", ticksOptions);
         _counters = new CounterGroup(Name);
         NetworkType = networkType;
     }
 
     public bool AddClient(IClient client)
     {
-        if (client == null) throw new ArgumentNullException("client");
+        if (client == null) throw new ArgumentNullException(nameof(client));
 
         if (_clients.ContainsKey(client.Address))
         {
@@ -119,7 +117,7 @@ public class Network : NodeBase, INetwork
 
     public bool Link(INetwork network)
     {
-        if (network == null) throw new ArgumentNullException("network");
+        if (network == null) throw new ArgumentNullException(nameof(network));
 
         if (_linkedNetworks.ContainsKey(network.Name))
         {
@@ -137,7 +135,7 @@ public class Network : NodeBase, INetwork
 
     public bool Unlink(INetwork network)
     {
-        if (network == null) throw new ArgumentNullException("network");
+        if (network == null) throw new ArgumentNullException(nameof(network));
 
         if (!_linkedNetworks.ContainsKey(network.Name))
         {
@@ -172,7 +170,7 @@ public class Network : NodeBase, INetwork
 
     public bool AddServer(IServer server)
     {
-        if (server == null) throw new ArgumentNullException("server");
+        if (server == null) throw new ArgumentNullException(nameof(server));
 
         if (_servers.ContainsKey(server.Name))
         {
@@ -205,7 +203,7 @@ public class Network : NodeBase, INetwork
         //_monitoringPacketsQueue.Add(networkMonitoringPacket.Packet.Id, networkMonitoringPacket);
         _monitoringPacketsQueue.AddOrUpdate(networkMonitoringPacket.Packet.Id, networkMonitoringPacket, (g, p) => p);
 
-        networkCounters.CountInbound(networkMonitoringPacket.Packet);
+        _networkCounters.CountInbound(networkMonitoringPacket.Packet);
     }
 
     //TODO: If queue limit is exceeded then reject Send
@@ -215,22 +213,22 @@ public class Network : NodeBase, INetwork
     {
         var networkPacket = GetNetworkPacketType(packet);
 
-        if (networkCounters.AvgInboundThroughput > networkTypeOption.Speed * 10)
+        if (_networkCounters.AvgInboundThroughput > _networkTypeOption.Speed * 10)
         {
-            networkCounters.Refuse();
+            _networkCounters.Refuse();
             return false;
         }
 
         if (_monitoringPacketsQueue.Count > 50000)
         {
-            networkCounters.Refuse();
+            _networkCounters.Refuse();
             return false;
         }
 
         // _monitoringPacketsQueue.Add(packet.Id, networkPacket);
         _monitoringPacketsQueue.AddOrUpdate(networkPacket.Packet.Id, networkPacket, (g, p) => p);
 
-        networkCounters.CountInbound(packet);
+        _networkCounters.CountInbound(packet);
 
         return true;
     }
@@ -263,7 +261,7 @@ public class Network : NodeBase, INetwork
         //var waitTime = _monitoringPacketsQueue.Count <= 5000 ? ticksOptions.NetworkTicks :
         //        _monitoringPacketsQueue.Count / 5000 * ticksOptions.NetworkTicks;
 
-        var waitTime = networkTypeOption.RefreshTicks;
+        var waitTime = _networkTypeOption.RefreshTicks;
 
         return new NetworkMonitoringPacket(packet, pathQueue, NetworkPacketType.Remote, destionationNode)
         {
@@ -291,7 +289,7 @@ public class Network : NodeBase, INetwork
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
         NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
 
-        networkCounters.CountOutbound(packet);
+        _networkCounters.CountOutbound(packet);
         return networkPacket.DestionationNode!.Receive(packet);
     }
 
@@ -332,8 +330,8 @@ public class Network : NodeBase, INetwork
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
 
 
-        networkCounters.CountTransfers();
-        networkCounters.CountOutbound(networkPacket.Packet);
+        _networkCounters.CountTransfers();
+        _networkCounters.CountOutbound(networkPacket.Packet);
         next.TransferNext(networkPacket);
 
         return true;
@@ -375,7 +373,7 @@ public class Network : NodeBase, INetwork
 
 
 
-        networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
+        _networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
         Counters.Refresh(NetworkGraph.TotalTicks);
     }
 
@@ -451,7 +449,7 @@ public class Network : NodeBase, INetwork
 
     public bool AddApplication(IApplication application)
     {
-        if (application == null) throw new ArgumentNullException("application");
+        if (application == null) throw new ArgumentNullException(nameof(application));
 
         if (_applications.ContainsKey(application.Name))
         {

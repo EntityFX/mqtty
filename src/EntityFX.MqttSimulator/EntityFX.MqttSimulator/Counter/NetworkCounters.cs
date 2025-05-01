@@ -7,7 +7,7 @@ namespace EntityFX.MqttY.Counter
     internal class NetworkCounters : CounterGroup
     {
         private readonly List<ICounter> _counters = new List<ICounter>();
-        private readonly double ticksPerSecond;
+        private readonly double _ticksPerSecond;
 
         private readonly GenericCounter _transferPacketsCounter;
         private readonly ValueCounter<long> _queueCounter;
@@ -21,7 +21,7 @@ namespace EntityFX.MqttY.Counter
         private readonly GenericCounter _inboundPacketsCounter;
         private readonly ValueCounter<double> _inboundThroughput;
 
-        private readonly TicksOptions ticksOptions;
+        private readonly TicksOptions _ticksOptions;
 
         private long _lastTicks;
 
@@ -32,7 +32,7 @@ namespace EntityFX.MqttY.Counter
         public NetworkCounters(string name, TicksOptions ticksOptions)
             : base(name)
         {
-            ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
+            _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
 
             _transferPacketsCounter = new GenericCounter("TransferPackets");
 
@@ -57,7 +57,7 @@ namespace EntityFX.MqttY.Counter
             _counters.Add(_outboundCounter);
             _counters.Add(_outboundThroughput);
             Counters = _counters.ToArray();
-            this.ticksOptions = ticksOptions;
+            this._ticksOptions = ticksOptions;
         }
 
         public void AddCounter(ICounter incrementable)
@@ -100,7 +100,7 @@ namespace EntityFX.MqttY.Counter
 
             if (ticksDiff < 100) return;
 
-            var tickRps = ticksPerSecond / ticksDiff;
+            var tickRps = _ticksPerSecond / ticksDiff;
 
             var inboundDiff = _inboundCounter.Value - _inboundCounter.PreviousValue;
             var outboundDiff = _outboundCounter.Value - _outboundCounter.PreviousValue;

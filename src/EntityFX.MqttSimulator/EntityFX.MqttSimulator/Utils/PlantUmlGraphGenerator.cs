@@ -1,7 +1,6 @@
 using System.Text;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
-using EntityFX.MqttY.Network;
 
 namespace EntityFX.MqttY.Utils;
 

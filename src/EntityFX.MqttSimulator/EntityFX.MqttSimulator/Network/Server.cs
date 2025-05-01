@@ -1,9 +1,6 @@
-﻿using EntityFX.MqttY.Contracts.Mqtt.Packets;
-using EntityFX.MqttY.Contracts.Network;
+﻿using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
-using System.Net;
-using static System.Formats.Asn1.AsnWriter;
 
 public class Server : Node, IServer
 {

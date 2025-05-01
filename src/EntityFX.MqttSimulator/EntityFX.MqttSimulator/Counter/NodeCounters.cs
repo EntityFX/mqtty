@@ -1,9 +1,8 @@
 ﻿using EntityFX.MqttY.Contracts.Counters;
-using System.Diagnostics.Metrics;
 
 namespace EntityFX.MqttY.Counter
 {
-    internal class NodeCounters : CounterGroup
+    public class NodeCounters : CounterGroup
     {
         private List<ICounter> _counters = new List<ICounter>();
         private readonly ValueCounter<long> _queueCounter;

@@ -5,8 +5,8 @@ namespace EntityFX.MqttY.Scenarios
 {
     public class Scenario<TContext> : IScenario<TContext>
     {
-        protected readonly IServiceProvider serviceProvider;
-        private bool disposedValue;
+        protected readonly IServiceProvider ServiceProvider;
+        private bool _disposedValue;
 
         public TContext Context { get; init; }
 
@@ -23,7 +23,7 @@ namespace EntityFX.MqttY.Scenarios
         public Scenario(IServiceProvider serviceProvider, string scenario, TContext context,
             Func<IScenario<TContext>, Dictionary<int, IAction<TContext>>> actionsBuildFunc)
         {
-            this.serviceProvider = serviceProvider;
+            this.ServiceProvider = serviceProvider;
             Name = scenario;
             Context = context;
             Actions = actionsBuildFunc(this).ToImmutableDictionary();
@@ -87,7 +87,7 @@ namespace EntityFX.MqttY.Scenarios
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposedValue)
+            if (!_disposedValue)
             {
                 if (disposing)
                 {
@@ -96,7 +96,7 @@ namespace EntityFX.MqttY.Scenarios
 
                 // TODO: free unmanaged resources (unmanaged objects) and override finalizer
                 // TODO: set large fields to null
-                disposedValue = true;
+                _disposedValue = true;
             }
         }
 

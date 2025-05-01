@@ -1,6 +1,5 @@
 ﻿using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.NetworkLogger;
-using EntityFX.MqttY.Contracts.Options;
 using System.Collections.Immutable;
 
 namespace EntityFX.MqttY.Contracts.Network

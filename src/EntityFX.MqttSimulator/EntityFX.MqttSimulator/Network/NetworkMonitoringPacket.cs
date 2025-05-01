@@ -1,5 +1,4 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
-using System.Net.Sockets;
 
 namespace EntityFX.MqttY.Network;
 
