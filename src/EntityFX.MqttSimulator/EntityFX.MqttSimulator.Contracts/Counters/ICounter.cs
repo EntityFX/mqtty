@@ -7,7 +7,7 @@
 
         new TValue PreviousValue { get; }
 
-        IEnumerable<KeyValuePair<long, TValue>> HistoryValues { get; }
+        new IEnumerable<KeyValuePair<long, TValue>> HistoryValues { get; }
     }
 
     public interface ICounter
@@ -19,6 +19,8 @@
         object Value { get; }
 
         object PreviousValue { get; }
+        
+        IEnumerable<KeyValuePair<long, object>> HistoryValues { get; }
 
         long LastTicks { get; }
 

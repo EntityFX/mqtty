@@ -100,6 +100,12 @@ internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDiction
             case "wait-network-queue":
                 return (IAction<TContext>)BuildAction<NetworkSimulation, WaitNetwokQueueEmptyAction, WaitNetwokQueueEmptyOptions>(
                     s, actionOption, configurationSection, actionOptionValue);
+            case "save-network-json":
+                return (IAction<TContext>)BuildAction<NetworkSimulation, SaveNetworkCountersJsonAction, PathOptions>(
+                    s, actionOption, configurationSection, actionOptionValue);            
+            case "save-all-counters-csv":
+                return (IAction<TContext>)BuildAction<NetworkSimulation, SaveAllCountersCsvAction, PathOptions>(
+                    s, actionOption, configurationSection, actionOptionValue);
         }
 
         return null;

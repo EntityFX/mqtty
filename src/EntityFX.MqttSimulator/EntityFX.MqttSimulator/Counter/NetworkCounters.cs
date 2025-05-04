@@ -20,6 +20,7 @@ namespace EntityFX.MqttY.Counter
         private readonly GenericCounter _inboundCounter;
         private readonly GenericCounter _inboundPacketsCounter;
         private readonly ValueCounter<double> _inboundThroughput;
+        private readonly ValueCounter<double> _avgInboundThroughput;
 
         private readonly TicksOptions _ticksOptions;
 
@@ -41,6 +42,7 @@ namespace EntityFX.MqttY.Counter
 
             _inboundPacketsCounter = new GenericCounter("InboundPackets");
             _inboundThroughput = new ValueCounter<double>("InboundThroughput", "b/s", NormalizeUnits.Bit);
+            _avgInboundThroughput = new ValueCounter<double>("AvgInboundThroughput", "b/s", NormalizeUnits.Bit);
             _inboundCounter = new GenericCounter("Inbound", "B", NormalizeUnits.Byte);
 
             _outboundPacketsCounter = new GenericCounter("OutboundPackets");
@@ -51,6 +53,7 @@ namespace EntityFX.MqttY.Counter
             _counters.Add(_queueCounter);
             _counters.Add(_refusedCounter);
             _counters.Add(_inboundPacketsCounter);
+            _counters.Add(_avgInboundThroughput);
             _counters.Add(_inboundCounter);
             _counters.Add(_inboundThroughput);
             _counters.Add(_outboundPacketsCounter);
@@ -110,6 +113,7 @@ namespace EntityFX.MqttY.Counter
             _outboundThroughput.Set(outboundDiff * tickRps);
 
             AvgInboundThroughput = _inboundThroughput.HistoryValues.Average(hv => hv.Value);
+            _avgInboundThroughput.Set(AvgInboundThroughput);
 
             _lastTicks = totalTicks;
         }

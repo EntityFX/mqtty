@@ -16,6 +16,7 @@
         public string? UnitOfMeasure { get; init; }
 
         public object PreviousValue => string.Empty;
+        public IEnumerable<KeyValuePair<long, object>> HistoryValues => Enumerable.Empty<KeyValuePair<long, object>>();
 
         public long LastTicks { get; private set; }
 

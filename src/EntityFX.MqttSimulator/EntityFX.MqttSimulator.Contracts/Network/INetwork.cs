@@ -6,6 +6,8 @@
         IReadOnlyDictionary<string, IServer> Servers { get; }
         IReadOnlyDictionary<string, IClient> Clients { get; }
         IReadOnlyDictionary<string, IApplication> Applications { get; }
+        
+        IReadOnlyDictionary<string, INode> Nodes { get; }
 
         public string NetworkType { get; }
 

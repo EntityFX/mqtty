@@ -17,12 +17,15 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
         public Dictionary<MqttPacketType, GenericCounter> RefusedPacketTypeCounters { get; }
 
         public Dictionary<MqttPacketType, ValueCounter<double>> RpsPacketTypeCounters { get; }
+        
+        public Dictionary<MqttPacketType, ValueCounter<double>> AvgRpsPacketTypeCounters { get; }
 
         public override IEnumerable<ICounter> Counters
         {
             get => PacketTypeCounters.Values.ToArray<GenericCounter>()
                 .Concat(RefusedPacketTypeCounters.Values).Cast<ICounter>().ToArray()
-                .Concat(RpsPacketTypeCounters.Values).ToArray();
+                .Concat(RpsPacketTypeCounters.Values).ToArray()
+                .Concat(AvgRpsPacketTypeCounters.Values).ToArray();
             set => base.Counters = value;
         }
 
@@ -39,15 +42,18 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
 
             RefusedPacketTypeCounters = Enum.GetValues<MqttPacketType>()
             .ToDictionary(k => k, v => new GenericCounter(
-                v.GetEnumDescription() + "_REFUSED"
+                v.GetEnumDescription() + "_Refused"
             ));
 
             RpsPacketTypeCounters = Enum.GetValues<MqttPacketType>()
             .ToDictionary(k => k, v => new ValueCounter<double>(
-                v.GetEnumDescription() + "_RPS"
+                v.GetEnumDescription() + "_Rps"
             ));
 
-
+            AvgRpsPacketTypeCounters = Enum.GetValues<MqttPacketType>()
+                .ToDictionary(k => k, v => new ValueCounter<double>(
+                    v.GetEnumDescription() + "_AvgRps"
+                ));
         }
 
         public void Increment(MqttPacketType mqttPacketType)
@@ -77,6 +83,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                 if ( diff > 0)
                 {
                     RpsPacketTypeCounters[rpsPaketPair.Key].Set(diff * tickRps);
+                    var avg = RpsPacketTypeCounters[rpsPaketPair.Key].HistoryValues
+                        .Average(hv => hv.Value);
+                    AvgRpsPacketTypeCounters[rpsPaketPair.Key].Set(avg);
                 }
             }
         }

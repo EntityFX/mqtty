@@ -18,6 +18,9 @@ namespace EntityFX.MqttY.Counter
 
         public TValue PreviousValue => _previousValue;
 
+        IEnumerable<KeyValuePair<long, object>> ICounter.HistoryValues => 
+            _valueHistory.Select(vh => new KeyValuePair<long, object>(vh.Key, vh.Value));
+
         object ICounter.PreviousValue => PreviousValue;
 
         public long LastTicks { get; private set; }
@@ -65,7 +68,7 @@ namespace EntityFX.MqttY.Counter
                 NormalizeUnits.Byte => doubleValue.ToHumanBytes(UnitOfMeasure),
                 NormalizeUnits.BiBit => doubleValue.ToHumanBiBits(UnitOfMeasure),
                 NormalizeUnits.BiByte => doubleValue.ToHumanBiBytes(UnitOfMeasure),
-                _ => $"{doubleValue}{(string.IsNullOrEmpty(UnitOfMeasure) ? string.Empty : $" {UnitOfMeasure}")}"
+                _ => $"{doubleValue:f2}{(string.IsNullOrEmpty(UnitOfMeasure) ? string.Empty : $" {UnitOfMeasure}")}"
             };
             return $"{Name}={stringValue}";
         }

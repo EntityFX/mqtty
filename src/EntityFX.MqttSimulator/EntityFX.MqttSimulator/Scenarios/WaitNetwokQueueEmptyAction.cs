@@ -14,6 +14,11 @@
                 throw new ArgumentNullException(nameof(Config));
             }
 
+            if (Config.WaitTimeOut == TimeSpan.Zero)
+            {
+                return;
+            }
+
             while (true)
             {
                 await Task.Delay(Config.WaitTimeOut);

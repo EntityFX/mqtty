@@ -30,7 +30,6 @@ public class Network : NodeBase, INetwork
 
     private readonly object _countersLock = new object();
     private CancellationTokenSource? _cancelTokenSource;
-
     public string NetworkType { get; }
 
     public override CounterGroup Counters
@@ -68,6 +67,11 @@ public class Network : NodeBase, INetwork
     public IReadOnlyDictionary<string, IClient> Clients => _clients.ToImmutableDictionary();
 
     public IReadOnlyDictionary<string, IApplication> Applications => _applications.ToImmutableDictionary();
+
+    public IReadOnlyDictionary<string, INode> Nodes => _clients.Values.OfType<INode>().ToArray()
+        .Concat(_servers.Values.OfType<INode>().ToArray())
+        .Concat(_applications.Values.OfType<INode>().ToArray())
+        .ToDictionary(n => n.Name, n => n).ToImmutableDictionary();
 
 
     public override NodeType NodeType => NodeType.Network;
