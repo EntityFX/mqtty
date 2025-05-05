@@ -26,3 +26,6 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
       working-directory: src/EntityFX.MqttSimulator
+    - name: Test
+      run: dotnet test EntityFX.MqttY.Plugin.Mqtt.csproj
+      working-directory: src/EntityFX.MqttSimulator/EntityFX.MqttY.Plugin.Mqtt
