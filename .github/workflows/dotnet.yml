@@ -32,7 +32,7 @@ jobs:
     - name: Publish
       run:  dotnet publish src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/EntityFX.MqttY.Cli.csproj -c Release --no-restore
     - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v2.1.1
+      uses: actions/upload-artifact@v3
       with:
         name: mqtty-net6.0
         path: src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/bin/Release/net6.0/publish/
