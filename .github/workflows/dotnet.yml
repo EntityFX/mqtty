@@ -29,7 +29,10 @@ jobs:
     - name: Test
       run: dotnet test EntityFX.Tests.Integration.csproj --no-restore
       working-directory: src/EntityFX.MqttSimulator/EntityFX.Tests.Integration
-    - name: Pack
-      run: dotnet pack src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/EntityFX.MqttY.Cli.csproj -c Release --no-restore --no-build --include-symbols -p:SymbolPackageFormat=snupkg -o .
-    - name: Push to NuGet
-      run: dotnet nuget push *.nupkg --skip-duplicate -s https://api.nuget.org/v3/index.json -k ${{secrets.NUGET_API_KEY}}
+    - name: Publish
+      run:  dotnet publish src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/EntityFX.MqttY.Cli.csproj -c Release --no-restore
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v2.1.1
+      with:
+        name: mqtty-net6.0
+        path: src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/bin/Release/net6.0/publish/
