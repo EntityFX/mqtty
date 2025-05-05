@@ -1,13 +1,20 @@
+using EntityFX.MqttY;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Contracts.Scenarios;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Factories;
 using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Network;
+using EntityFX.MqttY.Plugin.Mqtt;
 using EntityFX.MqttY.Plugin.Mqtt.Contracts;
 using EntityFX.MqttY.Plugin.Mqtt.Contracts.Formatters;
+using EntityFX.MqttY.Plugin.Mqtt.Factories;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
 using EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters;
+using EntityFX.MqttY.Utils;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EntityFX.Tests.Integration
@@ -27,15 +34,27 @@ namespace EntityFX.Tests.Integration
         public void Initialize()
         {
             var serviceCollection = new ServiceCollection()
-            .AddScoped<IFactory<IClient?, NodeBuildOptions<NetworkBuildOption>>, ClientFactory>()
-            .AddScoped<IFactory<IServer?, NodeBuildOptions<NetworkBuildOption>>, ServerFactory>()
-            .AddScoped<IFactory<INetwork, NodeBuildOptions<NetworkBuildOption>>, NetworkFactory>()
-            .AddScoped<IFactory<IApplication?, NodeBuildOptions<NetworkBuildOption>>, GenericApplicationFactiory>()
-            .AddScoped<IMqttPacketManager, MqttNativePacketManager>()
-            //.AddScoped<IMqttPacketManager, MqttJsonPacketManager>()
-            .AddScoped<IMqttTopicEvaluator, MqttTopicEvaluator>((serviceProvider) => new MqttTopicEvaluator(true))
-            .AddScoped<INodesBuilder, NodesBuilder>()
-            .AddScoped<INetworkSimulatorBuilder, NetworkSimulatorBuilder>();
+                .AddScoped<INodesBuilder, NodesBuilder>((sp) =>
+                {
+                    return new NodesBuilder(
+                        new Dictionary<string, IFactory<IClient?, NodeBuildOptions<NetworkBuildOption>>>()
+                        {
+                            ["net"] = new ClientFactory(),
+                            ["mqtt"] = new MqttClientFactory(),
+                        },
+                        new Dictionary<string, IFactory<IServer?, NodeBuildOptions<NetworkBuildOption>>>()
+                        {
+                            ["net"] = new ServerFactory(sp),
+                            ["mqtt"] = new MqttServerFactory(sp),
+                        },
+                        new Dictionary<string, IFactory<IApplication?, NodeBuildOptions<NetworkBuildOption>>>()
+                        {
+                            ["net"] = new GenericApplicationFactiory(),
+                            ["mqtt"] = new GenericApplicationFactiory(),
+                        }, sp.GetRequiredService<IFactory<INetwork, NodeBuildOptions<NetworkBuildOption>>>()!);
+                })
+                .ConfigureMqttServices()
+                .ConfigureServices();
 
             serviceProvider = serviceCollection.BuildServiceProvider();
 
@@ -51,9 +70,11 @@ namespace EntityFX.Tests.Integration
             var networkBuilder = serviceProvider?.GetRequiredService<INodesBuilder>();
             var networkSimulatorBuilder = serviceProvider?.GetRequiredService<INetworkSimulatorBuilder>();
 
-            graph = new NetworkSimulator(serviceProvider!, networkBuilder!, new DijkstraPathFinder(), monitoring!, 
-                new TicksOptions() {  
-                    ReceiveWaitPeriod = TimeSpan.FromMilliseconds(0.1)});
+            graph = new NetworkSimulator(serviceProvider!, networkBuilder!, new DijkstraPathFinder(), monitoring!,
+                new TicksOptions()
+                {
+                    ReceiveWaitPeriod = TimeSpan.FromMilliseconds(0.1)
+                });
 
             networkSimulatorBuilder!.Configure(graph, new NetworkGraphOption()
             {
