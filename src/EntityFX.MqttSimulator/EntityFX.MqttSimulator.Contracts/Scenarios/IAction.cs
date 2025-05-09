@@ -15,13 +15,15 @@
 
         ActionType Type { get; init; }
 
-        public new TContext? Context { get; set; }
+        new TContext? Context { get; set; }
 
         IScenario<TContext>? Scenario { get; init; }
+        
+        IServiceProvider ServiceProvider { get; init; }
     }
 
     public interface IAction<TContext, TConfig> : IAction<TContext>
     {
-        public TConfig? Config { get; set; }
+        TConfig? Config { get; set; }
     }
 }

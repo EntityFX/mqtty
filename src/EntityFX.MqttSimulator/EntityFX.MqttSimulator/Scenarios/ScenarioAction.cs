@@ -19,6 +19,8 @@ namespace EntityFX.MqttY.Scenarios
         public ActionType Type { get; init; }
         public TContext? Context { get; set; }
         public TConfig? Config { get; set; }
+        
+        public IServiceProvider? ServiceProvider { get; init;  }
 
         public IScenario<TContext>? Scenario { get; init; }
 
@@ -29,10 +31,11 @@ namespace EntityFX.MqttY.Scenarios
             Iterations = 1;
         }
 
-        public ScenarioAction(IScenario<TContext> scenario)
+        public ScenarioAction(IServiceProvider serviceProvider, IScenario<TContext> scenario)
         {
             Iterations = 1;
             Scenario = scenario;
+            ServiceProvider = serviceProvider;
         }
 
         public virtual Task ExecuteAsync()

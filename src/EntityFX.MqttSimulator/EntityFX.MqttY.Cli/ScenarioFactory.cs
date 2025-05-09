@@ -93,18 +93,27 @@ internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDiction
                     NetworkSimulatorBuilder = networkSimulatorBuilder
                 };
                 return (IAction<TContext>)BuildAction<NetworkSimulation, NetworkInitAction, NetworkGraphFactoryOption>(
+                    _serviceProvider,
                     s, actionOption, configurationSection, actionOptionValue, config);
             case "mqtt-publish":
                 return (IAction<TContext>)BuildAction<NetworkSimulation, MqttPublishAction, MqttPublishOptions>(
+                    _serviceProvider,
                     s, actionOption, configurationSection, actionOptionValue);
             case "wait-network-queue":
                 return (IAction<TContext>)BuildAction<NetworkSimulation, WaitNetwokQueueEmptyAction, WaitNetwokQueueEmptyOptions>(
+                    _serviceProvider,
                     s, actionOption, configurationSection, actionOptionValue);
             case "save-network-json":
                 return (IAction<TContext>)BuildAction<NetworkSimulation, SaveNetworkCountersJsonAction, PathOptions>(
+                    _serviceProvider,
                     s, actionOption, configurationSection, actionOptionValue);            
             case "save-all-counters-csv":
                 return (IAction<TContext>)BuildAction<NetworkSimulation, SaveAllCountersCsvAction, PathOptions>(
+                    _serviceProvider,
+                    s, actionOption, configurationSection, actionOptionValue);            
+            case "generate-plant-uml":
+                return (IAction<TContext>)BuildAction<NetworkSimulation, GeneratePlantUmlAction, PathOptions>(
+                    _serviceProvider,
                     s, actionOption, configurationSection, actionOptionValue);
         }
 
@@ -112,24 +121,26 @@ internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDiction
     }
 
     private static TAction BuildAction<TContext, TAction, TConfig>(
+        IServiceProvider serviceProvider,
         IScenario<TContext> s, KeyValuePair<string, ScenarioActionOption> actionOption, 
         IConfigurationSection configurationSection, ScenarioActionOption actionOptionValue, TConfig? initConfig = default)
         where TAction : IAction<TContext, TConfig>, new()
         where TConfig : new()
     {
-        var waitNetwokQueueEmptyOptions = (initConfig != null ? initConfig : configurationSection.Get<TConfig>()) ?? new TConfig();
-        var waitNetwokQueueEmptyAction = new TAction()
+        var waitNetworkQueueEmptyOptions = (initConfig != null ? initConfig : configurationSection.Get<TConfig>()) ?? new TConfig();
+        var waitNetworkQueueEmptyAction = new TAction()
         {
-            Config = waitNetwokQueueEmptyOptions,
+            Config = waitNetworkQueueEmptyOptions,
             Delay = actionOptionValue.Delay,
             Iterations = actionOptionValue.Iterations,
             IterationsTimeout = actionOptionValue.IterationsTimeout,
             ActionTimeout = actionOptionValue.ActionTimeout,
             Index = actionOption.Value.Index,
-            Scenario = s
+            Scenario = s,
+            ServiceProvider = serviceProvider
         };
 
-        return waitNetwokQueueEmptyAction;
+        return waitNetworkQueueEmptyAction;
     }
 
     public IScenario? Configure((string Scenario, IDictionary<string, ScenarioOption> Options) options, IScenario? service)

@@ -1,5 +1,6 @@
 using System.Text;
 using EntityFX.MqttY.Contracts.Counters;
+using EntityFX.MqttY.Helper;
 
 namespace EntityFX.MqttY.Scenarios;
 
@@ -12,39 +13,24 @@ public class SaveAllCountersCsvAction : ScenarioAction<NetworkSimulation, PathOp
             throw new ArgumentNullException(nameof(Config));
         }
 
-        var path = ReplaceParams(Config.Path, Scenario!.Name!);
-        CreateDirectory(path);
+        var path = FileExtensions.ReplaceParams(Config.Path, Scenario!.Name!);
+        FileExtensions.CreateDirectory(path);
 
         foreach (var network in Context!.NetworkGraph!.Networks)
         {
             var networkPath = Path.Combine(path, network.Key);
-            CreateDirectory(networkPath);
+            FileExtensions.CreateDirectory(networkPath);
 
             foreach (var node in network.Value.Nodes)
             {
                 var nodePath = Path.Combine(networkPath, node.Key);
-                CreateDirectory(nodePath);
+                FileExtensions.CreateDirectory(nodePath);
 
                 VisitCounter(node.Value.Counters, nodePath);
             }
         }
         
         return Task.CompletedTask;
-    }
-
-    private static void CreateDirectory(string nodePath)
-    {
-        if (!Directory.Exists(nodePath))
-        {
-            Directory.CreateDirectory(nodePath);
-        }
-    }
-
-    private string ReplaceParams(string source, string scenario)
-    {
-        return source
-            .Replace("{scenario}", scenario)
-            .Replace("{date}", $"{DateTime.Now:yyyy_MM_dd__HH_mm}");
     }
     
     private void VisitCounter(ICounter counter, string path)
