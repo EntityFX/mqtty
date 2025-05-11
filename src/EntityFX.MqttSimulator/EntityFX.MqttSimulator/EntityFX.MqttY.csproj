@@ -13,16 +13,10 @@
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="EntityFX.Tests.Integration" />
 	</ItemGroup>
-
-	<ItemGroup>
-	  <Reference Include="Microsoft.Extensions.Logging.Abstractions">
-	    <HintPath>..\..\..\..\..\.nuget\packages\microsoft.extensions.logging.abstractions\8.0.2\lib\net6.0\Microsoft.Extensions.Logging.Abstractions.dll</HintPath>
-	  </Reference>
-	</ItemGroup>
-
 </Project>
