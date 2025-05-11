@@ -2,9 +2,11 @@
 {
     public class TicksOptions
     {
-        public TimeSpan TickPeriod { get; set; } = TimeSpan.FromMilliseconds(0.1);
-        public TimeSpan ReceiveWaitPeriod { get; set; } = TimeSpan.FromSeconds(30);
+        public TimeSpan TickPeriod { get; set; }
+        public TimeSpan ReceiveWaitPeriod { get; set; }
 
-        public int NetworkTicks { get; set; } = 5;
+        public int NetworkTicks { get; set; }
+        
+        public int CounterHistoryDepth { get; set; }
     }
 }

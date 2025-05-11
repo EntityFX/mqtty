@@ -25,8 +25,8 @@ public class Client : Node, IClient
     public Client(int index, string name, string address, string protocolType, 
         string specification,
         INetwork network, INetworkSimulator networkGraph,
-        NetworkTypeOption networkTypeOption)
-        : base(index, name, address, networkGraph, networkTypeOption)
+        NetworkTypeOption networkTypeOption, TicksOptions ticksOptions)
+        : base(index, name, address, networkGraph, networkTypeOption, ticksOptions)
     {
         Network = network;
         ProtocolType = protocolType;

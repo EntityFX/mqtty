@@ -15,6 +15,7 @@ namespace EntityFX.MqttY.Counter
         private readonly ValueCounter<TimeSpan> _realTimeCounter;
         private readonly ValueCounter<TimeSpan> _refreshTimeCounter;
 
+        private readonly int _historyDepth;
         private readonly TicksOptions _ticksOptions;
 
         private readonly Stopwatch _stopwatch = new Stopwatch();
@@ -28,10 +29,10 @@ namespace EntityFX.MqttY.Counter
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
             _ticksOptions = ticksOptions;
 
-            _ticksCounter = new ValueCounter<long>("Ticks");
-            _virtualTimeCounter = new ValueCounter<TimeSpan>("VirtualTime");
-            _realTimeCounter = new ValueCounter<TimeSpan>("RealTime");
-            _refreshTimeCounter = new ValueCounter<TimeSpan>("RefreshTime");
+            _ticksCounter = new ValueCounter<long>("Ticks", ticksOptions.CounterHistoryDepth);
+            _virtualTimeCounter = new ValueCounter<TimeSpan>("VirtualTime", ticksOptions.CounterHistoryDepth);
+            _realTimeCounter = new ValueCounter<TimeSpan>("RealTime", ticksOptions.CounterHistoryDepth);
+            _refreshTimeCounter = new ValueCounter<TimeSpan>("RefreshTime", ticksOptions.CounterHistoryDepth);
 
             _counters.AddRange(Counters);
             _counters.Add(_ticksCounter);
@@ -64,7 +65,7 @@ namespace EntityFX.MqttY.Counter
         public void AddCounterValue<TValue>(string name, TValue value)
             where TValue : struct, IEquatable<TValue>
         {
-            var valueCounter = new ValueCounter<TValue>(name);
+            var valueCounter = new ValueCounter<TValue>(name, _historyDepth);
             valueCounter.Set(value);
 
             _counters.Add(valueCounter);

@@ -28,7 +28,7 @@ public class ServerFactory : IFactory<IServer?, NodeBuildOptions<NetworkBuildOpt
         
         return new Server(options.Index, options.Name, options.Address ?? options.Name,
             options.Protocol, options.Specification, options.Network, 
-            options.NetworkGraph, options.Additional!.NetworkTypeOption!)
+            options.NetworkGraph, options.Additional!.NetworkTypeOption!, options.Additional!.TicksOptions!)
         {
             Group = options.Group
         };

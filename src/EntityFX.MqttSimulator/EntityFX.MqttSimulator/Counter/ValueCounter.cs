@@ -31,16 +31,18 @@ namespace EntityFX.MqttY.Counter
 
         private TValue _previousValue = default;
 
-        private readonly FixedSizedQueue<KeyValuePair<long, TValue>> _valueHistory = new(1000);
+        private readonly FixedSizedQueue<KeyValuePair<long, TValue>> _valueHistory;
 
 
         private readonly NormalizeUnits? _normalizeUnits;
 
-        public ValueCounter(string name, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
+        public ValueCounter(string name, int historyDepth,  
+            string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
         {
             Name = name;
             UnitOfMeasure = unitOfMeasure;
             this._normalizeUnits = normalizeUnits;
+            _valueHistory = new(historyDepth);
         }
 
         public void Refresh(long totalTicks)

@@ -14,7 +14,8 @@ namespace EntityFX.Tests.Integration
         public IApplication? Create(NodeBuildOptions<NetworkBuildOption> options)
         {
             return new Application<NetworkBuildOption>(options.Index, options.Name, options.Address ?? options.Name,
-                options.Protocol, options.Specification, options.Network!, options.NetworkGraph, options.Additional)
+                options.Protocol, options.Specification, options.Network!, options.NetworkGraph, 
+                options.Additional!.TicksOptions!, options.Additional)
             {
                 Group = options.Group
             };

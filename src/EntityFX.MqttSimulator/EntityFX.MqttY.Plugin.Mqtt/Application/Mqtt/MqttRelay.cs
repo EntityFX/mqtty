@@ -19,7 +19,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
             IMqttTopicEvaluator mqttTopicEvaluator, TicksOptions ticksOptions,
             MqttRelayConfiguration? mqttRelayConfiguration) 
             : base(index, name, address, protocolType, specification, network, 
-                networkSimulatorBuilder.NetworkSimulator!, mqttRelayConfiguration)
+                networkSimulatorBuilder.NetworkSimulator!, ticksOptions, mqttRelayConfiguration)
         {
             this._networkSimulatorBuilder = networkSimulatorBuilder;
             this._mqttTopicEvaluator = mqttTopicEvaluator;

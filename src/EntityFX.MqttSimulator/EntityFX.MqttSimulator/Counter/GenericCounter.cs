@@ -25,18 +25,19 @@ namespace EntityFX.MqttY.Counter
 
         public IEnumerable<KeyValuePair<long, long>> HistoryValues => throw new NotImplementedException();
 
-        private readonly FixedSizedQueue<KeyValuePair<long, long>> _valueHistory = new(1000);
+        private readonly FixedSizedQueue<KeyValuePair<long, long>> _valueHistory;
 
         private long _value = 0;
         private long _privateValue = 0;
 
         private readonly NormalizeUnits? _normalizeUnits;
 
-        public GenericCounter(string name, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
+        public GenericCounter(string name, int historyDepth, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
         {
             Name = name;
             UnitOfMeasure = unitOfMeasure;
             this._normalizeUnits = normalizeUnits;
+            _valueHistory = new(historyDepth);
         }
 
         public void Increment()

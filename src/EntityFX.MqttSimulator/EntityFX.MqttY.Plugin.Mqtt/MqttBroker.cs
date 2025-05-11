@@ -23,13 +23,14 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         protected readonly MqttCounters MqttCounters;
 
-        public MqttBroker(IMqttPacketManager packetManager, INetwork network, INetworkSimulator networkGraph, IMqttTopicEvaluator mqttTopicEvaluator,
+        public MqttBroker(IMqttPacketManager packetManager, INetwork network, INetworkSimulator networkGraph, 
+            IMqttTopicEvaluator mqttTopicEvaluator,
             int index, string name, string address, string protocolType, 
             string specification, TicksOptions ticksOptions,
             NetworkTypeOption networkTypeOption
            )
             : base(index, name, address, protocolType, specification, 
-                  network, networkGraph, networkTypeOption)
+                  network, networkGraph, networkTypeOption, ticksOptions)
         {
             this.PacketReceived += MqttBroker_PacketReceived;
             this._packetManager = packetManager;

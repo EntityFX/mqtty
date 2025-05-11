@@ -35,19 +35,24 @@ namespace EntityFX.MqttY.Counter
         {
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
 
-            _transferPacketsCounter = new GenericCounter("TransferPackets");
+            _transferPacketsCounter = new GenericCounter("TransferPackets", ticksOptions.CounterHistoryDepth);
 
-            _queueCounter = new ValueCounter<long>("Queue");
-            _refusedCounter = new GenericCounter("Refused");
+            _queueCounter = new ValueCounter<long>("Queue", ticksOptions.CounterHistoryDepth);
+            _refusedCounter = new GenericCounter("Refused", ticksOptions.CounterHistoryDepth);
 
-            _inboundPacketsCounter = new GenericCounter("InboundPackets");
-            _inboundThroughput = new ValueCounter<double>("InboundThroughput", "b/s", NormalizeUnits.Bit);
-            _avgInboundThroughput = new ValueCounter<double>("AvgInboundThroughput", "b/s", NormalizeUnits.Bit);
-            _inboundCounter = new GenericCounter("Inbound", "B", NormalizeUnits.Byte);
+            _inboundPacketsCounter = new GenericCounter("InboundPackets", ticksOptions.CounterHistoryDepth);
+            _inboundThroughput = new ValueCounter<double>("InboundThroughput", ticksOptions.CounterHistoryDepth, 
+                "b/s", NormalizeUnits.Bit);
+            _avgInboundThroughput = new ValueCounter<double>("AvgInboundThroughput", ticksOptions.CounterHistoryDepth, 
+                "b/s", NormalizeUnits.Bit);
+            _inboundCounter = new GenericCounter("Inbound", ticksOptions.CounterHistoryDepth, 
+                "B", NormalizeUnits.Byte);
 
-            _outboundPacketsCounter = new GenericCounter("OutboundPackets");
-            _outboundThroughput = new ValueCounter<double>("OutboundThroughput", "b/s", NormalizeUnits.Bit);
-            _outboundCounter = new GenericCounter("Outbound", "B", NormalizeUnits.Byte);
+            _outboundPacketsCounter = new GenericCounter("OutboundPackets", ticksOptions.CounterHistoryDepth);
+            _outboundThroughput = new ValueCounter<double>("OutboundThroughput", ticksOptions.CounterHistoryDepth,
+                "b/s", NormalizeUnits.Bit);
+            _outboundCounter = new GenericCounter("Outbound", ticksOptions.CounterHistoryDepth, 
+                "B", NormalizeUnits.Byte);
 
             _counters.Add(_transferPacketsCounter);
             _counters.Add(_queueCounter);

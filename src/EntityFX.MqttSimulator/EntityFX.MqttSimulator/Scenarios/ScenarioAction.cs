@@ -1,4 +1,5 @@
 ﻿using EntityFX.MqttY.Contracts.Scenarios;
+using Microsoft.Extensions.Logging;
 
 namespace EntityFX.MqttY.Scenarios
 {

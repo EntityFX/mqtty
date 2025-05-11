@@ -20,6 +20,8 @@ public class SaveAllCountersCsvAction : ScenarioAction<NetworkSimulation, PathOp
         {
             var networkPath = Path.Combine(path, network.Key);
             FileExtensions.CreateDirectory(networkPath);
+            
+            VisitCounter(network.Value.Counters, networkPath);
 
             foreach (var node in network.Value.Nodes)
             {
@@ -35,6 +37,15 @@ public class SaveAllCountersCsvAction : ScenarioAction<NetworkSimulation, PathOp
     
     private void VisitCounter(ICounter counter, string path)
     {
+        if (counter.HistoryValues.Any() == true)
+        {
+            var ch = CounterHistoryToCsv(counter);
+
+            var csvPath = Path.Combine(path, $"{counter.Name}.csv");
+            
+            File.WriteAllText(csvPath, ch);
+        }
+        
         if (counter is CounterGroup counterGroup)
         {
             foreach (var counterItem in counterGroup.Counters.ToArray())
@@ -42,19 +53,6 @@ public class SaveAllCountersCsvAction : ScenarioAction<NetworkSimulation, PathOp
                 VisitCounter(counterItem, path);
             }
             
-        }
-        else
-        {
-            if (counter.HistoryValues.Any() != true)
-            {
-                return;
-            }
-            
-            var ch = CounterHistoryToCsv(counter);
-
-            var csvPath = Path.Combine(path, $"{counter.Name}.csv");
-            
-            File.WriteAllText(csvPath, ch);
         }
     }
 

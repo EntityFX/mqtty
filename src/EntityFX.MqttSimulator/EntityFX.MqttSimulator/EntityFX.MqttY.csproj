@@ -19,4 +19,10 @@
 		<InternalsVisibleTo Include="EntityFX.Tests.Integration" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Reference Include="Microsoft.Extensions.Logging.Abstractions">
+	    <HintPath>..\..\..\..\..\.nuget\packages\microsoft.extensions.logging.abstractions\8.0.2\lib\net6.0\Microsoft.Extensions.Logging.Abstractions.dll</HintPath>
+	  </Reference>
+	</ItemGroup>
+
 </Project>

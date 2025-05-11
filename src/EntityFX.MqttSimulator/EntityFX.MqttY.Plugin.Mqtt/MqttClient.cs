@@ -26,7 +26,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             string specification,
             string? clientId, TicksOptions ticksOptions,
             NetworkTypeOption networkTypeOption)
-            : base(index, name, address, protocolType, specification, network, networkGraph, networkTypeOption)
+            : base(index, name, address, protocolType, specification, 
+                network, networkGraph, networkTypeOption, ticksOptions)
         {
             this._packetManager = packetManager;
             ClientId = clientId ?? name;

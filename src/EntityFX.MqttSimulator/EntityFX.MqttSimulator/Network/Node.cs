@@ -10,7 +10,8 @@ public abstract class Node : NodeBase
     //храним только Guid, ManualResetEventSlim
     private readonly ConcurrentDictionary<Guid, NodeMonitoringPacket> _monitorMessages = new ConcurrentDictionary<Guid, NodeMonitoringPacket>();
     private readonly NetworkTypeOption _networkTypeOption;
-    
+    private readonly TicksOptions _ticksOptions;
+
     protected NodeCounters counters;
 
     public override CounterGroup Counters
@@ -23,9 +24,10 @@ public abstract class Node : NodeBase
     }
 
     public Node(int index, string name, string address, INetworkSimulator networkGraph,
-        NetworkTypeOption networkTypeOption) : base(index, name, address, networkGraph)
+        NetworkTypeOption networkTypeOption, TicksOptions ticksOptions) : base(index, name, address, networkGraph)
     {
-        counters = new NodeCounters(Name ?? string.Empty);
+        _ticksOptions = ticksOptions;
+        counters = new NodeCounters(Name ?? string.Empty, _ticksOptions.CounterHistoryDepth);
         _networkTypeOption = networkTypeOption;
     }
 

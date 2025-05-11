@@ -3,6 +3,7 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Counter;
 using System.Collections.Immutable;
+using EntityFX.MqttY.Contracts.Options;
 
 namespace EntityFX.MqttY.Application
 {
@@ -50,7 +51,7 @@ namespace EntityFX.MqttY.Application
         }
 
         public Application(int index, string name, string address, string protocolType, string specification,
-            INetwork network, INetworkSimulator networkGraph, TOptions? options)
+            INetwork network, INetworkSimulator networkGraph, TicksOptions ticksOptions, TOptions? options)
         {
             Address = address;
             Network = network;
@@ -62,7 +63,7 @@ namespace EntityFX.MqttY.Application
             NetworkGraph = networkGraph;
             Options = options;
 
-            counters = new ApplicationCounters(Name ?? string.Empty);
+            counters = new ApplicationCounters(Name ?? string.Empty, ticksOptions.CounterHistoryDepth);
         }
 
 

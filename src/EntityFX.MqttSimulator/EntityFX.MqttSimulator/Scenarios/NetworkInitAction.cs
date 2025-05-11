@@ -1,16 +1,22 @@
 ﻿using EntityFX.MqttY.Factories;
 using EntityFX.MqttY.Helper;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace EntityFX.MqttY.Scenarios
 {
     public class NetworkInitAction : ScenarioAction<NetworkSimulation, NetworkGraphFactoryOption>
     {
+        private ILogger<Scenario<NetworkSimulation>>? Logger { get; set; }
+        
         public override Task ExecuteAsync()
         {
             if (Config == null)
             {
                 throw new ArgumentNullException(nameof(Config));
             }
+
+            Logger = ServiceProvider.GetRequiredService<ILogger<Scenario<NetworkSimulation>>>();
 
             if (Config.MonitoringOption.Path != null)
             {
@@ -23,6 +29,7 @@ namespace EntityFX.MqttY.Scenarios
             Context!.NetworkGraph.OnRefresh += NetworkGraph_OnRefresh;
             Context!.NetworkGraph!.StartPeriodicRefreshAsync();
 
+            Config.NetworkGraphOption.Ticks = Config.TicksOption;
             Config.NetworkSimulatorBuilder!.OptionsPath = Config.OptionsPath;
             Config.NetworkSimulatorBuilder!.Configure(Context!.NetworkGraph, Config.NetworkGraphOption);
 
@@ -31,7 +38,7 @@ namespace EntityFX.MqttY.Scenarios
 
         private void NetworkGraph_OnRefresh(object? sender, long e)
         {
-            Console.Write(Context!.NetworkGraph!.Counters.Dump());
+            Logger!.LogInformation(Context!.NetworkGraph!.Counters.Dump());
         }
 
         protected override void Finish()

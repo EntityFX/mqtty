@@ -28,7 +28,8 @@ public class ClientFactory : IFactory<IClient?, NodeBuildOptions<NetworkBuildOpt
         
         return new Client(options.Index, options.Name, options.Address ?? options.Name, options.Protocol,
             options.Specification,
-            options.Network, options.NetworkGraph, options.Additional!.NetworkTypeOption!)
+            options.Network, options.NetworkGraph, options.Additional!.NetworkTypeOption!, 
+            options.Additional!.TicksOptions!)
         {
             Group = options.Group
         };

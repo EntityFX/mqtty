@@ -16,14 +16,14 @@ namespace EntityFX.MqttY.Counter
             set => _counters = value.ToList(); 
         }
 
-        public NodeCounters(string name)
+        public NodeCounters(string name, int historyDepth)
             : base(name)
         {
-            SendCounter = new GenericCounter("Send");
-            ReceiveCounter = new GenericCounter("Receive");
-            ErrorCounter = new GenericCounter("Error");
+            SendCounter = new GenericCounter("Send", historyDepth);
+            ReceiveCounter = new GenericCounter("Receive", historyDepth);
+            ErrorCounter = new GenericCounter("Error", historyDepth);
 
-            _queueCounter = new ValueCounter<long>("Queue");
+            _queueCounter = new ValueCounter<long>("Queue", historyDepth);
 
             _counters.Add(SendCounter);
             _counters.Add(ReceiveCounter);

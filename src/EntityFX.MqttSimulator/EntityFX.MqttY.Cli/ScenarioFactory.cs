@@ -80,6 +80,7 @@ internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDiction
             case "network-init":
                 var networkGraphOption = configurationSection.GetSection("graph").Get<NetworkGraphOption>();
                 var monitoringOption = configurationSection.GetSection("monitoring").Get<MonitoringOption>();
+                var ticksOption = configurationSection.GetSection("ticks").Get<TicksOptions>();
 
                 var networkGraph = _serviceProvider.GetRequiredService<IFactory<INetworkSimulator, NetworkGraphFactoryOption>>();
                 var networkSimulatorBuilder = _serviceProvider.GetRequiredService<INetworkSimulatorBuilder>();
@@ -90,7 +91,8 @@ internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDiction
                     NetworkGraphOption = networkGraphOption ?? new NetworkGraphOption(),
                     OptionsPath = configurationPath,
                     NetworkGraphFactory = networkGraph,
-                    NetworkSimulatorBuilder = networkSimulatorBuilder
+                    NetworkSimulatorBuilder = networkSimulatorBuilder, 
+                    TicksOption = ticksOption ?? new TicksOptions()
                 };
                 return (IAction<TContext>)BuildAction<NetworkSimulation, NetworkInitAction, NetworkGraphFactoryOption>(
                     _serviceProvider,
@@ -123,7 +125,8 @@ internal class ScenarioFactory : IFactory<IScenario?, (string Scenario, IDiction
     private static TAction BuildAction<TContext, TAction, TConfig>(
         IServiceProvider serviceProvider,
         IScenario<TContext> s, KeyValuePair<string, ScenarioActionOption> actionOption, 
-        IConfigurationSection configurationSection, ScenarioActionOption actionOptionValue, TConfig? initConfig = default)
+        IConfigurationSection configurationSection, ScenarioActionOption actionOptionValue, 
+        TConfig? initConfig = default)
         where TAction : IAction<TContext, TConfig>, new()
         where TConfig : new()
     {

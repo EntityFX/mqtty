@@ -12,7 +12,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
     {
         private IMqttClient? _mqttClient;
 
-        private MqttReceiverCounters _receiverCounter = new MqttReceiverCounters("Receiver");
+        private MqttReceiverCounters _receiverCounter;
         private readonly INetworkSimulatorBuilder _networkSimulatorBuilder;
         private readonly TicksOptions _ticksOptions;
         private readonly NetworkTypeOption _networkTypeOption;
@@ -20,10 +20,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
         public MqttReceiver(INetworkSimulatorBuilder networkSimulatorBuilder, int index, string name, string address, string protocolType, string specification, 
             INetwork network, INetworkSimulator networkGraph, TicksOptions ticksOptions,
             NetworkTypeOption networkTypeOption, MqttReceiverConfiguration? options) 
-            : base(index, name, address, protocolType, specification, network, networkGraph, options)
+            : base(index, name, address, protocolType, specification, network, networkGraph, ticksOptions, options)
         {
-            this._networkSimulatorBuilder = networkSimulatorBuilder;
             this._ticksOptions = ticksOptions;
+            _receiverCounter = new MqttReceiverCounters("Receiver", _ticksOptions.CounterHistoryDepth);
+            this._networkSimulatorBuilder = networkSimulatorBuilder;
             this._networkTypeOption = networkTypeOption;
             counters.AddCounter(_receiverCounter);
         }
