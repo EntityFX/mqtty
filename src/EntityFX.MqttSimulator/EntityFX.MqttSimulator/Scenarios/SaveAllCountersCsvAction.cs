@@ -59,7 +59,7 @@ public class SaveAllCountersCsvAction : ScenarioAction<NetworkSimulation, PathOp
     private string CounterHistoryToCsv(ICounter counter)
     {
         var sb = new StringBuilder();
-        sb.AppendLine($"Tick;Value");
+        sb.AppendLine($"Tick;{counter.UnitOfMeasure ?? "count"}");
 
         foreach (var historyValue in counter.HistoryValues)
         {

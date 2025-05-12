@@ -47,12 +47,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
 
             RpsPacketTypeCounters = Enum.GetValues<MqttPacketType>()
             .ToDictionary(k => k, v => new ValueCounter<double>(
-                v.GetEnumDescription() + "_Rps", ticksOptions.CounterHistoryDepth
+                v.GetEnumDescription() + "_Rps", ticksOptions.CounterHistoryDepth, "Rps"
             ));
 
             AvgRpsPacketTypeCounters = Enum.GetValues<MqttPacketType>()
                 .ToDictionary(k => k, v => new ValueCounter<double>(
-                    v.GetEnumDescription() + "_AvgRps", ticksOptions.CounterHistoryDepth
+                    v.GetEnumDescription() + "_AvgRps", ticksOptions.CounterHistoryDepth, "Rps"
                 ));
         }
 
