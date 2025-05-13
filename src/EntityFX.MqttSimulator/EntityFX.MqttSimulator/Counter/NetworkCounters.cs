@@ -20,13 +20,10 @@ namespace EntityFX.MqttY.Counter
         private readonly GenericCounter _inboundCounter;
         private readonly GenericCounter _inboundPacketsCounter;
         private readonly ValueCounter<double> _inboundThroughput;
-        private readonly ValueCounter<double> _avgInboundThroughput;
 
         private readonly TicksOptions _ticksOptions;
 
         private long _lastTicks;
-
-        public double InboundThroughput => _inboundThroughput.Value;
 
         public double AvgInboundThroughput { get; private set; }
 
@@ -43,8 +40,6 @@ namespace EntityFX.MqttY.Counter
             _inboundPacketsCounter = new GenericCounter("InboundPackets", ticksOptions.CounterHistoryDepth);
             _inboundThroughput = new ValueCounter<double>("InboundThroughput", ticksOptions.CounterHistoryDepth, 
                 "b/s", NormalizeUnits.Bit);
-            _avgInboundThroughput = new ValueCounter<double>("AvgInboundThroughput", ticksOptions.CounterHistoryDepth, 
-                "b/s", NormalizeUnits.Bit);
             _inboundCounter = new GenericCounter("Inbound", ticksOptions.CounterHistoryDepth, 
                 "B", NormalizeUnits.Byte);
 
@@ -58,7 +53,6 @@ namespace EntityFX.MqttY.Counter
             _counters.Add(_queueCounter);
             _counters.Add(_refusedCounter);
             _counters.Add(_inboundPacketsCounter);
-            _counters.Add(_avgInboundThroughput);
             _counters.Add(_inboundCounter);
             _counters.Add(_inboundThroughput);
             _counters.Add(_outboundPacketsCounter);
@@ -108,17 +102,38 @@ namespace EntityFX.MqttY.Counter
 
             if (ticksDiff < 100) return;
 
-            var tickRps = _ticksPerSecond / ticksDiff;
+            var inboundFirstTick = _inboundCounter.TickFirstValue;
 
-            var inboundDiff = _inboundCounter.Value - _inboundCounter.PreviousValue;
-            var outboundDiff = _outboundCounter.Value - _outboundCounter.PreviousValue;
+            if (inboundFirstTick == null)
+            {
+                return;
+            }
+
+            var inboundTickDiff = totalTicks - inboundFirstTick.Value.Key;
+
+            var inboundTtickRps = _ticksPerSecond / inboundTickDiff;
+
+            var inboundDiff = _inboundCounter.Value - inboundFirstTick.Value.Value;
 
             //считаем за дельту тиков.
-            _inboundThroughput.Set(inboundDiff * tickRps);
-            _outboundThroughput.Set(outboundDiff * tickRps);
-
+            _inboundThroughput.Set(inboundDiff * inboundTtickRps);
             AvgInboundThroughput = _inboundThroughput.HistoryValues.Average(hv => hv.Value);
-            _avgInboundThroughput.Set(AvgInboundThroughput);
+
+            var outboundFirstTick = _inboundCounter.TickFirstValue;
+            if (outboundFirstTick == null)
+            {
+                return;
+            }
+
+            var outboundTickDiff = totalTicks - outboundFirstTick.Value.Key;
+
+            var outboundTickRps = _ticksPerSecond / outboundTickDiff;
+
+            var outboundDiff = _outboundCounter.Value - outboundFirstTick.Value.Value;
+
+            _outboundThroughput.Set(outboundDiff * outboundTickRps);
+
+
 
             _lastTicks = totalTicks;
         }

@@ -23,12 +23,26 @@ namespace EntityFX.MqttY.Counter
 
         public long LastTicks { get; private set; }
 
-        public IEnumerable<KeyValuePair<long, long>> HistoryValues => throw new NotImplementedException();
+        public IEnumerable<KeyValuePair<long, long>> HistoryValues => 
+            _valueHistory;
+
+        public KeyValuePair<long, long>? TickPreviousValue => _tickPreviousValue;
+
+        KeyValuePair<long, object>? ICounter.TickPreviousValue => _tickPreviousValue != null ? new KeyValuePair<long, object>(_tickPreviousValue.Value.Key, _tickPreviousValue.Value.Value) : null;
+
+        public KeyValuePair<long, long>? TickFirstValue => _tickFirstValue;
+
+
+        KeyValuePair<long, object>? ICounter.TickFirstValue => _tickFirstValue != null ? new KeyValuePair<long, object>(_tickFirstValue.Value.Key, _tickFirstValue.Value.Value) : null;
 
         private readonly FixedSizedQueue<KeyValuePair<long, long>> _valueHistory;
 
         private long _value = 0;
         private long _privateValue = 0;
+        private KeyValuePair<long, long>? _tickPreviousValue;
+
+        private KeyValuePair<long, long>? _tickFirstValue;
+        
 
         private readonly NormalizeUnits? _normalizeUnits;
 
@@ -42,14 +56,30 @@ namespace EntityFX.MqttY.Counter
 
         public void Increment()
         {
+            _privateValue = Value;
             Interlocked.Increment(ref _value);
+            _tickPreviousValue = new KeyValuePair<long, long>(LastTicks, _privateValue);
+
+            if (_tickFirstValue == null)
+            {
+                _tickFirstValue = new KeyValuePair<long, long>(LastTicks, _privateValue);
+            }
+
+            _valueHistory.Enqueue(_tickPreviousValue.Value);
         }
 
         public void Add(long value)
         {
             _privateValue = Value;
             Interlocked.Add(ref _value, value);
-            _valueHistory.Enqueue(new KeyValuePair<long, long>(LastTicks, value));
+
+            if (_tickFirstValue == null)
+            {
+                _tickFirstValue = new KeyValuePair<long, long>(LastTicks, _privateValue);
+            }
+
+
+            _valueHistory.Enqueue(new KeyValuePair<long, long>(LastTicks, _privateValue));
         }
 
         public override string ToString()
@@ -69,6 +99,13 @@ namespace EntityFX.MqttY.Counter
         public void Refresh(long totalTicks)
         {
             LastTicks = totalTicks;
+        }
+
+        public double Average()
+        {
+            if (_valueHistory.Count == 0) return 0;
+
+            return _valueHistory.ToArray().Average(v => v.Value);
         }
     }
 }

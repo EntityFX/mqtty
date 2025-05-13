@@ -17,15 +17,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
         public Dictionary<MqttPacketType, GenericCounter> RefusedPacketTypeCounters { get; }
 
         public Dictionary<MqttPacketType, ValueCounter<double>> RpsPacketTypeCounters { get; }
-        
-        public Dictionary<MqttPacketType, ValueCounter<double>> AvgRpsPacketTypeCounters { get; }
 
         public override IEnumerable<ICounter> Counters
         {
             get => PacketTypeCounters.Values.ToArray<GenericCounter>()
                 .Concat(RefusedPacketTypeCounters.Values).Cast<ICounter>().ToArray()
-                .Concat(RpsPacketTypeCounters.Values).ToArray()
-                .Concat(AvgRpsPacketTypeCounters.Values).ToArray();
+                .Concat(RpsPacketTypeCounters.Values).ToArray();
             set => base.Counters = value;
         }
 
@@ -49,11 +46,6 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
             .ToDictionary(k => k, v => new ValueCounter<double>(
                 v.GetEnumDescription() + "_Rps", ticksOptions.CounterHistoryDepth, "Rps"
             ));
-
-            AvgRpsPacketTypeCounters = Enum.GetValues<MqttPacketType>()
-                .ToDictionary(k => k, v => new ValueCounter<double>(
-                    v.GetEnumDescription() + "_AvgRps", ticksOptions.CounterHistoryDepth, "Rps"
-                ));
         }
 
         public void Increment(MqttPacketType mqttPacketType)
@@ -74,19 +66,24 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
 
             if (ticksDiff < 100) return;
 
-            var tickRps = _ticksPerSecond / ticksDiff;
-
             foreach (var rpsPaketPair in PacketTypeCounters)
             {
-                var diff = rpsPaketPair.Value.Value - rpsPaketPair.Value.PreviousValue;
+                var firstTick = rpsPaketPair.Value.TickFirstValue;
 
-                if ( diff > 0)
+                if (firstTick == null)
                 {
-                    RpsPacketTypeCounters[rpsPaketPair.Key].Set(diff * tickRps);
-                    var avg = RpsPacketTypeCounters[rpsPaketPair.Key].HistoryValues
-                        .Average(hv => hv.Value);
-                    AvgRpsPacketTypeCounters[rpsPaketPair.Key].Set(avg);
+                    continue;
                 }
+
+                var rpsTickDiff = totalTicks - firstTick.Value.Key;
+                var valueDiff = rpsPaketPair.Value.Value - firstTick.Value.Value;
+                if (valueDiff == 0) {
+                    continue;
+                }
+
+                var ticksRps = _ticksPerSecond / rpsTickDiff;
+
+                RpsPacketTypeCounters[rpsPaketPair.Key].Set(ticksRps * valueDiff);
             }
         }
     }

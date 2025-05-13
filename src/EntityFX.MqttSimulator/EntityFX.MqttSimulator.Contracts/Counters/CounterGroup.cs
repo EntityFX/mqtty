@@ -20,6 +20,17 @@
 
         public long LastTicks { get; private set; }
 
+        public KeyValuePair<long, object> TickPreviousValue => new KeyValuePair<long, object>(0, 0);
+
+        public KeyValuePair<long, object>? TickFirstValue { get; }
+
+        KeyValuePair<long, object>? ICounter.TickPreviousValue { get; }
+
+        public double Average()
+        {
+            return 0;
+        }
+
         public virtual void Refresh(long totalTicks)
         {
             foreach (var counter in Counters)

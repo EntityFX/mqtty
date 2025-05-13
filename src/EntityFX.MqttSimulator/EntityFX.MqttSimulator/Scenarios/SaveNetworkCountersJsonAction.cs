@@ -50,10 +50,12 @@ public class SaveNetworkCountersJsonAction : ScenarioAction<NetworkSimulation, P
             }
 
             counters[counter.Name] = subCounters;
+            counters[counter.Name] = subCounters;
         }
         else
         {
             counters[counter.Name] = counter.Value;
+            counters[$"{counter.Name}__Avg"] = counter.Average();
         }
     }
 }

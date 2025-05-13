@@ -27,9 +27,25 @@ namespace EntityFX.MqttY.Counter
 
         public IEnumerable<KeyValuePair<long, TValue>> HistoryValues => _valueHistory;
 
+        public KeyValuePair<long, TValue>? TickPreviousValue => _tickPreviousValue;
+
+        KeyValuePair<long, object>? ICounter.TickPreviousValue => _tickPreviousValue != null 
+            ? new KeyValuePair<long, object>(_tickPreviousValue.Value.Key, _tickPreviousValue.Value.Value)
+            : null;
+
+        public KeyValuePair<long, TValue>? TickFirstValue => _tickFirstValue;
+
+        KeyValuePair<long, object>? ICounter.TickFirstValue => _tickFirstValue != null
+            ? new KeyValuePair<long, object>(_tickFirstValue.Value.Key, _tickFirstValue.Value.Value)
+            : null;
+
         private TValue _value = default;
 
         private TValue _previousValue = default;
+
+        private KeyValuePair<long, TValue>? _tickFirstValue;
+
+        private KeyValuePair<long, TValue>? _tickPreviousValue;
 
         private readonly FixedSizedQueue<KeyValuePair<long, TValue>> _valueHistory;
 
@@ -52,9 +68,33 @@ namespace EntityFX.MqttY.Counter
 
         public void Set(TValue value)
         {
+            if (_tickFirstValue == null)
+            {
+                _tickFirstValue = new KeyValuePair<long, TValue>(LastTicks, value);
+            }
+
             _previousValue = value;
             _value = value;
             _valueHistory.Enqueue(new KeyValuePair<long, TValue>(LastTicks, value));
+        }
+
+        public double Average()
+        {
+            if (_valueHistory.Count == 0) return 0;
+
+            if (Value is not long
+                && Value is not int
+                && Value is not short
+                && Value is not double
+                && Value is not float
+                && Value is not decimal)
+            {
+                return 0;
+            }
+
+            var avg = _valueHistory.Average(v => Convert.ToDouble(v.Value));
+
+            return avg;
         }
 
         public override string ToString()

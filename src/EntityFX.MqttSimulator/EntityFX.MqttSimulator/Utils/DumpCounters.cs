@@ -53,7 +53,8 @@ namespace EntityFX.MqttY.Helper
                     {
                         continue;
                     }
-                    sb.Append($"{counterItem}, ");
+
+                    sb.Append($"{{ {counterItem}, {counterItem.Name}.Avg={counterItem.Average()} }}, ");
                 }
             }
             else if (counters.Length == 1)
