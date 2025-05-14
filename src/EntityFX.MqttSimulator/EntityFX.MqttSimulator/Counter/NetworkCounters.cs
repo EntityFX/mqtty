@@ -117,7 +117,8 @@ namespace EntityFX.MqttY.Counter
 
             //считаем за дельту тиков.
             _inboundThroughput.Set(inboundDiff * inboundTtickRps);
-            AvgInboundThroughput = _inboundThroughput.HistoryValues.Average(hv => hv.Value);
+            AvgInboundThroughput = _inboundThroughput.HistoryValues.Any()
+                ? _inboundThroughput.HistoryValues.Average(hv => hv.Value) : 0;
 
             var outboundFirstTick = _inboundCounter.TickFirstValue;
             if (outboundFirstTick == null)

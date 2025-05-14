@@ -112,8 +112,10 @@ namespace EntityFX.Tests.Integration
             {
                 Assert.Fail(testException.Message);
             }
-
+            graph.StopPeriodicRefresh();
             Console.WriteLine(graph!.Counters.Dump());
+
+
         }
 
         [TestMethod]

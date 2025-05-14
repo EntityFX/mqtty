@@ -31,6 +31,11 @@
         public static string Normalize(this double unit, string? measureUnit, int @base = 1 << 10)
         {
             var index = 0;
+
+            if (double.IsInfinity(unit)) {
+                return $"Inf {(index > 0 ? (Units)index : string.Empty)}{measureUnit}";
+            }
+
             var normalized = unit;
             while (normalized > @base)
             {
