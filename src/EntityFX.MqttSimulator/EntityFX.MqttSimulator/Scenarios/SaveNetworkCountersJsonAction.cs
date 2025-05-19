@@ -27,7 +27,7 @@ public class SaveNetworkCountersJsonAction : ScenarioAction<NetworkSimulation, P
         
         VisitCounter(Context!.NetworkGraph!.Counters!, counters);
         
-        var countersJson = JsonSerializer.Serialize(counters);
+        var countersJson = JsonSerializer.Serialize(counters, new JsonSerializerOptions() {  WriteIndented = true, NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals });
 
         await File.WriteAllTextAsync(fullPath, countersJson, Encoding.UTF8);
     }
