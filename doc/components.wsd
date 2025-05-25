@@ -1,0 +1,43 @@
+@startuml Components
+
+    component "EntityFX.MqttSimulator.Contracts" as contracts {
+
+    }
+
+    component "EntityFX.MqttSimulator" as implementation {
+
+    }
+
+    component "EntityFX.MqttY.Plugin.Mqtt" as mqtt {
+
+    }
+
+    component "EntityFX.MqttY.Plugin.Http" as http {
+
+    }
+
+    component "EntityFX.MqttY.Plugin.*" as plugin {
+
+    }
+
+    component "EntityFX.MqttY.Cli" as cli {
+
+    }
+
+    contracts <-- implementation
+
+    contracts <-- mqtt
+    implementation <-- mqtt
+
+    contracts <-- http
+    implementation <-- http
+
+    contracts <-- plugin
+    implementation <-- plugin
+
+    contracts <-- cli
+    implementation <-- cli
+    mqtt <-- cli
+    http <-- cli
+    plugin <-- cli
+@enduml
