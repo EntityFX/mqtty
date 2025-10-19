@@ -45,6 +45,8 @@ namespace EntityFX.MqttY.Contracts.Network
 
         bool Refresh();
 
+        bool RefreshWithCounters();
+
         bool Reset();
 
         Task StartPeriodicRefreshAsync();

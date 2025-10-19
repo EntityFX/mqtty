@@ -19,8 +19,7 @@ public class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<Netwo
 
     public IApplication? Configure(NodeBuildOptions<NetworkBuildOption> options, IApplication? application)
     {
-
-        application?.StartAsync().Wait();
+        application?.Start();
         return application;
     }
 

@@ -22,7 +22,7 @@ public class MqttClientFactory : IFactory<IClient?, NodeBuildOptions<NetworkBuil
             return null;
         }
 
-        var connectResult = mqttClient.ConnectAsync(options.ConnectsTo, false).Result;
+        var connectResult = mqttClient.Connect(options.ConnectsTo, false);
 
         var subscribes = options.Additional?.Additional?.GetValueOrDefault("subscribe");
         var subscribeQos = options.Additional?.Additional?.GetValueOrDefault("subscribeQos");
@@ -34,10 +34,9 @@ public class MqttClientFactory : IFactory<IClient?, NodeBuildOptions<NetworkBuil
 
             foreach (var subscribeTopic in subscribes)
             {
-                mqttClient.SubscribeAsync(subscribeTopic, qosEnum).Wait();
+                mqttClient.Subscribe(subscribeTopic, qosEnum);
             }
         }
-
 
         return service;
     }

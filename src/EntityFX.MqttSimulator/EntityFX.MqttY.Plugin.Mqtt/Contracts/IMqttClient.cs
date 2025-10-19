@@ -11,14 +11,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Contracts
 
         event EventHandler<MqttMessage>? MessageReceived;
 
-        Task<SessionState> ConnectAsync(string server, bool cleanSession = false);
+        SessionState Connect(string server, bool cleanSession = false);
 
-        Task DisconnectAsync();
+        bool Publish(string topic, byte[] payload, MqttQos qos, bool retain = false);
 
-        Task<bool> PublishAsync(string topic, byte[] payload, MqttQos qos, bool retain = false);
+        void Subscribe(string topicFilter, MqttQos qos);
 
-        Task SubscribeAsync(string topicFilter, MqttQos qos);
-
-        Task<bool> UnsubscribeAsync(string topicFilter);
+        bool Unsubscribe(string topicFilter);
     }
 }

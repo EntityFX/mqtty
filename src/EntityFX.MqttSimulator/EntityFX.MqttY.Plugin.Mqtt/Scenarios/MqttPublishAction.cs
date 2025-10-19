@@ -44,7 +44,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Scenarios
 
         private void StartPublish(MqttClientPair[] mqttClients)
         {
-            Task.Run(async () =>
+            Task.Run(() =>
             {
                 var sw = new Stopwatch();
                 sw.Start();
@@ -67,7 +67,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Scenarios
 
                     foreach (var item in mqttClients!)
                     {
-                        var publishResult = await item.Client.PublishAsync(item.Options.Topic, item.Options.Payload, MqttQos.AtLeastOnce);
+                        var publishResult = item.Client.Publish(item.Options.Topic, item.Options.Payload, MqttQos.AtLeastOnce);
 
                         if (publishResult)
                         {

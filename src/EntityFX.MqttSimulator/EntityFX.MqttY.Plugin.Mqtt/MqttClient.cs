@@ -40,12 +40,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         public string Server => ServerName;
 
-        public async Task<SessionState> ConnectAsync(string server, bool cleanSession = false)
+        public SessionState Connect(string server, bool cleanSession = false)
         {
             var connect = new ConnectPacket(ClientId, true);
             var connectId = Guid.NewGuid();
             var payload = GetPacket(connectId, server, NodeType.Server, 
-                await _packetManager.PacketToBytes(connect), ProtocolType, "MQTT Connect", willWait: true);
+                _packetManager.PacketToBytes(connect), ProtocolType, "MQTT Connect", willWait: true);
 
             if (IsConnected)
             {
@@ -77,7 +77,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 throw new MqttException($"No connack");
             }
 
-            var connAck = await _packetManager.BytesToPacket<ConnectAckPacket>(response.Value.Payload);
+            var connAck = _packetManager.BytesToPacket<ConnectAckPacket>(response.Value.Payload);
 
             if (connAck == null)
             {
@@ -94,17 +94,17 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             return connAck.SessionPresent ? SessionState.SessionPresent : SessionState.CleanSession;
         }
 
-        public Task DisconnectAsync()
-        {
-            throw new NotImplementedException();
-        }
+        //public override bool Disconnect()
+        //{
+        //    base.Disconnect();
+        //}
 
-        public async Task SubscribeAsync(string topicFilter, MqttQos qos)
+        public void Subscribe(string topicFilter, MqttQos qos)
         {
             var packetId = _packetIdProvider.GetPacketId();
             var subscribe = new SubscribePacket(packetId, new[] { new Subscription(topicFilter, qos) });
             var subscribeId = Guid.NewGuid();
-            var payload = GetPacket(subscribeId, ServerName, NodeType.Server, await _packetManager.PacketToBytes(subscribe), ProtocolType, "MQTT Subscribe");
+            var payload = GetPacket(subscribeId, ServerName, NodeType.Server, _packetManager.PacketToBytes(subscribe), ProtocolType, "MQTT Subscribe");
             var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref payload!, 
                 $"Subscribe {Name} to {payload.To} using topic {topicFilter}");
 
@@ -134,7 +134,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             var responsePacket = response.Value.Packet;
 
-            var subscribeAck = await _packetManager.BytesToPacket<SubscribeAckPacket>(responsePacket.Payload);
+            var subscribeAck = _packetManager.BytesToPacket<SubscribeAckPacket>(responsePacket.Payload);
 
             if (subscribeAck == null)
             {
@@ -164,7 +164,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref responsePacket!);
         }
 
-        public async Task<bool> PublishAsync(string topic, byte[] payload, MqttQos qos, bool retain = false)
+        public bool Publish(string topic, byte[] payload, MqttQos qos, bool retain = false)
         {
             ushort? packetId = qos == MqttQos.AtMostOnce ? null : (ushort?)_packetIdProvider.GetPacketId();
             var publish = new PublishPacket(topic, qos, retain, duplicated: false, packetId: packetId)
@@ -172,7 +172,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 Payload = payload
             };
 
-            var packetPayload = GetPacket(Guid.NewGuid(), ServerName, NodeType.Server, await _packetManager.PacketToBytes(publish), ProtocolType, "MQTT Publish");
+            var packetPayload = GetPacket(Guid.NewGuid(), ServerName, NodeType.Server, 
+                _packetManager.PacketToBytes(publish), ProtocolType, "MQTT Publish");
             var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packetPayload!,
                 $"Publish {Name} to {packetPayload.To} with topic {topic}");
 
@@ -201,14 +202,14 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             return sendResult;
         }
 
-        public Task<bool> UnsubscribeAsync(string topicFilter)
+        public bool Unsubscribe(string topicFilter)
         {
             throw new NotImplementedException();
         }
 
         protected override void OnReceived(NetworkPacket packet)
         {
-            var payload = _packetManager.BytesToPacket<PacketBase>(packet.Payload).Result;
+            var payload = _packetManager.BytesToPacket<PacketBase>(packet.Payload);
             if (payload == null)
             {
                 base.OnReceived(packet);
@@ -218,7 +219,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             switch (payload!.Type)
             {
                 case MqttPacketType.PublishAck:
-                    ProcessPublishAckFromBroker(packet, _packetManager.BytesToPacket<PublishAckPacket>(packet.Payload).Result);
+                    ProcessPublishAckFromBroker(packet, _packetManager.BytesToPacket<PublishAckPacket>(packet.Payload));
                     break;
                 case MqttPacketType.PublishReceived:
                     break;
@@ -227,7 +228,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 case MqttPacketType.PingResponse:
                     break;
                 case MqttPacketType.Publish:
-                    ProcessPublishFromBroker(packet, _packetManager.BytesToPacket<PublishPacket>(packet.Payload).Result);
+                    ProcessPublishFromBroker(packet, _packetManager.BytesToPacket<PublishPacket>(packet.Payload));
                     break;
                 default:
                     return;
@@ -262,7 +263,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         private void SendPublishAck(NetworkPacket packet, string clientId, MqttQos qos, PublishPacket publishPacket)
         {
             var ack = new PublishAckPacket(publishPacket.PacketId ?? 0);
-            var ackPayload = _packetManager.PacketToBytes(ack).Result ?? Array.Empty<byte>();
+            var ackPayload = _packetManager.PacketToBytes(ack) ?? Array.Empty<byte>();
 
             var reversePacket = NetworkGraph.GetReversePacket(packet, ackPayload.ToArray(), "MQTT PubAck");
             NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, packet, NetworkLoggerType.Send,

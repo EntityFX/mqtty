@@ -25,7 +25,32 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
             };
         }
 
-        public Task<TPacket?> BytesToPacket<TPacket>(byte[] bytes)
+        public TPacket? BytesToPacket<TPacket>(byte[] bytes) where TPacket : IPacket
+        {
+            var packetType = (MqttPacketType)bytes.Byte(0).Bits(4);
+            var formatter = default(IFormatter);
+
+            if (!_formatters.TryGetValue(packetType, out formatter))
+                throw new MqttException("PacketUnknown");
+
+            var packet = formatter.Format(bytes);
+
+            return (TPacket?)packet;
+        }
+
+        public byte[] PacketToBytes<TPacket>(TPacket packet) where TPacket : IPacket
+        {
+            var formatter = default(IFormatter);
+
+            if (!_formatters.TryGetValue(packet.Type, out formatter))
+                throw new MqttException("PacketUnknown");
+
+            var bytes = formatter.Format(packet);
+
+            return bytes;
+        }
+
+        public Task<TPacket?> BytesToPacketAsync<TPacket>(byte[] bytes)
             where TPacket : IPacket
         {
             var packetType = (MqttPacketType)bytes.Byte(0).Bits(4);
@@ -39,7 +64,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
             return Task.FromResult((TPacket?)packet);
         }
 
-        public Task<byte[]> PacketToBytes<TPacket>(TPacket packet)
+        public Task<byte[]> PacketToBytesAsync<TPacket>(TPacket packet)
             where TPacket : IPacket
         {
             var formatter = default(IFormatter);
@@ -52,7 +77,4 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
             return Task.FromResult(bytes);
         }
     }
-
-
-
 }

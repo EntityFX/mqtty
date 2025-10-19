@@ -372,4 +372,21 @@ public class NetworkSimulator : INetworkSimulator
     {
         _counters.AddCounterValue(name, value);
     }
+
+    public bool RefreshWithCounters()
+    {
+        _counters.StartRefresh();
+        var refreshResult = Refresh();
+        _counters.StopRefresh();
+
+
+        if (!refreshResult)
+        {
+            Reset();
+            OnError?.Invoke(this, SimulationException!);
+            return false;
+        }
+
+        return true;
+    }
 }

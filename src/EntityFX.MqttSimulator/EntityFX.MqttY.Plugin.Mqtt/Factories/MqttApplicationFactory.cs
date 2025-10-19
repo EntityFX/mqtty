@@ -21,7 +21,7 @@ public class MqttApplicationFactory : IFactory<IApplication?, NodeBuildOptions<N
     public IApplication? Configure(NodeBuildOptions<NetworkBuildOption> options, IApplication? application)
     {
 
-        application?.StartAsync().Wait();
+        application?.Start();
         return application;
     }
 

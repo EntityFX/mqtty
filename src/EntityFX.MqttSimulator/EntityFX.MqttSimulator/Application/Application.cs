@@ -136,26 +136,22 @@ namespace EntityFX.MqttY.Application
             return true;
         }
 
-        public virtual Task StartAsync()
+        public virtual void Start()
         {
-            if (IsStarted) return Task.CompletedTask;
+            if (IsStarted) return;
 
             var result = Network?.AddApplication(this);
 
             IsStarted = result == true;
-
-            return Task.CompletedTask;
         }
 
-        public virtual Task StopAsync()
+        public virtual void Stop()
         {
-            if (!IsStarted) return Task.CompletedTask;
+            if (!IsStarted) return;
 
             var result = Network?.RemoveApplication(Address);
 
             IsStarted = result != true;
-
-            return Task.CompletedTask;
         }
     }
 }

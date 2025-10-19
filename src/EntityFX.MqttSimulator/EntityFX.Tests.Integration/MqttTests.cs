@@ -119,36 +119,36 @@ namespace EntityFX.Tests.Integration
         }
 
         [TestMethod]
-        public async Task MqttConnectTest()
+        public void MqttConnectTest()
         {
             var mqClient = graph!.GetNode("mqc1", NodeType.Client) as IMqttClient;
 
             Assert.IsNotNull(mqClient);
 
-            await mqClient.ConnectAsync("mqs1");
+            mqClient.Connect("mqs1");
 
             Assert.IsTrue(mqClient.IsConnected);
         }
 
         [TestMethod]
-        public async Task MqttConnectAndSubscribeTest()
+        public void MqttConnectAndSubscribeTest()
         {
             var mqClient2 = graph!.GetNode("mqc2", NodeType.Client) as IMqttClient;
 
             Assert.IsNotNull(mqClient2);
 
 
-            await mqClient2.ConnectAsync("mqs1");
+            mqClient2.Connect("mqs1");
 
             Assert.IsTrue(mqClient2.IsConnected);
 
-            await mqClient2.SubscribeAsync("/test/#", MqttQos.AtLeastOnce);
+            mqClient2.Subscribe("/test/#", MqttQos.AtLeastOnce);
 
             graph.Refresh();
         }
 
         [TestMethod]
-        public async Task MqttConnectSubscribeAndPublishTest()
+        public void MqttConnectSubscribeAndPublishTest()
         {
             var mqClient1 = graph!.GetNode("mqc1", NodeType.Client) as IMqttClient;
             var mqClient2 = graph!.GetNode("mqc2", NodeType.Client) as IMqttClient;
@@ -159,22 +159,22 @@ namespace EntityFX.Tests.Integration
             Assert.IsNotNull(mqClient2);
 
 
-            await mqClient1.ConnectAsync("mqs1");
-            await mqClient2.ConnectAsync("mqs1");
+            mqClient1.Connect("mqs1");
+            mqClient2.Connect("mqs1");
 
             Assert.IsTrue(mqClient1.IsConnected);
             Assert.IsTrue(mqClient2.IsConnected);
 
-            await mqClient2.SubscribeAsync("/test/#", MqttQos.AtLeastOnce);
+            mqClient2.Subscribe("/test/#", MqttQos.AtLeastOnce);
 
-            await mqClient1.PublishAsync("/test/data1", new byte[] { 1, 2, 3, 4, 5 }, MqttQos.AtLeastOnce);
+            mqClient1.Publish("/test/data1", new byte[] { 1, 2, 3, 4, 5 }, MqttQos.AtLeastOnce);
 
             mqClient2.MessageReceived += (object? sender, MqttMessage e) =>
             {
                 CollectionAssert.AreEqual(e.Payload, new byte[] { 1, 2, 3, 4, 5 });
             };
 
-            await Task.Delay(1000);
+            Thread.Sleep(1000);
         }
     }
 }

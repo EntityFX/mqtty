@@ -15,8 +15,8 @@
 
         bool RemoveClient(string clientAddress);
 
-        Task StartAsync();
+        void Start();
 
-        Task StopAsync();
+        void Stop();
     }
 }

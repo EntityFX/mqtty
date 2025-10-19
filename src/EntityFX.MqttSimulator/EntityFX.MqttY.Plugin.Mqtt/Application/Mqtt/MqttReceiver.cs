@@ -29,34 +29,34 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
             counters.AddCounter(_receiverCounter);
         }
 
-        public override async Task StartAsync()
+        public override void Start()
         {
             if (Options?.Server == null)
             {
                 return;
             }
 
-            _mqttClient = await AddMqttClient(Options.Server);
+            _mqttClient = AddMqttClient(Options.Server);
 
-            await base.StartAsync();
+            base.Start();
 
-            await SubscribeListenTopics(_mqttClient, Options.Topics);
+            SubscribeListenTopics(_mqttClient, Options.Topics);
 
 
         }
 
-        private async Task SubscribeListenTopics(IMqttClient? mqttClient, string[] listenTopics)
+        private void SubscribeListenTopics(IMqttClient? mqttClient, string[] listenTopics)
         {
 
             if (mqttClient == null) return;
 
             foreach (var listenTopic in listenTopics)
             {
-                await mqttClient.SubscribeAsync(listenTopic!, MqttQos.AtLeastOnce);
+                mqttClient.Subscribe(listenTopic!, MqttQos.AtLeastOnce);
             }
         }
 
-        private async Task<IMqttClient?> AddMqttClient(string serverOption)
+        private IMqttClient? AddMqttClient(string serverOption)
         {
             var nodeName = GetNodeName(Name, serverOption);
 
@@ -73,7 +73,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
             try
             {
-                await listenerMqttClient.ConnectAsync(serverOption);
+                listenerMqttClient.Connect(serverOption);
             }
             catch (Exception)
             {

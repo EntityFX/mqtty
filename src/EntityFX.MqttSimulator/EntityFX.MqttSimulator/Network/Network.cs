@@ -301,11 +301,6 @@ public class Network : NodeBase, INetwork
     private bool SendToRemote(NetworkMonitoringPacket networkPacket)
     {
         var packet = networkPacket.Packet;
-        if (packet == null)
-        {
-            return false;
-        }
-
 
         if (!networkPacket.Path.Any())
         {

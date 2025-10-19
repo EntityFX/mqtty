@@ -26,21 +26,19 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
             this._ticksOptions = ticksOptions;
         }
 
-        public override async Task StartAsync()
+        public override void Start()
         {
-            await AddMqttClients(Options?.ListenTopics.ToDictionary(kv => kv.Key, 
+            AddMqttClients(Options?.ListenTopics.ToDictionary(kv => kv.Key, 
                     kv => kv.Value.Server), $"{Name}listen");
-            await AddMqttClients(Options?.RelayTopics.ToDictionary(kv => kv.Key, 
+            AddMqttClients(Options?.RelayTopics.ToDictionary(kv => kv.Key, 
                     kv => kv.Value.Server), $"{Name}relay");
 
-            await base.StartAsync();
+            base.Start();
 
-            await SubscribeListenTopics(Options?.ListenTopics, $"{Name}listen");
-
-
+            SubscribeListenTopics(Options?.ListenTopics, $"{Name}listen");
         }
 
-        private async Task SubscribeListenTopics(Dictionary<string, MqttListenConfigurationItem>? subscribeOptions, string groupName)
+        private void SubscribeListenTopics(Dictionary<string, MqttListenConfigurationItem>? subscribeOptions, string groupName)
         {
             if ((subscribeOptions?.Any()) != true)
             {
@@ -56,12 +54,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
                 foreach (var listenTopics in listenServer.Value.Topics)
                 {
-                    await mqttClient.SubscribeAsync(listenTopics!, MqttQos.AtLeastOnce);
+                    mqttClient.Subscribe(listenTopics!, MqttQos.AtLeastOnce);
                 }
             }
         }
 
-        private async Task AddMqttClients(Dictionary<string, string>? serverTopics, string group)
+        private void AddMqttClients(Dictionary<string, string>? serverTopics, string group)
         {
             if ((serverTopics?.Any()) != true)
             {
@@ -81,7 +79,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
                 AddClient(listenerMqttClient);
                 _listenClients.Add(listenerMqttClient.Name, listenerMqttClient);
-                var result = await listenerMqttClient.ConnectAsync(listenServer.Value);
+                var result = listenerMqttClient.Connect(listenServer.Value);
 
                 listenerMqttClient.MessageReceived += ListenerMqttClient_MessageReceived;
             }
@@ -94,10 +92,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
             if (mqttClient.Server != e.Broker) return;
 
-            PublishToRelayed(e, Options?.RelayTopics, $"{Name}relay").Wait();
+            PublishToRelayed(e, Options?.RelayTopics, $"{Name}relay");
         }
 
-        private async Task PublishToRelayed(MqttMessage mqttMessage, Dictionary<string, MqttRelayConfigurationItem>? relayServers, string group)
+        private void PublishToRelayed(MqttMessage mqttMessage, Dictionary<string, MqttRelayConfigurationItem>? relayServers, string group)
         {
             var listenRelayOption = Options?.ListenTopics?.Where(
                 lt => lt.Value.Topics.Any(ltv => _mqttTopicEvaluator.Matches(mqttMessage.Topic, ltv)) 
@@ -139,8 +137,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
                 if (relayMqttClient == null) continue;
 
-                await relayMqttClient.PublishAsync(relayTopic, mqttMessage.Payload, mqttMessage.Qos);
-
+                relayMqttClient.Publish(relayTopic, mqttMessage.Payload, mqttMessage.Qos);
             }
         }
 

@@ -5,10 +5,16 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Contracts.Formatters
     public interface IMqttPacketManager
 
     {
-        Task<TPacket?> BytesToPacket<TPacket>(byte[] bytes)
+        Task<TPacket?> BytesToPacketAsync<TPacket>(byte[] bytes)
                     where TPacket : IPacket;
 
-        Task<byte[]> PacketToBytes<TPacket>(TPacket packet)
+        Task<byte[]> PacketToBytesAsync<TPacket>(TPacket packet)
+                    where TPacket : IPacket;
+
+        TPacket? BytesToPacket<TPacket>(byte[] bytes)
+            where TPacket : IPacket;
+
+        byte[] PacketToBytes<TPacket>(TPacket packet)
                     where TPacket : IPacket;
     }
 
