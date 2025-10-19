@@ -73,7 +73,8 @@ public abstract class NodeBase : ISender
 
     protected NetworkPacket GetPacket(Guid guid, string to, NodeType toType, byte[] payload,
         string protocol, string? category = null, Guid? requestId = null, bool willWait = false)
-        => new NetworkPacket(Name, to, NodeType, toType, payload, protocol, category)
+        => new NetworkPacket(guid, requestId, Name, to, NodeType, toType, 
+            payload, protocol, 0, willWait, category)
         {
             Id = guid,
             RequestId = requestId,

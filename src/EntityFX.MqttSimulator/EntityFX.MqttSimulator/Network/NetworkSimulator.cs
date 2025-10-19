@@ -92,19 +92,19 @@ public class NetworkSimulator : INetworkSimulator
     public Contracts.Network.NetworkPacket GetReversePacket(Contracts.Network.NetworkPacket packet, byte[] payload, string? category)
     {
         return new Contracts.Network.NetworkPacket(
+            Id: Guid.NewGuid(),
+            RequestId: packet.Id,
             To: packet.From,
             From: packet.To,
             Payload: payload,
             FromType: packet.ToType,
             ToType: packet.FromType,
             Protocol: packet.Protocol,
+            WillWait: packet.WillWait,
+            HeaderBytes: packet.HeaderBytes,
             Category: category ?? packet.Category,
             Scope: packet.Scope
-        )
-        {
-            Id = Guid.NewGuid(),
-            RequestId = packet.Id
-        };
+        );
     }
 
     public void RemoveClient(string clientAddress)

@@ -114,7 +114,7 @@ public class NetworkLogger : INetworkLogger
     {
         Push(tick, packet.From,
             packet.FromType, packet.To, packet.ToType, packet.Payload,
-            type, message, protocol, category, packet?.Scope ?? scope, packet?.Ttl);
+            type, message, protocol, category, packet.Scope ?? scope, packet.Ttl);
     }
 
     public NetworkLoggerScope? BeginScope(long tick, string scope, NetworkLoggerScope? parent = null)

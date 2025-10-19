@@ -86,7 +86,7 @@ public class Client : Node, IClient
             return null;
         }
 
-        var responsePacket = response.Packet;
+        var responsePacket = response.Value.Packet;
 
         NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref responsePacket!);
 
@@ -166,7 +166,10 @@ public class Client : Node, IClient
     public bool Send(byte[] payload, string? category = null)
     {
         var result = Send(
-            new NetworkPacket(Name, ServerName, NodeType.Client, NodeType.Server, payload, ProtocolType, category), true);
+            new NetworkPacket(
+                Guid.NewGuid(), null,
+                Name, ServerName, NodeType.Client, NodeType.Server, 
+            payload, ProtocolType, HeaderBytes: 0, WillWait: false, category), true);
 
         return result;
     }

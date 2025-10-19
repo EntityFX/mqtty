@@ -61,7 +61,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             var response = ConnectImplementation(server, payload);
 
-            NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref response!);
+            var networkPacket = response!.Value;
+            NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref networkPacket);
 
             if (response == null)
             {
@@ -76,7 +77,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 throw new MqttException($"No connack");
             }
 
-            var connAck = await _packetManager.BytesToPacket<ConnectAckPacket>(response.Payload);
+            var connAck = await _packetManager.BytesToPacket<ConnectAckPacket>(response.Value.Payload);
 
             if (connAck == null)
             {
@@ -131,7 +132,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return;
             }
 
-            var responsePacket = response.Packet;
+            var responsePacket = response.Value.Packet;
 
             var subscribeAck = await _packetManager.BytesToPacket<SubscribeAckPacket>(responsePacket.Payload);
 

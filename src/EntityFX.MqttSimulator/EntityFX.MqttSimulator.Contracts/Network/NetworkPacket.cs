@@ -2,24 +2,22 @@
 
 namespace EntityFX.MqttY.Contracts.Network
 {
-    public record NetworkPacket(
+    public record struct NetworkPacket(
+        Guid Id,
+        Guid? RequestId,
         string From, string To, 
-        NodeType FromType, NodeType ToType, byte[] Payload, string Protocol, string? Category = null, 
+        NodeType FromType, NodeType ToType, 
+        byte[] Payload, string Protocol,
+        int HeaderBytes,
+        bool WillWait,
+        string? Category = null, 
         NetworkLoggerScope? Scope = null)
     {
         private int ttl = 64;
 
         public int Ttl => ttl;
 
-        public Guid Id { get; set; }
-
-        public Guid? RequestId { get; set; }
-
-        public int HeaderBytes { get; set; }
-
         public int PacketBytes => HeaderBytes + Payload.Length;
-
-        public bool WillWait { get; set; }
 
         public int DecrementTtl()
         {

@@ -14,7 +14,7 @@ public static class NetworkLoggerHelper
     {
         monitoring.EndScope(tick, ref packet);
 
-        return packet?.Scope;
+        return packet.Scope;
     }
 
 }
