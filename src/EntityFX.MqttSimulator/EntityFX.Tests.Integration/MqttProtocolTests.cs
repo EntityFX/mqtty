@@ -1,7 +1,6 @@
-﻿using EntityFX.MqttY.Plugin.Mqtt.Contracts;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts.Packets;
+﻿using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
-using System;
 
 namespace EntityFX.Tests.Integration
 {

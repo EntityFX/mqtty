@@ -13,6 +13,16 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EntityFX.Tests.Integration"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EntityFX.MqttY.Plugin.Mqtt", "EntityFX.MqttY.Plugin.Mqtt\EntityFX.MqttY.Plugin.Mqtt.csproj", "{69103C26-D2CC-462A-9EDB-EC6E816406A1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EntityFX.MqttY.Plugin.Scenarios", "EntityFX.MqttY.Plugin.Scenarios\EntityFX.MqttY.Plugin.Scenarios.csproj", "{C8C6DB57-F8FE-4099-B088-5E662D143B02}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EntityFX.MqttY.Contracts.Mqtt", "EntityFX.MqttY.Contracts.Mqtt\EntityFX.MqttY.Contracts.Mqtt.csproj", "{EA587E5A-04AB-4657-9651-31EC8687F452}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EntityFX.MqttY.Contracts.Scenarios", "EntityFX.MqttY.Contracts.Scenarios\EntityFX.MqttY.Contracts.Scenarios.csproj", "{B347C93A-CABB-423B-BE50-D996AC872E05}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Core", "Core", "{E949E101-C1C7-4231-9E5C-62AA6289D55D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Plugins", "Plugins", "{ED7D18A8-4898-4A56-985D-CDEE9EBD3073}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,9 +49,29 @@ Global
 		{69103C26-D2CC-462A-9EDB-EC6E816406A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{69103C26-D2CC-462A-9EDB-EC6E816406A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{69103C26-D2CC-462A-9EDB-EC6E816406A1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C8C6DB57-F8FE-4099-B088-5E662D143B02}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C8C6DB57-F8FE-4099-B088-5E662D143B02}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C8C6DB57-F8FE-4099-B088-5E662D143B02}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C8C6DB57-F8FE-4099-B088-5E662D143B02}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EA587E5A-04AB-4657-9651-31EC8687F452}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EA587E5A-04AB-4657-9651-31EC8687F452}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EA587E5A-04AB-4657-9651-31EC8687F452}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EA587E5A-04AB-4657-9651-31EC8687F452}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B347C93A-CABB-423B-BE50-D996AC872E05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B347C93A-CABB-423B-BE50-D996AC872E05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B347C93A-CABB-423B-BE50-D996AC872E05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B347C93A-CABB-423B-BE50-D996AC872E05}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{1BEAE3B9-35DE-47F0-A300-3A1660D16812} = {E949E101-C1C7-4231-9E5C-62AA6289D55D}
+		{C58381BB-5393-42AF-B72F-CED32C59971A} = {E949E101-C1C7-4231-9E5C-62AA6289D55D}
+		{69103C26-D2CC-462A-9EDB-EC6E816406A1} = {ED7D18A8-4898-4A56-985D-CDEE9EBD3073}
+		{C8C6DB57-F8FE-4099-B088-5E662D143B02} = {ED7D18A8-4898-4A56-985D-CDEE9EBD3073}
+		{EA587E5A-04AB-4657-9651-31EC8687F452} = {ED7D18A8-4898-4A56-985D-CDEE9EBD3073}
+		{B347C93A-CABB-423B-BE50-D996AC872E05} = {ED7D18A8-4898-4A56-985D-CDEE9EBD3073}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {4315C5F3-4522-4F89-9214-B35F7C5942A2}

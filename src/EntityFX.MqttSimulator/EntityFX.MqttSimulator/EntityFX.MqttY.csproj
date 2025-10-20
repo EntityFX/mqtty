@@ -19,4 +19,8 @@
 	<ItemGroup>
 		<InternalsVisibleTo Include="EntityFX.Tests.Integration" />
 	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Scenarios\" />
+	</ItemGroup>
 </Project>

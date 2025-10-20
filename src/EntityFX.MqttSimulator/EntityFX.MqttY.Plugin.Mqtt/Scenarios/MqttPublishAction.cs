@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics;
+using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts;
 using EntityFX.MqttY.Scenarios;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Scenarios

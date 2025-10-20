@@ -8,10 +8,16 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\EntityFX.MqttSimulator\EntityFX.MqttY.csproj" />
+	  <ProjectReference Include="..\EntityFX.MqttY.Contracts.Mqtt\EntityFX.MqttY.Contracts.Mqtt.csproj" />
+	  <ProjectReference Include="..\EntityFX.MqttY.Contracts.Scenarios\EntityFX.MqttY.Contracts.Scenarios.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="EntityFX.Tests.Integration" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Contracts\" />
 	</ItemGroup>
 
 </Project>

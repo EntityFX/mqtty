@@ -1,5 +1,5 @@
-﻿using System.Text;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts;
+﻿using EntityFX.MqttY.Contracts.Mqtt;
+using System.Text;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
 {

@@ -1,20 +1,13 @@
 using EntityFX.MqttY;
+using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
-using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
-using EntityFX.MqttY.Contracts.Scenarios;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Factories;
 using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Plugin.Mqtt;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts.Formatters;
 using EntityFX.MqttY.Plugin.Mqtt.Factories;
-using EntityFX.MqttY.Plugin.Mqtt.Internals;
-using EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters;
-using EntityFX.MqttY.Utils;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EntityFX.Tests.Integration
@@ -70,7 +63,7 @@ namespace EntityFX.Tests.Integration
             var networkBuilder = serviceProvider?.GetRequiredService<INodesBuilder>();
             var networkSimulatorBuilder = serviceProvider?.GetRequiredService<INetworkSimulatorBuilder>();
 
-            graph = new NetworkSimulator(serviceProvider!, networkBuilder!, new DijkstraPathFinder(), monitoring!,
+            graph = new NetworkSimulator(new DijkstraPathFinder(), monitoring!,
                 new TicksOptions()
                 {
                     ReceiveWaitPeriod = TimeSpan.FromMilliseconds(0.1)

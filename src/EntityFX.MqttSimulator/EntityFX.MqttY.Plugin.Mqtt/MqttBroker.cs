@@ -1,9 +1,9 @@
-﻿using EntityFX.MqttY.Contracts.Network;
+﻿using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt.Formatters;
+using EntityFX.MqttY.Contracts.Mqtt.Packets;
+using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts.Formatters;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts.Packets;
 using EntityFX.MqttY.Plugin.Mqtt.Counter;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
 

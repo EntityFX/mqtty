@@ -1,4 +1,4 @@
-﻿using EntityFX.MqttY.Plugin.Mqtt.Contracts.Packets;
+﻿using EntityFX.MqttY.Contracts.Mqtt.Packets;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
 {

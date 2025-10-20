@@ -1,5 +1,6 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Network;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,7 +30,7 @@ internal class NetworkGraphFactory : IFactory<INetworkSimulator, NetworkGraphFac
 
         var mf = _serviceProvider.GetRequiredService<IFactory<INetworkLogger, NetworkGraphFactoryOption>>();
         var monitoring = mf.Create(options);
-        var ng = new NetworkSimulator(_serviceProvider, nb, pf, monitoring, options.TicksOption)
+        var ng = new NetworkSimulator(pf, monitoring, options.TicksOption)
         {
             OptionsPath = options.OptionsPath
         };

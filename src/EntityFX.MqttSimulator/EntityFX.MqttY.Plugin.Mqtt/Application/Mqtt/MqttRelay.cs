@@ -1,8 +1,8 @@
 ﻿using EntityFX.MqttY.Application;
+using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts;
 using static EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt.MqttRelayConfiguration;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt

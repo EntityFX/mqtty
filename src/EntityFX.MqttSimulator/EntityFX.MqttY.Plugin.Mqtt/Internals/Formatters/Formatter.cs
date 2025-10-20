@@ -1,11 +1,9 @@
-﻿using EntityFX.MqttY.Plugin.Mqtt.Contracts;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts.Formatters;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts.Packets;
+﻿using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt.Formatters;
+using EntityFX.MqttY.Contracts.Mqtt.Packets;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
 {
-
-
     internal abstract class Formatter<T> : IFormatter
         where T : class, IPacket
     {
@@ -18,10 +16,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
         protected static MqttEncoder Encoding => MqttEncoder.Default;
 
         protected static string GetAnonymousClientId() =>
-    string.Format(
-        "anonymous{0}",
-        Guid.NewGuid().ToString().Replace("-", string.Empty).Substring(0, 10)
-    );
+            string.Format(
+                "anonymous{0}",
+                Guid.NewGuid().ToString().Replace("-", string.Empty).Substring(0, 10)
+        );
 
         public IPacket Format(byte[] bytes)
         {

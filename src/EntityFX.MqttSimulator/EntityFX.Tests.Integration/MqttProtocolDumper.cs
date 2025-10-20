@@ -1,10 +1,10 @@
 ﻿using EntityFX.MqttY.Helper;
 using System.Collections;
 using System.Text;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts.Packets;
 using EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts.Formatters;
+using EntityFX.MqttY.Contracts.Mqtt.Packets;
+using EntityFX.MqttY.Contracts.Mqtt.Formatters;
+using EntityFX.MqttY.Contracts.Mqtt;
 
 namespace EntityFX.Tests.Integration
 {

@@ -1,4 +1,4 @@
-﻿using EntityFX.MqttY.Plugin.Mqtt.Contracts;
+﻿using EntityFX.MqttY.Contracts.Mqtt;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Internals
 {

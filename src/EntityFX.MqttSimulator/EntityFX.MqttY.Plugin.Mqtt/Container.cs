@@ -1,5 +1,5 @@
-using EntityFX.MqttY.Plugin.Mqtt.Contracts;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts.Formatters;
+using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
 using EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters;
 using Microsoft.Extensions.DependencyInjection;

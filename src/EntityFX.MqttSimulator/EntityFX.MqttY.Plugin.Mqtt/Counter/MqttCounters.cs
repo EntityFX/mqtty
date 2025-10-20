@@ -1,8 +1,8 @@
 ﻿using EntityFX.MqttY.Contracts.Counters;
+using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
 using EntityFX.MqttY.Helper;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts.Packets;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Counter
 {

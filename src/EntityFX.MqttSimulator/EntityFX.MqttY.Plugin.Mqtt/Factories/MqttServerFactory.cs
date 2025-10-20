@@ -1,7 +1,7 @@
+using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Utils;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts;
-using EntityFX.MqttY.Plugin.Mqtt.Contracts.Formatters;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Factories;

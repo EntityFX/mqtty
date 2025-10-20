@@ -1,7 +1,6 @@
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
-using EntityFX.MqttY.Contracts.Scenarios;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Factories;
 using EntityFX.MqttY.Utils;
@@ -21,6 +20,7 @@ public static class Container
             .AddScoped<IFactory<INetworkSimulator, NetworkGraphFactoryOption>, NetworkGraphFactory>()
             .AddScoped<IFactory<INetwork, NodeBuildOptions<NetworkBuildOption>>, NetworkFactory>()
             .AddScoped<INetworkSimulatorBuilder, NetworkSimulatorBuilder>()
+            .AddScoped<IUmlGraphGenerator, PlantUmlGraphGenerator>()
             .AddScoped<IPathFinder, DijkstraPathFinder>();
     }
 }

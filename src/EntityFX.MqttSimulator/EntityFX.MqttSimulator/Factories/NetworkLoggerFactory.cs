@@ -1,4 +1,5 @@
 ﻿using EntityFX.MqttY.Contracts.NetworkLogger;
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 
 namespace EntityFX.MqttY.Factories;

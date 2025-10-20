@@ -11,8 +11,6 @@ namespace EntityFX.MqttY.Network;
 
 public class NetworkSimulator : INetworkSimulator
 {
-    private readonly IServiceProvider _serviceProvider;
-    private readonly INodesBuilder _nodesBuilder;
     private readonly ConcurrentDictionary<(string Address, NodeType NodeType), ILeafNode> _nodes = new();
     private readonly ConcurrentDictionary<string, INetwork> _networks = new();
 
@@ -40,13 +38,9 @@ public class NetworkSimulator : INetworkSimulator
     private Timer? _timer;
 
     public NetworkSimulator(
-        IServiceProvider serviceProvider,
-        INodesBuilder nodesBuilder,
         IPathFinder pathFinder,
         INetworkLogger monitoring, TicksOptions ticksOptions)
     {
-        this._serviceProvider = serviceProvider;
-        _nodesBuilder = nodesBuilder;
         PathFinder = pathFinder;
         Monitoring = monitoring;
         PathFinder.NetworkGraph = this;
