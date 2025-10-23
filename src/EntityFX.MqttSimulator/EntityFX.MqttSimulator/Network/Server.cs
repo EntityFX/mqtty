@@ -6,7 +6,7 @@ public class Server : Node, IServer
 {
     private readonly Dictionary<string, IClient> _serverClients = new();
 
-    public INetwork Network { get; }
+    public INetwork? Network { get; internal set; }
 
     public INode? Parent { get; set; }
 
@@ -25,13 +25,11 @@ public class Server : Node, IServer
 
     public Server(int index, string name, string address, string protocolType,
         string specification,
-        INetwork network, INetworkSimulator networkGraph,
-        NetworkTypeOption networkTypeOption, TicksOptions ticksOptions) 
-        : base(index, name, address, networkGraph, networkTypeOption, ticksOptions)
+        TicksOptions ticksOptions) 
+        : base(index, name, address, ticksOptions)
     {
         ProtocolType = protocolType;
         Specification = specification;
-        Network = network;
     }
 
     public bool AttachClient(IClient client)
@@ -45,7 +43,7 @@ public class Server : Node, IServer
 
     public bool DetachClient(string address)
     {
-        var node = Network.FindNode(address, NodeType.Client);
+        var node = Network!.FindNode(address, NodeType.Client);
 
         var client = node as IClient;
 
@@ -96,13 +94,13 @@ public class Server : Node, IServer
 
     protected override bool SendImplementation(NetworkPacket packet)
     {
-        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!, 
+        var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packet!, 
             $"Send packet {packet.From} to {packet.To}");
-        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, packet, NetworkLoggerType.Send, 
+        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send, 
             $"Send packet {packet.From} to {packet.To}", ProtocolType, "Net Send", scope);
-        var result = Network.Send(packet);
+        var result = Network!.Send(packet);
 
-        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
+        NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
 
         return result;
     }
@@ -111,7 +109,7 @@ public class Server : Node, IServer
     {
         if (IsStarted) return;
 
-        var result = Network.AddServer(this);
+        var result = Network!.AddServer(this);
 
         IsStarted = result;
     }
@@ -120,7 +118,7 @@ public class Server : Node, IServer
     {
         if (!IsStarted) return;
 
-        var result = Network.RemoveServer(Address);
+        var result = Network!.RemoveServer(Address);
 
         IsStarted = !result;
     }
@@ -147,7 +145,7 @@ public class Server : Node, IServer
 
     protected override bool ReceiveImplementation(NetworkPacket packet)
     {
-        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
+        NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
 
         OnReceived(packet);
 

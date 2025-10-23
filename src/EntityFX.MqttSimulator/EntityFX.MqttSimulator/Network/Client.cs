@@ -12,7 +12,7 @@ public class Client : Node, IClient
     public string Specification { get; private set; } = string.Empty;
 
 
-    public INetwork? Network { get; }
+    public INetwork? Network { get; internal set; }
 
     public override NodeType NodeType => NodeType.Client;
 
@@ -24,11 +24,9 @@ public class Client : Node, IClient
 
     public Client(int index, string name, string address, string protocolType, 
         string specification,
-        INetwork network, INetworkSimulator networkGraph,
-        NetworkTypeOption networkTypeOption, TicksOptions ticksOptions)
-        : base(index, name, address, networkGraph, networkTypeOption, ticksOptions)
+        TicksOptions ticksOptions)
+        : base(index, name, address, ticksOptions)
     {
-        Network = network;
         ProtocolType = protocolType;
         Specification = specification;
     }
@@ -65,9 +63,9 @@ public class Client : Node, IClient
             return null;
         }
 
-        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref connectPacket!, 
+        var scope = NetworkSimulator.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref connectPacket!, 
             $"Connect {connectPacket.From} to {connectPacket.To}");
-        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, connectPacket, NetworkLoggerType.Connect, 
+        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, connectPacket, NetworkLoggerType.Connect, 
             $"Client {connectPacket.From} connects to server {connectPacket.To}", ProtocolType, "NET Connect");
 
         result = Send(connectPacket, false);
@@ -88,7 +86,7 @@ public class Client : Node, IClient
 
         var responsePacket = response.Value.Packet;
 
-        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref responsePacket!);
+        NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref responsePacket!);
 
         ServerName = server;
 
@@ -189,7 +187,7 @@ public class Client : Node, IClient
 
     protected override void BeforeReceive(NetworkPacket packet)
     {
-        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, packet, NetworkLoggerType.Receive, 
+        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Receive, 
             $"Recieve message from {packet.From} to {packet.To}", ProtocolType, "Net Receive");
     }
 

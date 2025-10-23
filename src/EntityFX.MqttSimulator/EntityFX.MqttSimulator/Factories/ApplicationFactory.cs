@@ -30,11 +30,16 @@ public class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<Netwo
             return null;
         }
 
-        return new Application.Application<object>(options.Index, options.Name, options.Address ?? options.Name,
-            options.Protocol, options.Specification, options.Network, options.NetworkGraph,
+        var app = new Application.Application<object>(options.Index, options.Name, options.Address ?? options.Name,
+            options.Protocol, options.Specification,
             options.Additional!.TicksOptions!, options.Additional)
         {
             Group = options.Group
         };
+
+
+        options.Network.AddApplication(app);
+        options.NetworkGraph.AddApplication(app);
+        return app;
     }
 }

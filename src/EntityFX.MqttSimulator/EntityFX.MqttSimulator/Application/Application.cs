@@ -7,15 +7,14 @@ using EntityFX.MqttY.Contracts.Options;
 
 namespace EntityFX.MqttY.Application
 {
-    public class Application<TOptions> : IApplication
+    public class ApplicationBase : IApplication
     {
         private readonly Dictionary<string, IServer> _servers = new();
         private readonly Dictionary<string, IClient> _clients = new();
 
         public bool IsStarted { get; private set; }
 
-        public INetwork? Network { get; private set; }
-        public TOptions? Options { get; }
+        public INetwork? Network { get; internal set; }
         public string ProtocolType { get; private set; } = string.Empty;
 
         public string Specification { get; private set; } = string.Empty;
@@ -37,10 +36,8 @@ namespace EntityFX.MqttY.Application
 
         public IReadOnlyDictionary<string, IClient> Clients => _clients.ToImmutableDictionary();
 
-        public INode? Parent {  get; set; }
+        public INode? Parent { get; set; }
         public NetworkLoggerScope? Scope { get; set; }
-
-        protected readonly INetworkSimulator NetworkGraph;
 
         protected ApplicationCounters counters;
 
@@ -50,26 +47,26 @@ namespace EntityFX.MqttY.Application
             set => counters = (ApplicationCounters)value;
         }
 
-        public Application(int index, string name, string address, string protocolType, string specification,
-            INetwork network, INetworkSimulator networkGraph, TicksOptions ticksOptions, TOptions? options)
+        public INetworkSimulator? NetworkSimulator { get; internal set; }
+
+        public ApplicationBase(int index, string name, string address, string protocolType, string specification,
+            TicksOptions ticksOptions)
         {
             Address = address;
-            Network = network;
             ProtocolType = protocolType;
             Specification = specification;
             Name = name;
             Id = Guid.NewGuid();
             Index = index;
-            NetworkGraph = networkGraph;
-            Options = options;
-
             counters = new ApplicationCounters(Name ?? string.Empty, ticksOptions.CounterHistoryDepth);
         }
 
 
         public virtual void Refresh()
         {
-            Counters.Refresh(NetworkGraph.TotalTicks);
+            if (NetworkSimulator == null) return;
+
+            Counters.Refresh(NetworkSimulator.TotalTicks);
         }
 
         public virtual void Reset()
@@ -152,6 +149,18 @@ namespace EntityFX.MqttY.Application
             var result = Network?.RemoveApplication(Address);
 
             IsStarted = result != true;
+        }
+    }
+
+    public class Application<TOptions> : ApplicationBase
+    {
+        public TOptions? Options { get; }
+
+        public Application(int index, string name, string address, string protocolType, string specification,
+            TicksOptions ticksOptions, TOptions? options)
+            : base(index, name, address, protocolType, specification, ticksOptions)
+        {
+            Options = options;
         }
     }
 }

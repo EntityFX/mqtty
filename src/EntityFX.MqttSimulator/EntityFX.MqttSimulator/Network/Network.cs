@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Counters;
+﻿using EntityFX.MqttY.Application;
+using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
@@ -78,9 +79,10 @@ public class Network : NodeBase, INetwork
 
     public long QueueSize => _monitoringPacketsQueue.Count;
 
-    public Network(int index, string name, string address, string networkType, INetworkSimulator networkGraph,
+    public Network(
+        int index, string name, string address, string networkType,
         NetworkTypeOption networkTypeOption, TicksOptions ticksOptions)
-        : base(index, name, address, networkGraph)
+        : base(index, name, address)
     {
         this._networkTypeOption = networkTypeOption;
         this._ticksOptions = ticksOptions;
@@ -98,6 +100,8 @@ public class Network : NodeBase, INetwork
             return false;
         }
         _clients[client.Name] = client;
+
+        ((Client)client).Network = this;
 
         return true;
     }
@@ -131,7 +135,7 @@ public class Network : NodeBase, INetwork
 
         var result = network.Link(this);
 
-        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, this, network, null, NetworkLoggerType.Link,
+        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Link,
             $"Link network {this.Name} to {network.Name}", "Network", "Link", Scope);
 
         return true;
@@ -152,7 +156,7 @@ public class Network : NodeBase, INetwork
             _linkedNetworks[network.Name] = network;
         }
 
-        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, this, network, null, NetworkLoggerType.Unlink,
+        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Unlink,
             $"Unlink network {this.Name} from {network.Name}", "Network", "Unlink");
 
         return true;
@@ -181,6 +185,8 @@ public class Network : NodeBase, INetwork
             return false;
         }
         _servers[server.Name] = server;
+
+        ((Server)server).Network = this;
 
         return true;
     }
@@ -246,18 +252,18 @@ public class Network : NodeBase, INetwork
             return new NetworkMonitoringPacket(packet, new Queue<INetwork>(), NetworkPacketType.Local, destionationNode);
         }
 
-        var sourceNode = NetworkGraph.GetNode(packet.From, packet.FromType);
+        var sourceNode = NetworkSimulator.GetNode(packet.From, packet.FromType);
 
-        var fromNetwork = NetworkGraph.GetNetworkByNode(packet.From, packet.FromType);
+        var fromNetwork = NetworkSimulator.GetNetworkByNode(packet.From, packet.FromType);
 
-        var toNetwork = NetworkGraph.GetNetworkByNode(packet.To, packet.ToType);
+        var toNetwork = NetworkSimulator.GetNetworkByNode(packet.To, packet.ToType);
 
         if (sourceNode == null || fromNetwork == null || toNetwork == null)
         {
             return new NetworkMonitoringPacket(packet, new Queue<INetwork>(), NetworkPacketType.Unreachable, null);
         }
 
-        var pathToRemote = NetworkGraph.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
+        var pathToRemote = NetworkSimulator.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
 
         var pathQueue = new Queue<INetwork>(pathToRemote);
         destionationNode = (toNetwork as Network)?.GetDestinationNode(packet.To!, packet.ToType);
@@ -288,10 +294,10 @@ public class Network : NodeBase, INetwork
         }
 
 
-        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
+        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
             $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
-        NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
+        NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
 
         _networkCounters.CountOutbound(packet);
         return networkPacket.DestionationNode!.Receive(packet);
@@ -318,13 +324,13 @@ public class Network : NodeBase, INetwork
 
         if (packet.Ttl == 0)
         {
-            NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Unreachable,
+            NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Unreachable,
                 $"NetworkMonitoringPacket unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope);
             //destination uneachable
             return false;
         }
 
-        NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Push,
+        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Push,
             $"Push packet from network {this.Name} to {next.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
 
@@ -373,7 +379,7 @@ public class Network : NodeBase, INetwork
 
 
         _networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
-        Counters.Refresh(NetworkGraph.TotalTicks);
+        Counters.Refresh(NetworkSimulator.TotalTicks);
     }
 
 
@@ -382,7 +388,7 @@ public class Network : NodeBase, INetwork
     {
         var result = false;
         var packet = networkPacket.Packet;
-        var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packet!,
+        var scope = NetworkSimulator.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packet!,
             $"Transfer packet {packet.From} to {packet.To}");
 
         if (networkPacket.Type == NetworkPacketType.Local)
@@ -398,7 +404,7 @@ public class Network : NodeBase, INetwork
 
     public INode? FindNode(string address, NodeType type)
     {
-        return NetworkGraph.GetNode(address, type);
+        return NetworkSimulator.GetNode(address, type);
     }
 
     public override string ToString()
@@ -455,6 +461,8 @@ public class Network : NodeBase, INetwork
             return false;
         }
         _applications[application.Name] = application;
+
+        ((ApplicationBase)application).Network = this;
 
         return true;
     }

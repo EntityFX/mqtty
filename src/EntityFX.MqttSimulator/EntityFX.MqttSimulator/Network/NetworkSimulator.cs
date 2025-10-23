@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using EntityFX.MqttY.Application;
 using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
@@ -174,7 +175,7 @@ public class NetworkSimulator : INetworkSimulator
                     network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
                     "Network", "Refresh", scope);
                 network.Value.Refresh();
-            }            );
+            });
 
             Parallel.ForEach(_nodes, node =>
             {
@@ -257,7 +258,7 @@ public class NetworkSimulator : INetworkSimulator
                 refreshResult = Refresh();
                 _counters.StopRefresh();
 
-                
+
                 if (!refreshResult)
                 {
                     Reset();
@@ -297,7 +298,14 @@ public class NetworkSimulator : INetworkSimulator
             return false;
         }
 
-        return _nodes.TryAdd((client.Name, NodeType.Client), client);
+        var result = _nodes.TryAdd((client.Name, NodeType.Client), client);
+
+        if (result)
+        {
+            ((NodeBase)client).NetworkSimulator = this;
+        }
+
+        return result;
     }
 
     public bool AddServer(IServer server)
@@ -307,7 +315,14 @@ public class NetworkSimulator : INetworkSimulator
             return false;
         }
 
-        return _nodes.TryAdd((server.Name, NodeType.Server), server);
+        var result = _nodes.TryAdd((server.Name, NodeType.Server), server);
+
+        if (result)
+        {
+            ((NodeBase)server).NetworkSimulator = this;
+        }
+
+        return result;
     }
 
     public bool AddApplication(IApplication application)
@@ -317,7 +332,14 @@ public class NetworkSimulator : INetworkSimulator
             return false;
         }
 
-        return _nodes.TryAdd((application.Name, NodeType.Application), application);
+        var result = _nodes.TryAdd((application.Name, NodeType.Application), application);
+
+        if (result)
+        {
+            ((ApplicationBase)application).NetworkSimulator = this;
+        }
+
+        return result;
     }
 
     public bool AddNetwork(INetwork network)
@@ -335,6 +357,8 @@ public class NetworkSimulator : INetworkSimulator
         }
 
         UpdateRoutes();
+
+        ((NodeBase)network).NetworkSimulator = this;
 
         return result;
     }

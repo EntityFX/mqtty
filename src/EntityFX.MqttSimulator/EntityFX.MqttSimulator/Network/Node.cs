@@ -9,7 +9,6 @@ public abstract class Node : NodeBase
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
     private readonly ConcurrentDictionary<Guid, NodeMonitoringPacket> _monitorMessages = new ConcurrentDictionary<Guid, NodeMonitoringPacket>();
-    private readonly NetworkTypeOption _networkTypeOption;
     private readonly TicksOptions _ticksOptions;
 
     protected NodeCounters counters;
@@ -23,12 +22,11 @@ public abstract class Node : NodeBase
         }
     }
 
-    public Node(int index, string name, string address, INetworkSimulator networkGraph,
-        NetworkTypeOption networkTypeOption, TicksOptions ticksOptions) : base(index, name, address, networkGraph)
+    public Node(int index, string name, string address,
+        TicksOptions ticksOptions) : base(index, name, address)
     {
         _ticksOptions = ticksOptions;
         counters = new NodeCounters(Name ?? string.Empty, _ticksOptions.CounterHistoryDepth);
-        _networkTypeOption = networkTypeOption;
     }
 
     public override void Reset()
@@ -86,7 +84,7 @@ public abstract class Node : NodeBase
         }
 
         monitorMessage.ResponsePacket = packet;
-        monitorMessage.ResponseTick = NetworkGraph.TotalTicks;
+        monitorMessage.ResponseTick = NetworkSimulator.TotalTicks;
         monitorMessage.ResetEventSlim?.Set();
         monitorMessage.IsSet = true;
 
@@ -101,7 +99,7 @@ public abstract class Node : NodeBase
             return;
         }
 
-        var startTicks = NetworkGraph.TotalTicks;
+        var startTicks = NetworkSimulator.TotalTicks;
 
         //while (NetworkGraph.TotalTicks - startTicks < _networkTypeOption.SendTicks)
         //{
@@ -116,7 +114,7 @@ public abstract class Node : NodeBase
         _monitorMessages.AddOrUpdate(packet.Id, new NodeMonitoringPacket()
         {
             RequestPacket = packet,
-            RequestTick = NetworkGraph.TotalTicks,
+            RequestTick = NetworkSimulator.TotalTicks,
             Marker = packet.Category ?? string.Empty,
             Id = packet.Id,
             ResetEventSlim = new ManualResetEventSlim(false),

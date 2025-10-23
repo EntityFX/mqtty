@@ -25,12 +25,17 @@ public class ServerFactory : IFactory<IServer?, NodeBuildOptions<NetworkBuildOpt
         {
             return null;
         }
-        
-        return new Server(options.Index, options.Name, options.Address ?? options.Name,
-            options.Protocol, options.Specification, options.Network, 
-            options.NetworkGraph, options.Additional!.NetworkTypeOption!, options.Additional!.TicksOptions!)
+        //options.Network, 
+        //options.NetworkGraph, 
+        var server = new Server(options.Index, options.Name, options.Address ?? options.Name,
+            options.Protocol, options.Specification, options.Additional!.TicksOptions!)
         {
             Group = options.Group
         };
+
+        options.Network.AddServer(server);
+        options.NetworkGraph.AddServer(server);
+
+        return server;
     }
 }

@@ -15,12 +15,15 @@ internal class NetworkFactory : IFactory<INetwork, NodeBuildOptions<NetworkBuild
     public INetwork Create(
         NodeBuildOptions<NetworkBuildOption> options)
     {
-        return new Network.Network(options.Index, 
+        var network = new Network.Network(options.Index, 
             options.Name, 
             options.Address ?? options.Name,
             options.Additional!.NetworkTypeOption!.NetworkType,
-            options.NetworkGraph, 
             options.Additional.NetworkTypeOption,
             options.Additional!.TicksOptions!);
+
+        options.NetworkGraph.AddNetwork(network);
+
+        return network;
     }
 }

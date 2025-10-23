@@ -25,13 +25,18 @@ public class ClientFactory : IFactory<IClient?, NodeBuildOptions<NetworkBuildOpt
         {
             return null;
         }
-        
-        return new Client(options.Index, options.Name, options.Address ?? options.Name, options.Protocol,
+        //options.NetworkGraph
+        //options.Network, 
+        var client = new Client(options.Index, options.Name, options.Address ?? options.Name, options.Protocol,
             options.Specification,
-            options.Network, options.NetworkGraph, options.Additional!.NetworkTypeOption!, 
             options.Additional!.TicksOptions!)
         {
             Group = options.Group
         };
+
+        options.Network.AddClient(client);
+        options.NetworkGraph.AddClient(client);
+
+        return client;
     }
 }

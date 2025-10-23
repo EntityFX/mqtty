@@ -4,7 +4,7 @@ using EntityFX.MqttY.Contracts.NetworkLogger;
 
 public abstract class NodeBase : ISender
 {
-    protected readonly INetworkSimulator NetworkGraph;
+    public INetworkSimulator? NetworkSimulator { get; internal set; }
 
     public Guid Id { get; private set; }
 
@@ -35,13 +35,12 @@ public abstract class NodeBase : ISender
     protected abstract void AfterSend(NetworkPacket packet);
 
 
-    public NodeBase(int index, string name, string address, INetworkSimulator networkGraph)
+    public NodeBase(int index, string name, string address)
     {
         Address = address;
         Name = name;
         Id = Guid.NewGuid();
         Index = index;
-        this.NetworkGraph = networkGraph;
     }
 
 
@@ -85,7 +84,9 @@ public abstract class NodeBase : ISender
     //Здесь обновляем время ождидания и триггерим ManualResetEventSlim
     public virtual void Refresh()
     {
-        Counters.Refresh(NetworkGraph.TotalTicks);
+        if (NetworkSimulator == null) return;
+
+        Counters.Refresh(NetworkSimulator.TotalTicks);
     }
 
     public abstract void Reset();
