@@ -18,9 +18,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
         private readonly NetworkTypeOption _networkTypeOption;
 
         public MqttReceiver(INetworkSimulatorBuilder networkSimulatorBuilder, int index, string name, string address, string protocolType, string specification, 
-            INetwork network, INetworkSimulator networkGraph, TicksOptions ticksOptions,
+            TicksOptions ticksOptions,
             NetworkTypeOption networkTypeOption, MqttReceiverConfiguration? options) 
-            : base(index, name, address, protocolType, specification, network, networkGraph, ticksOptions, options)
+            : base(index, name, address, protocolType, specification, ticksOptions, options)
         {
             this._ticksOptions = ticksOptions;
             _receiverCounter = new MqttReceiverCounters("Receiver", _ticksOptions.CounterHistoryDepth);
@@ -88,7 +88,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
         private void ListenerMqttClient_MessageReceived(object? sender, MqttMessage e)
         {
-            NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, NetworkLoggerType.Receive,
+            NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, NetworkLoggerType.Receive,
                 $"Mqtt Application {Name} receives message by topic {e.Topic} from broker {e.Broker}", 
                 Specification, "MQTT Receiver Application");
             _receiverCounter.Receive();

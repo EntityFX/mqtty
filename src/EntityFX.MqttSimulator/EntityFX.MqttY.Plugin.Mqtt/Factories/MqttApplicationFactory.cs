@@ -38,40 +38,50 @@ public class MqttApplicationFactory : IFactory<IApplication?, NodeBuildOptions<N
 
         switch (options)
         {
-            case {  Specification: "mqtt-relay" }:
-            {
-                var mqttRelayConf = configurationSection
-                    .Get<MqttRelayConfiguration>();
-
-                var mqttTopicEvaluator = _serviceProvider.GetRequiredService<IMqttTopicEvaluator>();
-                var networkSimulatorBuilder = _serviceProvider.GetRequiredService<INetworkSimulatorBuilder>();
-
-                return new MqttRelay
-                (options.Index, options.Name, options.Address ?? options.Name,
-                    options.Protocol, options.Specification, options.Network, networkSimulatorBuilder, mqttTopicEvaluator,
-                    options.Additional!.TicksOptions!,
-                    mqttRelayConf)
+            case { Specification: "mqtt-relay" }:
                 {
-                    Group = options.Group,
-                    GroupAmount = options.GroupAmount
-                };
-            }
-            case {  Specification: "mqtt-receiver" }:
-            {
-                var mqttReceiverConf = configurationSection
-                    .Get<MqttReceiverConfiguration>();
+                    var mqttRelayConf = configurationSection
+                        .Get<MqttRelayConfiguration>();
 
-                var networkSimulatorBuilder = _serviceProvider.GetRequiredService<INetworkSimulatorBuilder>();
+                    var mqttTopicEvaluator = _serviceProvider.GetRequiredService<IMqttTopicEvaluator>();
+                    var networkSimulatorBuilder = _serviceProvider.GetRequiredService<INetworkSimulatorBuilder>();
 
-                return new MqttReceiver
-                (networkSimulatorBuilder, options.Index, options.Name, options.Address ?? options.Name,
-                    options.Protocol, options.Specification, options.Network, options.NetworkGraph,
-                    options.Additional!.TicksOptions!, options.Additional.NetworkTypeOption!, mqttReceiverConf)
+                    var relay = new MqttRelay
+                    (options.Index, options.Name, options.Address ?? options.Name,
+                        options.Protocol, options.Specification, networkSimulatorBuilder, mqttTopicEvaluator,
+                        options.Additional!.TicksOptions!,
+                        mqttRelayConf)
+                    {
+                        Group = options.Group,
+                        GroupAmount = options.GroupAmount
+                    };
+
+                    options.Network.AddApplication(relay);
+                    options.NetworkGraph.AddApplication(relay);
+
+                    return relay;
+                }
+            case { Specification: "mqtt-receiver" }:
                 {
-                    Group = options.Group,
-                    GroupAmount = options.GroupAmount
-                };
-            }
+                    var mqttReceiverConf = configurationSection
+                        .Get<MqttReceiverConfiguration>();
+
+                    var networkSimulatorBuilder = _serviceProvider.GetRequiredService<INetworkSimulatorBuilder>();
+
+                    var receiver = new MqttReceiver
+                    (networkSimulatorBuilder, options.Index, options.Name, options.Address ?? options.Name,
+                        options.Protocol, options.Specification,
+                        options.Additional!.TicksOptions!, options.Additional.NetworkTypeOption!, mqttReceiverConf)
+                    {
+                        Group = options.Group,
+                        GroupAmount = options.GroupAmount
+                    };
+
+                    options.Network.AddApplication(receiver);
+                    options.NetworkGraph.AddApplication(receiver);
+
+                    return receiver;
+                }
             default: return null;
         }
     }

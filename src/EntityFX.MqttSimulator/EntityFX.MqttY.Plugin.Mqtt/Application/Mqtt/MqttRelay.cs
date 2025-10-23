@@ -15,11 +15,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
         private readonly TicksOptions _ticksOptions;
 
         public MqttRelay(int index, string name, string address, string protocolType, string specification,
-            INetwork network, INetworkSimulatorBuilder networkSimulatorBuilder,
+            INetworkSimulatorBuilder networkSimulatorBuilder,
             IMqttTopicEvaluator mqttTopicEvaluator, TicksOptions ticksOptions,
             MqttRelayConfiguration? mqttRelayConfiguration) 
-            : base(index, name, address, protocolType, specification, network, 
-                networkSimulatorBuilder.NetworkSimulator!, ticksOptions, mqttRelayConfiguration)
+            : base(index, name, address, protocolType, specification, ticksOptions, mqttRelayConfiguration)
         {
             this._networkSimulatorBuilder = networkSimulatorBuilder;
             this._mqttTopicEvaluator = mqttTopicEvaluator;

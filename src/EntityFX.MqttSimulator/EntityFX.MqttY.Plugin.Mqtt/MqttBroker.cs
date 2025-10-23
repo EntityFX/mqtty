@@ -23,14 +23,13 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         protected readonly MqttCounters MqttCounters;
 
-        public MqttBroker(IMqttPacketManager packetManager, INetwork network, INetworkSimulator networkGraph, 
+        public MqttBroker(IMqttPacketManager packetManager,
             IMqttTopicEvaluator mqttTopicEvaluator,
             int index, string name, string address, string protocolType, 
-            string specification, TicksOptions ticksOptions,
-            NetworkTypeOption networkTypeOption
+            string specification, TicksOptions ticksOptions
            )
             : base(index, name, address, protocolType, specification, 
-                  network, networkGraph, networkTypeOption, ticksOptions)
+                  ticksOptions)
         {
             this.PacketReceived += MqttBroker_PacketReceived;
             this._packetManager = packetManager;
@@ -47,7 +46,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             {
                 base.OnReceived(packet);
             }
-            NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
+            NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
             switch (payload!.Type)
             {
                 case MqttPacketType.Publish:
@@ -86,7 +85,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return;
             }
 
-            NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
+            NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
 
             var clientId = packet.From;
 
@@ -151,7 +150,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 SaveMessage(subscriptionPublish, subscription.ClientId, PendingMessageStatus.PendingToAcknowledge);
             }
 
-            var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref packetPayload, $"Publish {Name} to  Subscriber {packetPayload.To} with topic {publishPacket.Topic}");
+            var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packetPayload, $"Publish {Name} to  Subscriber {packetPayload.To} with topic {publishPacket.Topic}");
             MqttCounters.PacketTypeCounters[subscriptionPublish.Type].Increment();
             
             var sendResult = Send(packetPayload);
@@ -182,7 +181,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             _sessionRepository.Update(session);
 
-            NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref packet);
+            NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
         }
 
         private void SaveMessage(PublishPacket message, string clientId, PendingMessageStatus status)
@@ -219,13 +218,13 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         {
             var ack = new PublishAckPacket(publishPacket.PacketId ?? 0);
             var ackPayload = _packetManager.PacketToBytes(ack) ?? Array.Empty<byte>();
-            var reversePacket = NetworkGraph.GetReversePacket(packet, ackPayload.ToArray(), "MQTT PubAck");
-            var scope = NetworkGraph.Monitoring.WithBeginScope(NetworkGraph.TotalTicks, ref reversePacket,
+            var reversePacket = NetworkSimulator!.GetReversePacket(packet, ackPayload.ToArray(), "MQTT PubAck");
+            var scope = NetworkSimulator.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref reversePacket,
                 $"Publish Ack {packet.From} to {packet.To} with topic {publishPacket.Topic}");
-            NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, packet, NetworkLoggerType.Send, 
+            NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send, 
                 $"Send MQTT publish ack {packet.From} to {packet.To} with {publishPacket.Topic} (QoS={publishPacket.QualityOfService})", ProtocolType, "MQTT PubAck");
             Send(reversePacket);
-            NetworkGraph.Monitoring.WithEndScope(NetworkGraph.TotalTicks, ref reversePacket);
+            NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref reversePacket);
             MqttCounters.PacketTypeCounters[ack.Type].Increment();
         }
 
@@ -307,7 +306,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var packetPayload = GetPacket(Guid.NewGuid(), clientId, NodeType.Client,
                 _packetManager.PacketToBytes(subscribeAck),
                 ProtocolType, "MQTT SubAck", packet.Id);
-            NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, packet, NetworkLoggerType.Send,
+            NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send,
                 $"Send MQTT subscribe ack {packet.From} to {packet.To}", ProtocolType, "MQTT SubAck");
             Send(packetPayload);
             MqttCounters.PacketTypeCounters[subscribeAck.Type].Increment();
@@ -341,7 +340,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var packetPayload = GetPacket(Guid.NewGuid(), clientId, NodeType.Client, 
                 _packetManager.PacketToBytes(connecktAck), ProtocolType, "MQTT ConnAck", packet.Id);
 
-            NetworkGraph.Monitoring.Push(NetworkGraph.TotalTicks, packet, NetworkLoggerType.Send,
+            NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send,
                 $"Send MQTT connect ack {packet.From} to {packet.To} with Status={connecktAck.Status}", ProtocolType, "MQTT ConnAck");
 
             var sendResult = Send(packetPayload);

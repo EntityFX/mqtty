@@ -29,12 +29,17 @@ public class MqttServerFactory : IFactory<IServer?, NodeBuildOptions<NetworkBuil
         }
 
         var mqttTopicEvaluator = _serviceProvider.GetRequiredService<IMqttTopicEvaluator>();
-        
-            var mqttPacketManager = options.ServiceProvider.GetRequiredService<IMqttPacketManager>();
-            return new MqttBroker
-            (mqttPacketManager, options.Network, options.NetworkGraph, mqttTopicEvaluator, 
-                options.Index, options.Name, options.Address ?? options.Name,
-                options.Protocol, options.Specification, 
-                options.Additional!.TicksOptions!, options.Additional!.NetworkTypeOption!);
+        //            options.Network, options.NetworkGraph, 
+        var mqttPacketManager = options.ServiceProvider.GetRequiredService<IMqttPacketManager>();
+        var mqttBroker = new MqttBroker(mqttPacketManager,
+            mqttTopicEvaluator,
+            options.Index, options.Name, options.Address ?? options.Name,
+            options.Protocol, options.Specification,
+            options.Additional!.TicksOptions!);
+
+        options.Network.AddServer(mqttBroker);
+        options.NetworkGraph.AddServer(mqttBroker);
+
+        return mqttBroker;
     }
 }

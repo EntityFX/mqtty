@@ -5,9 +5,9 @@ namespace EntityFX.MqttY.Contracts.Network
 {
     public interface INode : IWithCounters
     {
-        public Guid Id { get; }
+        Guid Id { get; }
         
-        public int Index { get; }
+        int Index { get; }
 
         string Address { get; }
 
@@ -17,13 +17,15 @@ namespace EntityFX.MqttY.Contracts.Network
 
         int? GroupAmount { get; set; }
 
-        public NetworkLoggerScope? Scope { get; set; }
+        NetworkLoggerScope? Scope { get; set; }
 
         NodeType NodeType { get; }
 
         void Refresh();
 
         void Reset();
+
+        INetworkSimulator? NetworkSimulator { get; }
 
     }
 }

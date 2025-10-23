@@ -50,14 +50,19 @@ public class MqttClientFactory : IFactory<IClient?, NodeBuildOptions<NetworkBuil
 
 
         var mqttPacketManager = options.ServiceProvider.GetRequiredService<IMqttPacketManager>();
-        var mqttClient = new MqttClient(mqttPacketManager, options.Network, options.NetworkGraph, options.Index,
+        var mqttClient = new MqttClient(mqttPacketManager,  options.Index,
             options.Name, options.Address ?? options.Name,
             options.Protocol, options.Specification, options.Name,
-            options.Additional!.TicksOptions!, options.Additional!.NetworkTypeOption!)
+            options.Additional!.TicksOptions!)
         {
             Group = options.Group,
             GroupAmount = options.GroupAmount
         };
+
+        //options.Network, options.NetworkGraph,
+
+        options.Network.AddClient(mqttClient);
+        options.NetworkGraph.AddClient(mqttClient);
 
         return mqttClient;
     }
