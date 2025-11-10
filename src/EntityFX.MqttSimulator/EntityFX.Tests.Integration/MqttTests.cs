@@ -6,6 +6,8 @@ using EntityFX.MqttY.Plugin.Mqtt;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
 using EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters;
 using Microsoft.Extensions.DependencyInjection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace EntityFX.Tests.Integration
 {
@@ -39,11 +41,11 @@ namespace EntityFX.Tests.Integration
             }, tickOptions);
             graph.AddNetwork(network1);
 
-            var mqc1 = new MqttClient(mqttPacketManager, 0, "mqc1", "mqc1.net1.local",
-                "mqtt", "mqtt", "mqtt", tickOptions);
+            var mqc1 = new MqttClient(mqttPacketManager, 0, "mqc1", "mqtt://mqc1.net1.local",
+                "mqtt", "mqtt", "mqc1", tickOptions);
             network1.AddClient(mqc1);
 
-            var mqs1 = new MqttBroker(mqttPacketManager, mqttTopicEvaluator, 0, "mqs1", "mqs1.net1.local",
+            var mqs1 = new MqttBroker(mqttPacketManager, mqttTopicEvaluator, 0, "mqs1", "mqtt://mqs1.net1.local",
                 "mqtt", "mqtt", tickOptions);
             network1.AddServer(mqs1);
 
@@ -54,6 +56,8 @@ namespace EntityFX.Tests.Integration
             {
                 testException = e;
             };
+
+            var json = JsonSerializer.Serialize(graph, new JsonSerializerOptions() {  ReferenceHandler = ReferenceHandler.Preserve });
 
             _ = graph.StartPeriodicRefreshAsync();
         }
