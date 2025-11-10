@@ -7,8 +7,11 @@ public class DijkstraPathFinder : IPathFinder
 
     private Path<string>[] _paths = new Path<string>[0];
 
+    public Dictionary<string, IEnumerable<INetwork>> _pathCache = new Dictionary<string, IEnumerable<INetwork>>();
+
     public void Build()
     {
+        _pathCache.Clear();
         if (NetworkGraph?.Networks?.Any() != true)
         {
             return;
@@ -19,7 +22,7 @@ public class DijkstraPathFinder : IPathFinder
         {
             foreach (var destination in source.Value.LinkedNearestNetworks)
             {
-                pathsList.Add(new Path<string>(source.Key,destination.Key) { Cost = 1 });
+                pathsList.Add(new Path<string>(source.Key, destination.Key) { Cost = 1 });
             }
         }
         _paths = pathsList.ToArray();
@@ -28,6 +31,13 @@ public class DijkstraPathFinder : IPathFinder
 
     public IEnumerable<INetwork> GetPathToNetwork(string sourceNetworkAddress, string destinationNetworkAddress)
     {
+        var netPair = $"{sourceNetworkAddress}:{destinationNetworkAddress}";
+        var paths = _pathCache.GetValueOrDefault(netPair);
+        if (paths != null)
+        {
+            return paths;
+        }
+
         if (NetworkGraph?.Networks?.Any() != true)
         {
             return Enumerable.Empty<INetwork>();
@@ -37,9 +47,12 @@ public class DijkstraPathFinder : IPathFinder
 
 
         var networks = path.Select(p => NetworkGraph.Networks.GetValueOrDefault(p.Destination))
-            .Where(n => n!= null).Select(n => n!);
-  
+            .Where(n => n != null).Select(n => n!);
 
-        return networks ?? Enumerable.Empty<INetwork>();
+
+        var result = networks ?? Enumerable.Empty<INetwork>();
+        _pathCache[netPair] = result;
+
+        return result;
     }
 }

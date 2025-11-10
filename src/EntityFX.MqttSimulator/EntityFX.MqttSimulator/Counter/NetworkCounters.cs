@@ -111,7 +111,8 @@ namespace EntityFX.MqttY.Counter
 
             var inboundTickDiff = totalTicks - inboundFirstTick.Value.Key;
 
-            var inboundTtickRps = _ticksPerSecond / inboundTickDiff;
+
+            var inboundTtickRps = inboundTickDiff > 0 ? _ticksPerSecond / inboundTickDiff : 0;
 
             var inboundDiff = _inboundCounter.Value - inboundFirstTick.Value.Value;
 
@@ -119,6 +120,11 @@ namespace EntityFX.MqttY.Counter
             _inboundThroughput.Set(inboundDiff * inboundTtickRps);
             AvgInboundThroughput = _inboundThroughput.HistoryValues.Any()
                 ? _inboundThroughput.HistoryValues.Average(hv => hv.Value) : 0;
+
+            if (AvgInboundThroughput >= double.PositiveInfinity)
+            {
+
+            }
 
             var outboundFirstTick = _inboundCounter.TickFirstValue;
             if (outboundFirstTick == null)
