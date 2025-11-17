@@ -43,6 +43,19 @@ public class Client : Node, IClient
         return true;
     }
 
+    public bool BeginConnect(string server)
+    {
+        if (IsConnected) return true;
+
+        return BeginConnectImplementation(server,
+            GetPacket(Guid.NewGuid(), server, NodeType.Server, new byte[] { 0xFF }, "Net", "Connect"));
+    }
+
+    public bool CompleteConnect(ResponsePacket response)
+    {
+        return CompleteConnectImplementation(response);
+    }
+
     protected NetworkPacket? ConnectImplementation(string server, NetworkPacket connectPacket)
     {
         if (Network == null) return null;
@@ -63,7 +76,7 @@ public class Client : Node, IClient
             return null;
         }
 
-        var scope = NetworkSimulator.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref connectPacket!, 
+        var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref connectPacket!, 
             $"Connect {connectPacket.From} to {connectPacket.To}");
         NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, connectPacket, NetworkLoggerType.Connect, 
             $"Client {connectPacket.From} connects to server {connectPacket.To}", ProtocolType, "NET Connect");
@@ -93,6 +106,55 @@ public class Client : Node, IClient
         IsConnected = true;
 
         return responsePacket;
+    }
+
+    protected bool BeginConnectImplementation(string server, NetworkPacket connectPacket)
+    {
+        if (Network == null) return false;
+
+        var result = Network.AddClient(this);
+
+        if (!result)
+        {
+            IsConnected = false;
+            return false;
+        }
+
+        var remoteNode = AttachClientToServer(server);
+
+        if (remoteNode == null)
+        {
+            IsConnected = false;
+            return false;
+        }
+
+        var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref connectPacket!,
+            $"Connect {connectPacket.From} to {connectPacket.To}");
+        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, connectPacket, NetworkLoggerType.Connect,
+            $"Client {connectPacket.From} connects to server {connectPacket.To}", ProtocolType, "NET Connect");
+
+        result = Send(connectPacket, false);
+
+        if (!result)
+        {
+            IsConnected = false;
+            return false;
+        }
+
+        return true;
+    }
+
+    protected bool CompleteConnectImplementation(ResponsePacket response)
+    {
+        var responsePacket = response.Packet;
+
+        NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref responsePacket!);
+
+        ServerName = responsePacket.From;
+
+        IsConnected = true;
+
+        return true;
     }
 
     private INode? AttachClientToServer(string server)
@@ -187,7 +249,7 @@ public class Client : Node, IClient
 
     protected override void BeforeReceive(NetworkPacket packet)
     {
-        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Receive, 
+        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Receive, 
             $"Recieve message from {packet.From} to {packet.To}", ProtocolType, "Net Receive");
     }
 
@@ -204,5 +266,15 @@ public class Client : Node, IClient
     protected override void AfterSend(NetworkPacket packet)
     {
         base.AfterSend(packet);
+    }
+
+    public bool BeginDisconnect()
+    {
+        throw new NotImplementedException();
+    }
+
+    public bool CompleteDisconnect()
+    {
+        throw new NotImplementedException();
     }
 }

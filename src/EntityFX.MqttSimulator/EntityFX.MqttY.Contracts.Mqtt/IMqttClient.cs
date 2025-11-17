@@ -3,7 +3,7 @@ using EntityFX.MqttY.Contracts.Network;
 
 namespace EntityFX.MqttY.Contracts.Mqtt
 {
-    public interface IMqttClient : IClient
+    public interface IMqttClient : IClient, IStagedMqttClient
     {
         string Server { get; }
 

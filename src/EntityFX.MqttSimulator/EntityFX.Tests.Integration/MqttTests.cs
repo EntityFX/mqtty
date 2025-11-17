@@ -11,6 +11,7 @@ using System.Text.Json.Serialization;
 
 namespace EntityFX.Tests.Integration
 {
+
     [TestClass]
     public class MqttTests
     {
@@ -32,6 +33,10 @@ namespace EntityFX.Tests.Integration
                 TickPeriod = TimeSpan.FromMilliseconds(1)
             };
             graph = new NetworkSimulator(pathFinder, monitoring, tickOptions);
+
+
+            monitoringProvider = new ConsoleNetworkLoggerProvider(monitoring);
+            monitoringProvider.Start();
 
             var mqttTopicEvaluator = new MqttTopicEvaluator(true);
             var mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);

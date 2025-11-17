@@ -1,13 +1,12 @@
 ﻿namespace EntityFX.MqttY.Contracts.Network
 {
-    public interface IClient : ISender, ILeafNode
+    public interface IClient : ISender, ILeafNode, IStagedClient
     {
         bool IsConnected { get; }
 
         bool Connect(string server);
 
         bool Disconnect();
-
 
         event EventHandler<NetworkPacket>? PacketReceived;
 

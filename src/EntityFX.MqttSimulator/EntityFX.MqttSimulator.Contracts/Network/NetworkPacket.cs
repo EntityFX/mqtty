@@ -28,4 +28,6 @@ namespace EntityFX.MqttY.Contracts.Network
             return Ttl;
         }
     }
+
+
 }
