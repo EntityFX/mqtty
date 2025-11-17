@@ -1,17 +1,18 @@
 ﻿using EntityFX.MqttY.Contracts.NetworkLogger;
+using static System.Formats.Asn1.AsnWriter;
 
 namespace EntityFX.MqttY.Contracts.Network
 {
-    public record struct NetworkPacket(
+    public record NetworkPacket(
         Guid Id,
         Guid? RequestId,
-        string From, string To, 
-        NodeType FromType, NodeType ToType, 
+        string From, string To,
+        NodeType FromType, NodeType ToType,
         byte[] Payload, string Protocol,
         int HeaderBytes,
         bool WillWait,
-        string? Category = null, 
-        NetworkLoggerScope? Scope = null)
+        string? Category = null,
+        NetworkLoggerScope? Scope = null, object? Context = default)
     {
         private int ttl = 64;
 
@@ -29,5 +30,17 @@ namespace EntityFX.MqttY.Contracts.Network
         }
     }
 
+    public record NetworkPacket<TContext>(
+        Guid Id,
+        Guid? RequestId,
+        string From, string To,
+        NodeType FromType, NodeType ToType,
+        byte[] Payload, string Protocol,
+        int HeaderBytes,
+        bool WillWait,
+        string? Category = null,
+        NetworkLoggerScope? Scope = null, TContext? TypedContext = default) :
+            NetworkPacket(Id, RequestId, From, To, FromType, ToType, Payload, Protocol,
+        HeaderBytes, WillWait, Category, Scope, TypedContext);
 
 }

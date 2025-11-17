@@ -152,7 +152,7 @@ public abstract class Node : NodeBase
         }
 
         return new ResponsePacket(
-            monitorPacket.ResponsePacket!.Value, monitorPacket.RequestTick, 
+            monitorPacket.ResponsePacket!, monitorPacket.RequestTick, 
             monitorPacket.ResponseTick ?? 0);
         /* });*/
     }

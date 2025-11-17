@@ -66,7 +66,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 throw new MqttException($"Unable connect to broker {server}");
             }
 
-            var networkPacket = response!.Value;
+            var networkPacket = response!;
             NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref networkPacket);
 
             OpenClientSession(cleanSession);
@@ -77,7 +77,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 throw new MqttException($"No connack");
             }
 
-            var connAck = _packetManager.BytesToPacket<ConnectAckPacket>(response.Value.Payload);
+            var connAck = _packetManager.BytesToPacket<ConnectAckPacket>(response.Payload);
 
             if (connAck == null)
             {
@@ -98,8 +98,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         {
             var connect = new ConnectPacket(ClientId, true);
             var connectId = Guid.NewGuid();
-            var payload = GetPacket(connectId, server, NodeType.Server,
-                _packetManager.PacketToBytes(connect), ProtocolType, "MQTT Connect", willWait: true);
+            var payload = GetContextPacket<(string Server, bool CleanSession)>(connectId, server, NodeType.Server,
+                _packetManager.PacketToBytes(connect), ProtocolType, new (server, cleanSession), "MQTT Connect", willWait: true);
 
             if (IsConnected)
             {
@@ -118,24 +118,24 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             return result;
         }
 
-        public SessionState CompleteConnect(ResponsePacket<(string Server, bool? CleanSession)> response)
+        public SessionState CompleteConnect(NetworkPacket? response, string server, bool cleanSession = false)
         {
-            var networkPacket = response.Packet;
             //if (response == null)
             //{
-            //    NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref payload);
+            //    NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref null);
             //    throw new MqttException($"Unable connect to broker {server}");
             //}
 
+            if (response == null)
+            {
+                throw new MqttException($"No connack");
+            }
+            var networkPacket = (NetworkPacket)response!;
+
+
             NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref networkPacket);
 
-            OpenClientSession(response.Data.CleanSession ?? false);
-
-
-            //if (response == null)
-            //{
-            //    throw new MqttException($"No connack");
-            //}
+            OpenClientSession(cleanSession);
 
             var connAck = _packetManager.BytesToPacket<ConnectAckPacket>(networkPacket.Payload);
 
@@ -150,6 +150,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             }
 
             _mqttCounters.PacketTypeCounters[connAck.Type].Increment();
+
+            CompleteConnectImplementation(response);
 
             return connAck.SessionPresent ? SessionState.SessionPresent : SessionState.CleanSession;
         }
@@ -192,7 +194,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return;
             }
 
-            var responsePacket = response.Value.Packet;
+            var responsePacket = response.Packet;
 
             var subscribeAck = _packetManager.BytesToPacket<SubscribeAckPacket>(responsePacket.Payload);
 
@@ -272,7 +274,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             throw new NotImplementedException();
         }
 
-        public void CompleteUnsubscribe(ResponsePacket<string> response)
+        public void CompleteUnsubscribe(NetworkPacket? response, string topicFilter)
         {
             throw new NotImplementedException();
         }
@@ -313,7 +315,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         private void ProcessConnectAckFromBroker(NetworkPacket packet, ConnectAckPacket? connectAckPacket)
         {
             var responsePacket = WaitResponse(packet.RequestId!.Value);
-            //CompleteConnect()
+
+            var contextPacket = responsePacket?.Packet as NetworkPacket<(string Server, bool CleanSession)>;
+            CompleteConnect(packet, contextPacket?.TypedContext.Server ?? string.Empty, contextPacket?.TypedContext.CleanSession ?? false);
         }
 
         private void ProcessPublishFromBroker(NetworkPacket packet, PublishPacket? publishPacket)
@@ -489,20 +493,25 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             return true;
         }
 
-        public void CompleteSubscribe(ResponsePacket<(string TopicFilter, MqttQos Qos)> response)
+        public void CompleteSubscribe(NetworkPacket? response, string topicFilter, MqttQos qos)
         {
-            var responsePacket = response.Packet;
+            if (response == null)
+            {
+                //No Subscribe Ack (timeout)
+                return;
+            }
 
-            var subscribeAck = _packetManager.BytesToPacket<SubscribeAckPacket>(responsePacket.Payload);
+
+            var subscribeAck = _packetManager.BytesToPacket<SubscribeAckPacket>(response.Payload);
 
             if (subscribeAck == null)
             {
-                throw new MqttClientException($"Subscription Disconnected: {Id}, {response.Data.TopicFilter}");
+                throw new MqttClientException($"Subscription Disconnected: {Id}, {topicFilter}");
             }
 
             if (subscribeAck.ReturnCodes.FirstOrDefault() == SubscribeReturnCode.Failure)
             {
-                throw new MqttClientException($"Subscription Rejected: {Id}, {response.Data.TopicFilter}");
+                throw new MqttClientException($"Subscription Rejected: {Id}, {topicFilter}");
             }
 
             var session = _sessionRepository.Read(ClientId);
@@ -517,12 +526,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             session.Subscriptions.Add(new ClientSubscription()
             {
                 ClientId = ClientId,
-                MaximumQualityOfService = response.Data.Qos,
-                TopicFilter = response.Data.TopicFilter
+                MaximumQualityOfService = qos,
+                TopicFilter = topicFilter
             });
 
 
-            NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref responsePacket!);
+            NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref response!);
         }
     }
 }

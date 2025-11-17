@@ -4,6 +4,7 @@ using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using static System.Formats.Asn1.AsnWriter;
 
 public class NetworkLogger : INetworkLogger
 {
@@ -109,7 +110,15 @@ public class NetworkLogger : INetworkLogger
     }
 
 
-    public void Push(long tick, NetworkPacket packet, NetworkLoggerType type, string message,
+    public void Push<TContext>(long tick, NetworkPacket<TContext> packet, NetworkLoggerType type, string message,
+        string protocol, string? category, NetworkLoggerScope? scope = null)
+    {
+        Push(tick, packet.From,
+            packet.FromType, packet.To, packet.ToType, packet.Payload,
+            type, message, protocol, category, packet.Scope ?? scope, packet.Ttl);
+    }
+
+    public void Push(long tick, NetworkPacket packet, NetworkLoggerType type, string message, 
         string protocol, string? category, NetworkLoggerScope? scope = null)
     {
         Push(tick, packet.From,
@@ -140,7 +149,7 @@ public class NetworkLogger : INetworkLogger
         return scopeItem!;
     }
 
-    public void BeginScope(long tick, ref NetworkPacket packet, string scope)
+    public void BeginScope<TContext>(long tick, ref NetworkPacket<TContext> packet, string scope)
     {
         if (!_scopesEnabled) return;
 
@@ -179,7 +188,7 @@ public class NetworkLogger : INetworkLogger
         return;
     }
 
-    public void EndScope(long tick, ref NetworkPacket packet)
+    public void EndScope<TContext>(long tick, ref NetworkPacket<TContext> packet)
     {
         if (!_scopesEnabled) return;
 
@@ -272,5 +281,65 @@ public class NetworkLogger : INetworkLogger
         return _countersByMonitoringType
             .Select((v, i) => new KeyValuePair<NetworkLoggerType, long>((NetworkLoggerType)i, v))
             .ToImmutableDictionary();
+    }
+
+    public void BeginScope(long tick, ref NetworkPacket packet, string scope)
+    {
+        if (!_scopesEnabled) return;
+
+        if (packet.Scope == null)
+        {
+            var newScope = BeginScope(tick, scope, null);
+
+            if (newScope == null) return;
+
+            newScope.Source = packet.From;
+            newScope.Destination = packet.To;
+            packet = packet with
+            {
+                Scope = newScope
+            };
+            return;
+        }
+
+        var existingScope = packet.Scope;
+
+        if (existingScope == null)
+        {
+            existingScope = BeginScope(tick, scope, null);
+            packet = packet with
+            {
+                Scope = existingScope
+            };
+            return;
+        }
+
+        var linkedScope = BeginScope(tick, scope, existingScope);
+        packet = packet with
+        {
+            Scope = linkedScope
+        };
+        return;
+    }
+
+    public void EndScope(long tick, ref NetworkPacket packet)
+    {
+        if (!_scopesEnabled) return;
+
+        if (packet.Scope == null)
+        {
+            return;
+        }
+
+        var scope = packet.Scope;
+        if (scope != null)
+        {
+            EndScope(tick, scope!);
+        }
+        packet = packet with
+        {
+            Scope = scope?.Parent
+        };
+        return;
     }
 }

@@ -7,15 +7,14 @@ namespace EntityFX.MqttY.Contracts.Mqtt
     {
         bool BeginConnect(string server, bool cleanSession = false);
 
-        SessionState CompleteConnect(ResponsePacket<(string Server, bool? CleanSession)> response);
+        SessionState CompleteConnect(NetworkPacket? response, string server, bool cleanSession = false);
 
         bool BeginSubscribe(string topicFilter, MqttQos qos);
 
-        void CompleteSubscribe(ResponsePacket<(string TopicFilter, MqttQos Qos)> response);
+        void CompleteSubscribe(NetworkPacket? response, string topicFilter, MqttQos qos);
 
         bool BeginUnsubscribe(string topicFilter);
 
-        void CompleteUnsubscribe(ResponsePacket<string> response);
+        void CompleteUnsubscribe(NetworkPacket? response, string topicFilter);
     }
-
 }

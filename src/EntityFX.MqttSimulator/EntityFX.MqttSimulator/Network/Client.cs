@@ -53,7 +53,7 @@ public class Client : Node, IClient
 
     public bool CompleteConnect(ResponsePacket response)
     {
-        return CompleteConnectImplementation(response);
+        return CompleteConnectImplementation(response.Packet);
     }
 
     protected NetworkPacket? ConnectImplementation(string server, NetworkPacket connectPacket)
@@ -97,7 +97,7 @@ public class Client : Node, IClient
             return null;
         }
 
-        var responsePacket = response.Value.Packet;
+        var responsePacket = response.Packet;
 
         NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref responsePacket!);
 
@@ -144,9 +144,9 @@ public class Client : Node, IClient
         return true;
     }
 
-    protected bool CompleteConnectImplementation(ResponsePacket response)
+    protected bool CompleteConnectImplementation(NetworkPacket response)
     {
-        var responsePacket = response.Packet;
+        var responsePacket = response;
 
         NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref responsePacket!);
 

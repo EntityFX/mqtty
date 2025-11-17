@@ -62,7 +62,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                     ProcessToClientPublishAck(packet, _packetManager.BytesToPacket<PublishAckPacket>(packet.Payload));
                     break;
                 case MqttPacketType.Connect:
-                    ProcessConnect(packet, _packetManager.BytesToPacket<ConnectPacket>(packet.Payload));
+                    var contextPacket = packet as NetworkPacket<(string Server, bool CleanSession)>;
+                    ProcessConnect(packet, _packetManager.BytesToPacket<ConnectPacket>(packet.Payload), contextPacket?.TypedContext);
                     break;
                 case MqttPacketType.Disconnect:
                     break;
@@ -313,7 +314,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             return true;
         }
 
-        private bool ProcessConnect(NetworkPacket packet, ConnectPacket? connectPacket)
+        private bool ProcessConnect(NetworkPacket packet, ConnectPacket? connectPacket, (string Server, bool CleanSession)? context)
         {
             if (connectPacket == null) return false;
 
@@ -337,8 +338,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var sessionPresent = connectPacket.CleanSession ? false : session != null;
 
             var connecktAck = new ConnectAckPacket(MqttConnectionStatus.Accepted, sessionPresent);
-            var packetPayload = GetPacket(Guid.NewGuid(), clientId, NodeType.Client, 
-                _packetManager.PacketToBytes(connecktAck), ProtocolType, "MQTT ConnAck", packet.Id);
+            var packetPayload = context != null ? GetContextPacket(Guid.NewGuid(), clientId, NodeType.Client, 
+                _packetManager.PacketToBytes(connecktAck), ProtocolType, context.Value, "MQTT ConnAck", packet.Id) : 
+                GetPacket(Guid.NewGuid(), clientId, NodeType.Client,
+                    _packetManager.PacketToBytes(connecktAck), ProtocolType, "MQTT ConnAck", packet.Id);
 
             NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send,
                 $"Send MQTT connect ack {packet.From} to {packet.To} with Status={connecktAck.Status}", ProtocolType, "MQTT ConnAck");

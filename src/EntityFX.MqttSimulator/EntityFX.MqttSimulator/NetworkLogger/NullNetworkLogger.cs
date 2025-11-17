@@ -19,11 +19,19 @@ public class NullNetworkLogger : INetworkLogger
     {
     }
 
+    public void BeginScope<TContext>(long tick, ref NetworkPacket<TContext> packet, string scope)
+    {
+    }
+
     public void EndScope(long tick, ref NetworkPacket packet)
     {
     }
 
     public void EndScope(long tick, NetworkLoggerScope? scope)
+    {
+    }
+
+    public void EndScope<TContext>(long tick, ref NetworkPacket<TContext> packet)
     {
     }
 
@@ -51,6 +59,10 @@ public class NullNetworkLogger : INetworkLogger
     }
 
     public void Push(long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
+    {
+    }
+
+    public void Push<TContext>(long tick, NetworkPacket<TContext> packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null)
     {
     }
 }

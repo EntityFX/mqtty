@@ -80,6 +80,15 @@ public abstract class NodeBase : ISender
             WillWait = willWait
         };
 
+    protected NetworkPacket<TContext> GetContextPacket<TContext>(Guid guid, string to, NodeType toType, byte[] payload,
+        string protocol, TContext context, string? category = null, Guid? requestId = null, bool willWait = false)
+        => new NetworkPacket<TContext>(guid, requestId, Name, to, NodeType, toType,
+            payload, protocol, 0, willWait, category, TypedContext: context)
+        {
+            Id = guid,
+            RequestId = requestId,
+            WillWait = willWait
+        };
 
     //Здесь обновляем время ождидания и триггерим ManualResetEventSlim
     public virtual void Refresh()
