@@ -336,11 +336,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             }
 
             var sessionPresent = connectPacket.CleanSession ? false : session != null;
-
+            var clientName = packet.From;
             var connecktAck = new ConnectAckPacket(MqttConnectionStatus.Accepted, sessionPresent);
-            var packetPayload = context != null ? GetContextPacket(Guid.NewGuid(), clientId, NodeType.Client, 
+            var packetPayload = context != null ? GetContextPacket(Guid.NewGuid(), clientName, NodeType.Client, 
                 _packetManager.PacketToBytes(connecktAck), ProtocolType, context.Value, "MQTT ConnAck", packet.Id) : 
-                GetPacket(Guid.NewGuid(), clientId, NodeType.Client,
+                GetPacket(Guid.NewGuid(), clientName, NodeType.Client,
                     _packetManager.PacketToBytes(connecktAck), ProtocolType, "MQTT ConnAck", packet.Id);
 
             NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send,

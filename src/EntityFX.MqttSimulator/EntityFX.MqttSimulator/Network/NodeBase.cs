@@ -71,23 +71,23 @@ public abstract class NodeBase : ISender
     }
 
     protected NetworkPacket GetPacket(Guid guid, string to, NodeType toType, byte[] payload,
-        string protocol, string? category = null, Guid? requestId = null, bool willWait = false)
+        string protocol, string? category = null, Guid? requestId = null, int delayTicks = 0)
         => new NetworkPacket(guid, requestId, Name, to, NodeType, toType, 
-            payload, protocol, 0, willWait, category)
+            payload, protocol, 0, delayTicks, category)
         {
             Id = guid,
             RequestId = requestId,
-            WillWait = willWait
+            DelayTicks = delayTicks
         };
 
     protected NetworkPacket<TContext> GetContextPacket<TContext>(Guid guid, string to, NodeType toType, byte[] payload,
-        string protocol, TContext context, string? category = null, Guid? requestId = null, bool willWait = false)
+        string protocol, TContext context, string? category = null, Guid? requestId = null, int delayTicks = 0)
         => new NetworkPacket<TContext>(guid, requestId, Name, to, NodeType, toType,
-            payload, protocol, 0, willWait, category, TypedContext: context)
+            payload, protocol, 0, delayTicks, category, TypedContext: context)
         {
             Id = guid,
             RequestId = requestId,
-            WillWait = willWait
+            DelayTicks = delayTicks
         };
 
     //Здесь обновляем время ождидания и триггерим ManualResetEventSlim

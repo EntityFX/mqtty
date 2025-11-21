@@ -95,7 +95,7 @@ public class NetworkSimulator : INetworkSimulator
             FromType: packet.ToType,
             ToType: packet.FromType,
             Protocol: packet.Protocol,
-            WillWait: packet.WillWait,
+            DelayTicks: packet.DelayTicks,
             HeaderBytes: packet.HeaderBytes,
             Category: category ?? packet.Category,
             Scope: packet.Scope

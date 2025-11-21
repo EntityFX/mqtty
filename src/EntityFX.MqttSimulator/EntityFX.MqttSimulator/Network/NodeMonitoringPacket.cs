@@ -12,17 +12,25 @@ internal class NodeMonitoringPacket
 
     public Guid Id { get; set; }
 
-    public ManualResetEventSlim? ResetEventSlim { get; set; }
+    public ManualResetEventSlim? ReceiveResetEventSlim { get; set; }
 
-    public bool IsSet { get; set; }
+    public bool ReceiveIsSet { get; set; }
 
     public bool IsExpired { get; set; } = false;
 
     internal long WaitTicks => _waitTicks;
 
+    internal long DelayTick { get => _delayTicks; init => _delayTicks = value; }
+
     private long _waitTicks = 600000;
+    private long _delayTicks = 1;
 
     public string Marker { get; set; } = string.Empty;
+
+    internal void ReduceDelayTicks()
+    {
+        Interlocked.Decrement(ref _delayTicks);
+    }
 
     internal void ReduceWaitTicks()
     {
@@ -30,13 +38,13 @@ internal class NodeMonitoringPacket
 
         if (_waitTicks <= 0)
         {
-            ResetEventSlim?.Set();
+            ReceiveResetEventSlim?.Set();
         }
     }
 
     public bool WaitIsSet(TimeSpan timeout)
     {
-        return ResetEventSlim?.Wait(TimeSpan.FromMinutes(1)) ?? false;
+        return ReceiveResetEventSlim?.Wait(TimeSpan.FromMinutes(1)) ?? false;
 
         //var sw = new Stopwatch();
         //sw.Start();

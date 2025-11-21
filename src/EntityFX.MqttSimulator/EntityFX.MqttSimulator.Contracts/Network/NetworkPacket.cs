@@ -10,7 +10,7 @@ namespace EntityFX.MqttY.Contracts.Network
         NodeType FromType, NodeType ToType,
         byte[] Payload, string Protocol,
         int HeaderBytes,
-        bool WillWait,
+        int DelayTicks,
         string? Category = null,
         NetworkLoggerScope? Scope = null, object? Context = default)
     {
@@ -37,10 +37,10 @@ namespace EntityFX.MqttY.Contracts.Network
         NodeType FromType, NodeType ToType,
         byte[] Payload, string Protocol,
         int HeaderBytes,
-        bool WillWait,
+        int DelayTicks,
         string? Category = null,
         NetworkLoggerScope? Scope = null, TContext? TypedContext = default) :
             NetworkPacket(Id, RequestId, From, To, FromType, ToType, Payload, Protocol,
-        HeaderBytes, WillWait, Category, Scope, TypedContext);
+        HeaderBytes, DelayTicks, Category, Scope, TypedContext);
 
 }

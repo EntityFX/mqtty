@@ -135,7 +135,7 @@ public class Network : NodeBase, INetwork
 
         var result = network.Link(this);
 
-        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Link,
+        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Link,
             $"Link network {this.Name} to {network.Name}", "Network", "Link", Scope);
 
         return true;
@@ -156,7 +156,7 @@ public class Network : NodeBase, INetwork
             _linkedNetworks[network.Name] = network;
         }
 
-        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Unlink,
+        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Unlink,
             $"Unlink network {this.Name} from {network.Name}", "Network", "Unlink");
 
         return true;
@@ -252,7 +252,7 @@ public class Network : NodeBase, INetwork
             return new NetworkMonitoringPacket(packet, new Queue<INetwork>(), NetworkPacketType.Local, destionationNode);
         }
 
-        var sourceNode = NetworkSimulator.GetNode(packet.From, packet.FromType);
+        var sourceNode = NetworkSimulator!.GetNode(packet.From, packet.FromType);
 
         var fromNetwork = NetworkSimulator.GetNetworkByNode(packet.From, packet.FromType);
 
@@ -294,7 +294,7 @@ public class Network : NodeBase, INetwork
         }
 
 
-        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
+        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
             $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
         NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
@@ -324,13 +324,13 @@ public class Network : NodeBase, INetwork
 
         if (packet.Ttl == 0)
         {
-            NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Unreachable,
+            NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Unreachable,
                 $"NetworkMonitoringPacket unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope);
             //destination uneachable
             return false;
         }
 
-        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Push,
+        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Push,
             $"Push packet from network {this.Name} to {next.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
 
@@ -379,7 +379,7 @@ public class Network : NodeBase, INetwork
 
 
         _networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
-        Counters.Refresh(NetworkSimulator.TotalTicks);
+        Counters.Refresh(NetworkSimulator!.TotalTicks);
     }
 
 
@@ -388,7 +388,7 @@ public class Network : NodeBase, INetwork
     {
         var result = false;
         var packet = networkPacket.Packet;
-        var scope = NetworkSimulator.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packet!,
+        var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packet!,
             $"Transfer packet {packet.From} to {packet.To}");
 
         if (networkPacket.Type == NetworkPacketType.Local)
@@ -404,7 +404,7 @@ public class Network : NodeBase, INetwork
 
     public INode? FindNode(string address, NodeType type)
     {
-        return NetworkSimulator.GetNode(address, type);
+        return NetworkSimulator!.GetNode(address, type);
     }
 
     public override string ToString()

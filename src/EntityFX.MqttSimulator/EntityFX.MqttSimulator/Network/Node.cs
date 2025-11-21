@@ -33,7 +33,7 @@ public abstract class Node : NodeBase
     {
         foreach (var packet in _monitorMessages.Values.ToArray())
         {
-            packet.ResetEventSlim?.Set();
+            packet.ReceiveResetEventSlim?.Set();
         }
         _monitorMessages.Clear();
     }
@@ -46,7 +46,7 @@ public abstract class Node : NodeBase
 
             if (packet.Value.WaitTicks <= 0)
             {
-                packet.Value.ResetEventSlim?.Set();
+                packet.Value.ReceiveResetEventSlim?.Set();
                 packet.Value.IsExpired = true;
             }
         }
@@ -85,8 +85,8 @@ public abstract class Node : NodeBase
 
         monitorMessage.ResponsePacket = packet;
         monitorMessage.ResponseTick = NetworkSimulator.TotalTicks;
-        monitorMessage.ResetEventSlim?.Set();
-        monitorMessage.IsSet = true;
+        monitorMessage.ReceiveResetEventSlim?.Set();
+        monitorMessage.ReceiveIsSet = true;
 
         return true;
     }
@@ -94,11 +94,6 @@ public abstract class Node : NodeBase
 
     private void PreSend(NetworkPacket packet)
     {
-        if (!packet.WillWait)
-        {
-            return;
-        }
-
         var startTicks = NetworkSimulator.TotalTicks;
 
         //while (NetworkGraph.TotalTicks - startTicks < _networkTypeOption.SendTicks)
@@ -117,7 +112,7 @@ public abstract class Node : NodeBase
             RequestTick = NetworkSimulator.TotalTicks,
             Marker = packet.Category ?? string.Empty,
             Id = packet.Id,
-            ResetEventSlim = new ManualResetEventSlim(false),
+            ReceiveResetEventSlim = new ManualResetEventSlim(false),
         }, (id, packet) => packet);
     }
 

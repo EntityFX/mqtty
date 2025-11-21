@@ -90,16 +90,26 @@ namespace EntityFX.Tests.Integration
             netGlobal.Link(net3Local);
             netGlobal.Link(net4Local);
 
-            var mqc1 = new MqttClient(mqttPacketManager, 0, "mqc1", "mqtt://mqc1.net2.local",
-                "mqtt", "mqtt", "mqc1", tickOptions);
-            net2Local.AddClient(mqc1);
+            var mqc1_net2 = new MqttClient(mqttPacketManager, 0, "mqc1.net2.local", "mqtt://mqc1.net2.local",
+                "mqtt", "mqtt", "mqc1net2", tickOptions);
+            net2Local.AddClient(mqc1_net2);
 
-            var mqs1 = new MqttBroker(mqttPacketManager, mqttTopicEvaluator, 0, "mqs1", "mqtt://mqs1.net4.local",
+            var mqc1_net4 = new MqttClient(mqttPacketManager, 0, "mqc1.net4.local", "mqtt://mqc1.net4.local",
+                "mqtt", "mqtt", "mqc1net4", tickOptions);
+            net4Local.AddClient(mqc1_net4);
+
+            var mqs1_net1 = new MqttBroker(mqttPacketManager, mqttTopicEvaluator, 0, "mqs1.net1.local", "mqtt://mqs1.net1.local",
                 "mqtt", "mqtt", tickOptions);
-            net4Local.AddServer(mqs1);
+            net1Local.AddServer(mqs1_net1);
 
-            graph.AddClient(mqc1);
-            graph.AddServer(mqs1);
+            var mqs1_net3 = new MqttBroker(mqttPacketManager, mqttTopicEvaluator, 0, "mqs1.net3.local", "mqtt://mqs1.net3.local",
+                "mqtt", "mqtt", tickOptions);
+            net3Local.AddServer(mqs1_net3);
+
+            graph.AddClient(mqc1_net2);
+            graph.AddClient(mqc1_net4);
+            graph.AddServer(mqs1_net1);
+            graph.AddServer(mqs1_net3);
 
             graph!.OnError += (sender, e) =>
             {
@@ -109,29 +119,27 @@ namespace EntityFX.Tests.Integration
             var json = JsonSerializer.Serialize(graph, new JsonSerializerOptions() { ReferenceHandler = ReferenceHandler.Preserve });
 
             graph.UpdateRoutes();
-
-            //_ = graph.StartPeriodicRefreshAsync();
         }
 
 
         [TestMethod]
         public void MqttConnectTest()
         {
-            var mqc1 = graph!.GetNode("mqc1", NodeType.Client) as IMqttClient;
+            var mqc1_net2 = graph!.GetNode("mqc1.net2.local", NodeType.Client) as IMqttClient;
+            Assert.IsNotNull(mqc1_net2);
+            mqc1_net2.BeginConnect("mqs1.net3.local", false);
 
-            Assert.IsNotNull(mqc1);
+            var mqc1_net4 = graph!.GetNode("mqc1.net4.local", NodeType.Client) as IMqttClient;
+            Assert.IsNotNull(mqc1_net4);
+            mqc1_net4.BeginConnect("mqs1.net1.local", false);
 
-            mqc1.BeginConnect("mqs1", false);
+            for (int i = 0; i < 7; i++)
+            {
+                graph.RefreshWithCounters();
+            }
 
-            graph.RefreshWithCounters();
-            graph.RefreshWithCounters();
-            graph.RefreshWithCounters();
-            graph.RefreshWithCounters();
-            graph.RefreshWithCounters();
-            graph.RefreshWithCounters();
-            graph.RefreshWithCounters();
-
-            Assert.IsTrue(mqc1.IsConnected);
+            Assert.IsTrue(mqc1_net2.IsConnected);
+            Assert.IsTrue(mqc1_net4.IsConnected);
         }
     }
 }

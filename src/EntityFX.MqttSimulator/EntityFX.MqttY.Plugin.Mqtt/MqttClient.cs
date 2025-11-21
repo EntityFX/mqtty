@@ -44,7 +44,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var connect = new ConnectPacket(ClientId, true);
             var connectId = Guid.NewGuid();
             var payload = GetPacket(connectId, server, NodeType.Server, 
-                _packetManager.PacketToBytes(connect), ProtocolType, "MQTT Connect", willWait: true);
+                _packetManager.PacketToBytes(connect), ProtocolType, "MQTT Connect", delayTicks: 2);
 
             if (IsConnected)
             {
@@ -99,7 +99,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var connect = new ConnectPacket(ClientId, true);
             var connectId = Guid.NewGuid();
             var payload = GetContextPacket<(string Server, bool CleanSession)>(connectId, server, NodeType.Server,
-                _packetManager.PacketToBytes(connect), ProtocolType, new (server, cleanSession), "MQTT Connect", willWait: true);
+                _packetManager.PacketToBytes(connect), ProtocolType, new (server, cleanSession), "MQTT Connect", delayTicks: 2);
 
             if (IsConnected)
             {

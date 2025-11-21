@@ -218,9 +218,11 @@ public class Client : Node, IClient
 
     protected override bool SendImplementation(NetworkPacket packet)
     {
-        var result = Network!.Send(packet);
+        //var result = Network!.Send(packet);
 
-        return result;
+        //Send(packet, result);
+
+        return true;
     }
 
     public bool Send(byte[] payload, string? category = null)
@@ -229,7 +231,7 @@ public class Client : Node, IClient
             new NetworkPacket(
                 Guid.NewGuid(), null,
                 Name, ServerName, NodeType.Client, NodeType.Server, 
-            payload, ProtocolType, HeaderBytes: 0, WillWait: false, category), true);
+            payload, ProtocolType, HeaderBytes: 0, DelayTicks: 0, category), true);
 
         return result;
     }
