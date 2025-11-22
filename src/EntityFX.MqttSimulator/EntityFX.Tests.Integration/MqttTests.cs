@@ -15,28 +15,28 @@ namespace EntityFX.Tests.Integration
     [TestClass]
     public class MqttTests
     {
-        private ServiceProvider? serviceProvider;
-        private NetworkLogger? monitoring;
-        private ConsoleNetworkLoggerProvider? monitoringProvider;
-        private NetworkSimulator? graph;
+        private ServiceProvider? _serviceProvider;
+        private NetworkLogger? _monitoring;
+        private ConsoleNetworkLoggerProvider? _monitoringProvider;
+        private NetworkSimulator? _graph;
 
-        private Exception? testException;
+        private Exception? _testException;
 
         [TestInitialize]
         public void Initialize()
         {
             var pathFinder = new DijkstraPathFinder();
-            monitoring = new NetworkLogger(true, TimeSpan.FromMilliseconds(1), new MonitoringIgnoreOption());
+            _monitoring = new NetworkLogger(true, TimeSpan.FromMilliseconds(1), new MonitoringIgnoreOption());
             var tickOptions = new TicksOptions()
             {
                 NetworkTicks = 2,
                 TickPeriod = TimeSpan.FromMilliseconds(1)
             };
-            graph = new NetworkSimulator(pathFinder, monitoring, tickOptions);
+            _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions);
 
 
-            monitoringProvider = new ConsoleNetworkLoggerProvider(monitoring);
-            monitoringProvider.Start();
+            _monitoringProvider = new ConsoleNetworkLoggerProvider(_monitoring);
+            _monitoringProvider.Start();
 
             var mqttTopicEvaluator = new MqttTopicEvaluator(true);
             var mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
@@ -44,7 +44,7 @@ namespace EntityFX.Tests.Integration
             var network1 = new Network(0, "net1", "net1.local", "eth", new NetworkTypeOption() {
                 NetworkType = "eth", RefreshTicks = 2, SendTicks = 3, Speed = 18750000
             }, tickOptions);
-            graph.AddNetwork(network1);
+            _graph.AddNetwork(network1);
 
             var mqc1 = new MqttClient(mqttPacketManager, 0, "mqc1", "mqtt://mqc1.net1.local",
                 "mqtt", "mqtt", "mqc1", tickOptions);
@@ -54,23 +54,23 @@ namespace EntityFX.Tests.Integration
                 "mqtt", "mqtt", tickOptions);
             network1.AddServer(mqs1);
 
-            graph.AddClient(mqc1);
-            graph.AddServer(mqs1);
+            _graph.AddClient(mqc1);
+            _graph.AddServer(mqs1);
 
-            graph!.OnError += (sender, e) =>
+            _graph!.OnError += (sender, e) =>
             {
-                testException = e;
+                _testException = e;
             };
 
-            var json = JsonSerializer.Serialize(graph, new JsonSerializerOptions() {  ReferenceHandler = ReferenceHandler.Preserve });
+            var json = JsonSerializer.Serialize(_graph, new JsonSerializerOptions() {  ReferenceHandler = ReferenceHandler.Preserve });
 
-            _ = graph.StartPeriodicRefreshAsync();
+            _ = _graph.StartPeriodicRefreshAsync();
         }
 
         [TestMethod]
         public void MqttConnectTest()
         {
-            var mqClient = graph!.GetNode("mqc1", NodeType.Client) as IMqttClient;
+            var mqClient = _graph!.GetNode("mqc1", NodeType.Client) as IMqttClient;
 
             Assert.IsNotNull(mqClient);
 

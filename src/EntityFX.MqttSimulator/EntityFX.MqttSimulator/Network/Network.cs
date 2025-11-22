@@ -19,7 +19,7 @@ public class Network : NodeBase, INetwork
     /// <summary>
     /// TODO: Add max size limit
     /// </summary>
-    private readonly ConcurrentDictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
+    private readonly Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
     private readonly NetworkTypeOption _networkTypeOption;
 
     //private Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
@@ -40,15 +40,15 @@ public class Network : NodeBase, INetwork
             _counters.Counters = new ICounter[]
                 {
                     _networkCounters,
-                    new CounterGroup("Servers")
+                    new CounterGroup(Name, "Servers")
                     {
                         Counters = _servers.Values.ToArray().Select(s =>s.Counters).ToArray()
                     },
-                    new CounterGroup("Clients")
+                    new CounterGroup(Name, "Clients")
                     {
                         Counters = _clients.Values.ToArray().Select(s =>s.Counters).ToArray()
                     },
-                    new CounterGroup("Applications")
+                    new CounterGroup(Name, "Applications")
                     {
                         Counters = _applications.Values.ToArray().Select(s =>s.Counters).ToArray()
                     },
@@ -86,8 +86,8 @@ public class Network : NodeBase, INetwork
     {
         this._networkTypeOption = networkTypeOption;
         this._ticksOptions = ticksOptions;
-        _networkCounters = new NetworkCounters("Network", ticksOptions);
-        _counters = new CounterGroup(Name);
+        _networkCounters = new NetworkCounters(Name, ticksOptions);
+        _counters = new CounterGroup(Name, "Network");
         NetworkType = networkType;
     }
 
@@ -210,8 +210,8 @@ public class Network : NodeBase, INetwork
             networkMonitoringPacket.Type = NetworkPacketType.Local;
         }
 
-        //_monitoringPacketsQueue.Add(networkMonitoringPacket.Packet.Id, networkMonitoringPacket);
-        _monitoringPacketsQueue.AddOrUpdate(networkMonitoringPacket.Packet.Id, networkMonitoringPacket, (g, p) => p);
+        _monitoringPacketsQueue.Add(networkMonitoringPacket.Packet.Id, networkMonitoringPacket);
+        //_monitoringPacketsQueue[networkMonitoringPacket.Packet.Id] = networkMonitoringPacket;
 
         _networkCounters.CountInbound(networkMonitoringPacket.Packet);
     }
@@ -235,8 +235,8 @@ public class Network : NodeBase, INetwork
             return false;
         }
 
-        // _monitoringPacketsQueue.Add(packet.Id, networkPacket);
-        _monitoringPacketsQueue.AddOrUpdate(networkPacket.Packet.Id, networkPacket, (g, p) => p);
+         _monitoringPacketsQueue.Add(packet.Id, networkPacket);
+        //_monitoringPacketsQueue.AddOrUpdate(networkPacket.Packet.Id, networkPacket, (g, p) => p);
 
         _networkCounters.CountInbound(packet);
 

@@ -2,14 +2,17 @@
 {
     public class CounterGroup : ICounter
     {
-        public CounterGroup(string name)
+        public CounterGroup(string name, string groupType)
         {
             Name = name;
+            GroupType = groupType;
         }
 
         public virtual IEnumerable<ICounter> Counters { get; set; } = Enumerable.Empty<ICounter>();
 
-        public string Name { get; init; } = string.Empty;
+        public string Name { get; init; }
+
+        public string GroupType { get; init; }
 
         public object Value => string.Empty;
 
@@ -29,6 +32,14 @@
         public double Average()
         {
             return 0;
+        }
+
+        public void Clear()
+        {
+            foreach (var counter in Counters)
+            {
+                counter.Clear();
+            }
         }
 
         public virtual void Refresh(long totalTicks)

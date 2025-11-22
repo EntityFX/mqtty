@@ -16,8 +16,8 @@ namespace EntityFX.MqttY.Counter
             set => _counters = value.ToList(); 
         }
 
-        public NodeCounters(string name, int historyDepth)
-            : base(name)
+        public NodeCounters(string name, string groupType, int historyDepth)
+            : base(name, groupType)
         {
             SendCounter = new GenericCounter("Send", historyDepth);
             ReceiveCounter = new GenericCounter("Receive", historyDepth);

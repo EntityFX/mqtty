@@ -15,12 +15,12 @@ namespace EntityFX.Tests.Integration
     [TestClass]
     public class MqttConfigurableTests
     {
-        private ServiceProvider? serviceProvider;
-        private NetworkLogger? monitoring;
-        private ConsoleNetworkLoggerProvider? monitoringProvider;
-        private NetworkSimulator? graph;
+        private ServiceProvider? _serviceProvider;
+        private NetworkLogger? _monitoring;
+        private ConsoleNetworkLoggerProvider? _monitoringProvider;
+        private NetworkSimulator? _graph;
 
-        private Exception? testException;
+        private Exception? _testException;
 
         [TestInitialize]
         public void Initialize()
@@ -48,27 +48,27 @@ namespace EntityFX.Tests.Integration
                 .ConfigureMqttServices()
                 .ConfigureServices();
 
-            serviceProvider = serviceCollection.BuildServiceProvider();
+            _serviceProvider = serviceCollection.BuildServiceProvider();
 
 
-            monitoring = new NetworkLogger(false, TimeSpan.FromMilliseconds(0.1), new MonitoringIgnoreOption()
+            _monitoring = new NetworkLogger(false, TimeSpan.FromMilliseconds(0.1), new MonitoringIgnoreOption()
             {
                 Category = new string[] { "Refresh" }
             });
-            monitoringProvider = new ConsoleNetworkLoggerProvider(monitoring);
+            _monitoringProvider = new ConsoleNetworkLoggerProvider(_monitoring);
 
-            monitoringProvider.Start();
+            _monitoringProvider.Start();
 
-            var networkBuilder = serviceProvider?.GetRequiredService<INodesBuilder>();
-            var networkSimulatorBuilder = serviceProvider?.GetRequiredService<INetworkSimulatorBuilder>();
+            var networkBuilder = _serviceProvider?.GetRequiredService<INodesBuilder>();
+            var networkSimulatorBuilder = _serviceProvider?.GetRequiredService<INetworkSimulatorBuilder>();
 
-            graph = new NetworkSimulator(new DijkstraPathFinder(), monitoring!,
+            _graph = new NetworkSimulator(new DijkstraPathFinder(), _monitoring!,
                 new TicksOptions()
                 {
                     ReceiveWaitPeriod = TimeSpan.FromMilliseconds(0.1)
                 });
 
-            networkSimulatorBuilder!.Configure(graph, new NetworkGraphOption()
+            networkSimulatorBuilder!.Configure(_graph, new NetworkGraphOption()
             {
                 Networks = new SortedDictionary<string, NetworkNodeOption>()
                 {
@@ -88,24 +88,24 @@ namespace EntityFX.Tests.Integration
                 }
             });
 
-            graph!.OnError += (sender, e) =>
+            _graph!.OnError += (sender, e) =>
             {
-                testException = e;
+                _testException = e;
             };
 
-            _ = graph.StartPeriodicRefreshAsync();
+            _ = _graph.StartPeriodicRefreshAsync();
 
         }
 
         [TestCleanup]
         public void Cleanup()
         {
-            if (testException != null)
+            if (_testException != null)
             {
-                Assert.Fail(testException.Message);
+                Assert.Fail(_testException.Message);
             }
-            graph.StopPeriodicRefresh();
-            Console.WriteLine(graph!.Counters.Dump());
+            _graph.StopPeriodicRefresh();
+            Console.WriteLine(_graph!.Counters.Dump());
 
 
         }
@@ -113,7 +113,7 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void MqttConnectTest()
         {
-            var mqClient = graph!.GetNode("mqc1", NodeType.Client) as IMqttClient;
+            var mqClient = _graph!.GetNode("mqc1", NodeType.Client) as IMqttClient;
 
             Assert.IsNotNull(mqClient);
 
@@ -125,7 +125,7 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void MqttConnectAndSubscribeTest()
         {
-            var mqClient2 = graph!.GetNode("mqc2", NodeType.Client) as IMqttClient;
+            var mqClient2 = _graph!.GetNode("mqc2", NodeType.Client) as IMqttClient;
 
             Assert.IsNotNull(mqClient2);
 
@@ -136,14 +136,14 @@ namespace EntityFX.Tests.Integration
 
             mqClient2.Subscribe("/test/#", MqttQos.AtLeastOnce);
 
-            graph.Refresh();
+            _graph.Refresh();
         }
 
         [TestMethod]
         public void MqttConnectSubscribeAndPublishTest()
         {
-            var mqClient1 = graph!.GetNode("mqc1", NodeType.Client) as IMqttClient;
-            var mqClient2 = graph!.GetNode("mqc2", NodeType.Client) as IMqttClient;
+            var mqClient1 = _graph!.GetNode("mqc1", NodeType.Client) as IMqttClient;
+            var mqClient2 = _graph!.GetNode("mqc2", NodeType.Client) as IMqttClient;
 
 
 

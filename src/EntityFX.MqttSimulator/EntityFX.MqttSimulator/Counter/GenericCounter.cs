@@ -107,5 +107,14 @@ namespace EntityFX.MqttY.Counter
 
             return _valueHistory.ToArray().Average(v => v.Value);
         }
+
+        public void Clear()
+        {
+            _value = 0;
+            _privateValue = 0;
+            _tickFirstValue = null;
+            _tickPreviousValue = null;
+            _valueHistory.Clear();
+        }
     }
 }

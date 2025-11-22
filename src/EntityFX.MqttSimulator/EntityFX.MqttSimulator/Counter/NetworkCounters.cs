@@ -28,7 +28,7 @@ namespace EntityFX.MqttY.Counter
         public double AvgInboundThroughput { get; private set; }
 
         public NetworkCounters(string name, TicksOptions ticksOptions)
-            : base(name)
+            : base(name, "NetworkCounters")
         {
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
 

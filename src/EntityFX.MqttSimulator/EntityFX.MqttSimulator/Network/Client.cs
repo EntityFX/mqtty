@@ -10,10 +10,7 @@ public class Client : Node, IClient
     public string ProtocolType { get; }
 
     public string Specification { get; private set; } = string.Empty;
-
-
-    public INetwork? Network { get; internal set; }
-
+    
     public override NodeType NodeType => NodeType.Client;
 
     public INode? Parent { get; set; }
@@ -216,14 +213,14 @@ public class Client : Node, IClient
         return Send(packet);
     }
 
-    protected override bool SendImplementation(NetworkPacket packet)
-    {
-        //var result = Network!.Send(packet);
-
-        //Send(packet, result);
-
-        return true;
-    }
+    // protected override bool SendImplementation(NetworkPacket packet)
+    // {
+    //     //var result = Network!.Send(packet);
+    //
+    //     //Send(packet, result);
+    //
+    //     return true;
+    // }
 
     public bool Send(byte[] payload, string? category = null)
     {

@@ -26,8 +26,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
             set => base.Counters = value;
         }
 
-        public MqttCounters(string name, TicksOptions ticksOptions)
-            : base(name)
+        public MqttCounters(string name, string group, TicksOptions ticksOptions)
+            : base(name, group)
         {
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
             _ticksOptions = ticksOptions;

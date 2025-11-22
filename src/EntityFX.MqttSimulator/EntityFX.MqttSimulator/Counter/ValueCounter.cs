@@ -97,6 +97,15 @@ namespace EntityFX.MqttY.Counter
             return avg;
         }
 
+        public void Clear()
+        {
+            _value = default(TValue);
+            _previousValue = default(TValue);
+            _tickFirstValue = null;
+            _tickPreviousValue = null;
+            _valueHistory.Clear(); 
+        }
+
         public override string ToString()
         {
             if (!Value.IsNumericType())

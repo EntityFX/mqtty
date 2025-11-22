@@ -9,7 +9,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
         private GenericCounter _receiveCounter;
 
         public MqttReceiverCounters(string name, int historyDepth)
-            : base(name) 
+            : base(name, "MqttReceiver") 
         {
             _receiveCounter = new GenericCounter("Received", historyDepth);
             _counters.Add(_receiveCounter);

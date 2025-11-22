@@ -2,9 +2,10 @@
 {
     internal class ClientSession : IStorageObject
     {
-        public ClientSession(string clientId, bool clean = false)
+        public ClientSession(string id, string clientId,  bool clean = false)
         {
-            Id = clientId;
+            Id = id;
+            ClientId = clientId;
             Clean = clean;
             Subscriptions = new List<ClientSubscription>();
             PendingMessages = new List<PendingMessage>();
@@ -12,6 +13,8 @@
         }
 
         public string Id { get; }
+        
+        public string ClientId { get; }
 
         public bool Clean { get; }
 

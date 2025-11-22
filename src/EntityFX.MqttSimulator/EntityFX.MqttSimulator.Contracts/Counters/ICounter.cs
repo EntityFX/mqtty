@@ -34,5 +34,7 @@
         void Refresh(long totalTicks);
 
         double Average();
+
+        void Clear();
     }
 }

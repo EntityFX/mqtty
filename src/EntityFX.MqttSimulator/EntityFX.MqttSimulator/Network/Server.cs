@@ -6,8 +6,6 @@ public class Server : Node, IServer
 {
     private readonly Dictionary<string, IClient> _serverClients = new();
 
-    public INetwork? Network { get; internal set; }
-
     public INode? Parent { get; set; }
 
 
@@ -99,9 +97,9 @@ public class Server : Node, IServer
         NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send, 
             $"Send packet {packet.From} to {packet.To}", ProtocolType, "Net Send", scope);
         var result = Network!.Send(packet);
-
+    
         NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
-
+    
         return result;
     }
 

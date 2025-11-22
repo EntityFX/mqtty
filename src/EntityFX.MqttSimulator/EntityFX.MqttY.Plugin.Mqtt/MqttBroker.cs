@@ -35,7 +35,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             this._packetManager = packetManager;
             this._topicEvaluator = mqttTopicEvaluator;
 
-            MqttCounters = new MqttCounters("Mqtt", ticksOptions);
+            MqttCounters = new MqttCounters(Name,"MqttBroker", ticksOptions);
             counters.AddCounter(MqttCounters);
         }
 
@@ -320,17 +320,17 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             var clientId = connectPacket.ClientId ?? string.Empty;
 
-            var session = _sessionRepository.Read(clientId);
+            var session = _sessionRepository.Read(packet.From);
 
             if (connectPacket.CleanSession && session != null)
             {
-                _sessionRepository.Delete(clientId);
+                _sessionRepository.Delete(packet.From);
                 session = null;
             }
 
             if ( session == null)
             {
-                session = new ClientSession(clientId, connectPacket.CleanSession);
+                session = new ClientSession(packet.From, clientId, connectPacket.CleanSession);
 
                 _sessionRepository.Update(session);
             }
