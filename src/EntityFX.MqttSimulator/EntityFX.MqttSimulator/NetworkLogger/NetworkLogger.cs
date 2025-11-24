@@ -39,14 +39,14 @@ public class NetworkLogger : INetworkLogger
         this._ignore = ignore;
     }
 
-    public void Push(long tick, NetworkLoggerType type, string message, string protocol, string? category,
+    public void Push(Guid id, long tick, NetworkLoggerType type, string message, string protocol, string? category,
         NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
-        Push(tick, string.Empty, NodeType.Other, string.Empty, NodeType.Other,
+        Push(id, tick, string.Empty, NodeType.Other, string.Empty, NodeType.Other,
             Array.Empty<byte>(), type, message, protocol, category, scope, ttl, queueLength);
     }
 
-    private void Push(long tick, string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
+    private void Push(Guid id, long tick, string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
         NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
         if (ValidateIgnore(protocol, category))
@@ -55,7 +55,7 @@ public class NetworkLogger : INetworkLogger
         }
 
         var item = new NetworkLoggerItem(
-            Guid.NewGuid(), tick,
+            id, tick,
             TimeSpan.FromTicks(_simulationTickTime.Ticks * tick),
             DateTimeOffset.Now, from,
             fromType, to, toType,
@@ -101,10 +101,10 @@ public class NetworkLogger : INetworkLogger
         return false;
     }
 
-    public void Push(long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message,
+    public void Push(Guid id, long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message,
         string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
-        Push(tick, from.Name,
+        Push(id, tick, from.Name,
             from.NodeType, to.Name, to.NodeType, packet,
             type, message, protocol, category, scope, ttl, queueLength);
     }
@@ -113,7 +113,7 @@ public class NetworkLogger : INetworkLogger
     public void Push<TContext>(long tick, NetworkPacket<TContext> packet, NetworkLoggerType type, string message,
         string protocol, string? category, NetworkLoggerScope? scope = null)
     {
-        Push(tick, packet.From,
+        Push(packet.Id, tick, packet.From,
             packet.FromType, packet.To, packet.ToType, packet.Payload,
             type, message, protocol, category, packet.Scope ?? scope, packet.Ttl);
     }
@@ -121,7 +121,7 @@ public class NetworkLogger : INetworkLogger
     public void Push(long tick, NetworkPacket packet, NetworkLoggerType type, string message, 
         string protocol, string? category, NetworkLoggerScope? scope = null)
     {
-        Push(tick, packet.From,
+        Push(packet.Id, tick, packet.From,
             packet.FromType, packet.To, packet.ToType, packet.Payload,
             type, message, protocol, category, packet.Scope ?? scope, packet.Ttl);
     }

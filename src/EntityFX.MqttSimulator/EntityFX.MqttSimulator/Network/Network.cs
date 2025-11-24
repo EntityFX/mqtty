@@ -19,7 +19,7 @@ public class Network : NodeBase, INetwork
     /// <summary>
     /// TODO: Add max size limit
     /// </summary>
-    private readonly Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
+    private List<NetworkMonitoringPacket> _monitoringPacketsQueue = new();
     private readonly NetworkTypeOption _networkTypeOption;
 
     //private Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
@@ -135,8 +135,8 @@ public class Network : NodeBase, INetwork
 
         var result = network.Link(this);
 
-        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Link,
-            $"Link network {this.Name} to {network.Name}", "Network", "Link", Scope);
+        NetworkSimulator!.Monitoring.Push(Guid.Empty, NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Link,
+            $"Link network {this.Name} <-> {network.Name}", "Network", "Link", Scope);
 
         return true;
     }
@@ -156,7 +156,7 @@ public class Network : NodeBase, INetwork
             _linkedNetworks[network.Name] = network;
         }
 
-        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Unlink,
+        NetworkSimulator!.Monitoring.Push(Guid.Empty, NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Unlink,
             $"Unlink network {this.Name} from {network.Name}", "Network", "Unlink");
 
         return true;
@@ -210,7 +210,7 @@ public class Network : NodeBase, INetwork
             networkMonitoringPacket.Type = NetworkPacketType.Local;
         }
 
-        _monitoringPacketsQueue.Add(networkMonitoringPacket.Packet.Id, networkMonitoringPacket);
+        _monitoringPacketsQueue.Add(networkMonitoringPacket);
         //_monitoringPacketsQueue[networkMonitoringPacket.Packet.Id] = networkMonitoringPacket;
 
         _networkCounters.CountInbound(networkMonitoringPacket.Packet);
@@ -235,7 +235,7 @@ public class Network : NodeBase, INetwork
             return false;
         }
 
-         _monitoringPacketsQueue.Add(packet.Id, networkPacket);
+         _monitoringPacketsQueue.Add(networkPacket);
         //_monitoringPacketsQueue.AddOrUpdate(networkPacket.Packet.Id, networkPacket, (g, p) => p);
 
         _networkCounters.CountInbound(packet);
@@ -249,7 +249,7 @@ public class Network : NodeBase, INetwork
 
         if (destionationNode != null)
         {
-            return new NetworkMonitoringPacket(packet, new Queue<INetwork>(), NetworkPacketType.Local, destionationNode);
+            return new NetworkMonitoringPacket(NetworkSimulator!.TotalTicks, packet, new Queue<INetwork>(), NetworkPacketType.Local, destionationNode);
         }
 
         var sourceNode = NetworkSimulator!.GetNode(packet.From, packet.FromType);
@@ -260,7 +260,8 @@ public class Network : NodeBase, INetwork
 
         if (sourceNode == null || fromNetwork == null || toNetwork == null)
         {
-            return new NetworkMonitoringPacket(packet, new Queue<INetwork>(), NetworkPacketType.Unreachable, null);
+            return new NetworkMonitoringPacket(
+                NetworkSimulator!.TotalTicks, packet, new Queue<INetwork>(), NetworkPacketType.Unreachable, null);
         }
 
         var pathToRemote = NetworkSimulator.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
@@ -268,12 +269,9 @@ public class Network : NodeBase, INetwork
         var pathQueue = new Queue<INetwork>(pathToRemote);
         destionationNode = (toNetwork as Network)?.GetDestinationNode(packet.To!, packet.ToType);
 
-        //var waitTime = _monitoringPacketsQueue.Count <= 5000 ? ticksOptions.NetworkTicks :
-        //        _monitoringPacketsQueue.Count / 5000 * ticksOptions.NetworkTicks;
-
         var waitTime = _networkTypeOption.RefreshTicks;
 
-        return new NetworkMonitoringPacket(packet, pathQueue, NetworkPacketType.Remote, destionationNode)
+        return new NetworkMonitoringPacket(NetworkSimulator!.TotalTicks, packet, pathQueue, NetworkPacketType.Remote, destionationNode)
         {
             WaitTime = waitTime
         };
@@ -294,8 +292,8 @@ public class Network : NodeBase, INetwork
         }
 
 
-        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
-            $"Push packet from network {network.Name} to node {networkPacket.DestionationNode.Name}",
+        NetworkSimulator!.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
+            $"Push packet from network to node: {network.Name} ~> {networkPacket.DestionationNode.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
         NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
 
@@ -308,7 +306,7 @@ public class Network : NodeBase, INetwork
     {
         var packet = networkPacket.Packet;
 
-        if (!networkPacket.Path.Any())
+        if (networkPacket.Path.Count == 0)
         {
             return false;
         }
@@ -324,20 +322,21 @@ public class Network : NodeBase, INetwork
 
         if (packet.Ttl == 0)
         {
-            NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Unreachable,
-                $"NetworkMonitoringPacket unreachable: {packet.From} to {packet.To}", "Network", packet.Category, packet.Scope);
+            NetworkSimulator!.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Unreachable,
+                $"NetworkMonitoringPacket unreachable: {packet.From} => {packet.To}", "Network", packet.Category, packet.Scope);
             //destination uneachable
             return false;
         }
 
-        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Push,
-            $"Push packet from network {this.Name} to {next.Name}",
+        NetworkSimulator!.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Push,
+            $"Push netwok packet:  {this.Name} => {next.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
 
 
         _networkCounters.CountTransfers();
         _networkCounters.CountOutbound(networkPacket.Packet);
-        next.TransferNext(networkPacket);
+        var nextNetworkPacket = networkPacket.Transfer(NetworkSimulator!.TotalTicks);
+        next.TransferNext(nextNetworkPacket);
 
         return true;
     }
@@ -351,32 +350,19 @@ public class Network : NodeBase, INetwork
     public override void Refresh()
     {
 
-        foreach (var pendingPacket in _monitoringPacketsQueue)
+        foreach (var pendingPacket in _monitoringPacketsQueue.ToArray())
         {
-            pendingPacket.Value.ReduceWaitTime();
-            if (pendingPacket.Value.WaitTime > 0)
+            pendingPacket.ReduceWaitTime();
+            if (pendingPacket.WaitTime > 0 || pendingPacket.Released)
             {
                 continue;
             }
-            var result = ProcessTransferPacket(pendingPacket.Value);
-            //if (!result)
-            //{
-            //    pendingPacket.Value.WaitTime = 5;
-            //    continue;
-            //}
-            _monitoringPacketsQueue.Remove(pendingPacket.Key, out var t);
+
+            var result = ProcessTransferPacket(pendingPacket);
+
         }
 
-        //foreach (var pendingPacket in _monitoringPacketsQueue)
-        //{
-        //    if (pendingPacket.Value.WaitTime > 0)
-        //    {
-        //        continue;
-        //    }
-
-        //}
-
-
+        _monitoringPacketsQueue.RemoveAll(p => p.Released);
 
         _networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
         Counters.Refresh(NetworkSimulator!.TotalTicks);
@@ -386,6 +372,9 @@ public class Network : NodeBase, INetwork
     //TODO: need VIRTUAL wait 
     private bool ProcessTransferPacket(NetworkMonitoringPacket networkPacket)
     {
+        networkPacket.WaitTime = 0;
+        networkPacket.Released = true;
+
         var result = false;
         var packet = networkPacket.Packet;
         var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packet!,

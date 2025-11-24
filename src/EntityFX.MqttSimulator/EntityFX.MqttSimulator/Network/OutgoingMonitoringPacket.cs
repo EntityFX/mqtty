@@ -16,6 +16,8 @@ internal class OutgoingMonitoringPacket
     public long DelayTicks { get => _delayTicks; init => _delayTicks = value; }
     
     public long SendTick { get; init; }
+
+    public bool Released { get; set; }
     
     public Guid Id { get; set; }
     

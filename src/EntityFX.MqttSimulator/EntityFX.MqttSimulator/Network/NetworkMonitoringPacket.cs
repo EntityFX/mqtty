@@ -4,8 +4,9 @@ namespace EntityFX.MqttY.Network;
 
 internal class NetworkMonitoringPacket
 {
-    public NetworkMonitoringPacket(Contracts.Network.NetworkPacket packet, Queue<INetwork> path, NetworkPacketType type, ISender? destionationNode)
+    public NetworkMonitoringPacket(long tick, Contracts.Network.NetworkPacket packet, Queue<INetwork> path, NetworkPacketType type, ISender? destionationNode)
     {
+        Tick = tick;
         Packet = packet;
         Path = path;
         Type = type;
@@ -13,9 +14,12 @@ internal class NetworkMonitoringPacket
         Marker = packet.Category ?? string.Empty;
     }
 
+    public long Tick { get; }
     public NetworkPacket Packet { get; }
 
     internal long WaitTime { get => _waitTime; set => _waitTime = value; }
+
+    internal bool Released { get; set; } = false;
 
     private long _waitTime = 2;
 
@@ -27,5 +31,10 @@ internal class NetworkMonitoringPacket
     internal void ReduceWaitTime()
     {
         Interlocked.Decrement(ref _waitTime);
+    }
+
+    public NetworkMonitoringPacket Transfer(long tick)
+    {
+        return new NetworkMonitoringPacket(tick, Packet, Path, Type, DestionationNode);
     }
 }

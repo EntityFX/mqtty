@@ -136,7 +136,7 @@ namespace EntityFX.Tests.Integration
 
             mqClient2.Subscribe("/test/#", MqttQos.AtLeastOnce);
 
-            _graph.Refresh();
+            _graph.Refresh(false);
         }
 
         [TestMethod]

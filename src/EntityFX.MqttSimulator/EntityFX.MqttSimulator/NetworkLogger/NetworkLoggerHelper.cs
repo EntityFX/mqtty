@@ -31,4 +31,14 @@ public static class NetworkLoggerHelper
         return packet.Scope;
     }
 
+    public static string GetMonitoringLine(this NetworkLoggerItem item) => $"{new string(' ', (item.Scope?.Level + 1 ?? 0) * 4)}<{item.Date:O}> " +
+        $"(LogTick={item.Tick}, Time={item.SimulationTime}, {item.Id}) " +
+        $"{{{item.Type}}} " +
+        $"{(!string.IsNullOrEmpty(item.Category) ? $"[Category={item.Category}] " : "")}" +
+        $"{(item.Ttl != null ? $"{{Ttl={item.Ttl}}} " : "")} " +
+        $"{(item.QueueLength != null ? $"{{Queue={item.QueueLength}}} " : "")} " +
+        $"{item.SourceType}[\"{item.From}\"] -> {item.DestinationType}[\"{item.To}\"]" +
+        $"{(item.PacketSize > 0 ? $", NetworkMonitoringPacket Size={item.PacketSize}" : "")}" +
+        $"{(!string.IsNullOrEmpty(item.Message) ? $", Message={item.Message}" : "")}";
+
 }

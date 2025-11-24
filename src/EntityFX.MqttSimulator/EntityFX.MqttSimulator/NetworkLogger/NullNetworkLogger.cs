@@ -50,7 +50,7 @@ public class NullNetworkLogger : INetworkLogger
         return ImmutableDictionary<NetworkLoggerType, long>.Empty;
     }
 
-    public void Push(long tick, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
+    public void Push(Guid id, long tick, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
     }
 
@@ -58,7 +58,7 @@ public class NullNetworkLogger : INetworkLogger
     {
     }
 
-    public void Push(long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
+    public void Push(Guid id, long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
     }
 

@@ -90,18 +90,18 @@ public class Server : Node, IServer
         PacketReceived?.Invoke(this, packet);
     }
 
-    protected override bool SendImplementation(NetworkPacket packet)
-    {
-        var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packet!, 
-            $"Send packet {packet.From} to {packet.To}");
-        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send, 
-            $"Send packet {packet.From} to {packet.To}", ProtocolType, "Net Send", scope);
-        var result = Network!.Send(packet);
+    //protected override bool SendImplementation(NetworkPacket packet)
+    //{
+    //    var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packet!, 
+    //        $"Send packet {packet.From} to {packet.To}");
+    //    NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send, 
+    //        $"Send packet {packet.From} to {packet.To}", ProtocolType, "Net Send", scope);
+    //    var result = Network!.Send(packet);
     
-        NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
+    //    NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
     
-        return result;
-    }
+    //    return result;
+    //}
 
     public void Start()
     {

@@ -249,7 +249,7 @@ public class Client : Node, IClient
     protected override void BeforeReceive(NetworkPacket packet)
     {
         NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Receive, 
-            $"Recieve message from {packet.From} to {packet.To}", ProtocolType, "Net Receive");
+            $"Recieve message: {packet.To} <- {packet.From}", ProtocolType, "Net Receive");
     }
 
     protected override void AfterReceive(NetworkPacket packet) 

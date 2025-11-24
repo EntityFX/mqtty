@@ -246,13 +246,13 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             if (!IsConnected)
             {
-                SaveMessage(publish, ClientId, PendingMessageStatus.PendingToSend);
+                SaveMessage(publish, Name, PendingMessageStatus.PendingToSend);
                 return true;
             }
 
             if (qos > MqttQos.AtMostOnce)
             {
-                SaveMessage(publish, ClientId, PendingMessageStatus.PendingToAcknowledge);
+                SaveMessage(publish, Name, PendingMessageStatus.PendingToAcknowledge);
             }
             _mqttCounters.Increment(publish.Type);
 
@@ -341,11 +341,6 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return;
             }
 
-            if (Name == "mgx11")
-            {
-
-            }
-
             NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Receive, 
                 $"MQTT Client {ClientId} receives Publish message from {packet.From} broker by topic {publishPacket.Topic}", 
                 ProtocolType, "MQTT Publish");
@@ -378,7 +373,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return;
             }
 
-            var session = _sessionRepository.Read(ClientId);
+            var session = _sessionRepository.Read(Name);
 
             if (session == null)
             {

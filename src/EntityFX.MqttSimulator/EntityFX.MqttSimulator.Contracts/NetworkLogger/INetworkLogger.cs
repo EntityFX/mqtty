@@ -19,13 +19,13 @@ namespace EntityFX.MqttY.Contracts.NetworkLogger
 
         IImmutableDictionary<NetworkLoggerType, long> GetCountersByMonitoringType();
 
-        void Push(long tick, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null);
+        void Push(Guid id, long tick, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null);
 
         void Push<TContext>(long tick, NetworkPacket<TContext> packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null);
 
         void Push(long tick, NetworkPacket packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null);
 
-        void Push(long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message, string protocol, string? category,
+        void Push(Guid id, long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message, string protocol, string? category,
             NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null);
 
         NetworkLoggerScope? BeginScope(long tick, string scopeMessage, NetworkLoggerScope? parent = null);

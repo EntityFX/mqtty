@@ -10,7 +10,7 @@ public abstract class Node : NodeBase
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
     private readonly Dictionary<Guid, ResponseMonitoringPacket> _responseMessages = new();
-    private readonly Dictionary<Guid, OutgoingMonitoringPacket> _outgoingMessages = new();
+    private readonly List<OutgoingMonitoringPacket> _outgoingMessages = new();
     private readonly TicksOptions _ticksOptions;
 
     protected NodeCounters counters;
@@ -43,14 +43,17 @@ public abstract class Node : NodeBase
     {
         foreach (var outgoingMonitoringPacket in _outgoingMessages)
         {
-            outgoingMonitoringPacket.Value.ReduceDelayTicks();
+            outgoingMonitoringPacket.ReduceDelayTicks();
 
-            if (outgoingMonitoringPacket.Value.DelayTicks <= 0)
+            if (outgoingMonitoringPacket.DelayTicks <= 0 && !outgoingMonitoringPacket.Released)
             {
-                SendToNetwork(outgoingMonitoringPacket.Value.RequestPacket, outgoingMonitoringPacket.Value.SendTick);
+                SendToNetwork(outgoingMonitoringPacket);
             }
         }
-        
+
+        _outgoingMessages.RemoveAll(o => o.Released);
+
+
         foreach (var packet in _responseMessages)
         {
             packet.Value.ReduceWaitTicks();
@@ -59,19 +62,19 @@ public abstract class Node : NodeBase
         counters.SetQueueLength(_responseMessages.Count);
     }
 
-    private void SendToNetwork(NetworkPacket requestPacket, long sendTick)
+    private void SendToNetwork(OutgoingMonitoringPacket outgoing)
     {
-        _responseMessages[requestPacket.Id] = new ResponseMonitoringPacket()
+        outgoing.Released = true;
+        var packet = outgoing.RequestPacket;
+        _responseMessages[packet.Id] = new ResponseMonitoringPacket()
         {
-            RequestPacket = requestPacket,
-            RequestTick = sendTick,
-            Marker = requestPacket.Category ?? string.Empty,
-            Id = requestPacket.Id
+            RequestPacket = packet,
+            RequestTick = outgoing.SendTick,
+            Marker = packet.Category ?? string.Empty,
+            Id = packet.Id
         };
         
-        _outgoingMessages.Remove(requestPacket.Id);
-        
-        Network?.Send(requestPacket);
+        Network?.Send(packet);
     }
 
     protected override void BeforeSend(NetworkPacket packet)
@@ -118,12 +121,12 @@ public abstract class Node : NodeBase
 
     private void PreSend(NetworkPacket packet)
     {
-        _outgoingMessages[packet.Id] = new OutgoingMonitoringPacket(packet)
+        _outgoingMessages.Add(new OutgoingMonitoringPacket(packet)
         {
             DelayTicks = 2,
             Id = Guid.NewGuid(),
             SendTick = NetworkSimulator!.TotalTicks
-        };
+        });
 
         // if (_responseMessages.ContainsKey(packet.Id))
         // {
