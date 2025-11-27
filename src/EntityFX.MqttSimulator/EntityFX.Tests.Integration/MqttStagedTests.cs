@@ -15,6 +15,7 @@ using EntityFX.MqttY.Plugin.Mqtt.Counter;
 
 namespace EntityFX.Tests.Integration
 {
+
     [TestClass]
     public class MqttStagedTests
     {
