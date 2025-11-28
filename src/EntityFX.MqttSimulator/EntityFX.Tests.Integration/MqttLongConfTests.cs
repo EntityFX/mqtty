@@ -40,13 +40,15 @@ namespace EntityFX.Tests.Integration
             var mqttTopicEvaluator = new MqttTopicEvaluator(true);
             var mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
 
+            var builder = new MqttNetworkBulder(_graph!, mqttPacketManager, mqttTopicEvaluator);
+            var networks = builder.BuildTree(5, 4, 10, 1, tickOptions);
+
         }
 
         [TestMethod]
         public void SimpleCommunicationTest()
         {
-            var builder = new NetworkBulder(_graph!);
-            var networks = builder.BuildTree(5, 4, tickOptions);
+
 
             var plantUmlGraphGenerator = new SimpleGraphMLGenerator();
             var uml = plantUmlGraphGenerator.Generate(_graph!); 
