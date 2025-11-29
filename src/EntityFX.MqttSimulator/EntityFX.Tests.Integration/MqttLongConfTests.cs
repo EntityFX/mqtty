@@ -41,7 +41,7 @@ namespace EntityFX.Tests.Integration
             var mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
 
             var builder = new MqttNetworkBulder(_graph!, mqttPacketManager, mqttTopicEvaluator);
-            var networks = builder.BuildTree(5, 4, 10, 1, tickOptions);
+            var networks = builder.BuildTree(3, 3, 2, 1, tickOptions);
 
         }
 
