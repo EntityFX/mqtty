@@ -1,4 +1,5 @@
-﻿using System.Xml.Linq;
+﻿using System.Globalization;
+using System.Xml.Linq;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Utils;
@@ -6,40 +7,37 @@ using EntityFX.MqttY.Network;
 
 namespace EntityFX.MqttY.Utils;
 
-public class SimpleGraphMLGenerator : IUmlGraphGenerator
+public class SimpleGraphMlGenerator : INetworkGraphFormatter
 {
-    private const string networkNodeFgColor = "#009999";
-    private const string networkNodeBgColor = "#006363";
-    private const string clientNodeFgColor = "#00CC00";
-    private const string clientNodeBgColor = "#008500";
-    private const string serverNodeFgColor = "#A64B00";
-    private const string serverNodeBgColor = "#4BA600";
+    private record NodeColor(byte R, byte G, byte B);
+    
+    private readonly XNamespace _ns = XNamespace.Get("http://graphml.graphdrawing.org/xmlns");
 
-    private readonly XNamespace ns = XNamespace.Get("http://graphml.graphdrawing.org/xmlns");
-
-    public string Generate(INetworkSimulator networkGraph)
+    public string SerializeNetworkGraph(INetworkSimulator networkGraph)
     {
-        var graphmlEl = new XElement(ns + "graphml");
-  
+        var graphmlEl = new XElement(_ns + "graphml");
         var graphMl = new XDocument(graphmlEl);
-        var graphEl = new XElement(ns + "graph");
+        var graphEl = new XElement(_ns + "graph");
+        
+        AddAttributes(graphmlEl);
+        
         graphEl.SetAttributeValue("id", "G");
         graphmlEl.Add(graphEl);
 
         foreach (var network in networkGraph.Networks)
         {
-            AddNode( graphEl, network.Value, "n", networkNodeFgColor, networkNodeBgColor);
+            AddNode( graphEl, network.Value, "n", 100.0m, new NodeColor(154, 150, 229));
         }
 
         foreach (var client in networkGraph.Clients)
         {
-            AddNode(graphEl, client.Value, "c", clientNodeFgColor, clientNodeBgColor);
+            AddNode(graphEl, client.Value, "c", 50.0m, new NodeColor(40, 179, 106));
         }
 
 
         foreach (var server in networkGraph.Servers)
         {
-            AddNode(graphEl, server.Value, "s", serverNodeFgColor, serverNodeBgColor);
+            AddNode(graphEl, server.Value, "s", 70.0m, new NodeColor(249, 119, 67));
         }
 
         var visitedNetworks = new HashSet<string>();
@@ -76,27 +74,60 @@ public class SimpleGraphMLGenerator : IUmlGraphGenerator
 
     private void AddEdge(XElement graphEl, INode source, INetwork target, string sourcePrefix)
     {
-        var edgeEl = new XElement(ns + "edge");
+        var edgeEl = new XElement(_ns + "edge");
         edgeEl.SetAttributeValue("id", $"e{source.Index}_{target.Index}");
         edgeEl.SetAttributeValue("source", $"{sourcePrefix}{source.Index}");
         edgeEl.SetAttributeValue("target", $"n{target!.Index}");
+        
+        edgeEl.Add(BuildDataElement("weight", 1.0));
+        
         graphEl.Add(edgeEl);
     }
 
-    private void AddNode(XElement graphEl, INode node, string nodePrefix, string backColor, string borderColor)
+    private void AddNode(XElement graphEl, INode node, string nodePrefix, decimal size, NodeColor? nodeColor)
     {
-        var nodeEl = new XElement(ns + "node");
-        nodeEl.SetAttributeValue("name", node.Address);
+        var nodeEl = new XElement(_ns + "node");
         nodeEl.SetAttributeValue("id", $"{nodePrefix}{node.Index}");
-        nodeEl.SetAttributeValue("color", borderColor);
-        nodeEl.SetAttributeValue("background", backColor);
-        nodeEl.SetAttributeValue("border", borderColor);
+        nodeEl.Add(BuildDataElement("label", node.Address));
+        nodeEl.Add(BuildDataElement("type", node.NodeType.ToString()));
+        nodeEl.Add(BuildDataElement("size", size.ToString(CultureInfo.InvariantCulture)));
+
+        if (nodeColor != null)
+        {
+            nodeEl.Add(BuildDataElement("r", nodeColor.R.ToString(CultureInfo.InvariantCulture)));
+            nodeEl.Add(BuildDataElement("g", nodeColor.G.ToString(CultureInfo.InvariantCulture)));
+            nodeEl.Add(BuildDataElement("b", nodeColor.B.ToString(CultureInfo.InvariantCulture)));
+        }
 
         graphEl.Add(nodeEl);
     }
 
-    public string GenerateSequence(INetworkLogger monitoring, NetworkLoggerScope monitoringScope)
+    private void AddAttributes(XElement graphml)
     {
-        return string.Empty;
+        graphml.Add(BuildKeyElement("label", "string", "node"));
+        graphml.Add(BuildKeyElement("weight", "double", "edge"));
+        graphml.Add(BuildKeyElement("r", "int", "node"));
+        graphml.Add(BuildKeyElement("g", "int", "node"));
+        graphml.Add(BuildKeyElement("b", "int", "node"));
+        graphml.Add(BuildKeyElement("size", "float", "node"));
+        graphml.Add(BuildKeyElement("type", "string", "node"));
+    }
+
+    private XElement BuildKeyElement(string name, string type, string forElement)
+    {
+        var keyElement = new XElement(_ns + "key");
+        keyElement.SetAttributeValue("attr.name", name);
+        keyElement.SetAttributeValue("attr.type", type);
+        keyElement.SetAttributeValue("for", forElement);
+        keyElement.SetAttributeValue("id", name);
+        return keyElement;
+    }
+    
+    private XElement BuildDataElement(string key, object value)
+    {
+        var keyElement = new XElement(_ns + "data");
+        keyElement.SetAttributeValue("key", key);
+        keyElement.SetValue(value);
+        return keyElement;
     }
 }

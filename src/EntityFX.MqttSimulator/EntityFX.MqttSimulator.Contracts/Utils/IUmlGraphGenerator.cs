@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Network;
+﻿using System.Runtime.Serialization;
+using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 
 namespace EntityFX.MqttY.Contracts.Utils

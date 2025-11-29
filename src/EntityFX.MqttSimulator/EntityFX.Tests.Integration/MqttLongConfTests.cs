@@ -3,7 +3,7 @@ using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
 using EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters;
 using EntityFX.MqttY.Contracts.NetworkLogger;
-using EntityFX.Tests.Integration.Helpers;
+using EntityFX.MqttY.Plugin.Mqtt.Helper;
 using EntityFX.MqttY.Utils;
 
 namespace EntityFX.Tests.Integration
@@ -40,9 +40,12 @@ namespace EntityFX.Tests.Integration
             var mqttTopicEvaluator = new MqttTopicEvaluator(true);
             var mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
 
-            var builder = new MqttNetworkBulder(_graph!, mqttPacketManager, mqttTopicEvaluator);
-            var networks = builder.BuildTree(3, 3, 2, 1, tickOptions);
-
+            var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator);
+            var networks = builder.BuildTree(
+                5, 4, 10, 2, true, tickOptions);
+            
+            // var networks = builder.BuildTree(
+            //     3, 3, 3, 1, true, tickOptions);
         }
 
         [TestMethod]
@@ -50,8 +53,8 @@ namespace EntityFX.Tests.Integration
         {
 
 
-            var plantUmlGraphGenerator = new SimpleGraphMLGenerator();
-            var uml = plantUmlGraphGenerator.Generate(_graph!); 
+            var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
+            var uml = plantUmlGraphGenerator.SerializeNetworkGraph(_graph!); 
         }
 
 
