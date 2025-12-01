@@ -31,6 +31,7 @@ namespace EntityFX.Tests.Integration
         public void Initialize()
         {
             var pathFinder = new DijkstraPathFinder();
+            var pathFinder2 = new DijkstraIndexPathFinder();
             //_monitoring = new NetworkLogger(false, TimeSpan.FromMilliseconds(1), new MonitoringIgnoreOption() { 
             //    Category = new string[] { "Refresh" } });
             _monitoring = new NullNetworkLogger();
@@ -39,7 +40,7 @@ namespace EntityFX.Tests.Integration
                 NetworkTicks = 2,
                 TickPeriod = TimeSpan.FromMilliseconds(1)
             };
-            _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions);
+            _graph = new NetworkSimulator(pathFinder2, _monitoring, tickOptions);
 
 
             _monitoringProvider = new NullNetworkLoggerProvider(_monitoring);
@@ -454,6 +455,7 @@ namespace EntityFX.Tests.Integration
             }
 
 
+            Console.WriteLine(_graph.TotalSteps);
             Console.WriteLine(_graph.Counters.PrintCounters());
         }
 

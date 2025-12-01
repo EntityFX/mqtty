@@ -1,11 +1,12 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using EntityFX.MqttY.Contracts.Network;
-using EntityFX.MqttY.Helper;
-public class DijkstraPathFinder : IPathFinder
+using EntityFX.MqttY.PathFinder;
+
+public class DijkstraIndexPathFinder : IPathFinder
 {
     public INetworkSimulator? NetworkGraph { get; set; }
 
-    private Path<string>[] _paths = new Path<string>[0];
+    private Path<int>[] _paths = new Path<int>[0];
 
     public Dictionary<string, IEnumerable<INetwork>> _pathCache = new Dictionary<string, IEnumerable<INetwork>>();
 
@@ -17,21 +18,21 @@ public class DijkstraPathFinder : IPathFinder
             return;
         }
 
-        var pathsList = new List<Path<string>>();
+        var pathsList = new List<Path<int>>();
         foreach (var source in NetworkGraph.Networks)
         {
             foreach (var destination in source.Value.LinkedNearestNetworks)
             {
-                pathsList.Add(new Path<string>(source.Key, destination.Key) { Cost = 1 });
+                pathsList.Add(new Path<int>(source.Value.Index, destination.Value.Index) { Cost = 1 });
             }
         }
         _paths = pathsList.ToArray();
     }
 
 
-    public IEnumerable<INetwork> GetPathToNetwork(string sourceNetworkAddress, string destinationNetworkAddress)
+    public IEnumerable<INetwork> GetPath(INode source, INode destination)
     {
-        var netPair = $"{sourceNetworkAddress}:{destinationNetworkAddress}";
+        var netPair = $"{source}:{destination}";
         var paths = _pathCache.GetValueOrDefault(netPair);
         if (paths != null)
         {
@@ -43,10 +44,15 @@ public class DijkstraPathFinder : IPathFinder
             return Enumerable.Empty<INetwork>();
         }
 
-        var path = DijkstraEngine.CalculateShortestPathBetween(sourceNetworkAddress, destinationNetworkAddress, _paths);
+        var path = DijkstraEngine.CalculateShortestPathBetween(
+            source.Index, destination.Index, _paths);
 
 
-        var networks = path.Select(p => NetworkGraph.Networks.GetValueOrDefault(p.Destination))
+        //TODO: optimize
+
+
+        var networks = path.Select(p => 
+            NetworkGraph.Networks.Values.FirstOrDefault(n => n.Index == p.Destination))
             .Where(n => n != null).Select(n => n!);
 
 

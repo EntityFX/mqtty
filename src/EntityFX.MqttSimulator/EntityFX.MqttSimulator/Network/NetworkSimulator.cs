@@ -16,6 +16,7 @@ public class NetworkSimulator : INetworkSimulator
     private readonly ConcurrentDictionary<string, INetwork> _networks = new();
 
     private long _tick = 0;
+    private long _step = 0;
 
     private CancellationTokenSource? _cancelTokenSource;
 
@@ -63,6 +64,10 @@ public class NetworkSimulator : INetworkSimulator
         .ToDictionary(k => k.Key.Address, v => (IServer)v.Value).ToImmutableDictionary();
 
     public long TotalTicks => _tick;
+
+    public bool Construction { get; set; }
+
+    public long TotalSteps => _step;
 
     public string GetAddress(string name, string protocolType, string networkAddress)
     {
@@ -168,7 +173,7 @@ public class NetworkSimulator : INetworkSimulator
             if (parallel)
             {
                 ParallelRefreshImplementation(scope);
-            } 
+            }
             else
             {
                 RefreshImplementation(scope);
@@ -319,6 +324,11 @@ public class NetworkSimulator : INetworkSimulator
         Interlocked.Increment(ref _tick);
     }
 
+    public void Step()
+    {
+        Interlocked.Increment(ref _step);
+    }
+
 
     public void StopPeriodicRefresh()
     {
@@ -402,6 +412,10 @@ public class NetworkSimulator : INetworkSimulator
 
     public void UpdateRoutes()
     {
+        if (Construction)
+        {
+            return;
+        }
         PathFinder.Build();
         _counters.WithNetworks(_networks.Values);
     }

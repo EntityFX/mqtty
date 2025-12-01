@@ -11,25 +11,25 @@ public class SimplePathFinder : IPathFinder
 
     }
 
-    public IEnumerable<INetwork> GetPathToNetwork(string sourceNetworkAddress, string destinationNetworkAddress)
+    public IEnumerable<INetwork> GetPath(INode source, INode destination)
     {
         if (NetworkGraph == null)
         {
             return Enumerable.Empty<INetwork>();
         }
 
-        if (!NetworkGraph.Networks.ContainsKey(destinationNetworkAddress))
+        if (!NetworkGraph.Networks.ContainsKey(destination.Name))
         {
             return Enumerable.Empty<INetwork>();
         }
 
-        if (!NetworkGraph.Networks.ContainsKey(sourceNetworkAddress))
+        if (!NetworkGraph.Networks.ContainsKey(source.Name))
         {
             return Enumerable.Empty<INetwork>();
         }
 
         var path = new List<INetwork>();
-        var result = GetPathToNetworkWeighted(sourceNetworkAddress, destinationNetworkAddress);
+        var result = GetPathToNetworkWeighted(source.Name, destination.Name);
         return result;
     }
 

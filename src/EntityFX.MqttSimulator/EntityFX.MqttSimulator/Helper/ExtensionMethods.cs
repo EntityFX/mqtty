@@ -1,6 +1,7 @@
 ﻿namespace EntityFX.MqttY.Helper
 {
     using System.Collections.Generic;
+    using EntityFX.MqttY.PathFinder;
 
     public static class ExtensionMethods
     {

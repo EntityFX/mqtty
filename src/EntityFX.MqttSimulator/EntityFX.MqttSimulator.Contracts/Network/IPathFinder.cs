@@ -1,11 +1,15 @@
 ﻿namespace EntityFX.MqttY.Contracts.Network
 {
-    public interface IPathFinder
+    public interface IPathFinder<TIndexType, TResult>
     {
         INetworkSimulator? NetworkGraph { get; set; }
 
         void Build();
 
-        IEnumerable<INetwork> GetPathToNetwork(string sourceNetworkAddress, string destinationNetworkAddress);
+        IEnumerable<TResult> GetPath(TIndexType source, TIndexType destination);
+    }
+
+    public interface IPathFinder : IPathFinder<INode, INetwork>
+    {
     }
 }

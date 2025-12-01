@@ -1,4 +1,6 @@
-﻿namespace EntityFX.MqttY.Helper
+﻿using EntityFX.MqttY.Helper;
+
+namespace EntityFX.MqttY.PathFinder
 {
 
 
@@ -36,7 +38,7 @@
             paths.SelectMany(p => new T[] { p.Source, p.Destination })           // union source and destinations
                     .Distinct()                                                  // remove duplicates
                     .ToList()                                                    // ToList exposes ForEach
-                    .ForEach(s => shortestPaths.Set(s, Int32.MaxValue));   // add to ShortestPaths with MaxValue cost
+                    .ForEach(s => shortestPaths.Set(s, int.MaxValue));   // add to ShortestPaths with MaxValue cost
 
             // update cost for self-to-self as 0; no path
             shortestPaths.Set(source, 0);
@@ -53,8 +55,8 @@
                 {
                     if (!locationsProcessed.Contains(location))
                     {
-                        if (shortestPaths[location].Key == Int32.MaxValue)
-                            return shortestPaths.ToDictionary(k => k.Key, v => v.Value.Value) 
+                        if (shortestPaths[location].Key == int.MaxValue)
+                            return shortestPaths.ToDictionary(k => k.Key, v => v.Value.Value)
                                 ?? new Dictionary<T, LinkedList<Path<T>>>(); //ShortestPaths[destination].Value;
 
                         locationToProcess = location;
@@ -88,6 +90,4 @@
             //return ShortestPaths[destination].Value;
         }
     }
-
-
 }

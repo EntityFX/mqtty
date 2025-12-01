@@ -5,17 +5,19 @@ using System.Collections.Immutable;
 namespace EntityFX.MqttY.Contracts.Network
 {
     public interface INetworkSimulator : IWithCounters
-    {       
-        public IPathFinder PathFinder { get; }
-        public INetworkLogger Monitoring { get; }
+    {
+        bool Construction { get; set; }
 
-        public IImmutableDictionary<string, INetwork> Networks { get; }
-        public IImmutableDictionary<string, IClient> Clients { get; }
-        public IImmutableDictionary<string, IServer> Servers { get; }
+        IPathFinder PathFinder { get; }
+        INetworkLogger Monitoring { get; }
 
-        public event EventHandler<Exception>? OnError;
+        IImmutableDictionary<string, INetwork> Networks { get; }
+        IImmutableDictionary<string, IClient> Clients { get; }
+        IImmutableDictionary<string, IServer> Servers { get; }
 
-        public event EventHandler<long>? OnRefresh;
+        event EventHandler<Exception>? OnError;
+
+        event EventHandler<long>? OnRefresh;
 
         string GetAddress(string name, string protocolType, string network);
 
@@ -55,7 +57,11 @@ namespace EntityFX.MqttY.Contracts.Network
 
         void Tick();
 
+        void Step();
+
         long TotalTicks { get; }
+
+        long TotalSteps { get; }
 
         void AddCounterValue<TValue>(string name, TValue value)
             where TValue : struct, IEquatable<TValue>;

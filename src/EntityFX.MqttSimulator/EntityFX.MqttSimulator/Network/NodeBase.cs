@@ -1,6 +1,7 @@
 ﻿using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
+using EntityFX.MqttY.Network;
 
 public abstract class NodeBase : ISender
 {
@@ -49,6 +50,7 @@ public abstract class NodeBase : ISender
     {
         BeforeSend(packet);
 
+        NetworkSimulator!.Step();
         var result = SendImplementation(packet);
 
         AfterSend(packet);
@@ -62,7 +64,7 @@ public abstract class NodeBase : ISender
     public bool Receive(NetworkPacket packet)
     {
         BeforeReceive(packet);
-
+        NetworkSimulator!.Step();
         var result = ReceiveImplementation(packet);
 
         AfterReceive(packet);

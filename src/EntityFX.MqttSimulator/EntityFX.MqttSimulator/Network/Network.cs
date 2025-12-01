@@ -212,7 +212,7 @@ public class Network : NodeBase, INetwork
 
         _monitoringPacketsQueue.Add(networkMonitoringPacket);
         //_monitoringPacketsQueue[networkMonitoringPacket.Packet.Id] = networkMonitoringPacket;
-
+        NetworkSimulator!.Step();
         _networkCounters.CountInbound(networkMonitoringPacket.Packet);
     }
 
@@ -264,7 +264,7 @@ public class Network : NodeBase, INetwork
                 NetworkSimulator!.TotalTicks, packet, new Queue<INetwork>(), NetworkPacketType.Unreachable, null);
         }
 
-        var pathToRemote = NetworkSimulator.PathFinder.GetPathToNetwork(fromNetwork.Name, toNetwork.Name);
+        var pathToRemote = NetworkSimulator.PathFinder.GetPath(fromNetwork, toNetwork);
 
         var pathQueue = new Queue<INetwork>(pathToRemote);
         destionationNode = (toNetwork as Network)?.GetDestinationNode(packet.To!, packet.ToType);

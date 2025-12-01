@@ -61,19 +61,19 @@ public class MqttNetworkBuilder
 
         }
 
-        CreateClients(node, namePrefix, clientsPerNode, ticksOptions);
-        CreateServers(node, namePrefix, serversPerNode, ticksOptions);
+        CreateClients(node, clientsPerNode, ticksOptions);
+        CreateServers(node, serversPerNode, ticksOptions);
 
         return node;
     }
 
-    private void CreateServers(Network.Network node, string namePrefix, int serversPerNode, TicksOptions ticksOptions)
+    private void CreateServers(Network.Network node, int serversPerNode, TicksOptions ticksOptions)
     {
         for (int i = 0; i < serversPerNode; i++)
         {
             var ix = _nextId++;
             var name = $"mqb{ix}";
-            var fullName = $"{name}.{namePrefix}";
+            var fullName = $"{name}.{node.Name}";
 
             var address = $"mqtt://{name}";
             var broker = new MqttBroker(mqttPacketManager, mqttTopicEvaluator, ix, fullName, address, "mqtt", "mqtt", ticksOptions);
@@ -82,13 +82,13 @@ public class MqttNetworkBuilder
         }
     }
 
-    private void CreateClients(Network.Network node, string namePrefix, int clientsPerNode, TicksOptions ticksOptions)
+    private void CreateClients(Network.Network node, int clientsPerNode, TicksOptions ticksOptions)
     {
         for(int i = 0;i < clientsPerNode;i++)
         {
             var ix = _nextId++;
             var name = $"mqc{ix}";
-            var fullName = $"{name}.{namePrefix}";
+            var fullName = $"{name}.{node.Name}";
 
             var address = $"mqtt://{name}";
             var client = new MqttClient(mqttPacketManager, ix, fullName, address, "mqtt", "mqtt", name, ticksOptions);

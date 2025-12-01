@@ -1,4 +1,4 @@
-﻿namespace EntityFX.MqttY.Helper
+﻿namespace EntityFX.MqttY.PathFinder
 {
     public class Path<T>
         where T : notnull
