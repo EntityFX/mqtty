@@ -454,8 +454,6 @@ namespace EntityFX.Tests.Integration
                 }
             }
 
-
-            Console.WriteLine(_graph.TotalSteps);
             Console.WriteLine(_graph.Counters.PrintCounters());
         }
 

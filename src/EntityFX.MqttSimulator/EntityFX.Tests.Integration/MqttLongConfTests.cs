@@ -11,12 +11,14 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Counter;
 using EntityFX.MqttY.Plugin.Mqtt.Counter;
+using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
     public class MqttLongConfTests
     {
+        private DijkstraWeightedIndexPathFinder pathFinder;
         private INetworkLogger? _monitoring;
         private TicksOptions tickOptions;
         private INetworkLoggerProvider? _monitoringProvider;
@@ -25,13 +27,15 @@ namespace EntityFX.Tests.Integration
         private Exception? _testException;
 
         private bool IsParallelRefresh = true;
+        private MqttTopicEvaluator mqttTopicEvaluator;
+        private MqttNativePacketManager mqttPacketManager;
 
         [TestInitialize]
         public void Initialize()
         {
             //var pathFinder = new DijkstraPathFinder();
             //var pathFinder2 = new DijkstraIndexPathFinder();
-            var pathFinder3 = new DijkstraWeightedIndexPathFinder();
+            pathFinder = new DijkstraWeightedIndexPathFinder();
 
             _monitoring = new NullNetworkLogger();
             tickOptions = new TicksOptions()
@@ -39,14 +43,14 @@ namespace EntityFX.Tests.Integration
                 NetworkTicks = 2,
                 TickPeriod = TimeSpan.FromMilliseconds(1)
             };
-            _graph = new NetworkSimulator(pathFinder3, _monitoring, tickOptions);
+            _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions);
 
 
             _monitoringProvider = new NullNetworkLoggerProvider(_monitoring);
             _monitoringProvider.Start();
 
-            var mqttTopicEvaluator = new MqttTopicEvaluator(true);
-            var mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
+            mqttTopicEvaluator = new MqttTopicEvaluator(true);
+            mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
 
             var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator);
 
@@ -75,6 +79,38 @@ namespace EntityFX.Tests.Integration
 
             var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
             var uml = plantUmlGraphGenerator.SerializeNetworkGraph(_graph!);
+        }
+
+        [TestMethod]
+        public void BuildRandomTest()
+        {
+            var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions);
+            var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator);
+
+            graph!.Construction = true;
+            var networks = builder.BuildRandomNodesTree(3, 3, (2, 10), (1, 3), true, tickOptions);
+            //var networks = builder.BuildTree(3, 3, 3, 1, true, tickOptions);
+            graph.Construction = false;
+            graph.UpdateRoutes();
+
+            var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
+            var uml = plantUmlGraphGenerator.SerializeNetworkGraph(graph!);
+        }
+
+        [TestMethod]
+        public void BuildChainTest()
+        {
+            var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions);
+            var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator);
+
+            graph!.Construction = true;
+            var networks = builder.BuildChain(3, 10, 5, 2, true, tickOptions);
+            //var networks = builder.BuildTree(3, 3, 3, 1, true, tickOptions);
+            graph.Construction = false;
+            graph.UpdateRoutes();
+
+            var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
+            var uml = plantUmlGraphGenerator.SerializeNetworkGraph(graph!);
         }
 
         [TestMethod]
