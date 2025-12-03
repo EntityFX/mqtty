@@ -43,7 +43,7 @@ namespace EntityFX.MqttY.Contracts.Network
 
         ILeafNode? GetNode(string name, NodeType nodeType);
 
-        NetworkPacket GetReversePacket(NetworkPacket packet, byte[] payload, string? category);
+        INetworkPacket GetReversePacket(INetworkPacket packet, byte[] payload, string? category);
 
         bool Refresh(bool parallel);
 

@@ -11,6 +11,7 @@ namespace EntityFX.MqttY.Counter
 
         private readonly List<ICounter> _counters = new List<ICounter>();
         private readonly ValueCounter<long> _ticksCounter;
+        private readonly ValueCounter<long> _stepsCounter;
         private readonly ValueCounter<TimeSpan> _virtualTimeCounter;
         private readonly ValueCounter<TimeSpan> _realTimeCounter;
         private readonly ValueCounter<TimeSpan> _refreshTimeCounter;
@@ -29,12 +30,14 @@ namespace EntityFX.MqttY.Counter
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
             _ticksOptions = ticksOptions;
 
+            _stepsCounter = new ValueCounter<long>("Steps", ticksOptions.CounterHistoryDepth);
             _ticksCounter = new ValueCounter<long>("Ticks", ticksOptions.CounterHistoryDepth);
             _virtualTimeCounter = new ValueCounter<TimeSpan>("VirtualTime", ticksOptions.CounterHistoryDepth);
             _realTimeCounter = new ValueCounter<TimeSpan>("RealTime", ticksOptions.CounterHistoryDepth);
             _refreshTimeCounter = new ValueCounter<TimeSpan>("RefreshTime", ticksOptions.CounterHistoryDepth);
 
             _counters.AddRange(Counters);
+            _counters.Add(_stepsCounter);
             _counters.Add(_ticksCounter);
             _counters.Add(_virtualTimeCounter);
             _counters.Add(_realTimeCounter);
@@ -44,12 +47,13 @@ namespace EntityFX.MqttY.Counter
             _stopwatch.Start();
         }
 
-        public override void Refresh(long totalTicks)
+        public override void Refresh(long totalTicks, long steps)
         {
             _ticksCounter.Set(totalTicks);
+            _stepsCounter.Set(steps);
             _virtualTimeCounter.Set(_ticksOptions.TickPeriod * totalTicks);
             _realTimeCounter.Set(_stopwatch.Elapsed);
-            base.Refresh(totalTicks);
+            base.Refresh(totalTicks, steps);
         }
 
         public override IEnumerable<ICounter> Counters { 

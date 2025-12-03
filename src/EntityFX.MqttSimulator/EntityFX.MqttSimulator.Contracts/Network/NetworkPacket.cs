@@ -3,7 +3,35 @@ using static System.Formats.Asn1.AsnWriter;
 
 namespace EntityFX.MqttY.Contracts.Network
 {
-    public record NetworkPacket(
+    //public record NetworkPacket(
+    //    Guid Id,
+    //    Guid? RequestId,
+    //    string From, string To,
+    //    NodeType FromType, NodeType ToType,
+    //    byte[] Payload, string Protocol,
+    //    int HeaderBytes,
+    //    int DelayTicks,
+    //    int Ttl = 64,
+    //    string? Category = null,
+    //    NetworkLoggerScope? Scope = null, object? Context = default)
+    //{
+    //    private int ttl = Ttl;
+
+    //    public int Ttl { get => ttl; init => ttl = value; }
+
+    //    public int PacketBytes => HeaderBytes + Payload.Length;
+
+    //    public int DecrementTtl()
+    //    {
+    //        Interlocked.Decrement(ref ttl);
+
+    //        if (ttl < 0) Interlocked.Exchange(ref ttl, 0);
+
+    //        return Ttl;
+    //    }
+    //}
+
+    public record struct NetworkPacket<TContext>(
         Guid Id,
         Guid? RequestId,
         string From, string To,
@@ -11,14 +39,17 @@ namespace EntityFX.MqttY.Contracts.Network
         byte[] Payload, string Protocol,
         int HeaderBytes,
         int DelayTicks,
+        int Ttl = 64,
         string? Category = null,
-        NetworkLoggerScope? Scope = null, object? Context = default)
+        NetworkLoggerScope? Scope = null, TContext? TypedContext = default) : INetworkPacket
     {
-        private int ttl = 64;
+        private int ttl = Ttl;
 
-        public int Ttl => ttl;
+        public int Ttl { get => ttl; init => ttl = value; }
 
         public int PacketBytes => HeaderBytes + Payload.Length;
+
+        public object Context { get => TypedContext; set => TypedContext = (TContext?)value; }
 
         public int DecrementTtl()
         {
@@ -30,17 +61,18 @@ namespace EntityFX.MqttY.Contracts.Network
         }
     }
 
-    public record NetworkPacket<TContext>(
-        Guid Id,
-        Guid? RequestId,
-        string From, string To,
-        NodeType FromType, NodeType ToType,
-        byte[] Payload, string Protocol,
-        int HeaderBytes,
-        int DelayTicks,
-        string? Category = null,
-        NetworkLoggerScope? Scope = null, TContext? TypedContext = default) :
-            NetworkPacket(Id, RequestId, From, To, FromType, ToType, Payload, Protocol,
-        HeaderBytes, DelayTicks, Category, Scope, TypedContext);
+    //public record NetworkPacket<TContext>(
+    //    Guid Id,
+    //    Guid? RequestId,
+    //    string From, string To,
+    //    NodeType FromType, NodeType ToType,
+    //    byte[] Payload, string Protocol,
+    //    int HeaderBytes,
+    //    int DelayTicks,
+    //    int Ttl = 64,
+    //    string? Category = null,
+    //    NetworkLoggerScope? Scope = null, TContext? TypedContext = default) :
+    //        NetworkPacket(Id, RequestId, From, To, FromType, ToType, Payload, Protocol,
+    //    HeaderBytes, DelayTicks, Ttl, Category, Scope, TypedContext);
 
 }

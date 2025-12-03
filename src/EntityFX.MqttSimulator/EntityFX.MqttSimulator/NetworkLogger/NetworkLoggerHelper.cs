@@ -17,14 +17,14 @@ public static class NetworkLoggerHelper
         return packet.Scope;
     }
 
-    public static NetworkLoggerScope? WithBeginScope(this INetworkLogger monitoring, long tick, ref NetworkPacket packet, string message)
+    public static NetworkLoggerScope? WithBeginScope(this INetworkLogger monitoring, long tick, ref INetworkPacket packet, string message)
     {
         monitoring.BeginScope(tick, ref packet, message);
 
         return packet.Scope;
     }
 
-    public static NetworkLoggerScope? WithEndScope(this INetworkLogger monitoring, long tick, ref NetworkPacket packet)
+    public static NetworkLoggerScope? WithEndScope(this INetworkLogger monitoring, long tick, ref INetworkPacket packet)
     {
         monitoring.EndScope(tick, ref packet);
 

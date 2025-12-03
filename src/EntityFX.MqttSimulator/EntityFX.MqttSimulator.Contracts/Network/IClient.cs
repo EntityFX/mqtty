@@ -8,7 +8,7 @@
 
         bool Disconnect();
 
-        event EventHandler<NetworkPacket>? PacketReceived;
+        event EventHandler<INetworkPacket>? PacketReceived;
 
         bool Send(byte[] packet, string? category = null);
     }

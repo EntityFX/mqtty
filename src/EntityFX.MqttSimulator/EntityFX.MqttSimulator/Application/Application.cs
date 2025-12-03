@@ -66,7 +66,7 @@ namespace EntityFX.MqttY.Application
         {
             if (NetworkSimulator == null) return;
 
-            Counters.Refresh(NetworkSimulator.TotalTicks);
+            Counters.Refresh(NetworkSimulator.TotalTicks, NetworkSimulator.TotalSteps);
         }
 
         public virtual void Reset()

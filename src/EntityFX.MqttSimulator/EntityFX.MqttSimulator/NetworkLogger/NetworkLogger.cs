@@ -118,7 +118,7 @@ public class NetworkLogger : INetworkLogger
             type, message, protocol, category, packet.Scope ?? scope, packet.Ttl);
     }
 
-    public void Push(long tick, NetworkPacket packet, NetworkLoggerType type, string message, 
+    public void Push(long tick, INetworkPacket packet, NetworkLoggerType type, string message, 
         string protocol, string? category, NetworkLoggerScope? scope = null)
     {
         Push(packet.Id, tick, packet.From,
@@ -283,7 +283,7 @@ public class NetworkLogger : INetworkLogger
             .ToImmutableDictionary();
     }
 
-    public void BeginScope(long tick, ref NetworkPacket packet, string scope)
+    public void BeginScope(long tick, ref INetworkPacket packet, string scope)
     {
         if (!_scopesEnabled) return;
 
@@ -295,10 +295,7 @@ public class NetworkLogger : INetworkLogger
 
             newScope.Source = packet.From;
             newScope.Destination = packet.To;
-            packet = packet with
-            {
-                Scope = newScope
-            };
+            packet.Scope = newScope;
             return;
         }
 
@@ -307,22 +304,16 @@ public class NetworkLogger : INetworkLogger
         if (existingScope == null)
         {
             existingScope = BeginScope(tick, scope, null);
-            packet = packet with
-            {
-                Scope = existingScope
-            };
+            packet.Scope = existingScope;
             return;
         }
 
         var linkedScope = BeginScope(tick, scope, existingScope);
-        packet = packet with
-        {
-            Scope = linkedScope
-        };
+        packet.Scope = existingScope;
         return;
     }
 
-    public void EndScope(long tick, ref NetworkPacket packet)
+    public void EndScope(long tick, ref INetworkPacket packet)
     {
         if (!_scopesEnabled) return;
 
@@ -336,10 +327,7 @@ public class NetworkLogger : INetworkLogger
         {
             EndScope(tick, scope!);
         }
-        packet = packet with
-        {
-            Scope = scope?.Parent
-        };
+        packet.Scope = scope?.Parent;
         return;
     }
 }

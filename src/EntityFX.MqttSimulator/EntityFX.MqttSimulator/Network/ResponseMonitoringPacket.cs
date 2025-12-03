@@ -4,11 +4,11 @@ namespace EntityFX.MqttY.Network;
 
 internal class ResponseMonitoringPacket
 {
-    public NetworkPacket? RequestPacket { get; set; }
+    public INetworkPacket? RequestPacket { get; set; }
 
     public long RequestTick { get; init; }
 
-    public NetworkPacket? ResponsePacket { get; set; }
+    public INetworkPacket? ResponsePacket { get; set; }
 
     public long? ResponseTick { get; set; }
 

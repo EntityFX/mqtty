@@ -58,9 +58,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
             RefusedPacketTypeCounters[mqttPacketType].Increment();
         }
 
-        public override void Refresh(long totalTicks)
+        public override void Refresh(long totalTicks, long totalSteps)
         {
-            base.Refresh(totalTicks);
+            base.Refresh(totalTicks, totalSteps);
 
             var ticksDiff = totalTicks - _lastTicks;
 

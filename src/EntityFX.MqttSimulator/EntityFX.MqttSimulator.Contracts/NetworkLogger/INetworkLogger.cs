@@ -23,7 +23,7 @@ namespace EntityFX.MqttY.Contracts.NetworkLogger
 
         void Push<TContext>(long tick, NetworkPacket<TContext> packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null);
 
-        void Push(long tick, NetworkPacket packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null);
+        void Push(long tick, INetworkPacket packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null);
 
         void Push(Guid id, long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message, string protocol, string? category,
             NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null);
@@ -32,11 +32,11 @@ namespace EntityFX.MqttY.Contracts.NetworkLogger
 
         void BeginScope<TContext>(long tick, ref NetworkPacket<TContext> packet, string scope);
 
-        void BeginScope(long tick, ref NetworkPacket packet, string scope);
+        void BeginScope(long tick, ref INetworkPacket packet, string scope);
 
         void EndScope<TContext>(long tick, ref NetworkPacket<TContext> packet);
 
-        void EndScope(long tick, ref NetworkPacket packet);
+        void EndScope(long tick, ref INetworkPacket packet);
 
         void EndScope(long tick, NetworkLoggerScope? scope);
 

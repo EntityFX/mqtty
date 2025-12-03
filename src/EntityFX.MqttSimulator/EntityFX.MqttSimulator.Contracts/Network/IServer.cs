@@ -4,7 +4,7 @@
     {
         bool IsStarted { get; }
 
-        event EventHandler<NetworkPacket>? PacketReceived;
+        event EventHandler<INetworkPacket>? PacketReceived;
 
         event EventHandler<IClient>? ClientConnected;
 

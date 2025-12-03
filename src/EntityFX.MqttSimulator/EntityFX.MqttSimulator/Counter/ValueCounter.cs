@@ -24,6 +24,7 @@ namespace EntityFX.MqttY.Counter
         object ICounter.PreviousValue => PreviousValue;
 
         public long LastTicks { get; private set; }
+        public long LastSteps { get; private set; }
 
         public IEnumerable<KeyValuePair<long, TValue>> HistoryValues => _valueHistory;
 
@@ -61,9 +62,10 @@ namespace EntityFX.MqttY.Counter
             _valueHistory = new(historyDepth);
         }
 
-        public void Refresh(long totalTicks)
+        public void Refresh(long totalTicks, long totalSteps)
         {
             LastTicks = totalTicks;
+            LastSteps = totalSteps;
         }
 
         public void Set(TValue value)

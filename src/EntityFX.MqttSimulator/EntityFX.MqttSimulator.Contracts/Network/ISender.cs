@@ -2,8 +2,8 @@
 {
     public interface ISender : INode
     {
-        bool Send(NetworkPacket packet);
+        bool Send(INetworkPacket packet);
 
-        bool Receive(NetworkPacket packet);
+        bool Receive(INetworkPacket packet);
     }
 }

@@ -77,27 +77,27 @@ public abstract class Node : NodeBase
         Network?.Send(packet);
     }
 
-    protected override void BeforeSend(NetworkPacket packet)
+    protected override void BeforeSend(INetworkPacket packet)
     {
         PreSend(packet);
     }
 
-    protected override bool SendImplementation(NetworkPacket packet)
+    protected override bool SendImplementation(INetworkPacket packet)
     {
         return true;
     }
 
-    protected override void AfterSend(NetworkPacket packet)
+    protected override void AfterSend(INetworkPacket packet)
     {
         counters.SendCounter.Increment();
     }
 
-    protected override void AfterReceive(NetworkPacket packet)
+    protected override void AfterReceive(INetworkPacket packet)
     {
         counters.ReceiveCounter.Increment();
     }
 
-    protected override bool ReceiveImplementation(NetworkPacket packet)
+    protected override bool ReceiveImplementation(INetworkPacket packet)
     {
         if (packet.RequestId == null)
         {
@@ -112,14 +112,14 @@ public abstract class Node : NodeBase
         }
 
         monitorMessage.ResponsePacket = packet;
-        monitorMessage.ResponseTick = NetworkSimulator.TotalTicks;
+        monitorMessage.ResponseTick = NetworkSimulator!.TotalTicks;
         monitorMessage.ReceiveIsSet = true;
 
         return true;
     }
 
 
-    private void PreSend(NetworkPacket packet)
+    private void PreSend(INetworkPacket packet)
     {
         _outgoingMessages.Add(new OutgoingMonitoringPacket(packet)
         {

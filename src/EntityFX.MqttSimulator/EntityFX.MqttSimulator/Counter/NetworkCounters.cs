@@ -67,13 +67,13 @@ namespace EntityFX.MqttY.Counter
             _counters.Add(incrementable);
         }
 
-        public void CountInbound(NetworkPacket networkPacket)
+        public void CountInbound(INetworkPacket networkPacket)
         {
             _inboundPacketsCounter!.Increment();
             _inboundCounter!.Add(networkPacket.PacketBytes);
         }
 
-        public void CountOutbound(NetworkPacket networkPacket)
+        public void CountOutbound(INetworkPacket networkPacket)
         {
             _outboundPacketsCounter!.Increment();
             _outboundCounter!.Add(networkPacket.PacketBytes);
@@ -94,9 +94,9 @@ namespace EntityFX.MqttY.Counter
             _refusedCounter.Increment();
         }
 
-        public override void Refresh(long totalTicks)
+        public override void Refresh(long totalTicks, long steps)
         {
-            base.Refresh(totalTicks);
+            base.Refresh(totalTicks, steps);
 
             var ticksDiff = totalTicks - _lastTicks;
 

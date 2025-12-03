@@ -23,6 +23,8 @@
 
         public long LastTicks { get; private set; }
 
+        public long LastSteps { get; private set; }
+
         public KeyValuePair<long, object> TickPreviousValue => new KeyValuePair<long, object>(0, 0);
 
         public KeyValuePair<long, object>? TickFirstValue { get; }
@@ -42,13 +44,14 @@
             }
         }
 
-        public virtual void Refresh(long totalTicks)
+        public virtual void Refresh(long totalTicks, long totalSteps)
         {
             foreach (var counter in Counters)
             {
-                counter.Refresh(totalTicks);
+                counter.Refresh(totalTicks, totalSteps);
             }
             LastTicks = totalTicks;
+            LastSteps = totalSteps;
         }
 
         public override string ToString()

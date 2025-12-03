@@ -4,7 +4,7 @@ namespace EntityFX.MqttY.Network;
 
 internal class NetworkMonitoringPacket
 {
-    public NetworkMonitoringPacket(long tick, Contracts.Network.NetworkPacket packet, Queue<INetwork> path, NetworkPacketType type, ISender? destionationNode)
+    public NetworkMonitoringPacket(long tick, INetworkPacket packet, Queue<INetwork> path, NetworkPacketType type, ISender? destionationNode)
     {
         Tick = tick;
         Packet = packet;
@@ -15,7 +15,7 @@ internal class NetworkMonitoringPacket
     }
 
     public long Tick { get; }
-    public NetworkPacket Packet { get; }
+    public INetworkPacket Packet { get; }
 
     internal long WaitTime { get => _waitTime; set => _waitTime = value; }
 

@@ -15,7 +15,7 @@ public class NullNetworkLogger : INetworkLogger
         return null;
     }
 
-    public void BeginScope(long tick, ref NetworkPacket packet, string scope)
+    public void BeginScope(long tick, ref INetworkPacket packet, string scope)
     {
     }
 
@@ -23,7 +23,7 @@ public class NullNetworkLogger : INetworkLogger
     {
     }
 
-    public void EndScope(long tick, ref NetworkPacket packet)
+    public void EndScope(long tick, ref INetworkPacket packet)
     {
     }
 
@@ -54,7 +54,7 @@ public class NullNetworkLogger : INetworkLogger
     {
     }
 
-    public void Push(long tick, NetworkPacket packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null)
+    public void Push(long tick, INetworkPacket packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null)
     {
     }
 

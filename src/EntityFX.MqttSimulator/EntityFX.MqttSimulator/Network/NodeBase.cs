@@ -24,16 +24,16 @@ public abstract class NodeBase : ISender
     public abstract CounterGroup Counters { get; set;  }
 
 
-    protected abstract bool ReceiveImplementation(NetworkPacket packet);
+    protected abstract bool ReceiveImplementation(INetworkPacket packet);
 
-    protected abstract bool SendImplementation(NetworkPacket packet);
+    protected abstract bool SendImplementation(INetworkPacket packet);
 
 
-    protected abstract void BeforeReceive(NetworkPacket packet);
-    protected abstract void AfterReceive(NetworkPacket packet);
+    protected abstract void BeforeReceive(INetworkPacket packet);
+    protected abstract void AfterReceive(INetworkPacket packet);
 
-    protected abstract void BeforeSend(NetworkPacket packet);
-    protected abstract void AfterSend(NetworkPacket packet);
+    protected abstract void BeforeSend(INetworkPacket packet);
+    protected abstract void AfterSend(INetworkPacket packet);
 
 
     public NodeBase(int index, string name, string address)
@@ -46,7 +46,7 @@ public abstract class NodeBase : ISender
 
 
     //Создаём ManualResetEventSlim 
-    public bool Send(NetworkPacket packet)
+    public bool Send(INetworkPacket packet)
     {
         BeforeSend(packet);
 
@@ -61,7 +61,7 @@ public abstract class NodeBase : ISender
 
 
     //Добавляем и Снимаем ManualResetEventSlim 
-    public bool Receive(NetworkPacket packet)
+    public bool Receive(INetworkPacket packet)
     {
         BeforeReceive(packet);
         NetworkSimulator!.Step();
@@ -72,10 +72,10 @@ public abstract class NodeBase : ISender
         return result;
     }
 
-    protected NetworkPacket GetPacket(Guid guid, string to, NodeType toType, byte[] payload,
+    protected INetworkPacket GetPacket(Guid guid, string to, NodeType toType, byte[] payload,
         string protocol, string? category = null, Guid? requestId = null, int delayTicks = 0)
-        => new NetworkPacket(guid, requestId, Name, to, NodeType, toType, 
-            payload, protocol, 0, delayTicks, category)
+        => new NetworkPacket<int>(guid, requestId, Name, to, NodeType, toType, 
+            payload, protocol, 0, delayTicks, Category: category)
         {
             Id = guid,
             RequestId = requestId,
@@ -85,7 +85,7 @@ public abstract class NodeBase : ISender
     protected NetworkPacket<TContext> GetContextPacket<TContext>(Guid guid, string to, NodeType toType, byte[] payload,
         string protocol, TContext context, string? category = null, Guid? requestId = null, int delayTicks = 0)
         => new NetworkPacket<TContext>(guid, requestId, Name, to, NodeType, toType,
-            payload, protocol, 0, delayTicks, category, TypedContext: context)
+            payload, protocol, 0, delayTicks, Category: category, TypedContext: context)
         {
             Id = guid,
             RequestId = requestId,
@@ -97,7 +97,7 @@ public abstract class NodeBase : ISender
     {
         if (NetworkSimulator == null) return;
 
-        Counters.Refresh(NetworkSimulator.TotalTicks);
+        Counters.Refresh(NetworkSimulator.TotalTicks, NetworkSimulator.TotalSteps);
     }
 
     public abstract void Reset();

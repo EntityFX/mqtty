@@ -31,7 +31,9 @@
 
         long LastTicks { get; }
 
-        void Refresh(long totalTicks);
+        long LastSteps { get; }
+
+        void Refresh(long totalTicks, long totalSteps);
 
         double Average();
 

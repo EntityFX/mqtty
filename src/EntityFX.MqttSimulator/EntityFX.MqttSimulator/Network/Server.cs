@@ -17,7 +17,7 @@ public class Server : Node, IServer
 
     public string Specification { get; }
 
-    public event EventHandler<NetworkPacket>? PacketReceived;
+    public event EventHandler<INetworkPacket>? PacketReceived;
     public event EventHandler<IClient>? ClientConnected;
     public event EventHandler<string>? ClientDisconnected;
 
@@ -85,7 +85,7 @@ public class Server : Node, IServer
         return true;
     }
 
-    protected virtual void OnReceived(NetworkPacket packet)
+    protected virtual void OnReceived(INetworkPacket packet)
     {
         PacketReceived?.Invoke(this, packet);
     }
@@ -121,29 +121,29 @@ public class Server : Node, IServer
         IsStarted = !result;
     }
 
-    protected override void BeforeReceive(NetworkPacket packet)
+    protected override void BeforeReceive(INetworkPacket packet)
     {
        // NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category);
     }
 
-    protected override void AfterReceive(NetworkPacket packet)
+    protected override void AfterReceive(INetworkPacket packet)
     {
         base.AfterReceive(packet);
     }
 
-    protected override void BeforeSend(NetworkPacket packet)
+    protected override void BeforeSend(INetworkPacket packet)
     {
         base.BeforeSend(packet);
     }
 
-    protected override void AfterSend(NetworkPacket packet)
+    protected override void AfterSend(INetworkPacket packet)
     {
         base.AfterSend(packet);
     }
 
-    protected override bool ReceiveImplementation(NetworkPacket packet)
+    protected override bool ReceiveImplementation(INetworkPacket packet)
     {
-        NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
+        NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
 
         OnReceived(packet);
 

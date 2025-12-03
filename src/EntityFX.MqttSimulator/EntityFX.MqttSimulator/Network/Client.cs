@@ -15,7 +15,7 @@ public class Client : Node, IClient
 
     public INode? Parent { get; set; }
 
-    public event EventHandler<NetworkPacket>? PacketReceived;
+    public event EventHandler<INetworkPacket>? PacketReceived;
 
     protected string ServerName = string.Empty;
 
@@ -53,7 +53,7 @@ public class Client : Node, IClient
         return CompleteConnectImplementation(response.Packet);
     }
 
-    protected NetworkPacket? ConnectImplementation(string server, NetworkPacket connectPacket)
+    protected INetworkPacket? ConnectImplementation(string server, INetworkPacket connectPacket)
     {
         if (Network == null) return null;
 
@@ -105,7 +105,7 @@ public class Client : Node, IClient
         return responsePacket;
     }
 
-    protected bool BeginConnectImplementation(string server, NetworkPacket connectPacket)
+    protected bool BeginConnectImplementation(string server, INetworkPacket connectPacket)
     {
         if (Network == null) return false;
 
@@ -141,7 +141,7 @@ public class Client : Node, IClient
         return true;
     }
 
-    protected bool CompleteConnectImplementation(NetworkPacket response)
+    protected bool CompleteConnectImplementation(INetworkPacket response)
     {
         var responsePacket = response;
 
@@ -205,7 +205,7 @@ public class Client : Node, IClient
     }
 
 
-    protected bool Send(NetworkPacket packet, bool checkConnection)
+    protected bool Send(INetworkPacket packet, bool checkConnection)
     {
         if (checkConnection && !IsConnected)
             throw new InvalidOperationException("Not Connected To server");
@@ -225,15 +225,15 @@ public class Client : Node, IClient
     public bool Send(byte[] payload, string? category = null)
     {
         var result = Send(
-            new NetworkPacket(
+            new NetworkPacket<int>(
                 Guid.NewGuid(), null,
                 Name, ServerName, NodeType.Client, NodeType.Server, 
-            payload, ProtocolType, HeaderBytes: 0, DelayTicks: 0, category), true);
+            payload, ProtocolType, HeaderBytes: 0, DelayTicks: 0, Category: category), true);
 
         return result;
     }
 
-    protected override bool ReceiveImplementation(NetworkPacket packet)
+    protected override bool ReceiveImplementation(INetworkPacket packet)
     {
         var result = base.ReceiveImplementation(packet);
         OnReceived(packet);
@@ -241,28 +241,28 @@ public class Client : Node, IClient
         return result;
     }
 
-    protected virtual void OnReceived(NetworkPacket packet)
+    protected virtual void OnReceived(INetworkPacket packet)
     {
         PacketReceived?.Invoke(this, packet);
     }
 
-    protected override void BeforeReceive(NetworkPacket packet)
+    protected override void BeforeReceive(INetworkPacket packet)
     {
         NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Receive, 
             $"Recieve message: {packet.To} <- {packet.From}", ProtocolType, "Net Receive");
     }
 
-    protected override void AfterReceive(NetworkPacket packet) 
+    protected override void AfterReceive(INetworkPacket packet) 
     {
         base.AfterReceive(packet);
     }
 
-    protected override void BeforeSend(NetworkPacket packet)
+    protected override void BeforeSend(INetworkPacket packet)
     {
         base.BeforeSend(packet);
     }
 
-    protected override void AfterSend(NetworkPacket packet)
+    protected override void AfterSend(INetworkPacket packet)
     {
         base.AfterSend(packet);
     }

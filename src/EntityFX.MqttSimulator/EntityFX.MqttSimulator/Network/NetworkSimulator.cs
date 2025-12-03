@@ -89,9 +89,9 @@ public class NetworkSimulator : INetworkSimulator
         return _nodes[(address, nodeType)];
     }
 
-    public Contracts.Network.NetworkPacket GetReversePacket(Contracts.Network.NetworkPacket packet, byte[] payload, string? category)
+    public INetworkPacket GetReversePacket(INetworkPacket packet, byte[] payload, string? category)
     {
-        return new Contracts.Network.NetworkPacket(
+        return new NetworkPacket<int>(
             Id: Guid.NewGuid(),
             RequestId: packet.Id,
             To: packet.From,
@@ -195,7 +195,7 @@ public class NetworkSimulator : INetworkSimulator
         Tick();
         var bytes = Array.Empty<byte>();
 
-        _counters.Refresh(TotalTicks);
+        _counters.Refresh(TotalTicks, _step);
 
         Parallel.ForEach(_networks, network =>
         {
@@ -219,7 +219,7 @@ public class NetworkSimulator : INetworkSimulator
         Tick();
         var bytes = Array.Empty<byte>();
 
-        _counters.Refresh(TotalTicks);
+        _counters.Refresh(TotalTicks, _step);
 
         foreach (var network in _networks)
         {

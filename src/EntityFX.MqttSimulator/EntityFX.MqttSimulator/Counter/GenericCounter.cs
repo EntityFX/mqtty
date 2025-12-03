@@ -23,6 +23,8 @@ namespace EntityFX.MqttY.Counter
 
         public long LastTicks { get; private set; }
 
+        public long LastSteps { get; private set; }
+
         public IEnumerable<KeyValuePair<long, long>> HistoryValues => 
             _valueHistory;
 
@@ -96,9 +98,10 @@ namespace EntityFX.MqttY.Counter
             return $"{Name}={stringValue}";
         }
 
-        public void Refresh(long totalTicks)
+        public void Refresh(long totalTicks, long totalSteps)
         {
             LastTicks = totalTicks;
+            LastSteps = totalSteps;
         }
 
         public double Average()

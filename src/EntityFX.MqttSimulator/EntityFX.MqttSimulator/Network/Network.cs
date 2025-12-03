@@ -212,14 +212,13 @@ public class Network : NodeBase, INetwork
 
         _monitoringPacketsQueue.Add(networkMonitoringPacket);
         //_monitoringPacketsQueue[networkMonitoringPacket.Packet.Id] = networkMonitoringPacket;
-        NetworkSimulator!.Step();
         _networkCounters.CountInbound(networkMonitoringPacket.Packet);
     }
 
     //TODO: If queue limit is exceeded then reject Send
     //bool?
     //timeout?
-    protected override bool SendImplementation(NetworkPacket packet)
+    protected override bool SendImplementation(INetworkPacket packet)
     {
         var networkPacket = GetNetworkPacketType(packet);
 
@@ -243,7 +242,7 @@ public class Network : NodeBase, INetwork
         return true;
     }
 
-    private NetworkMonitoringPacket GetNetworkPacketType(NetworkPacket packet)
+    private NetworkMonitoringPacket GetNetworkPacketType(INetworkPacket packet)
     {
         var destionationNode = GetDestinationNode(packet.To!, packet.ToType);
 
@@ -341,7 +340,7 @@ public class Network : NodeBase, INetwork
         return true;
     }
 
-    protected override bool ReceiveImplementation(NetworkPacket packet)
+    protected override bool ReceiveImplementation(INetworkPacket packet)
     {
         return true;
     }
@@ -365,7 +364,8 @@ public class Network : NodeBase, INetwork
         _monitoringPacketsQueue.RemoveAll(p => p.Released);
 
         _networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
-        Counters.Refresh(NetworkSimulator!.TotalTicks);
+        NetworkSimulator!.Step();
+        Counters.Refresh(NetworkSimulator!.TotalTicks, NetworkSimulator!.TotalSteps);
     }
 
 
@@ -425,19 +425,19 @@ public class Network : NodeBase, INetwork
         return result;
     }
 
-    protected override void BeforeReceive(Contracts.Network.NetworkPacket packet)
+    protected override void BeforeReceive(INetworkPacket packet)
     {
     }
 
-    protected override void AfterReceive(Contracts.Network.NetworkPacket packet)
+    protected override void AfterReceive(INetworkPacket packet)
     {
     }
 
-    protected override void BeforeSend(Contracts.Network.NetworkPacket packet)
+    protected override void BeforeSend(INetworkPacket packet)
     {
     }
 
-    protected override void AfterSend(Contracts.Network.NetworkPacket packet)
+    protected override void AfterSend(INetworkPacket packet)
     {
     }
 

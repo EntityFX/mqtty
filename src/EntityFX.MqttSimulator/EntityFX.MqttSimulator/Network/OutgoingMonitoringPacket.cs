@@ -6,12 +6,12 @@ internal class OutgoingMonitoringPacket
 {
     private long _delayTicks = 1;
     
-    public OutgoingMonitoringPacket(NetworkPacket requestPacket)
+    public OutgoingMonitoringPacket(INetworkPacket requestPacket)
     {
         RequestPacket = requestPacket;
     }
 
-    public NetworkPacket RequestPacket { get; set; }
+    public INetworkPacket RequestPacket { get; set; }
     
     public long DelayTicks { get => _delayTicks; init => _delayTicks = value; }
     

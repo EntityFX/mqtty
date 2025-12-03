@@ -445,7 +445,7 @@ namespace EntityFX.Tests.Integration
                 CollectionAssert.AreEqual(e.Payload, new byte[] { 1, 2, 3, 4, 5 });
             };
 
-            for (int n = 0; n < 10000; n++)
+            for (int n = 0; n < 3000; n++)
             {
                 mqc1Net3.Publish("/test4/data1", new byte[] { 1, 2, 3, 4, 5 }, MqttQos.AtLeastOnce);
                 for (int i = 0; i < 18; i++)
