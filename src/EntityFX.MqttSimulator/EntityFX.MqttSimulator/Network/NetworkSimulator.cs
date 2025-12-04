@@ -69,6 +69,8 @@ public class NetworkSimulator : INetworkSimulator
 
     public long TotalSteps => _step;
 
+    public bool WaitMode { get; private set; }
+
     public string GetAddress(string name, string protocolType, string networkAddress)
     {
         return $"{protocolType}://{name}.{networkAddress}";
@@ -285,7 +287,7 @@ public class NetworkSimulator : INetworkSimulator
         _cancelTokenSource = new CancellationTokenSource();
 
         _timer = new Timer(Refreshed, this, 0, 1000);
-
+        WaitMode = true;
         return Task.Run(() =>
         {
             bool refreshResult = true;
@@ -294,6 +296,7 @@ public class NetworkSimulator : INetworkSimulator
             {
                 if (_cancelTokenSource.Token.IsCancellationRequested)
                 {
+                    WaitMode = false;
                     return;
                 }
                 _counters.StartRefresh();
@@ -308,6 +311,7 @@ public class NetworkSimulator : INetworkSimulator
                     _cancelTokenSource.Cancel();
 
                     OnError?.Invoke(this, SimulationException!);
+                    WaitMode = false;
                     break;
                 }
             }

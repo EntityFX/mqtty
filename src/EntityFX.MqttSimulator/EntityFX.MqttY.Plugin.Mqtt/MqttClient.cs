@@ -43,8 +43,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         {
             var connect = new ConnectPacket(ClientId, true);
             var connectId = Guid.NewGuid();
-            var payload = GetPacket(connectId, server, NodeType.Server,
-                _packetManager.PacketToBytes(connect), ProtocolType, "MQTT Connect", delayTicks: 2);
+            var payload = GetContextPacket<(string Server, bool CleanSession)>(
+                connectId, server, NodeType.Server,
+                _packetManager.PacketToBytes(connect), ProtocolType, new(server, cleanSession),
+                "MQTT Connect", delayTicks: 2);
 
             if (IsConnected)
             {
@@ -168,7 +170,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var packetId = _packetIdProvider.GetPacketId();
             var subscribe = new SubscribePacket(packetId, new[] { new Subscription(topicFilter, qos) });
             var subscribeId = Guid.NewGuid();
-            var payload = GetPacket(subscribeId, ServerName, NodeType.Server, _packetManager.PacketToBytes(subscribe), ProtocolType, "MQTT Subscribe");
+
+            var payload = GetContextPacket<(string TopicFilter, MqttQos Qos)>(
+                subscribeId, ServerName, NodeType.Server,
+                _packetManager.PacketToBytes(subscribe), ProtocolType, new(topicFilter, qos),
+                "MQTT Subscribe", delayTicks: 2);
+
             var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref payload!,
                 $"Subscribe {Name} to {payload.To} using topic {topicFilter}");
 
@@ -321,18 +328,14 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         private void ProcessSubscribeAckFromBroker(INetworkPacket packet, SubscribeAckPacket? bytesToPacket)
         {
-            var responsePacket = WaitNoMonitorResponse(packet.RequestId!.Value);
-
-            var contextPacket = (NetworkPacket<(string TopicFilter, MqttQos Qos)>)responsePacket!.Packet;
+            var contextPacket = (NetworkPacket<(string TopicFilter, MqttQos Qos)>)packet;
             CompleteSubscribe(packet, contextPacket.TypedContext.TopicFilter ?? string.Empty,
                 contextPacket.TypedContext.Qos);
         }
 
         private void ProcessConnectAckFromBroker(INetworkPacket packet, ConnectAckPacket? connectAckPacket)
         {
-            var responsePacket = WaitNoMonitorResponse(packet.RequestId!.Value);
-
-            var contextPacket = (NetworkPacket<(string Server, bool CleanSession)>)responsePacket!.Packet;
+            var contextPacket = (NetworkPacket<(string Server, bool CleanSession)>)packet;
             CompleteConnect(packet, contextPacket.TypedContext.Server ?? string.Empty, contextPacket.TypedContext.CleanSession);
         }
 

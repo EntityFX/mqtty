@@ -8,6 +8,8 @@ namespace EntityFX.MqttY.Contracts.Network
     {
         bool Construction { get; set; }
 
+        bool WaitMode { get; }
+
         IPathFinder PathFinder { get; }
         INetworkLogger Monitoring { get; }
 

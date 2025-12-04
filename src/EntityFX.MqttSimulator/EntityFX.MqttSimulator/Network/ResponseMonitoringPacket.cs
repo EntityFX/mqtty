@@ -13,9 +13,11 @@ internal class ResponseMonitoringPacket
     public long? ResponseTick { get; set; }
 
     public Guid Id { get; set; }
+
+    public bool WaitMode { get; }
     
 
-    public bool ReceiveIsSet { get; internal set; }
+    public bool ReceiveIsSet { get; private set; }
 
     public bool IsExpired { get; private set; } = false;
 
@@ -24,6 +26,12 @@ internal class ResponseMonitoringPacket
     private long _waitTicks = 600000;
 
     public string Marker { get; set; } = string.Empty;
+    public ManualResetEventSlim ResetEventSlim { get; private set; } = new ManualResetEventSlim(false);
+
+    public ResponseMonitoringPacket(bool waitMode)
+    {
+        WaitMode = waitMode;
+    }
 
     internal void ReduceWaitTicks()
     {
@@ -37,11 +45,17 @@ internal class ResponseMonitoringPacket
 
     public bool WaitIsSet(TimeSpan timeSpan)
     {
-        while (!ReceiveIsSet)
+        var isSet = ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
+
+        return isSet ?? false;
+    }
+
+    public void Receive()
+    {
+        ReceiveIsSet = true;
+        if (WaitMode)
         {
-            Thread.Sleep(1);
+            ResetEventSlim.Set();
         }
-        
-        return ReceiveIsSet;
     }
 }

@@ -31,7 +31,7 @@ namespace EntityFX.Tests.Integration
         public void Initialize()
         {
             var pathFinder = new DijkstraPathFinder();
-            var pathFinder2 = new DijkstraIndexPathFinder();
+            var pathFinder2 = new DijkstraWeightedIndexPathFinder();
             //_monitoring = new NetworkLogger(false, TimeSpan.FromMilliseconds(1), new MonitoringIgnoreOption() { 
             //    Category = new string[] { "Refresh" } });
             _monitoring = new NullNetworkLogger();

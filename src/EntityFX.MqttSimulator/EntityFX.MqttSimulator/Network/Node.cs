@@ -23,7 +23,7 @@ public abstract class Node : NodeBase
             counters = (NodeCounters)value;
         }
     }
-    
+
     public INetwork? Network { get; internal set; }
 
     public Node(int index, string name, string address,
@@ -41,7 +41,8 @@ public abstract class Node : NodeBase
 
     public override void Refresh()
     {
-        foreach (var outgoingMonitoringPacket in _outgoingMessages)
+        var outgoing = _outgoingMessages.ToArray();
+        foreach (var outgoingMonitoringPacket in outgoing)
         {
             outgoingMonitoringPacket.ReduceDelayTicks();
 
@@ -64,16 +65,16 @@ public abstract class Node : NodeBase
 
     private void SendToNetwork(OutgoingMonitoringPacket outgoing)
     {
-        outgoing.Released = true;
         var packet = outgoing.RequestPacket;
-        _responseMessages[packet.Id] = new ResponseMonitoringPacket()
+        _responseMessages[packet.Id] = new ResponseMonitoringPacket(NetworkSimulator!.WaitMode)
         {
             RequestPacket = packet,
             RequestTick = outgoing.SendTick,
             Marker = packet.Category ?? string.Empty,
             Id = packet.Id
         };
-        
+        outgoing.Release();
+
         Network?.Send(packet);
     }
 
@@ -113,7 +114,7 @@ public abstract class Node : NodeBase
 
         monitorMessage.ResponsePacket = packet;
         monitorMessage.ResponseTick = NetworkSimulator!.TotalTicks;
-        monitorMessage.ReceiveIsSet = true;
+        monitorMessage.Receive();
 
         return true;
     }
@@ -121,7 +122,7 @@ public abstract class Node : NodeBase
 
     private void PreSend(INetworkPacket packet)
     {
-        _outgoingMessages.Add(new OutgoingMonitoringPacket(packet)
+        _outgoingMessages.Add(new OutgoingMonitoringPacket(packet, NetworkSimulator!.WaitMode)
         {
             DelayTicks = 2,
             Id = Guid.NewGuid(),
@@ -135,8 +136,14 @@ public abstract class Node : NodeBase
         //
 
     }
-    
-    protected ResponsePacket? WaitNoMonitorResponse(Guid packetId)
+
+    protected ResponsePacket? WaitResponse(Guid packetId)
+    {
+        return NetworkSimulator!.WaitMode ? WaitMonitorResponse(packetId) : WaitNoMonitorResponse(packetId);
+    }
+
+
+    private ResponsePacket? WaitNoMonitorResponse(Guid packetId)
     {
         var monitorPacket = _responseMessages.GetValueOrDefault(packetId);
 
@@ -144,7 +151,7 @@ public abstract class Node : NodeBase
         {
             return null;
         }
-        
+
         _responseMessages.Remove(packetId);
 
         if (monitorPacket.IsExpired == true)
@@ -153,26 +160,40 @@ public abstract class Node : NodeBase
         }
 
         return new ResponsePacket(
-            monitorPacket.ResponsePacket!, monitorPacket.RequestTick, 
+            monitorPacket.ResponsePacket!, monitorPacket.RequestTick,
             monitorPacket.ResponseTick ?? 0);
     }
 
-    //подписываемся на ManualResetEventSlim и ждём его
-    protected ResponsePacket? WaitResponse(Guid packetId)
+    private ResponsePacket? WaitMonitorResponse(Guid packetId)
     {
-        /*return Task.Run(() =>
-        {*/
         var monitorPacket = _responseMessages.GetValueOrDefault(packetId);
 
         if (monitorPacket == null)
         {
-            return null;
+            var outgoingMessage = _outgoingMessages.FirstOrDefault(o => o.RequestPacket.Id == packetId);
+
+            if (outgoingMessage == null)
+            {
+                return null;
+            }
+
+            var released = outgoingMessage.WaitIsReleased(TimeSpan.FromMinutes(1));
+
+            if (released != true)
+            {
+                return null;
+            }
+
+            monitorPacket = _responseMessages.GetValueOrDefault(packetId);
+
+            if (monitorPacket == null)
+            {
+                return null;
+            }
         }
 
-        //var isSet = monitorPacket?.ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
-
         var isSet = monitorPacket.WaitIsSet(TimeSpan.FromMinutes(1));
-        
+
         _responseMessages.Remove(packetId);
 
         if (isSet != true)
@@ -186,8 +207,7 @@ public abstract class Node : NodeBase
         }
 
         return new ResponsePacket(
-            monitorPacket.ResponsePacket!, monitorPacket.RequestTick, 
+            monitorPacket.ResponsePacket!, monitorPacket.RequestTick,
             monitorPacket.ResponseTick ?? 0);
-        /* });*/
     }
 }
