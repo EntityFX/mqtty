@@ -2,6 +2,10 @@
 {
     public interface IClient : ISender, ILeafNode, IStagedClient
     {
+        string? ServerName { get; }
+
+        int? ServerIndex { get; }
+
         bool IsConnected { get; }
 
         bool Connect(string server);

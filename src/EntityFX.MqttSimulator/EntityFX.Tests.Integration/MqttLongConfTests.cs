@@ -12,7 +12,6 @@ using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Counter;
 using EntityFX.MqttY.Plugin.Mqtt.Counter;
 using EntityFX.MqttY.Contracts.Mqtt.Formatters;
-using System.Security.Cryptography;
 
 namespace EntityFX.Tests.Integration
 {
@@ -123,65 +122,6 @@ namespace EntityFX.Tests.Integration
 
             var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
             var uml = plantUmlGraphGenerator.SerializeNetworkGraph(graph!);
-        }
-
-        [TestMethod]
-        public void MqttBenchmarkTest()
-        {
-            var netsWithClients = _graph!.Networks.Values.Where(n => n.Clients.Count > 0).ToArray();
-
-            var netsWithServers = _graph!.Networks.Values.Where(n => n.Servers.Count > 0).ToArray();
-
-            var offset = 5;
-
-            var clToSrvMap = new Dictionary<string, string>();
-            foreach (var netWithClients in netsWithClients)
-            {
-                foreach (var client in netWithClients.Clients)
-                {
-                    var serverNetwork = netsWithServers[0];
-                    do
-                    {
-                        var netServerIx = RandomNumberGenerator.GetInt32(0, netsWithServers.Length);
-                        serverNetwork = netsWithServers[netServerIx];
-                    } while (serverNetwork.Index == netWithClients.Index);
-
-                    var serverIx = RandomNumberGenerator.GetInt32(0, serverNetwork.Servers.Count);
-                    clToSrvMap.Add(client.Key, serverNetwork.Servers.Keys.ToArray()[serverIx]);
-                }
-            }
-
-            foreach (var clientKv in clToSrvMap)
-            {
-                var client = _graph!.GetNode(clientKv.Key, NodeType.Client) as IMqttClient;
-                Assert.IsNotNull(client);
-
-                var broker = _graph.GetNode(clientKv.Value, NodeType.Server) as IMqttBroker;
-                Assert.IsNotNull(broker);
-
-                client.BeginConnect(broker.Name, false);
-            }
-
-
-
-            for (int i = 0; i < 500; i++)
-            {
-                _graph.RefreshWithCounters(IsParallelRefresh);
-                //_graph.Refresh(IsParallelRefresh);
-            }
-
-            //Assert.IsTrue(mqc1426.IsConnected);
-
-            //var mqc1426C = GetMqttCounters(mqc1426);
-            //var mqb782S = GetMqttCounters(mqb782);
-
-
-            //Assert.AreEqual(mqc1426C!.PacketTypeCounters[MqttPacketType.Connect].Value, 1);
-            //Assert.AreEqual(mqb782S!.PacketTypeCounters[MqttPacketType.Connect].Value, 1);
-            //Assert.AreEqual(mqc1426C!.PacketTypeCounters[MqttPacketType.ConnectAck].Value, 1);
-            //Assert.AreEqual(mqb782S!.PacketTypeCounters[MqttPacketType.ConnectAck].Value, 1);
-
-            Console.WriteLine(_graph.Counters.PrintCounters());
         }
 
 

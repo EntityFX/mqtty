@@ -72,9 +72,12 @@ public abstract class NodeBase : ISender
         return result;
     }
 
-    protected INetworkPacket GetPacket(Guid guid, string to, NodeType toType, byte[] payload,
-        string protocol, string? category = null, Guid? requestId = null, int delayTicks = 0)
+    protected INetworkPacket GetPacket(Guid guid, string to, NodeType toType, int toIndex,
+        byte[] payload,
+        string protocol, string? category = null, 
+        Guid? requestId = null, int delayTicks = 0)
         => new NetworkPacket<int>(guid, requestId, Name, to, NodeType, toType, 
+            Index, toIndex,
             payload, protocol, 0, delayTicks, Category: category)
         {
             Id = guid,
@@ -82,9 +85,13 @@ public abstract class NodeBase : ISender
             DelayTicks = delayTicks
         };
 
-    protected NetworkPacket<TContext> GetContextPacket<TContext>(Guid guid, string to, NodeType toType, byte[] payload,
-        string protocol, TContext context, string? category = null, Guid? requestId = null, int delayTicks = 0)
+    protected NetworkPacket<TContext> GetContextPacket<TContext>(
+        Guid guid, string to, NodeType toType,
+        int toIndex, byte[] payload,
+        string protocol, TContext context, string? category = null, 
+        Guid? requestId = null, int delayTicks = 0)
         => new NetworkPacket<TContext>(guid, requestId, Name, to, NodeType, toType,
+            Index, toIndex,
             payload, protocol, 0, delayTicks, Category: category, TypedContext: context)
         {
             Id = guid,

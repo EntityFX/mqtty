@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Drawing;
+using System.Globalization;
 using System.Xml.Linq;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
@@ -19,7 +20,7 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
         var graphMl = new XDocument(graphmlEl);
         var graphEl = new XElement(_ns + "graph");
         
-        AddAttributes(graphmlEl);
+        AddBaseAttributes(graphmlEl, networkGraph);
         
         graphEl.SetAttributeValue("id", "G");
         graphmlEl.Add(graphEl);
@@ -31,7 +32,7 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
 
         foreach (var client in networkGraph.Clients)
         {
-            AddNode(graphEl, client.Value, "c", 50.0m, new NodeColor(40, 179, 106));
+            AddClientNode(graphEl, client.Value);
         }
 
 
@@ -67,6 +68,17 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
         return wr.ToString();
     }
 
+    private void AddClientNode(XElement graphEl, IClient client)
+    {
+        var nodeEl = AddNode(graphEl, client, "c", 50.0m, new NodeColor(40, 179, 106));
+
+        if (client.IsConnected)
+        {
+            nodeEl.Add(BuildDataElement("connectsTo", client.ServerName ?? string.Empty));
+            nodeEl.Add(BuildDataElement("connectsId", $"s{client.ServerIndex}"));
+        }
+    }
+
     private void AddEdge(XElement graphEl, ILeafNode source, string sourcePrefix)
     {
         AddEdge(graphEl, source, source.Network!, sourcePrefix);
@@ -84,11 +96,12 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
         graphEl.Add(edgeEl);
     }
 
-    private void AddNode(XElement graphEl, INode node, string nodePrefix, decimal size, NodeColor? nodeColor)
+    private XElement AddNode(XElement graphEl, INode node, string nodePrefix, decimal size, NodeColor? nodeColor)
     {
         var nodeEl = new XElement(_ns + "node");
         nodeEl.SetAttributeValue("id", $"{nodePrefix}{node.Index}");
-        nodeEl.Add(BuildDataElement("label", node.Address));
+        nodeEl.Add(BuildDataElement("label", node.Name));
+        nodeEl.Add(BuildDataElement("address", node.Address));
         nodeEl.Add(BuildDataElement("type", node.NodeType.ToString()));
         nodeEl.Add(BuildDataElement("size", size.ToString(CultureInfo.InvariantCulture)));
 
@@ -100,9 +113,11 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
         }
 
         graphEl.Add(nodeEl);
+
+        return nodeEl;
     }
 
-    private void AddAttributes(XElement graphml)
+    private void AddBaseAttributes(XElement graphml, INetworkSimulator networkGraph)
     {
         graphml.Add(BuildKeyElement("label", "string", "node"));
         graphml.Add(BuildKeyElement("weight", "double", "edge"));
@@ -111,6 +126,15 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
         graphml.Add(BuildKeyElement("b", "int", "node"));
         graphml.Add(BuildKeyElement("size", "float", "node"));
         graphml.Add(BuildKeyElement("type", "string", "node"));
+        graphml.Add(BuildKeyElement("address", "string", "node"));
+
+        AddAttributes(graphml, networkGraph);
+    }
+
+    protected virtual void AddAttributes(XElement graphml, INetworkSimulator networkGraph)
+    {
+        graphml.Add(BuildKeyElement("connectsTo", "string", "node"));
+        graphml.Add(BuildKeyElement("connectsId", "string", "node"));
     }
 
     private XElement BuildKeyElement(string name, string type, string forElement)

@@ -8,6 +8,9 @@ namespace EntityFX.MqttY.Contracts.Network
         int DelayTicks { get; set; }
         string From { get; set; }
         NodeType FromType { get; set; }
+
+        int FromIndex { get; set; }
+
         int HeaderBytes { get; set; }
         Guid Id { get; set; }
         int PacketBytes { get; }
@@ -17,6 +20,9 @@ namespace EntityFX.MqttY.Contracts.Network
         NetworkLoggerScope? Scope { get; set; }
         string To { get; set; }
         NodeType ToType { get; set; }
+
+        int ToIndex { get; set; }
+
         int Ttl { get; init; }
 
         object? Context { get; set; }

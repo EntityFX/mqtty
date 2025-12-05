@@ -3,39 +3,12 @@ using static System.Formats.Asn1.AsnWriter;
 
 namespace EntityFX.MqttY.Contracts.Network
 {
-    //public record NetworkPacket(
-    //    Guid Id,
-    //    Guid? RequestId,
-    //    string From, string To,
-    //    NodeType FromType, NodeType ToType,
-    //    byte[] Payload, string Protocol,
-    //    int HeaderBytes,
-    //    int DelayTicks,
-    //    int Ttl = 64,
-    //    string? Category = null,
-    //    NetworkLoggerScope? Scope = null, object? Context = default)
-    //{
-    //    private int ttl = Ttl;
-
-    //    public int Ttl { get => ttl; init => ttl = value; }
-
-    //    public int PacketBytes => HeaderBytes + Payload.Length;
-
-    //    public int DecrementTtl()
-    //    {
-    //        Interlocked.Decrement(ref ttl);
-
-    //        if (ttl < 0) Interlocked.Exchange(ref ttl, 0);
-
-    //        return Ttl;
-    //    }
-    //}
-
     public record struct NetworkPacket<TContext>(
         Guid Id,
         Guid? RequestId,
         string From, string To,
         NodeType FromType, NodeType ToType,
+        int FromIndex, int ToIndex,
         byte[] Payload, string Protocol,
         int HeaderBytes,
         int DelayTicks,

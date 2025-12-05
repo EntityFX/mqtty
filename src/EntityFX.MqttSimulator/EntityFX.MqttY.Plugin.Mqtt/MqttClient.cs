@@ -37,14 +37,14 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         public string ClientId { get; set; }
 
-        public string Server => ServerName;
+        public string Server => ServerName ?? string.Empty;
 
         public SessionState Connect(string server, bool cleanSession = false)
         {
             var connect = new ConnectPacket(ClientId, true);
             var connectId = Guid.NewGuid();
             var payload = GetContextPacket<(string Server, bool CleanSession)>(
-                connectId, server, NodeType.Server,
+                connectId, server, NodeType.Server, ServerIndex ?? -1,
                 _packetManager.PacketToBytes(connect), ProtocolType, new(server, cleanSession),
                 "MQTT Connect", delayTicks: 2);
 
@@ -101,7 +101,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var connect = new ConnectPacket(ClientId, true);
             var connectId = Guid.NewGuid();
             var payload = GetContextPacket<(string Server, bool CleanSession)>(
-                connectId, server, NodeType.Server,
+                connectId, server, NodeType.Server, ServerIndex ?? -1,
                 _packetManager.PacketToBytes(connect), ProtocolType, new(server, cleanSession),
                 "MQTT Connect", delayTicks: 2);
 
@@ -172,7 +172,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var subscribeId = Guid.NewGuid();
 
             var payload = GetContextPacket<(string TopicFilter, MqttQos Qos)>(
-                subscribeId, ServerName, NodeType.Server,
+                subscribeId, ServerName ?? string.Empty, NodeType.Server, ServerIndex ?? -1,
                 _packetManager.PacketToBytes(subscribe), ProtocolType, new(topicFilter, qos),
                 "MQTT Subscribe", delayTicks: 2);
 
@@ -245,7 +245,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 Payload = payload
             };
 
-            var packetPayload = GetPacket(Guid.NewGuid(), ServerName, NodeType.Server,
+            var packetPayload = GetPacket(Guid.NewGuid(), ServerName ?? string.Empty,
+                NodeType.Server,
+                ServerIndex ?? -1,
                 _packetManager.PacketToBytes(publish), ProtocolType, "MQTT Publish");
             var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packetPayload!,
                 $"Publish {Name} to {packetPayload.To} with topic {topic}");
@@ -487,7 +489,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var subscribeId = Guid.NewGuid();
 
             var payload = GetContextPacket<(string TopicFilter, MqttQos Qos)>(
-                subscribeId, ServerName, NodeType.Server,
+                subscribeId, ServerName ?? string.Empty, NodeType.Server, ServerIndex ?? -1,
                 _packetManager.PacketToBytes(subscribe), ProtocolType, new(topicFilter, qos),
                 "MQTT Subscribe", delayTicks: 2);
 

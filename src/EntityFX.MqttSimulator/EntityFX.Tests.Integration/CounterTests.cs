@@ -15,7 +15,8 @@ namespace EntityFX.Tests.Integration
             var nc = new NetworkCounters("nc1",
                 new TicksOptions() { TickPeriod = TimeSpan.FromMilliseconds(0.1), CounterHistoryDepth = 1000 });
             nc.CountInbound(new NetworkPacket<int>(
-                Guid.NewGuid(), null, "a", "b", NodeType.Client, NodeType.Client, payload, "tcp", 10, 0));
+                Guid.NewGuid(), null, "a", "b",NodeType.Client, NodeType.Client, 0, 1, 
+                payload, "tcp", 10, 0));
             nc.Refresh(10, 100);
         }
     }

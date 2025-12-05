@@ -17,7 +17,9 @@ public class Client : Node, IClient
 
     public event EventHandler<INetworkPacket>? PacketReceived;
 
-    protected string ServerName = string.Empty;
+    public string? ServerName { get; private set; }
+
+    public int? ServerIndex { get; private set; }
 
     public Client(int index, string name, string address, string protocolType, 
         string specification,
@@ -33,7 +35,7 @@ public class Client : Node, IClient
         if (IsConnected) return true;
 
         var response = ConnectImplementation(server,
-            GetPacket(Guid.NewGuid(), server, NodeType.Server, new byte[] { 0xFF }, "Net", "Connect"));
+            GetPacket(Guid.NewGuid(), server, NodeType.Server, -1, new byte[] { 0xFF }, "Net", "Connect"));
 
         if (response == null) return false;
 
@@ -45,7 +47,7 @@ public class Client : Node, IClient
         if (IsConnected) return true;
 
         return BeginConnectImplementation(server,
-            GetPacket(Guid.NewGuid(), server, NodeType.Server, new byte[] { 0xFF }, "Net", "Connect"));
+            GetPacket(Guid.NewGuid(), server, NodeType.Server, -1, new byte[] { 0xFF }, "Net", "Connect"));
     }
 
     public bool CompleteConnect(ResponsePacket response)
@@ -72,6 +74,7 @@ public class Client : Node, IClient
             IsConnected = false;
             return null;
         }
+        connectPacket.ToIndex = remoteNode.Index;
 
         var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref connectPacket!, 
             $"Connect {connectPacket.From} to {connectPacket.To}");
@@ -100,6 +103,8 @@ public class Client : Node, IClient
 
         ServerName = server;
 
+        ServerIndex = remoteNode.Index;
+
         IsConnected = true;
 
         return responsePacket;
@@ -125,6 +130,8 @@ public class Client : Node, IClient
             return false;
         }
 
+        connectPacket.ToIndex = remoteNode.Index;
+
         var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref connectPacket!,
             $"Connect {connectPacket.From} to {connectPacket.To}");
         NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, connectPacket, NetworkLoggerType.Connect,
@@ -149,12 +156,14 @@ public class Client : Node, IClient
 
         ServerName = responsePacket.From;
 
+        ServerIndex = responsePacket.FromIndex;
+
         IsConnected = true;
 
         return true;
     }
 
-    private INode? AttachClientToServer(string server)
+    private IServer? AttachClientToServer(string server)
     {
         if (Network == null) return null;
 
@@ -227,7 +236,8 @@ public class Client : Node, IClient
         var result = Send(
             new NetworkPacket<int>(
                 Guid.NewGuid(), null,
-                Name, ServerName, NodeType.Client, NodeType.Server, 
+                Name, ServerName ?? string.Empty, NodeType.Client, NodeType.Server, 
+                Index, ServerIndex ?? -1,
             payload, ProtocolType, HeaderBytes: 0, DelayTicks: 0, Category: category), true);
 
         return result;

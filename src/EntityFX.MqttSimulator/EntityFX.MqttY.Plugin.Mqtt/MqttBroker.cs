@@ -145,7 +145,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 Payload = publishPacket.Payload
             };
             var packetPayload = GetPacket(
-                Guid.NewGuid(), subscription.ClientId, NodeType.Client, _packetManager.PacketToBytes(subscriptionPublish), ProtocolType, "MQTT Publish");
+                Guid.NewGuid(), subscription.ClientId, NodeType.Client, packet.FromIndex,
+                    _packetManager.PacketToBytes(subscriptionPublish), ProtocolType, "MQTT Publish");
 
             if (subscriptionPublish.QualityOfService > MqttQos.AtMostOnce)
             {
@@ -306,9 +307,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             var subscribeAck = new SubscribeAckPacket(subscribePacket.PacketId, returnCodes.ToArray());
 
-            var packetPayload = context != null ? GetContextPacket(Guid.NewGuid(), clientId, NodeType.Client,
+            var packetPayload = context != null ? GetContextPacket(Guid.NewGuid(), clientId, NodeType.Client, packet.FromIndex,
                 _packetManager.PacketToBytes(subscribeAck), ProtocolType, context.Value, "MQTT SubAck", packet.Id) :
-                GetPacket(Guid.NewGuid(), clientId, NodeType.Client,
+                GetPacket(Guid.NewGuid(), clientId, NodeType.Client, packet.FromIndex,
                     _packetManager.PacketToBytes(subscribeAck), ProtocolType, "MQTT SubAck", packet.Id);
 
 
@@ -343,9 +344,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var sessionPresent = connectPacket.CleanSession ? false : session != null;
             var clientName = packet.From;
             var connecktAck = new ConnectAckPacket(MqttConnectionStatus.Accepted, sessionPresent);
-            var packetPayload = context != null ? GetContextPacket(Guid.NewGuid(), clientName, NodeType.Client, 
+            var packetPayload = context != null ? GetContextPacket(Guid.NewGuid(), clientName, NodeType.Client, packet.FromIndex,
                 _packetManager.PacketToBytes(connecktAck), ProtocolType, context.Value, "MQTT ConnAck", packet.Id) : 
-                GetPacket(Guid.NewGuid(), clientName, NodeType.Client,
+                GetPacket(Guid.NewGuid(), clientName, NodeType.Client, packet.FromIndex,
                     _packetManager.PacketToBytes(connecktAck), ProtocolType, "MQTT ConnAck", packet.Id);
 
             NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send,
