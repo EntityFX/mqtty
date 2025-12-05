@@ -1,12 +1,13 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.PathFinder;
+using System.Collections.Concurrent;
 
 public class DijkstraWeightedIndexPathFinder : IPathFinder
 {
     public INetworkSimulator? NetworkGraph { get; set; }
 
-    public Dictionary<string, IEnumerable<INetwork>> _pathCache = new Dictionary<string, IEnumerable<INetwork>>();
+    public ConcurrentDictionary<string, IEnumerable<INetwork>> _pathCache = new ConcurrentDictionary<string, IEnumerable<INetwork>>();
 
     private DijkstraWeightedGraph<INetwork> _di = new DijkstraWeightedGraph<INetwork>();
 
@@ -55,7 +56,8 @@ public class DijkstraWeightedIndexPathFinder : IPathFinder
         var networks = path.Select(p => p.item);
 
         var result = networks ?? Enumerable.Empty<INetwork>();
-        _pathCache[netPair] = result;
+
+        _pathCache.AddOrUpdate(netPair, (k) => result, (k, v) => v);
 
         return result;
     }

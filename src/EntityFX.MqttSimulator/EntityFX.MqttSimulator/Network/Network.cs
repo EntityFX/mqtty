@@ -150,7 +150,7 @@ public class Network : NodeBase, INetwork
             return false;
         }
 
-        var result = network.Unlink(this);
+        var result = _linkedNetworks.Remove(network.Name);
         if (!result)
         {
             _linkedNetworks[network.Name] = network;
@@ -159,14 +159,14 @@ public class Network : NodeBase, INetwork
         NetworkSimulator!.Monitoring.Push(Guid.Empty, NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Unlink,
             $"Unlink network {this.Name} from {network.Name}", "Network", "Unlink");
 
-        return true;
+        return result;
     }
 
     public bool UnlinkAll()
     {
         foreach (var network in _linkedNetworks.Values)
         {
-            var result = network.UnlinkAll();
+            var result = network.Unlink(this);
             if (!result)
             {
                 return false;

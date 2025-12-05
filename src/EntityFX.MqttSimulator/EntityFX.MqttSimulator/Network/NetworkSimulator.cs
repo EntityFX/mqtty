@@ -122,18 +122,16 @@ public class NetworkSimulator : INetworkSimulator
             return;
         }
 
-        client.Disconnect();
+        if (client.IsConnected)
+        {
+            client.Disconnect();
+        }
 
         _nodes.Remove((clientAddress, NodeType.Client), out _);
     }
 
     public void RemoveNetwork(string networkAddress)
     {
-        if (_networks.ContainsKey(networkAddress))
-        {
-            return;
-        }
-
         var network = _networks.GetValueOrDefault(networkAddress);
         if (network == null)
         {
@@ -154,7 +152,7 @@ public class NetworkSimulator : INetworkSimulator
             return;
         }
 
-        var server = GetNode(serverAddress, NodeType.Client) as IServer;
+        var server = GetNode(serverAddress, NodeType.Server) as IServer;
         if (server == null)
         {
             return;
@@ -162,7 +160,7 @@ public class NetworkSimulator : INetworkSimulator
 
         server.Stop();
 
-        _nodes.Remove((serverAddress, NodeType.Client), out _);
+        _nodes.Remove((serverAddress, NodeType.Server), out _);
     }
 
     public bool Refresh(bool parallel)
@@ -461,5 +459,59 @@ public class NetworkSimulator : INetworkSimulator
         }
 
         return true;
+    }
+
+    public void Clear()
+    {
+        Reset();
+        try
+        {
+            Tick();
+            var scope = Monitoring.BeginScope(TotalTicks, "Clear sourceNetwork graph");
+            Monitoring.Push(Guid.Empty, TotalTicks, NetworkLoggerType.Disconnect, $"Clear whole sourceNetwork", "Network", "Clean", scope);
+
+            var bytes = Array.Empty<byte>();
+
+            foreach (var node in _nodes.Values)
+            {
+                Monitoring.Push(Guid.Empty, TotalTicks,
+                    node, node, Array.Empty<byte>(), NetworkLoggerType.Disconnect, $"Clean {node.NodeType} {node.Name}", node.NodeType.ToString(), "Clean",
+                    scope);
+                switch (node.NodeType)
+                {
+                    case NodeType.Network:
+                        RemoveNetwork(node.Name);
+                        break;
+                    case NodeType.Server:
+                        RemoveServer(node.Name);
+                        break;
+                    case NodeType.Client:
+                        RemoveClient(node.Name);
+                        break;
+                    case NodeType.Application:
+
+                        break;
+                    case NodeType.Other:
+                        break;
+                }
+            }
+
+            foreach (var network in _networks)
+            {
+                Monitoring.Push(Guid.Empty, TotalTicks,
+                    network.Value, network.Value, bytes, NetworkLoggerType.Disconnect, $"Clean sourceNetwork {network.Key}",
+                    "Network", "Clean", scope);
+                network.Value.Reset();
+                RemoveNetwork(network.Key);
+            }
+
+
+
+            Monitoring.EndScope(TotalTicks, scope);
+        }
+        catch (Exception ex)
+        {
+            SimulationException = ex;
+        }
     }
 }

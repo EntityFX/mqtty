@@ -53,6 +53,8 @@ namespace EntityFX.MqttY.Contracts.Network
 
         bool Reset();
 
+        void Clear();
+
         Task StartPeriodicRefreshAsync();
 
         void StopPeriodicRefresh();
