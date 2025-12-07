@@ -22,7 +22,7 @@ namespace EntityFX.MqttY.Helper
         public Network.Network BuildChain(int branchingFactor, int length, int clientsPerNode, int serversPerNode,
             bool createLeafNodesOnly, TicksOptions ticksOptions)
         {
-            if (branchingFactor < 1 || length < 1)
+            if (length < 1)
                 throw new ArgumentException("Параметры должны быть положительными числами");
 
             Network.Network? previous = null;
@@ -45,6 +45,42 @@ namespace EntityFX.MqttY.Helper
                 previous = network;
 
             }
+
+            return previous!;
+        }
+
+        public Network.Network BuildLine(int length, int clientsPerNode, int serversPerNode,
+            bool createLeafNodesOnly, TicksOptions ticksOptions)
+        {
+            if (length < 1)
+                throw new ArgumentException("Параметры должны быть положительными числами");
+
+            Network.Network? previous = null;
+            var networks = new Network.Network[length];
+            for (int i = 0; i < length; i++)
+            {
+                var ix = _nextId++;
+                var nodeName = $"n{ix}.net";
+                var network = new Network.Network(ix, nodeName, nodeName, "eth", new NetworkTypeOption()
+                {
+                    NetworkType = "eth",
+                    RefreshTicks = 2,
+                    SendTicks = 3,
+                    Speed = 18750000
+                }, ticksOptions);
+                networkSimulator.AddNetwork(network);
+
+                if (previous != null)
+                {
+                    network.Link(previous);
+                }
+
+                previous = network;
+                networks[i] = network;
+            }
+
+            CreateClients(networks[0], clientsPerNode, ticksOptions);
+            CreateServers(networks[length - 1], serversPerNode, ticksOptions);
 
             return previous!;
         }

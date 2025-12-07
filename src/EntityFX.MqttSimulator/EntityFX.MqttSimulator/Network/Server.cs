@@ -121,32 +121,13 @@ public class Server : Node, IServer
         IsStarted = !result;
     }
 
-    protected override void BeforeReceive(INetworkPacket packet)
+    protected override bool CompleteReceiveImplementation(INetworkPacket packet)
     {
-       // NetworkGraph.Monitoring.Push(packet, MonitoringType.Receive, packet.Category);
-    }
-
-    protected override void AfterReceive(INetworkPacket packet)
-    {
-        base.AfterReceive(packet);
-    }
-
-    protected override void BeforeSend(INetworkPacket packet)
-    {
-        base.BeforeSend(packet);
-    }
-
-    protected override void AfterSend(INetworkPacket packet)
-    {
-        base.AfterSend(packet);
-    }
-
-    protected override bool ReceiveImplementation(INetworkPacket packet)
-    {
+        var result = base.CompleteReceiveImplementation(packet);
         NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
 
         OnReceived(packet);
 
-        return true;
+        return result;
     }
 }

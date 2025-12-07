@@ -46,7 +46,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var payload = GetContextPacket<(string Server, bool CleanSession)>(
                 connectId, server, NodeType.Server, ServerIndex ?? -1,
                 _packetManager.PacketToBytes(connect), ProtocolType, new(server, cleanSession),
-                "MQTT Connect", delayTicks: 2);
+                "MQTT Connect", outgoingTicks: TicksOptions.OutgoingWaitTicks);
 
             if (IsConnected)
             {
@@ -103,7 +103,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var payload = GetContextPacket<(string Server, bool CleanSession)>(
                 connectId, server, NodeType.Server, ServerIndex ?? -1,
                 _packetManager.PacketToBytes(connect), ProtocolType, new(server, cleanSession),
-                "MQTT Connect", delayTicks: 2);
+                "MQTT Connect", outgoingTicks: TicksOptions.OutgoingWaitTicks);
 
             if (IsConnected)
             {
@@ -174,7 +174,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var payload = GetContextPacket<(string TopicFilter, MqttQos Qos)>(
                 subscribeId, ServerName ?? string.Empty, NodeType.Server, ServerIndex ?? -1,
                 _packetManager.PacketToBytes(subscribe), ProtocolType, new(topicFilter, qos),
-                "MQTT Subscribe", delayTicks: 2);
+                "MQTT Subscribe", outgoingTicks: TicksOptions.OutgoingWaitTicks);
 
             var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref payload!,
                 $"Subscribe {Name} to {payload.To} using topic {topicFilter}");
@@ -491,7 +491,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var payload = GetContextPacket<(string TopicFilter, MqttQos Qos)>(
                 subscribeId, ServerName ?? string.Empty, NodeType.Server, ServerIndex ?? -1,
                 _packetManager.PacketToBytes(subscribe), ProtocolType, new(topicFilter, qos),
-                "MQTT Subscribe", delayTicks: 2);
+                "MQTT Subscribe", outgoingTicks: TicksOptions.OutgoingWaitTicks);
 
 
             var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref payload!,

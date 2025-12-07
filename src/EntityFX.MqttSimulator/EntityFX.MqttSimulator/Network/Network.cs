@@ -248,7 +248,8 @@ public class Network : NodeBase, INetwork
 
         if (destionationNode != null)
         {
-            return new NetworkMonitoringPacket(NetworkSimulator!.TotalTicks, packet, new Queue<INetwork>(), NetworkPacketType.Local, destionationNode);
+            return new NetworkMonitoringPacket(NetworkSimulator!.TotalTicks,
+            _networkTypeOption.SendTicks, packet, new Queue<INetwork>(), NetworkPacketType.Local, destionationNode);
         }
 
         var sourceNode = NetworkSimulator!.GetNode(packet.From, packet.FromType);
@@ -260,7 +261,8 @@ public class Network : NodeBase, INetwork
         if (sourceNode == null || fromNetwork == null || toNetwork == null)
         {
             return new NetworkMonitoringPacket(
-                NetworkSimulator!.TotalTicks, packet, new Queue<INetwork>(), NetworkPacketType.Unreachable, null);
+                NetworkSimulator!.TotalTicks,
+            _networkTypeOption.SendTicks, packet, new Queue<INetwork>(), NetworkPacketType.Unreachable, null);
         }
 
         var pathToRemote = NetworkSimulator.PathFinder.GetPath(fromNetwork, toNetwork);
@@ -270,9 +272,10 @@ public class Network : NodeBase, INetwork
 
         var waitTime = _networkTypeOption.RefreshTicks;
 
-        return new NetworkMonitoringPacket(NetworkSimulator!.TotalTicks, packet, pathQueue, NetworkPacketType.Remote, destionationNode)
+        return new NetworkMonitoringPacket(NetworkSimulator!.TotalTicks, 
+            _networkTypeOption.SendTicks, packet, pathQueue, NetworkPacketType.Remote, destionationNode)
         {
-            WaitTime = waitTime
+            TransferWaitTicks = waitTime
         };
     }
 
@@ -327,14 +330,15 @@ public class Network : NodeBase, INetwork
             return false;
         }
 
-        NetworkSimulator!.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Push,
+        NetworkSimulator!.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Transfer,
             $"Push netwok packet:  {this.Name} => {next.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
 
 
         _networkCounters.CountTransfers();
         _networkCounters.CountOutbound(networkPacket.Packet);
-        var nextNetworkPacket = networkPacket.Transfer(NetworkSimulator!.TotalTicks);
+        var nextNetworkPacket = networkPacket.Transfer(NetworkSimulator!.TotalTicks,
+            _networkTypeOption.SendTicks);
         next.TransferNext(nextNetworkPacket);
 
         return true;
@@ -351,8 +355,8 @@ public class Network : NodeBase, INetwork
 
         foreach (var pendingPacket in _monitoringPacketsQueue.ToArray())
         {
-            pendingPacket.ReduceWaitTime();
-            if (pendingPacket.WaitTime > 0 || pendingPacket.Released)
+            pendingPacket.ReduceTransferTicks();
+            if (pendingPacket.TransferWaitTicks > 0 || pendingPacket.Released)
             {
                 continue;
             }
@@ -372,7 +376,7 @@ public class Network : NodeBase, INetwork
     //TODO: need VIRTUAL wait 
     private bool ProcessTransferPacket(NetworkMonitoringPacket networkPacket)
     {
-        networkPacket.WaitTime = 0;
+        networkPacket.TransferWaitTicks = 0;
         networkPacket.Released = true;
 
         var result = false;
@@ -423,22 +427,6 @@ public class Network : NodeBase, INetwork
         }
 
         return result;
-    }
-
-    protected override void BeforeReceive(INetworkPacket packet)
-    {
-    }
-
-    protected override void AfterReceive(INetworkPacket packet)
-    {
-    }
-
-    protected override void BeforeSend(INetworkPacket packet)
-    {
-    }
-
-    protected override void AfterSend(INetworkPacket packet)
-    {
     }
 
     public bool AddApplication(IApplication application)

@@ -29,7 +29,7 @@ namespace EntityFX.Tests.Integration
             _monitoring = new NetworkLogger(true, TimeSpan.FromMilliseconds(1), new MonitoringIgnoreOption());
             var tickOptions = new TicksOptions()
             {
-                NetworkTicks = 2,
+                OutgoingWaitTicks = 2,
                 TickPeriod = TimeSpan.FromMilliseconds(1)
             };
             _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions);

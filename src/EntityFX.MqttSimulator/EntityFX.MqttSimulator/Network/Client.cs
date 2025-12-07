@@ -238,7 +238,7 @@ public class Client : Node, IClient
                 Guid.NewGuid(), null,
                 Name, ServerName ?? string.Empty, NodeType.Client, NodeType.Server, 
                 Index, ServerIndex ?? -1,
-            payload, ProtocolType, HeaderBytes: 0, DelayTicks: 0, Category: category), true);
+            payload, ProtocolType, HeaderBytes: 0, OutgoingTicks: 0, Category: category), true);
 
         return result;
     }
@@ -246,6 +246,10 @@ public class Client : Node, IClient
     protected override bool ReceiveImplementation(INetworkPacket packet)
     {
         var result = base.ReceiveImplementation(packet);
+
+        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Receive,
+            $"Recieve message: {packet.To} <- {packet.From}", ProtocolType, "Net Receive");
+
         OnReceived(packet);
 
         return result;
@@ -254,27 +258,6 @@ public class Client : Node, IClient
     protected virtual void OnReceived(INetworkPacket packet)
     {
         PacketReceived?.Invoke(this, packet);
-    }
-
-    protected override void BeforeReceive(INetworkPacket packet)
-    {
-        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Receive, 
-            $"Recieve message: {packet.To} <- {packet.From}", ProtocolType, "Net Receive");
-    }
-
-    protected override void AfterReceive(INetworkPacket packet) 
-    {
-        base.AfterReceive(packet);
-    }
-
-    protected override void BeforeSend(INetworkPacket packet)
-    {
-        base.BeforeSend(packet);
-    }
-
-    protected override void AfterSend(INetworkPacket packet)
-    {
-        base.AfterSend(packet);
     }
 
     public bool BeginDisconnect()

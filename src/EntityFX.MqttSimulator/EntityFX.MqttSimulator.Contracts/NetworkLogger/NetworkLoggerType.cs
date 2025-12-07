@@ -4,7 +4,7 @@
     {
         Send,
         Receive,
-        Push,
+        Transfer,
         Unreachable,
         Connect,
         Disconnect,

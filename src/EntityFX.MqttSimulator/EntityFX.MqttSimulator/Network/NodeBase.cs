@@ -29,13 +29,6 @@ public abstract class NodeBase : ISender
     protected abstract bool SendImplementation(INetworkPacket packet);
 
 
-    protected abstract void BeforeReceive(INetworkPacket packet);
-    protected abstract void AfterReceive(INetworkPacket packet);
-
-    protected abstract void BeforeSend(INetworkPacket packet);
-    protected abstract void AfterSend(INetworkPacket packet);
-
-
     public NodeBase(int index, string name, string address)
     {
         Address = address;
@@ -48,12 +41,8 @@ public abstract class NodeBase : ISender
     //Создаём ManualResetEventSlim 
     public bool Send(INetworkPacket packet)
     {
-        BeforeSend(packet);
-
         NetworkSimulator!.Step();
         var result = SendImplementation(packet);
-
-        AfterSend(packet);
 
         return result;
     }
@@ -63,11 +52,8 @@ public abstract class NodeBase : ISender
     //Добавляем и Снимаем ManualResetEventSlim 
     public bool Receive(INetworkPacket packet)
     {
-        BeforeReceive(packet);
         NetworkSimulator!.Step();
         var result = ReceiveImplementation(packet);
-
-        AfterReceive(packet);
 
         return result;
     }
@@ -75,28 +61,28 @@ public abstract class NodeBase : ISender
     protected INetworkPacket GetPacket(Guid guid, string to, NodeType toType, int toIndex,
         byte[] payload,
         string protocol, string? category = null, 
-        Guid? requestId = null, int delayTicks = 0)
+        Guid? requestId = null, int outgoingTicks = 1)
         => new NetworkPacket<int>(guid, requestId, Name, to, NodeType, toType, 
             Index, toIndex,
-            payload, protocol, 0, delayTicks, Category: category)
+            payload, protocol, 0, outgoingTicks, Category: category)
         {
             Id = guid,
             RequestId = requestId,
-            DelayTicks = delayTicks
+            OutgoingTicks = outgoingTicks
         };
 
     protected NetworkPacket<TContext> GetContextPacket<TContext>(
         Guid guid, string to, NodeType toType,
         int toIndex, byte[] payload,
         string protocol, TContext context, string? category = null, 
-        Guid? requestId = null, int delayTicks = 0)
+        Guid? requestId = null, int outgoingTicks = 1)
         => new NetworkPacket<TContext>(guid, requestId, Name, to, NodeType, toType,
             Index, toIndex,
-            payload, protocol, 0, delayTicks, Category: category, TypedContext: context)
+            payload, protocol, 0, outgoingTicks, Category: category, TypedContext: context)
         {
             Id = guid,
             RequestId = requestId,
-            DelayTicks = delayTicks
+            OutgoingTicks = outgoingTicks
         };
 
     //Здесь обновляем время ождидания и триггерим ManualResetEventSlim

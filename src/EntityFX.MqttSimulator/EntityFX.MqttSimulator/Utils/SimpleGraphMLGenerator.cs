@@ -1,9 +1,11 @@
-﻿using System.Drawing;
+﻿using System.Diagnostics.Metrics;
+using System.Drawing;
 using System.Globalization;
 using System.Xml.Linq;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Utils;
+using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Network;
 
 namespace EntityFX.MqttY.Utils;
@@ -19,15 +21,28 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
         var graphmlEl = new XElement(_ns + "graphml");
         var graphMl = new XDocument(graphmlEl);
         var graphEl = new XElement(_ns + "graph");
-        
+
         AddBaseAttributes(graphmlEl, networkGraph);
-        
+        HashSet<string> allUniqueCounters = GetUniqueCounterAttributes(networkGraph);
+        AddCounterAttributes(graphmlEl, allUniqueCounters);
+
         graphEl.SetAttributeValue("id", "G");
         graphmlEl.Add(graphEl);
 
+
         foreach (var network in networkGraph.Networks)
         {
-            AddNode( graphEl, network.Value, "n", 100.0m, new NodeColor(154, 150, 229));
+            var networkElement = AddNode(graphEl, network.Value, "n", 100.0m, new NodeColor(154, 150, 229));
+
+            var allCounters = network.Value.Counters.GetAllGenericCounters();
+            var statistics = network.Value.Counters.GetAllGenericCountersAsText();
+
+            networkElement.Add(BuildDataElement("statistics", statistics));
+            foreach (var counter in allCounters)
+            {
+                var elemName = $"s:{counter.Key}";
+                networkElement.Add(BuildDataElement(elemName, counter.Value.Value));
+            }
         }
 
         foreach (var client in networkGraph.Clients)
@@ -38,7 +53,7 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
 
         foreach (var server in networkGraph.Servers)
         {
-            AddNode(graphEl, server.Value, "s", 70.0m, new NodeColor(249, 119, 67));
+            AddServerNode(graphEl, server.Value);
         }
 
         var visitedNetworks = new HashSet<string>();
@@ -68,15 +83,91 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
         return wr.ToString();
     }
 
-    private void AddClientNode(XElement graphEl, IClient client)
+    private void AddCounterAttributes(XElement graphmlEl, HashSet<string> allUniqueCounters)
+    {
+        BuildKeyElement("statistics", "string", "node");
+        foreach (var uniqueCounter in allUniqueCounters)
+        {
+            graphmlEl.Add(BuildKeyElement(uniqueCounter, "int", "node"));
+        }
+    }
+
+    private static HashSet<string> GetUniqueCounterAttributes(INetworkSimulator networkGraph)
+    {
+        var allUniqueCounters = new HashSet<string>();
+        foreach (var network in networkGraph.Networks)
+        {
+            var allCounters = network.Value.Counters.GetAllGenericCounters();
+
+            foreach (var counter in allCounters)
+            {
+                var elemName = $"s:{counter.Key}";
+                allUniqueCounters.Add(elemName);
+            }
+        }
+
+        foreach (var client in networkGraph.Clients)
+        {
+            var allCounters = client.Value.Counters.GetAllGenericCounters();
+
+            foreach (var counter in allCounters)
+            {
+                var elemName = $"s:{counter.Key}";
+                allUniqueCounters.Add(elemName);
+            }
+        }
+
+        foreach (var server in networkGraph.Servers)
+        {
+            var allCounters = server.Value.Counters.GetAllGenericCounters();
+
+            foreach (var counter in allCounters)
+            {
+                var elemName = $"s:{counter.Key}";
+                allUniqueCounters.Add(elemName);
+            }
+        }
+
+        return allUniqueCounters;
+    }
+
+    private XElement AddServerNode(XElement graphEl, IServer server)
+    {
+        var nodeEl = AddNode(graphEl, server, "s", 70.0m, new NodeColor(249, 119, 67));
+
+        var allCounters = server.Counters.GetAllGenericCounters();
+
+        foreach (var counter in allCounters)
+        {
+            var elemName = $"s:{counter.Key}";
+            nodeEl.Add(BuildDataElement(elemName, counter.Value.Value));
+        }
+
+        return nodeEl;
+    }
+
+
+    private XElement AddClientNode(XElement graphEl, IClient client)
     {
         var nodeEl = AddNode(graphEl, client, "c", 50.0m, new NodeColor(40, 179, 106));
 
-        if (client.IsConnected)
+        if (!client.IsConnected)
         {
-            nodeEl.Add(BuildDataElement("connectsTo", client.ServerName ?? string.Empty));
-            nodeEl.Add(BuildDataElement("connectsId", $"s{client.ServerIndex}"));
+            return nodeEl;
         }
+
+        nodeEl.Add(BuildDataElement("connectsTo", client.ServerName ?? string.Empty));
+        nodeEl.Add(BuildDataElement("connectsId", $"s{client.ServerIndex}"));
+
+        var allCounters = client.Counters.GetAllGenericCounters();
+
+        foreach (var counter in allCounters)
+        {
+            var elemName = $"s:{counter.Key}";
+            nodeEl.Add(BuildDataElement(elemName, counter.Value.Value));
+        }
+
+        return nodeEl;
     }
 
     private void AddEdge(XElement graphEl, ILeafNode source, string sourcePrefix)

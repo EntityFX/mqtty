@@ -5,7 +5,9 @@ namespace EntityFX.MqttY.Counter
     public class NodeCounters : CounterGroup
     {
         private List<ICounter> _counters = new List<ICounter>();
-        private readonly ValueCounter<long> _queueCounter;
+        private readonly ValueCounter<long> _outgoingQueue;
+        private readonly ValueCounter<long> _incommingQueue;
+        private readonly ValueCounter<long> _receiveQueue;
 
         public GenericCounter SendCounter { get; }
         public GenericCounter ReceiveCounter { get; }
@@ -23,12 +25,16 @@ namespace EntityFX.MqttY.Counter
             ReceiveCounter = new GenericCounter("Receive", historyDepth);
             ErrorCounter = new GenericCounter("Error", historyDepth);
 
-            _queueCounter = new ValueCounter<long>("Queue", historyDepth);
+            _outgoingQueue = new ValueCounter<long>("OutgoingQueue", historyDepth);
+            _incommingQueue = new ValueCounter<long>("IncommingQueue", historyDepth);
+            _receiveQueue = new ValueCounter<long>("ReceiveQueue", historyDepth);
 
             _counters.Add(SendCounter);
             _counters.Add(ReceiveCounter);
             _counters.Add(ErrorCounter);
-            _counters.Add(_queueCounter);
+            _counters.Add(_outgoingQueue);
+            _counters.Add(_incommingQueue);
+            _counters.Add(_receiveQueue);
         }
 
         public void AddCounter(ICounter incrementable)
@@ -41,9 +47,19 @@ namespace EntityFX.MqttY.Counter
             ErrorCounter.Increment();
         }
 
-        public void SetQueueLength(long queueLength)
+        public void SetOutgoingQueueLength(long queueLength)
         {
-            _queueCounter.Set(queueLength);
+            _outgoingQueue.Set(queueLength);
+        }        
+        
+        public void SetIncommingQueueLength(long queueLength)
+        {
+            _incommingQueue.Set(queueLength);
+        }
+
+        public void SetReceiveQueueLength(long queueLength)
+        {
+            _receiveQueue.Set(queueLength);
         }
     }
 }

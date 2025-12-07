@@ -11,7 +11,7 @@ namespace EntityFX.MqttY.Contracts.Network
         int FromIndex, int ToIndex,
         byte[] Payload, string Protocol,
         int HeaderBytes,
-        int DelayTicks,
+        int OutgoingTicks,
         int Ttl = 64,
         string? Category = null,
         NetworkLoggerScope? Scope = null, TContext? TypedContext = default) : INetworkPacket

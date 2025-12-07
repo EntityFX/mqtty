@@ -2,11 +2,11 @@ using EntityFX.MqttY.Contracts.Network;
 
 namespace EntityFX.MqttY.Network;
 
-internal class OutgoingMonitoringPacket
+internal class NodeMonitoringPacket
 {
-    private long _delayTicks = 1;
+    private long _outgoingWaitTicks;
     
-    public OutgoingMonitoringPacket(INetworkPacket requestPacket, bool waitMode)
+    public NodeMonitoringPacket(INetworkPacket requestPacket, bool waitMode)
     {
         RequestPacket = requestPacket;
         WaitMode = waitMode;
@@ -14,7 +14,7 @@ internal class OutgoingMonitoringPacket
 
     public INetworkPacket RequestPacket { get; set; }
     
-    public long DelayTicks { get => _delayTicks; init => _delayTicks = value; }
+    public long WaitTicks { get => _outgoingWaitTicks; init => _outgoingWaitTicks = value; }
     
     public long SendTick { get; init; }
 
@@ -26,9 +26,9 @@ internal class OutgoingMonitoringPacket
 
     public bool WaitMode { get; }
 
-    internal void ReduceDelayTicks()
+    internal void ReduceWaitTicks()
     {
-        Interlocked.Decrement(ref _delayTicks);
+        Interlocked.Decrement(ref _outgoingWaitTicks);
     }
 
     public bool WaitIsReleased(TimeSpan timeSpan)

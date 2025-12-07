@@ -10,8 +10,9 @@ public abstract class Node : NodeBase
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
     private readonly Dictionary<Guid, ResponseMonitoringPacket> _responseMessages = new();
-    private readonly List<OutgoingMonitoringPacket> _outgoingMessages = new();
-    private readonly TicksOptions _ticksOptions;
+    private readonly List<NodeMonitoringPacket> _outgoingMessages = new();
+    private readonly List<NodeMonitoringPacket> _incommingMessages = new();
+    protected readonly TicksOptions TicksOptions;
 
     protected NodeCounters counters;
 
@@ -29,13 +30,14 @@ public abstract class Node : NodeBase
     public Node(int index, string name, string address,
         TicksOptions ticksOptions) : base(index, name, address)
     {
-        _ticksOptions = ticksOptions;
-        counters = new NodeCounters(Name, Group ?? "Node", _ticksOptions.CounterHistoryDepth);
+        TicksOptions = ticksOptions;
+        counters = new NodeCounters(Name, Group ?? "Node", TicksOptions.CounterHistoryDepth);
     }
 
     public override void Reset()
     {
         _outgoingMessages.Clear();
+        _incommingMessages.Clear();
         _responseMessages.Clear();
     }
 
@@ -44,15 +46,26 @@ public abstract class Node : NodeBase
         var outgoing = _outgoingMessages.ToArray();
         foreach (var outgoingMonitoringPacket in outgoing)
         {
-            outgoingMonitoringPacket.ReduceDelayTicks();
+            outgoingMonitoringPacket.ReduceWaitTicks();
 
-            if (outgoingMonitoringPacket.DelayTicks <= 0 && !outgoingMonitoringPacket.Released)
+            if (outgoingMonitoringPacket.WaitTicks <= 0 && !outgoingMonitoringPacket.Released)
             {
                 SendToNetwork(outgoingMonitoringPacket);
             }
         }
-
         _outgoingMessages.RemoveAll(o => o.Released);
+
+        var incomming = _incommingMessages.ToArray();
+        foreach (var incommingMonitoringPacket in incomming)
+        {
+            incommingMonitoringPacket.ReduceWaitTicks();
+
+            if (incommingMonitoringPacket.WaitTicks <= 0 && !incommingMonitoringPacket.Released)
+            {
+                CompleteReceive(incommingMonitoringPacket);
+            }
+        }
+        _incommingMessages.RemoveAll(o => o.Released);
 
 
         foreach (var packet in _responseMessages)
@@ -60,10 +73,12 @@ public abstract class Node : NodeBase
             packet.Value.ReduceWaitTicks();
         }
         base.Refresh();
-        counters.SetQueueLength(_responseMessages.Count);
+        counters.SetOutgoingQueueLength(_outgoingMessages.Count);
+        counters.SetIncommingQueueLength(_incommingMessages.Count);
+        counters.SetReceiveQueueLength(_responseMessages.Count);
     }
 
-    private void SendToNetwork(OutgoingMonitoringPacket outgoing)
+    private void SendToNetwork(NodeMonitoringPacket outgoing)
     {
         var packet = outgoing.RequestPacket;
         _responseMessages[packet.Id] = new ResponseMonitoringPacket(NetworkSimulator!.WaitMode)
@@ -78,27 +93,28 @@ public abstract class Node : NodeBase
         Network?.Send(packet);
     }
 
-    protected override void BeforeSend(INetworkPacket packet)
+    private void CompleteReceive(NodeMonitoringPacket incomming)
     {
-        PreSend(packet);
+        var packet = incomming.RequestPacket;
+        incomming.Release();
+        CompleteReceiveImplementation(packet);
     }
 
     protected override bool SendImplementation(INetworkPacket packet)
     {
+        PreSend(packet);
+        counters.SendCounter.Increment();
         return true;
     }
 
-    protected override void AfterSend(INetworkPacket packet)
-    {
-        counters.SendCounter.Increment();
-    }
-
-    protected override void AfterReceive(INetworkPacket packet)
-    {
-        counters.ReceiveCounter.Increment();
-    }
-
     protected override bool ReceiveImplementation(INetworkPacket packet)
+    {
+        PreReceive(packet);
+        counters.ReceiveCounter.Increment();
+        return true;
+    }
+
+    protected virtual bool CompleteReceiveImplementation(INetworkPacket packet)
     {
         if (packet.RequestId == null)
         {
@@ -122,19 +138,22 @@ public abstract class Node : NodeBase
 
     private void PreSend(INetworkPacket packet)
     {
-        _outgoingMessages.Add(new OutgoingMonitoringPacket(packet, NetworkSimulator!.WaitMode)
+        _outgoingMessages.Add(new NodeMonitoringPacket(packet, NetworkSimulator!.WaitMode)
         {
-            DelayTicks = 2,
+            WaitTicks = TicksOptions.OutgoingWaitTicks,
             Id = Guid.NewGuid(),
             SendTick = NetworkSimulator!.TotalTicks
         });
+    }
 
-        // if (_responseMessages.ContainsKey(packet.Id))
-        // {
-        //     return;
-        // }
-        //
-
+    private void PreReceive(INetworkPacket packet)
+    {
+        _incommingMessages.Add(new NodeMonitoringPacket(packet, NetworkSimulator!.WaitMode)
+        {
+            WaitTicks = TicksOptions.OutgoingWaitTicks,
+            Id = Guid.NewGuid(),
+            SendTick = NetworkSimulator!.TotalTicks
+        });
     }
 
     protected ResponsePacket? WaitResponse(Guid packetId)

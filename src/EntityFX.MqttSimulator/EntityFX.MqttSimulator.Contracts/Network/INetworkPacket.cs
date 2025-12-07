@@ -5,7 +5,7 @@ namespace EntityFX.MqttY.Contracts.Network
     public interface INetworkPacket
     {
         string? Category { get; set; }
-        int DelayTicks { get; set; }
+        int OutgoingTicks { get; set; }
         string From { get; set; }
         NodeType FromType { get; set; }
 

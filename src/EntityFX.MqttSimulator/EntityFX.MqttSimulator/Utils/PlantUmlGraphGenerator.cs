@@ -127,7 +127,7 @@ public class PlantUmlGraphGenerator : IUmlGraphGenerator
                 if (string.IsNullOrEmpty(monitoringItem.From) || string.IsNullOrEmpty(monitoringItem.To))
                     continue;
 
-                var arrow = monitoringItem.Type == NetworkLoggerType.Push ? "->" : "-->";
+                var arrow = monitoringItem.Type == NetworkLoggerType.Transfer ? "->" : "-->";
 
                 plantUmlBuilder.AppendLine($"{monitoringItem.From} {arrow} {monitoringItem.To} " +
                     $": {{{monitoringItem.Type}}} {monitoringItem.Category} [Tick={monitoringItem.Tick}]");

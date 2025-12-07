@@ -5,7 +5,7 @@
         public TimeSpan TickPeriod { get; set; }
         public TimeSpan ReceiveWaitPeriod { get; set; }
 
-        public int NetworkTicks { get; set; }
+        public int OutgoingWaitTicks { get; set; }
         
         public int CounterHistoryDepth { get; set; }
     }
