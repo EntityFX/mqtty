@@ -35,7 +35,7 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
             var networkElement = AddNode(graphEl, network.Value, "n", 100.0m, new NodeColor(154, 150, 229));
 
             var allCounters = network.Value.Counters.GetAllGenericCounters();
-            var statistics = network.Value.Counters.GetAllGenericCountersAsText();
+            var statistics = network.Value.Counters.GetAllGenericCountersAsShortText();
 
             networkElement.Add(BuildDataElement("statistics", statistics));
             foreach (var counter in allCounters)
@@ -136,7 +136,8 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
         var nodeEl = AddNode(graphEl, server, "s", 70.0m, new NodeColor(249, 119, 67));
 
         var allCounters = server.Counters.GetAllGenericCounters();
-
+        var statistics = server.Counters.GetAllGenericCountersAsShortText();
+        nodeEl.Add(BuildDataElement("statistics", statistics));
         foreach (var counter in allCounters)
         {
             var elemName = $"s:{counter.Key}";
@@ -160,6 +161,8 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
         nodeEl.Add(BuildDataElement("connectsId", $"s{client.ServerIndex}"));
 
         var allCounters = client.Counters.GetAllGenericCounters();
+        var statistics = client.Counters.GetAllGenericCountersAsShortText();
+        nodeEl.Add(BuildDataElement("statistics", statistics));
 
         foreach (var counter in allCounters)
         {
@@ -218,6 +221,7 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
         graphml.Add(BuildKeyElement("size", "float", "node"));
         graphml.Add(BuildKeyElement("type", "string", "node"));
         graphml.Add(BuildKeyElement("address", "string", "node"));
+        graphml.Add(BuildKeyElement("statistics", "string", "node"));
 
         AddAttributes(graphml, networkGraph);
     }

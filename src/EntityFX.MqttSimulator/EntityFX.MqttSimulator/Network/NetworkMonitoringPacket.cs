@@ -12,6 +12,7 @@ internal class NetworkMonitoringPacket
         Type = type;
         DestionationNode = destionationNode;
         Marker = packet.Category ?? string.Empty;
+        _transferWaitTicks = transferWaitTicks;
     }
 
     public long Tick { get; }

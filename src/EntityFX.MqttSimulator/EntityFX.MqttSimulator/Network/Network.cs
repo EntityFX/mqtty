@@ -40,15 +40,15 @@ public class Network : NodeBase, INetwork
             _counters.Counters = new ICounter[]
                 {
                     _networkCounters,
-                    new CounterGroup(Name, "Servers")
+                    new CounterGroup(Name, "SS", "Servers", "SG")
                     {
                         Counters = _servers.Values.ToArray().Select(s =>s.Counters).ToArray()
                     },
-                    new CounterGroup(Name, "Clients")
+                    new CounterGroup(Name, "CS", "Clients", "CG")
                     {
                         Counters = _clients.Values.ToArray().Select(s =>s.Counters).ToArray()
                     },
-                    new CounterGroup(Name, "Applications")
+                    new CounterGroup(Name, "AS", "Applications", "AG")
                     {
                         Counters = _applications.Values.ToArray().Select(s =>s.Counters).ToArray()
                     },
@@ -86,8 +86,8 @@ public class Network : NodeBase, INetwork
     {
         this._networkTypeOption = networkTypeOption;
         this._ticksOptions = ticksOptions;
-        _networkCounters = new NetworkCounters(Name, ticksOptions);
-        _counters = new CounterGroup(Name, "Network");
+        _networkCounters = new NetworkCounters(Name, "NC", ticksOptions);
+        _counters = new CounterGroup(Name, "NN", "Network", "NG");
         NetworkType = networkType;
     }
 
@@ -249,7 +249,7 @@ public class Network : NodeBase, INetwork
         if (destionationNode != null)
         {
             return new NetworkMonitoringPacket(NetworkSimulator!.TotalTicks,
-            _networkTypeOption.SendTicks, packet, new Queue<INetwork>(), NetworkPacketType.Local, destionationNode);
+            _networkTypeOption.TransferTicks, packet, new Queue<INetwork>(), NetworkPacketType.Local, destionationNode);
         }
 
         var sourceNode = NetworkSimulator!.GetNode(packet.From, packet.FromType);
@@ -262,7 +262,7 @@ public class Network : NodeBase, INetwork
         {
             return new NetworkMonitoringPacket(
                 NetworkSimulator!.TotalTicks,
-            _networkTypeOption.SendTicks, packet, new Queue<INetwork>(), NetworkPacketType.Unreachable, null);
+            _networkTypeOption.TransferTicks, packet, new Queue<INetwork>(), NetworkPacketType.Unreachable, null);
         }
 
         var pathToRemote = NetworkSimulator.PathFinder.GetPath(fromNetwork, toNetwork);
@@ -270,10 +270,10 @@ public class Network : NodeBase, INetwork
         var pathQueue = new Queue<INetwork>(pathToRemote);
         destionationNode = (toNetwork as Network)?.GetDestinationNode(packet.To!, packet.ToType);
 
-        var waitTime = _networkTypeOption.RefreshTicks;
+        var waitTime = _networkTypeOption.TransferTicks;
 
         return new NetworkMonitoringPacket(NetworkSimulator!.TotalTicks, 
-            _networkTypeOption.SendTicks, packet, pathQueue, NetworkPacketType.Remote, destionationNode)
+            _networkTypeOption.TransferTicks, packet, pathQueue, NetworkPacketType.Remote, destionationNode)
         {
             TransferWaitTicks = waitTime
         };
@@ -337,8 +337,11 @@ public class Network : NodeBase, INetwork
 
         _networkCounters.CountTransfers();
         _networkCounters.CountOutbound(networkPacket.Packet);
+
         var nextNetworkPacket = networkPacket.Transfer(NetworkSimulator!.TotalTicks,
-            _networkTypeOption.SendTicks);
+            _networkTypeOption.TransferTicks);
+
+
         next.TransferNext(nextNetworkPacket);
 
         return true;
@@ -356,13 +359,10 @@ public class Network : NodeBase, INetwork
         foreach (var pendingPacket in _monitoringPacketsQueue.ToArray())
         {
             pendingPacket.ReduceTransferTicks();
-            if (pendingPacket.TransferWaitTicks > 0 || pendingPacket.Released)
+            if (pendingPacket.TransferWaitTicks <= 0 && !pendingPacket.Released)
             {
-                continue;
+                var result = ProcessTransferPacket(pendingPacket);
             }
-
-            var result = ProcessTransferPacket(pendingPacket);
-
         }
 
         _monitoringPacketsQueue.RemoveAll(p => p.Released);

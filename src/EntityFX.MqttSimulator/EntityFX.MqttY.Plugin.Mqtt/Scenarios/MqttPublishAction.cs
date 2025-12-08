@@ -85,9 +85,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Scenarios
 
                     if (sw.Elapsed > Config!.PublishPeriod)
                     {
-                        Context!.NetworkGraph!.AddCounterValue<long>("TotalPublished", published);
-                        Context!.NetworkGraph!.AddCounterValue<long>("FailedPublish", failedPublish);
-                        Context!.NetworkGraph!.AddCounterValue<long>("PublishPerTick", published / Context!.NetworkGraph!.TotalTicks);
+                        Context!.NetworkGraph!.AddCounterValue<long>("TotalPublished", "TP", published);
+                        Context!.NetworkGraph!.AddCounterValue<long>("FailedPublish", "FP", failedPublish);
+                        Context!.NetworkGraph!.AddCounterValue<long>("PublishPerTick", "PT", published / Context!.NetworkGraph!.TotalTicks);
                         break;
                     }
                 }

@@ -26,25 +26,31 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
             set => base.Counters = value;
         }
 
-        public MqttCounters(string name, string group, TicksOptions ticksOptions)
-            : base(name, group)
+        public MqttCounters(string name, string shortName, 
+            string group, string shortGroup, TicksOptions ticksOptions)
+            : base(name, shortName, group, shortGroup)
         {
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
             _ticksOptions = ticksOptions;
 
             PacketTypeCounters = Enum.GetValues<MqttPacketType>()
                 .ToDictionary(k => k, v => new GenericCounter(
-                    v.GetEnumDescription(), ticksOptions.CounterHistoryDepth
+                    v.GetEnumDescription(), 
+                    v.GetEnumCategory(),
+                    ticksOptions.CounterHistoryDepth
                 ));
 
             RefusedPacketTypeCounters = Enum.GetValues<MqttPacketType>()
             .ToDictionary(k => k, v => new GenericCounter(
-                v.GetEnumDescription() + "_Refused", ticksOptions.CounterHistoryDepth
+                v.GetEnumDescription() + "_Refused",
+                v.GetEnumCategory() + "-",
+                ticksOptions.CounterHistoryDepth
             ));
 
             RpsPacketTypeCounters = Enum.GetValues<MqttPacketType>()
             .ToDictionary(k => k, v => new ValueCounter<double>(
-                v.GetEnumDescription() + "_Rps", ticksOptions.CounterHistoryDepth, "Rps"
+                v.GetEnumDescription() + "_Rps",
+                v.GetEnumCategory() + "-", ticksOptions.CounterHistoryDepth, "Rps"
             ));
         }
 

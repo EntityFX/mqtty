@@ -31,7 +31,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             this._packetManager = packetManager;
             ClientId = clientId ?? name;
 
-            _mqttCounters = new MqttCounters(Name, "MqttClient", ticksOptions);
+            _mqttCounters = new MqttCounters(Name, Name.Substring(0, 2), "MqttClient", "MC", ticksOptions);
             counters.AddCounter(_mqttCounters);
         }
 

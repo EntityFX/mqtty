@@ -67,7 +67,7 @@ namespace EntityFX.MqttY.Contracts.Network
 
         long TotalSteps { get; }
 
-        void AddCounterValue<TValue>(string name, TValue value)
+        void AddCounterValue<TValue>(string name, string shortName, TValue value)
             where TValue : struct, IEquatable<TValue>;
     }
 }

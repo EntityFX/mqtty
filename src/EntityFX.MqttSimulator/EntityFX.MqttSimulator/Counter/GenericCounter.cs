@@ -8,6 +8,8 @@ namespace EntityFX.MqttY.Counter
     {
         public string Name { get; init; }
 
+        public string ShortName { get; init; }
+
         public long Value => _value;
 
         public string? UnitOfMeasure { get; init; }
@@ -48,9 +50,11 @@ namespace EntityFX.MqttY.Counter
 
         private readonly NormalizeUnits? _normalizeUnits;
 
-        public GenericCounter(string name, int historyDepth, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
+        public GenericCounter(string name, string shortName,
+            int historyDepth, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
         {
             Name = name;
+            ShortName = shortName;
             UnitOfMeasure = unitOfMeasure;
             this._normalizeUnits = normalizeUnits;
             _valueHistory = new(historyDepth);

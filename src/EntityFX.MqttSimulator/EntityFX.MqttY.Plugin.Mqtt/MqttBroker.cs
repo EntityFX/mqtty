@@ -35,7 +35,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             this._packetManager = packetManager;
             this._topicEvaluator = mqttTopicEvaluator;
 
-            MqttCounters = new MqttCounters(Name,"MqttBroker", ticksOptions);
+            MqttCounters = new MqttCounters(Name, Name.Substring(0, 2), "MqttBroker", "MB", ticksOptions);
             counters.AddCounter(MqttCounters);
         }
 

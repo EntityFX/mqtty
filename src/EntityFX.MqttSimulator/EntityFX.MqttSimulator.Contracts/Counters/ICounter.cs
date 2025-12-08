@@ -17,6 +17,8 @@
     {
         string Name { get; init; }
 
+        string ShortName { get; init; }
+
         string? UnitOfMeasure { get; init; }
 
         object Value { get; }

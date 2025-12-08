@@ -52,8 +52,7 @@ namespace EntityFX.Tests.Integration
             var netGlobal = new Network(0, "net.global", "net.global", "eth", new NetworkTypeOption()
             {
                 NetworkType = "eth",
-                RefreshTicks = 2,
-                SendTicks = 3,
+                TransferTicks = 3,
                 Speed = 18750000
             }, tickOptions);
             _graph.AddNetwork(netGlobal);
@@ -61,8 +60,7 @@ namespace EntityFX.Tests.Integration
             var net1Local = new Network(1, "net1.local", "net1.local", "eth", new NetworkTypeOption()
             {
                 NetworkType = "eth",
-                RefreshTicks = 2,
-                SendTicks = 3,
+                TransferTicks = 3,
                 Speed = 18750000
             }, tickOptions);
             _graph.AddNetwork(net1Local);
@@ -70,8 +68,7 @@ namespace EntityFX.Tests.Integration
             var net2Local = new Network(2, "net2.local", "net2.local", "eth", new NetworkTypeOption()
             {
                 NetworkType = "eth",
-                RefreshTicks = 2,
-                SendTicks = 3,
+                TransferTicks = 3,
                 Speed = 18750000
             }, tickOptions);
             _graph.AddNetwork(net2Local);
@@ -79,8 +76,7 @@ namespace EntityFX.Tests.Integration
             var net3Local = new Network(3, "net3.local", "net3.local", "eth", new NetworkTypeOption()
             {
                 NetworkType = "eth",
-                RefreshTicks = 2,
-                SendTicks = 3,
+                TransferTicks = 3,
                 Speed = 18750000
             }, tickOptions);
             _graph.AddNetwork(net3Local);
@@ -88,8 +84,7 @@ namespace EntityFX.Tests.Integration
             var net4Local = new Network(3, "net4.local", "net4.local", "eth", new NetworkTypeOption()
             {
                 NetworkType = "eth",
-                RefreshTicks = 2,
-                SendTicks = 3,
+                TransferTicks = 3,
                 Speed = 18750000
             }, tickOptions);
             _graph.AddNetwork(net4Local);

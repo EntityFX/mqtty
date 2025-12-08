@@ -84,7 +84,7 @@ namespace EntityFX.Tests.Integration
                 },
                 NetworkTypes = new SortedDictionary<string, NetworkTypeOption>()
                 {
-                    ["1g"] = new NetworkTypeOption() { RefreshTicks = 2, SendTicks = 2, Speed = 125_000_000 }
+                    ["1g"] = new NetworkTypeOption() { TransferTicks = 2, Speed = 125_000_000 }
                 }
             });
 

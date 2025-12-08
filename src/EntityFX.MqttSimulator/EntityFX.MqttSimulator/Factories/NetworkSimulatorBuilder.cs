@@ -180,8 +180,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
         {
             var networkType = option.NetworkTypes.GetValueOrDefault(networkOption.Value.NetworkType) ?? new NetworkTypeOption()
             {
-                RefreshTicks = 2,
-                SendTicks = 3,
+                TransferTicks = 3,
                 Speed = 125000000
             };
 

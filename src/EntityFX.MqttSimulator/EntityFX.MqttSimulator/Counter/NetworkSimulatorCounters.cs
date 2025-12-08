@@ -24,17 +24,17 @@ namespace EntityFX.MqttY.Counter
 
         private IEnumerable<ICounter> _netwotkCounters = Enumerable.Empty<ICounter>();
 
-        public NetworkSimulatorCounters(string name, TicksOptions ticksOptions)
-            : base(name, "Simulator")
+        public NetworkSimulatorCounters(string name, string shortName, TicksOptions ticksOptions)
+            : base(name, shortName, "Simulator", "SM")
         {
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
             _ticksOptions = ticksOptions;
 
-            _stepsCounter = new ValueCounter<long>("Steps", ticksOptions.CounterHistoryDepth);
-            _ticksCounter = new ValueCounter<long>("Ticks", ticksOptions.CounterHistoryDepth);
-            _virtualTimeCounter = new ValueCounter<TimeSpan>("VirtualTime", ticksOptions.CounterHistoryDepth);
-            _realTimeCounter = new ValueCounter<TimeSpan>("RealTime", ticksOptions.CounterHistoryDepth);
-            _refreshTimeCounter = new ValueCounter<TimeSpan>("RefreshTime", ticksOptions.CounterHistoryDepth);
+            _stepsCounter = new ValueCounter<long>("Steps", "S$", ticksOptions.CounterHistoryDepth);
+            _ticksCounter = new ValueCounter<long>("Ticks", "T$",ticksOptions.CounterHistoryDepth);
+            _virtualTimeCounter = new ValueCounter<TimeSpan>("VirtualTime", "TV", ticksOptions.CounterHistoryDepth);
+            _realTimeCounter = new ValueCounter<TimeSpan>("RealTime", "TR", ticksOptions.CounterHistoryDepth);
+            _refreshTimeCounter = new ValueCounter<TimeSpan>("RefreshTime", "R$", ticksOptions.CounterHistoryDepth);
 
             _counters.AddRange(Counters);
             _counters.Add(_stepsCounter);
@@ -66,10 +66,10 @@ namespace EntityFX.MqttY.Counter
             _netwotkCounters = networks.Select(n => n.Counters);
         }
 
-        public void AddCounterValue<TValue>(string name, TValue value)
+        public void AddCounterValue<TValue>(string name, string shortName, TValue value)
             where TValue : struct, IEquatable<TValue>
         {
-            var valueCounter = new ValueCounter<TValue>(name, _historyDepth);
+            var valueCounter = new ValueCounter<TValue>(name, shortName, _historyDepth);
             valueCounter.Set(value);
 
             _counters.Add(valueCounter);

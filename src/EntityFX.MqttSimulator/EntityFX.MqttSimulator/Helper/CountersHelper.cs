@@ -24,6 +24,13 @@ public static class CountersHelper
         return sb.ToString();
     }
 
+    public static string GetAllGenericCountersAsShortText(this CounterGroup counterGroup)
+    {
+        var sb = new StringBuilder();
+        GetGroupGenericCountersShort(counterGroup, sb);
+        return sb.ToString();
+    }
+
     private static void GetGroupGenericCounters(CounterGroup counterGroup, StringBuilder sb)
     {
         sb.AppendLine($"{counterGroup.GroupType}:");
@@ -41,6 +48,26 @@ public static class CountersHelper
                 GetGroupGenericCounters(cg, sb);
             }
         }
+    }
+
+    private static void GetGroupGenericCountersShort(CounterGroup counterGroup, StringBuilder sb)
+    {
+        sb.Append($"{counterGroup.ShortGroupType}#");
+        foreach (var counter in counterGroup.Counters)
+        {
+            if (counter is GenericCounter gc)
+            {
+                if (gc.Value == 0) continue;
+
+                sb.Append($"{gc.ShortName}:{gc.Value},");
+            }
+
+            if (counter is CounterGroup cg)
+            {
+                GetGroupGenericCountersShort(cg, sb);
+            }
+        }
+        sb.Append(";");
     }
 
     private static void GetGroupGenericCounters(string prefix, CounterGroup counterGroup, Dictionary<string, GenericCounter> counters)

@@ -31,7 +31,7 @@ public abstract class Node : NodeBase
         TicksOptions ticksOptions) : base(index, name, address)
     {
         TicksOptions = ticksOptions;
-        counters = new NodeCounters(Name, Group ?? "Node", TicksOptions.CounterHistoryDepth);
+        counters = new NodeCounters(Name, "N", Group ?? "Node", "NG", TicksOptions.CounterHistoryDepth);
     }
 
     public override void Reset()
@@ -47,7 +47,6 @@ public abstract class Node : NodeBase
         foreach (var outgoingMonitoringPacket in outgoing)
         {
             outgoingMonitoringPacket.ReduceWaitTicks();
-
             if (outgoingMonitoringPacket.WaitTicks <= 0 && !outgoingMonitoringPacket.Released)
             {
                 SendToNetwork(outgoingMonitoringPacket);
@@ -59,7 +58,6 @@ public abstract class Node : NodeBase
         foreach (var incommingMonitoringPacket in incomming)
         {
             incommingMonitoringPacket.ReduceWaitTicks();
-
             if (incommingMonitoringPacket.WaitTicks <= 0 && !incommingMonitoringPacket.Released)
             {
                 CompleteReceive(incommingMonitoringPacket);

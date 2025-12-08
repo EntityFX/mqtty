@@ -32,8 +32,7 @@ namespace EntityFX.MqttY.Helper
                 "net", new NetworkTypeOption()
                 {
                     NetworkType = "eth",
-                    RefreshTicks = 2,
-                    SendTicks = 3,
+                    TransferTicks = 2,
                     Speed = 18750000
                 }, ticksOptions);
 
@@ -64,8 +63,7 @@ namespace EntityFX.MqttY.Helper
                 var network = new Network.Network(ix, nodeName, nodeName, "eth", new NetworkTypeOption()
                 {
                     NetworkType = "eth",
-                    RefreshTicks = 2,
-                    SendTicks = 3,
+                    TransferTicks = 2,
                     Speed = 18750000
                 }, ticksOptions);
                 networkSimulator.AddNetwork(network);
@@ -95,8 +93,7 @@ namespace EntityFX.MqttY.Helper
                 "net", new NetworkTypeOption()
                 {
                     NetworkType = "eth",
-                    RefreshTicks = 2,
-                    SendTicks = 3,
+                    TransferTicks = 2,
                     Speed = 18750000
                 }, ticksOptions);
         }
@@ -112,8 +109,7 @@ namespace EntityFX.MqttY.Helper
                 "net", new NetworkTypeOption()
                 {
                     NetworkType = "eth",
-                    RefreshTicks = 2,
-                    SendTicks = 3,
+                    TransferTicks = 2,
                     Speed = 18750000
                 }, ticksOptions);
         }

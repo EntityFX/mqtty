@@ -47,7 +47,7 @@ public class NetworkSimulator : INetworkSimulator
         Monitoring = monitoring;
         PathFinder.NetworkGraph = this;
 
-        _counters = new NetworkSimulatorCounters("NetworkSimulator", ticksOptions);
+        _counters = new NetworkSimulatorCounters("NetworkSimulator", "NN", ticksOptions);
     }
 
     public string? OptionsPath { get; set; }
@@ -218,7 +218,6 @@ public class NetworkSimulator : INetworkSimulator
 
     private void RefreshImplementation(NetworkLoggerScope? scope)
     {
-        Tick();
         var bytes = Array.Empty<byte>();
 
         _counters.Refresh(TotalTicks, _step);
@@ -238,13 +237,14 @@ public class NetworkSimulator : INetworkSimulator
                 scope);
             node.Value.Refresh();
         }
+        Tick();
     }
 
     public bool Reset()
     {
         try
         {
-            Tick();
+
             var scope = Monitoring.BeginScope(TotalTicks, "Reset sourceNetwork graph");
             Monitoring.Push(Guid.Empty, TotalTicks, NetworkLoggerType.Refresh, $"Reset whole sourceNetwork", "Network", "Reset", scope);
 
@@ -267,6 +267,8 @@ public class NetworkSimulator : INetworkSimulator
             }
 
             Monitoring.EndScope(TotalTicks, scope);
+
+            Tick();
 
             return true;
         }
@@ -441,9 +443,9 @@ public class NetworkSimulator : INetworkSimulator
         return source.Link(destination);
     }
 
-    public void AddCounterValue<TValue>(string name, TValue value) where TValue : struct, IEquatable<TValue>
+    public void AddCounterValue<TValue>(string name, string shortName, TValue value) where TValue : struct, IEquatable<TValue>
     {
-        _counters.AddCounterValue(name, value);
+        _counters.AddCounterValue(name, shortName, value);
     }
 
     public bool RefreshWithCounters(bool parallel)

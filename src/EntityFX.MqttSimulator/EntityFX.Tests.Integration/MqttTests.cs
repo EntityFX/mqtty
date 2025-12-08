@@ -42,7 +42,7 @@ namespace EntityFX.Tests.Integration
             var mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
 
             var network1 = new Network(0, "net1", "net1.local", "eth", new NetworkTypeOption() {
-                NetworkType = "eth", RefreshTicks = 2, SendTicks = 3, Speed = 18750000
+                NetworkType = "eth", TransferTicks = 3, Speed = 18750000
             }, tickOptions);
             _graph.AddNetwork(network1);
 
