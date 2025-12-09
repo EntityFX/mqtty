@@ -34,7 +34,7 @@ internal class NetworkMonitoringPacket
         Interlocked.Decrement(ref _transferWaitTicks);
     }
 
-    public NetworkMonitoringPacket Transfer(long tick, int transferWaitTicks)
+    public NetworkMonitoringPacket BuildTransferPacket(long tick, int transferWaitTicks)
     {
         return new NetworkMonitoringPacket(tick, transferWaitTicks, Packet, Path, Type, DestionationNode);
     }

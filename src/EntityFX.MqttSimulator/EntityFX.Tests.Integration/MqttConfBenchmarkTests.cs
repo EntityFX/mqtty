@@ -9,6 +9,7 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Helper;
 using System.Security.Cryptography;
 using EntityFX.MqttY.Utils;
+using System.Text;
 
 namespace EntityFX.Tests.Integration
 {
@@ -20,7 +21,7 @@ namespace EntityFX.Tests.Integration
         private TicksOptions tickOptions;
         private INetworkLoggerProvider? _monitoringProvider;
         private NetworkSimulator? _graph;
-
+        private StringBuilder _logSb;
         private Exception? _testException;
 
         private bool IsParallelRefresh = false;
@@ -31,7 +32,7 @@ namespace EntityFX.Tests.Integration
         {
             pathFinder = new DijkstraWeightedIndexPathFinder();
 
-            _monitoring = new NullNetworkLogger();
+            _monitoring = new NetworkLogger(false, TimeSpan.FromMilliseconds(1), new MonitoringIgnoreOption() { Category = new string[] { "Refresh" } });
 
             //_monitoring = new NetworkLogger(false, TimeSpan.FromMilliseconds(1), new MonitoringIgnoreOption());
             //_monitoringProvider = new ConsoleNetworkLoggerProvider(_monitoring);
@@ -44,8 +45,9 @@ namespace EntityFX.Tests.Integration
             };
             _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions);
 
+            _logSb = new StringBuilder();
 
-            _monitoringProvider = new NullNetworkLoggerProvider(_monitoring);
+            _monitoringProvider = new SimpleNetworkLoggerProvider(_monitoring, _logSb);
             _monitoringProvider.Start();
 
             mqttTopicEvaluator = new MqttTopicEvaluator(true);
@@ -233,6 +235,7 @@ namespace EntityFX.Tests.Integration
             var uml = plantUmlGraphGenerator.SerializeNetworkGraph(_graph!);
 
             Console.WriteLine(_graph.Counters.PrintCounters());
+            Console.WriteLine(_logSb.ToString());
         }
 
 

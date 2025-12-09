@@ -53,7 +53,7 @@ public class DijkstraWeightedIndexPathFinder : IPathFinder
 
         var path = _di.FindShortestPath(source.Index, destination.Index);
 
-        var networks = path.Select(p => p.item);
+        var networks = path.Skip(1).Select(p => p.item);
 
         var result = networks ?? Enumerable.Empty<INetwork>();
 

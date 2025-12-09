@@ -349,9 +349,6 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 GetPacket(Guid.NewGuid(), clientName, NodeType.Client, packet.FromIndex,
                     _packetManager.PacketToBytes(connecktAck), ProtocolType, "MQTT ConnAck", packet.Id);
 
-            NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send,
-                $"Send MQTT connect ack {packet.From} to {packet.To} with Status={connecktAck.Status}", ProtocolType, "MQTT ConnAck");
-
             var sendResult = Send(packetPayload);
             MqttCounters.PacketTypeCounters[connecktAck.Type].Increment();
             return sendResult;

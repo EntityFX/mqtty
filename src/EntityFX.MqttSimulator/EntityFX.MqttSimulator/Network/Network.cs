@@ -294,7 +294,7 @@ public class Network : NodeBase, INetwork
         }
 
 
-        NetworkSimulator!.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Receive,
+        NetworkSimulator!.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Push,
             $"Push packet from network to node: {network.Name} ~> {networkPacket.DestionationNode.Name}",
             "Network", packet.Category, packet.Scope, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
         NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
@@ -338,9 +338,8 @@ public class Network : NodeBase, INetwork
         _networkCounters.CountTransfers();
         _networkCounters.CountOutbound(networkPacket.Packet);
 
-        var nextNetworkPacket = networkPacket.Transfer(NetworkSimulator!.TotalTicks,
+        var nextNetworkPacket = networkPacket.BuildTransferPacket(NetworkSimulator!.TotalTicks,
             _networkTypeOption.TransferTicks);
-
 
         next.TransferNext(nextNetworkPacket);
 

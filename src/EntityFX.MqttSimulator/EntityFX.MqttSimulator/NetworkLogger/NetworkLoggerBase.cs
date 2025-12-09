@@ -51,5 +51,5 @@ internal abstract class NetworkLoggerBase : INetworkLoggerProvider
 
     protected abstract void WriteItem(NetworkLoggerItem item);
 
-    protected string GetMonitoringLine(NetworkLoggerItem item) => item.GetMonitoringLine();
+    protected virtual string GetMonitoringLine(NetworkLoggerItem item) => item.GetMonitoringLine();
 }

@@ -194,7 +194,6 @@ public class NetworkSimulator : INetworkSimulator
 
     private void ParallelRefreshImplementation(NetworkLoggerScope? scope)
     {
-        Tick();
         var bytes = Array.Empty<byte>();
 
         _counters.Refresh(TotalTicks, _step);
@@ -214,6 +213,8 @@ public class NetworkSimulator : INetworkSimulator
                 scope);
             node.Value.Refresh();
         });
+
+        Tick();
     }
 
     private void RefreshImplementation(NetworkLoggerScope? scope)

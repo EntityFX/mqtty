@@ -4,6 +4,8 @@ using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
 using System.Collections.Concurrent;
 using EntityFX.MqttY.Network;
+using EntityFX.MqttY.Contracts.NetworkLogger;
+using System.Net.Sockets;
 
 public abstract class Node : NodeBase
 {
@@ -79,6 +81,8 @@ public abstract class Node : NodeBase
     private void SendToNetwork(NodeMonitoringPacket outgoing)
     {
         var packet = outgoing.RequestPacket;
+        NetworkSimulator!.Monitoring.Push(packet.Id, NetworkSimulator.TotalTicks, this, Network!, packet.Payload, NetworkLoggerType.Push,
+            $"Push message: {packet.From} -> {Network!.Name}", packet.Protocol, "Node");
         _responseMessages[packet.Id] = new ResponseMonitoringPacket(NetworkSimulator!.WaitMode)
         {
             RequestPacket = packet,
@@ -100,6 +104,8 @@ public abstract class Node : NodeBase
 
     protected override bool SendImplementation(INetworkPacket packet)
     {
+        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send,
+            $"Send message: {packet.From} -> {packet.To}", packet.Protocol, "Node");
         PreSend(packet);
         counters.SendCounter.Increment();
         return true;
@@ -114,6 +120,8 @@ public abstract class Node : NodeBase
 
     protected virtual bool CompleteReceiveImplementation(INetworkPacket packet)
     {
+        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Receive,
+            $"receive message: {packet.To} <~ {packet.From}", packet.Protocol, "Node");
         if (packet.RequestId == null)
         {
             return false;
