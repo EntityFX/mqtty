@@ -140,7 +140,7 @@ namespace EntityFX.Tests.Integration
             var mqs1Net3 = _graph.GetNode("mqs1.net3.local", NodeType.Server) as IMqttBroker;
             Assert.IsNotNull(mqs1Net3);
 
-            for (int i = 0; i < 18; i++)
+            for (int i = 0; i < 23; i++)
             {
                 _graph.RefreshWithCounters(IsParallelRefresh);
             }
@@ -191,7 +191,7 @@ namespace EntityFX.Tests.Integration
             var mqs1Net3 = _graph.GetNode("mqs1.net3.local", NodeType.Server) as IMqttBroker;
             Assert.IsNotNull(mqs1Net3);
 
-            for (int i = 0; i < 18; i++)
+            for (int i = 0; i < 23; i++)
             {
                 _graph.RefreshWithCounters(IsParallelRefresh);
             }
@@ -239,7 +239,7 @@ namespace EntityFX.Tests.Integration
             var mqs1Net3 = _graph.GetNode("mqs1.net3.local", NodeType.Server) as IMqttBroker;
             Assert.IsNotNull(mqs1Net3);
 
-            for (int i = 0; i < 18; i++)
+            for (int i = 0; i < 23; i++)
             {
                 _graph.RefreshWithCounters(IsParallelRefresh);
             }
@@ -265,7 +265,7 @@ namespace EntityFX.Tests.Integration
             mqc1Net2.BeginSubscribe("/test2/#", MqttQos.AtLeastOnce);
             mqc1Net4.BeginSubscribe("/test4/#", MqttQos.AtLeastOnce);
 
-            for (int i = 0; i < 18; i++)
+            for (int i = 0; i < 23; i++)
             {
                 _graph.RefreshWithCounters(IsParallelRefresh);
             }
@@ -305,7 +305,7 @@ namespace EntityFX.Tests.Integration
             var mqs1Net3 = _graph.GetNode("mqs1.net3.local", NodeType.Server) as IMqttBroker;
             Assert.IsNotNull(mqs1Net3);
 
-            for (int i = 0; i < 18; i++)
+            for (int i = 0; i < 23; i++)
             {
                 _graph.RefreshWithCounters(IsParallelRefresh);
             }
@@ -336,7 +336,7 @@ namespace EntityFX.Tests.Integration
             mqc1Net2.BeginSubscribe("/test2/#", MqttQos.AtLeastOnce);
             mqc1Net4.BeginSubscribe("/test4/#", MqttQos.AtLeastOnce);
 
-            for (int i = 0; i < 18; i++)
+            for (int i = 0; i < 23; i++)
             {
                 _graph.RefreshWithCounters(IsParallelRefresh);
             }
@@ -358,7 +358,7 @@ namespace EntityFX.Tests.Integration
                 CollectionAssert.AreEqual(e.Payload, new byte[] { 1, 2, 3, 4, 5 });
             };
 
-            for (int i = 0; i < 18; i++)
+            for (int i = 0; i < 23; i++)
             {
                 _graph.RefreshWithCounters(IsParallelRefresh);
             }
@@ -387,7 +387,7 @@ namespace EntityFX.Tests.Integration
             var mqs1Net3 = _graph.GetNode("mqs1.net3.local", NodeType.Server) as IMqttBroker;
             Assert.IsNotNull(mqs1Net3);
 
-            for (int i = 0; i < 18; i++)
+            for (int i = 0; i < 23; i++)
             {
                 _graph.RefreshWithCounters(IsParallelRefresh);
             }
@@ -418,7 +418,7 @@ namespace EntityFX.Tests.Integration
             mqc1Net2.BeginSubscribe("/test2/#", MqttQos.AtLeastOnce);
             mqc1Net4.BeginSubscribe("/test4/#", MqttQos.AtLeastOnce);
 
-            for (int i = 0; i < 18; i++)
+            for (int i = 0; i < 23; i++)
             {
                 _graph.RefreshWithCounters(IsParallelRefresh);
             }
@@ -443,7 +443,7 @@ namespace EntityFX.Tests.Integration
             for (int n = 0; n < 3000; n++)
             {
                 mqc1Net3.Publish("/test4/data1", new byte[] { 1, 2, 3, 4, 5 }, MqttQos.AtLeastOnce);
-                for (int i = 0; i < 18; i++)
+                for (int i = 0; i < 23; i++)
                 {
                     _graph.RefreshWithCounters(false);
                 }

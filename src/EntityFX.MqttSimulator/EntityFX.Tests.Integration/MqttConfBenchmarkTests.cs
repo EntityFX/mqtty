@@ -24,7 +24,7 @@ namespace EntityFX.Tests.Integration
         private StringBuilder _logSb;
         private Exception? _testException;
 
-        private bool IsParallelRefresh = false;
+        private bool IsParallelRefresh = true;
         private MqttTopicEvaluator mqttTopicEvaluator;
         private MqttNativePacketManager mqttPacketManager;
 
@@ -128,8 +128,6 @@ namespace EntityFX.Tests.Integration
                 //var nonConnected = _graph!.Clients.Where(c => !c.Value.IsConnected);
                 _graph.RefreshWithCounters(IsParallelRefresh);
             }
-
-            var nonConnected = _graph!.Clients.Where(c => !c.Value.IsConnected);
 
             //Assert.IsTrue(mqc1426.IsConnected);
 

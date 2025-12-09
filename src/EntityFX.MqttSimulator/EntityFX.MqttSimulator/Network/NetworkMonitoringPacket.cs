@@ -4,7 +4,8 @@ namespace EntityFX.MqttY.Network;
 
 internal class NetworkMonitoringPacket
 {
-    public NetworkMonitoringPacket(long tick, int transferWaitTicks, INetworkPacket packet, Queue<INetwork> path, NetworkPacketType type, ISender? destionationNode)
+    public NetworkMonitoringPacket(long tick, int transferWaitTicks, bool passTillNextTick, 
+        INetworkPacket packet, Queue<INetwork> path, NetworkPacketType type, ISender? destionationNode)
     {
         Tick = tick;
         Packet = packet;
@@ -13,6 +14,7 @@ internal class NetworkMonitoringPacket
         DestionationNode = destionationNode;
         Marker = packet.Category ?? string.Empty;
         _transferWaitTicks = transferWaitTicks;
+        PassTillNextTick = passTillNextTick;
     }
 
     public long Tick { get; }
@@ -21,6 +23,7 @@ internal class NetworkMonitoringPacket
     internal long TransferWaitTicks { get => _transferWaitTicks; set => _transferWaitTicks = value; }
 
     internal bool Released { get; set; } = false;
+    internal bool PassTillNextTick { get; private set; }
 
     private long _transferWaitTicks;
 
@@ -34,8 +37,8 @@ internal class NetworkMonitoringPacket
         Interlocked.Decrement(ref _transferWaitTicks);
     }
 
-    public NetworkMonitoringPacket BuildTransferPacket(long tick, int transferWaitTicks)
+    public NetworkMonitoringPacket BuildTransferPacket(long tick, int transferWaitTicks, bool passTillNextTick)
     {
-        return new NetworkMonitoringPacket(tick, transferWaitTicks, Packet, Path, Type, DestionationNode);
+        return new NetworkMonitoringPacket(tick, transferWaitTicks, passTillNextTick, Packet, Path, Type, DestionationNode);
     }
 }
