@@ -82,9 +82,9 @@ namespace EntityFX.Tests.Integration
                     ["mqc1"] = new NodeOption() { Index = 1, Protocol = "mqtt", Type = NodeOptionType.Client, Specification = "mqtt-client", Network = "n1" },
                     ["mqc2"] = new NodeOption() { Index = 2, Protocol = "mqtt", Type = NodeOptionType.Client, Specification = "mqtt-client", Network = "n2" },
                 },
-                NetworkTypes = new SortedDictionary<string, NetworkTypeOption>()
+                NetworkTypes = new SortedDictionary<string, NetworkOptions>()
                 {
-                    ["1g"] = new NetworkTypeOption() { TransferTicks = 2, Speed = 125_000_000 }
+                    ["1g"] = new NetworkOptions() { TransferTicks = 2, Speed = 125_000_000 }
                 }
             });
 

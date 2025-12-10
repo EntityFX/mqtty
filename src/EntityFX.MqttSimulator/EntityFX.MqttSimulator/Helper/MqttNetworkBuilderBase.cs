@@ -20,7 +20,7 @@ namespace EntityFX.MqttY.Helper
         protected abstract IServer CreateServer(TicksOptions ticksOptions, int ix, string fullName, string address);
 
         public Network.Network BuildChain(int branchingFactor, int length, int clientsPerNode, int serversPerNode,
-            bool createLeafNodesOnly, TicksOptions ticksOptions)
+            bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
         {
             if (length < 1)
                 throw new ArgumentException("Параметры должны быть положительными числами");
@@ -29,12 +29,7 @@ namespace EntityFX.MqttY.Helper
             for (int i = 0; i < length; i++)
             {
                 var network = CreateBranchingNetwork(branchingFactor, clientsPerNode, serversPerNode, createLeafNodesOnly,
-                "net", new NetworkTypeOption()
-                {
-                    NetworkType = "eth",
-                    TransferTicks = 2,
-                    Speed = 18750000
-                }, ticksOptions);
+                "net", networkTypeOption, ticksOptions);
 
                 if (previous != null)
                 {
@@ -49,7 +44,7 @@ namespace EntityFX.MqttY.Helper
         }
 
         public Network.Network BuildLine(int length, int clientsPerNode, int serversPerNode,
-            bool createLeafNodesOnly, TicksOptions ticksOptions)
+            bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
         {
             if (length < 1)
                 throw new ArgumentException("Параметры должны быть положительными числами");
@@ -60,12 +55,7 @@ namespace EntityFX.MqttY.Helper
             {
                 var ix = _nextId++;
                 var nodeName = $"n{ix}.net";
-                var network = new Network.Network(ix, nodeName, nodeName, "eth", new NetworkTypeOption()
-                {
-                    NetworkType = "eth",
-                    TransferTicks = 2,
-                    Speed = 18750000
-                }, ticksOptions);
+                var network = new Network.Network(ix, nodeName, nodeName, "eth", networkTypeOption, ticksOptions);
                 networkSimulator.AddNetwork(network);
 
                 if (previous != null)
@@ -84,29 +74,24 @@ namespace EntityFX.MqttY.Helper
         }
 
         public Network.Network BuildTree(int branchingFactor, int depth, int clientsPerNode, int serversPerNode,
-            bool createLeafNodesOnly, TicksOptions ticksOptions)
+            bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
         {
             if (branchingFactor < 1 || depth < 1)
                 throw new ArgumentException("Параметры должны быть положительными числами");
 
             return CreateDepthNetwork(branchingFactor, depth, clientsPerNode, serversPerNode, createLeafNodesOnly,
-                "net", new NetworkTypeOption()
-                {
-                    NetworkType = "eth",
-                    TransferTicks = 2,
-                    Speed = 18750000
-                }, ticksOptions);
+                "net",  ticksOptions, networkTypeOption);
         }
 
         public Network.Network BuildRandomNodesTree(int branchingFactor, int depth,
             (int Min, int Max) clientsPerNode, (int Min, int Max) serversPerNode,
-            bool createLeafNodesOnly, TicksOptions ticksOptions)
+            bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
         {
             if (branchingFactor < 1 || depth < 1)
                 throw new ArgumentException("Параметры должны быть положительными числами");
 
             return CreateRandomNodesNetwork(branchingFactor, depth, clientsPerNode, serversPerNode, createLeafNodesOnly,
-                "net", new NetworkTypeOption()
+                "net", new NetworkOptions()
                 {
                     NetworkType = "eth",
                     TransferTicks = 2,
@@ -131,7 +116,7 @@ namespace EntityFX.MqttY.Helper
 
         private Network.Network CreateBranchingNetwork(int branchingFactor,
             int clientsPerNode, int serversPerNode, bool createLeafNodesOnly, string namePrefix,
-            NetworkTypeOption networkTypeOption, TicksOptions ticksOptions)
+            NetworkOptions networkTypeOption, TicksOptions ticksOptions)
         {
             var ix = _nextId++;
             var nodeName = $"n{ix}.{namePrefix}";
@@ -164,7 +149,8 @@ namespace EntityFX.MqttY.Helper
 
         private Network.Network CreateDepthNetwork(int branchingFactor, int depth,
             int clientsPerNode, int serversPerNode, bool createLeafNodesOnly, string namePrefix,
-            NetworkTypeOption networkTypeOption, TicksOptions ticksOptions)
+            TicksOptions ticksOptions,
+            NetworkOptions networkTypeOption)
         {
             var ix = _nextId++;
             var name = $"n{ix}.{namePrefix}";
@@ -175,8 +161,8 @@ namespace EntityFX.MqttY.Helper
                 for (int i = 0; i < branchingFactor; i++)
                 {
                     var child = CreateDepthNetwork(branchingFactor, depth - 1, clientsPerNode, serversPerNode,
-                        createLeafNodesOnly, name,
-                        networkTypeOption, ticksOptions);
+                        createLeafNodesOnly, name, ticksOptions,
+                        networkTypeOption);
                     child.Link(node);
 
                 }
@@ -197,7 +183,7 @@ namespace EntityFX.MqttY.Helper
             (int Min, int Max) clientsPerNode,
             (int Min, int Max) serversPerNode,
             bool createLeafNodesOnly, string namePrefix,
-            NetworkTypeOption networkTypeOption, TicksOptions ticksOptions)
+            NetworkOptions networkTypeOption, TicksOptions ticksOptions)
         {
             var ix = _nextId++;
             var name = $"n{ix}.{namePrefix}";

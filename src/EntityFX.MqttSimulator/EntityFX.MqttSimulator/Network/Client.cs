@@ -132,9 +132,7 @@ public class Client : Node, IClient
 
         connectPacket.ToIndex = remoteNode.Index;
 
-        var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref connectPacket!,
-            $"Connect {connectPacket.From} to {connectPacket.To}");
-        NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, connectPacket, NetworkLoggerType.Connect,
+        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, connectPacket, NetworkLoggerType.Connect,
             $"Client {connectPacket.From} connects to server {connectPacket.To}", ProtocolType, "NET Connect");
 
         result = Send(connectPacket, false);
@@ -247,8 +245,13 @@ public class Client : Node, IClient
     {
         var result = base.ReceiveImplementation(packet);
 
-        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Receive,
-            $"Recieve message: {packet.To} <- {packet.From}", ProtocolType, "Net Receive");
+        return result;
+    }
+
+    protected override bool CompleteReceiveImplementation(INetworkPacket packet)
+    {
+        var result = base.CompleteReceiveImplementation(packet);
+        NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
 
         OnReceived(packet);
 

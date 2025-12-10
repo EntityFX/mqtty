@@ -10,21 +10,21 @@ namespace EntityFX.MqttY.Contracts.Utils
         INetworkSimulator? NetworkSimulator { get; }
 
         INetwork? BuildNetwork(int index, string name, string address, 
-            NetworkTypeOption networkTypeOption, TicksOptions ticks);
+            NetworkOptions networkTypeOption, TicksOptions ticks);
 
         IClient? BuildClient(int index, string name, string protocolType, string specification,
-            INetwork network, NetworkTypeOption networkTypeOption, TicksOptions ticks, 
+            INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks, 
             string? group = null, int? groupAmount = null,
             Dictionary<string, string[]>? additional = null);
 
         TClient? BuildClient<TClient>(int index, string name, string protocolType, string specification,
-            INetwork network, NetworkTypeOption networkTypeOption, TicksOptions ticks, 
+            INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks, 
             string? group = null, int? groupAmount = null,
             Dictionary<string, string[]>? additional = null)
             where TClient : IClient;
 
         IServer? BuildServer(int index, string name, string protocolType, string specification,
-            INetwork network, NetworkTypeOption networkTypeOption, TicksOptions ticks, 
+            INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks, 
             string? group = null, int? groupAmount = null,
             Dictionary<string, string[]>? additional = null);
 
@@ -32,7 +32,7 @@ namespace EntityFX.MqttY.Contracts.Utils
             Dictionary<string, string[]>? additional = null);
 
         IApplication? BuildApplication(int index, string name, string protocolType, string specification,
-            INetwork network, NetworkTypeOption? networkTypeOption, TicksOptions? ticks, 
+            INetwork network, NetworkOptions? networkTypeOption, TicksOptions? ticks, 
             string? group = null, int? groupAmount = null,
             Dictionary<string, string[]>? additional = default);
 

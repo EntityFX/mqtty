@@ -247,14 +247,14 @@ public class NetworkSimulator : INetworkSimulator
         {
 
             var scope = Monitoring.BeginScope(TotalTicks, "Reset sourceNetwork graph");
-            Monitoring.Push(Guid.Empty, TotalTicks, NetworkLoggerType.Refresh, $"Reset whole sourceNetwork", "Network", "Reset", scope);
+            Monitoring.Push(Guid.Empty, TotalTicks, NetworkLoggerType.Reset, $"Reset whole sourceNetwork", "Network", "Reset", scope);
 
             var bytes = Array.Empty<byte>();
 
             foreach (var network in _networks)
             {
                 Monitoring.Push(Guid.Empty, TotalTicks,
-                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Reset sourceNetwork {network.Key}",
+                    network.Value, network.Value, bytes, NetworkLoggerType.Reset, $"Reset sourceNetwork {network.Key}",
                     "Network", "Refresh", scope);
                 network.Value.Reset();
             }
@@ -262,7 +262,7 @@ public class NetworkSimulator : INetworkSimulator
             foreach (var node in _nodes)
             {
                 Monitoring.Push(Guid.Empty, TotalTicks,
-                    node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"RefrResetesh node {node.Key}", "Network", "Reset",
+                    node.Value, node.Value, bytes, NetworkLoggerType.Reset, $"Reset node {node.Key}", "Network", "Reset",
                     scope);
                 node.Value.Reset();
             }

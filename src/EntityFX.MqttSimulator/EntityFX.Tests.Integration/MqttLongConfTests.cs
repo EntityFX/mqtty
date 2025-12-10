@@ -23,7 +23,7 @@ namespace EntityFX.Tests.Integration
         private TicksOptions tickOptions;
         private INetworkLoggerProvider? _monitoringProvider;
         private NetworkSimulator? _graph;
-
+        private NetworkOptions _networkOptions;
         private Exception? _testException;
 
         private bool IsParallelRefresh = true;
@@ -44,6 +44,13 @@ namespace EntityFX.Tests.Integration
             };
             _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions);
 
+            _networkOptions = new NetworkOptions()
+            {
+                NetworkType = "eth",
+                TransferTicks = 2,
+                Speed = 18750000
+            };
+
 
             _monitoringProvider = new NullNetworkLoggerProvider(_monitoring);
             _monitoringProvider.Start();
@@ -60,7 +67,7 @@ namespace EntityFX.Tests.Integration
             var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator);
 
             _graph!.Construction = true;
-            var networks = builder.BuildTree(5, 4, 10, 2, true, tickOptions);
+            var networks = builder.BuildTree(5, 4, 10, 2, true, tickOptions, _networkOptions);
             //var networks = builder.BuildTree(3, 3, 3, 1, true, tickOptions);
             _graph.Construction = false;
             _graph.UpdateRoutes();
@@ -99,7 +106,7 @@ namespace EntityFX.Tests.Integration
             var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator);
 
             graph!.Construction = true;
-            var networks = builder.BuildRandomNodesTree(3, 3, (2, 10), (1, 3), true, tickOptions);
+            var networks = builder.BuildRandomNodesTree(3, 3, (2, 10), (1, 3), true, tickOptions, _networkOptions);
             //var networks = builder.BuildTree(3, 3, 3, 1, true, tickOptions);
             graph.Construction = false;
             graph.UpdateRoutes();
@@ -115,7 +122,7 @@ namespace EntityFX.Tests.Integration
             var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator);
 
             graph!.Construction = true;
-            var networks = builder.BuildChain(3, 10, 5, 2, true, tickOptions);
+            var networks = builder.BuildChain(3, 10, 5, 2, true, tickOptions, _networkOptions);
             //var networks = builder.BuildTree(3, 3, 3, 1, true, tickOptions);
             graph.Construction = false;
             graph.UpdateRoutes();

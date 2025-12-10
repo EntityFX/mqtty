@@ -23,7 +23,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 
     public IApplication? BuildApplication(
         int index, string name, string protocolType, string specification, INetwork network,
-        NetworkTypeOption? networkTypeOption, TicksOptions? ticks,
+        NetworkOptions? networkTypeOption, TicksOptions? ticks,
         string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = default)
     {
         if (NetworkSimulator == null)
@@ -58,7 +58,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
     }
 
     public IClient? BuildClient(int index, string name, string protocolType, string specification,
-        INetwork network, NetworkTypeOption? networkTypeOption, TicksOptions? ticks,
+        INetwork network, NetworkOptions? networkTypeOption, TicksOptions? ticks,
         string? group = null, int? groupAmount = null,
         Dictionary<string, string[]>? additional = default)
     {
@@ -90,7 +90,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
     }
 
     public TClient? BuildClient<TClient>(int index, string name, string protocolType, string specification,
-        INetwork network, NetworkTypeOption networkTypeOption, TicksOptions ticks,
+        INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks,
         string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = default)
         where TClient : IClient
     {
@@ -98,7 +98,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
             networkTypeOption, ticks, group, groupAmount, additional);
     }
 
-    public INetwork? BuildNetwork(int index, string name, string address, NetworkTypeOption networkTypeOption, TicksOptions ticks)
+    public INetwork? BuildNetwork(int index, string name, string address, NetworkOptions networkTypeOption, TicksOptions ticks)
     {
         if (NetworkSimulator == null)
         {
@@ -135,7 +135,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
     }
 
     public IServer? BuildServer(int index, string name, string protocolType, string specification,
-        INetwork network, NetworkTypeOption networkTypeOption, TicksOptions ticks,
+        INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks,
         string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = null)
     {
         if (NetworkSimulator == null)
@@ -178,7 +178,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 
         foreach (var networkOption in option.Networks)
         {
-            var networkType = option.NetworkTypes.GetValueOrDefault(networkOption.Value.NetworkType) ?? new NetworkTypeOption()
+            var networkType = option.NetworkTypes.GetValueOrDefault(networkOption.Value.NetworkType) ?? new NetworkOptions()
             {
                 TransferTicks = 3,
                 Speed = 125000000

@@ -21,6 +21,7 @@ namespace EntityFX.Tests.Integration
         private TicksOptions tickOptions;
         private INetworkLoggerProvider? _monitoringProvider;
         private NetworkSimulator? _graph;
+        private NetworkOptions _networkOptions;
         private StringBuilder _logSb;
         private Exception? _testException;
 
@@ -32,7 +33,7 @@ namespace EntityFX.Tests.Integration
         {
             pathFinder = new DijkstraWeightedIndexPathFinder();
 
-            _monitoring = new NetworkLogger(false, TimeSpan.FromMilliseconds(1), new MonitoringIgnoreOption() { Category = new string[] { "Refresh" } });
+            _monitoring = new NetworkLogger(false, TimeSpan.FromMilliseconds(1), new MonitoringIgnoreOption() { Category = new string[] { "Refresh", "Link" } });
 
             //_monitoring = new NetworkLogger(false, TimeSpan.FromMilliseconds(1), new MonitoringIgnoreOption());
             //_monitoringProvider = new ConsoleNetworkLoggerProvider(_monitoring);
@@ -44,6 +45,13 @@ namespace EntityFX.Tests.Integration
                 TickPeriod = TimeSpan.FromMilliseconds(1)
             };
             _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions);
+
+            _networkOptions = new NetworkOptions()
+            {
+                NetworkType = "eth",
+                TransferTicks = 2,
+                Speed = 18750000
+            };
 
             _logSb = new StringBuilder();
 
@@ -73,7 +81,7 @@ namespace EntityFX.Tests.Integration
             var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator);
 
             _graph!.Construction = true;
-            var networks = builder.BuildTree(branches, depth, clients, servers, true, tickOptions);
+            var networks = builder.BuildTree(branches, depth, clients, servers, true, tickOptions, _networkOptions);
             _graph.Construction = false;
             _graph.UpdateRoutes();
         }
@@ -83,7 +91,7 @@ namespace EntityFX.Tests.Integration
             var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator);
 
             _graph!.Construction = true;
-            var networks = builder.BuildChain(branches, length, clients, servers, true, tickOptions);
+            var networks = builder.BuildChain(branches, length, clients, servers, true, tickOptions, _networkOptions);
             _graph.Construction = false;
             _graph.UpdateRoutes();
         }
@@ -93,7 +101,7 @@ namespace EntityFX.Tests.Integration
             var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator);
 
             _graph!.Construction = true;
-            var networks = builder.BuildLine(length, clients, servers, true, tickOptions);
+            var networks = builder.BuildLine(length, clients, servers, true, tickOptions, _networkOptions);
             _graph.Construction = false;
             _graph.UpdateRoutes();
         }
@@ -149,7 +157,7 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void MqttChainTest()
         {
-            InitChain(0, 3, 1, 1);
+            InitChain(1, 3, 1, 1);
 
             var netsWithClients = _graph!.Networks.Values.Where(n => n.Clients.Count > 0).ToArray();
 
@@ -177,8 +185,6 @@ namespace EntityFX.Tests.Integration
                 _graph.RefreshWithCounters(IsParallelRefresh);
             }
 
-            var nonConnected = _graph!.Clients.Where(c => !c.Value.IsConnected);
-
             //Assert.IsTrue(mqc1426.IsConnected);
 
             //var mqc1426C = GetMqttCounters(mqc1426);
@@ -200,7 +206,7 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void MqttLineTest()
         {
-            InitLine(5, 1, 1);
+            InitLine(2, 1, 1);
 
             var netsWithClients = _graph!.Networks.Values.Where(n => n.Clients.Count > 0).ToArray();
 
@@ -232,7 +238,6 @@ namespace EntityFX.Tests.Integration
             var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
             var uml = plantUmlGraphGenerator.SerializeNetworkGraph(_graph!);
 
-            Console.WriteLine(_graph.Counters.PrintCounters());
             Console.WriteLine(_logSb.ToString());
         }
 

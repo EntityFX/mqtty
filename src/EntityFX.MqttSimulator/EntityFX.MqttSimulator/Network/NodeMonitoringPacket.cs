@@ -6,14 +6,20 @@ internal class NodeMonitoringPacket
 {
     private long _outgoingWaitTicks;
     
-    public NodeMonitoringPacket(INetworkPacket requestPacket, bool waitMode)
+    public NodeMonitoringPacket(long tick, INetworkPacket requestPacket, bool passTillNextTick, bool waitMode)
     {
         RequestPacket = requestPacket;
         WaitMode = waitMode;
+        PassTillNextTick = passTillNextTick;
+        Tick = tick;
     }
 
     public INetworkPacket RequestPacket { get; set; }
-    
+
+    public long Tick { get; }
+
+    internal bool PassTillNextTick { get; private set; }
+
     public long WaitTicks { get => _outgoingWaitTicks; init => _outgoingWaitTicks = value; }
     
     public long SendTick { get; init; }

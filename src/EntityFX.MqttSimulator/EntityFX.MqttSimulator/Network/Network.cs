@@ -20,7 +20,7 @@ public class Network : NodeBase, INetwork
     /// TODO: Add max size limit
     /// </summary>
     private List<NetworkMonitoringPacket> _monitoringPacketsQueue = new();
-    private readonly NetworkTypeOption _networkTypeOption;
+    private readonly NetworkOptions _networkTypeOption;
 
     //private Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
 
@@ -81,7 +81,7 @@ public class Network : NodeBase, INetwork
 
     public Network(
         int index, string name, string address, string networkType,
-        NetworkTypeOption networkTypeOption, TicksOptions ticksOptions)
+        NetworkOptions networkTypeOption, TicksOptions ticksOptions)
         : base(index, name, address)
     {
         this._networkTypeOption = networkTypeOption;
@@ -359,6 +359,11 @@ public class Network : NodeBase, INetwork
         {
             if (pendingPacket.PassTillNextTick && pendingPacket.Tick == NetworkSimulator!.TotalTicks)
             {
+                NetworkSimulator!.Monitoring.Push(pendingPacket.Packet.Id, NetworkSimulator.TotalTicks,
+                    this, pendingPacket.Path.First(),
+                    pendingPacket.Packet.Payload, NetworkLoggerType.Pass,
+                    $"Pass incomming: {pendingPacket.Packet.From} -> {pendingPacket.Path.First()!.Name}",
+                    pendingPacket.Packet.Protocol, "Node");
                 continue;
             }
 

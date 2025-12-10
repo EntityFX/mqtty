@@ -1,6 +1,6 @@
 ﻿namespace EntityFX.MqttY.Contracts.Options;
 
-public class NetworkTypeOption
+public class NetworkOptions
 {
     public int Speed { get; set; }
 

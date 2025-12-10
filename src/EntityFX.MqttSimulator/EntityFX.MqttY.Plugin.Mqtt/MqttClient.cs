@@ -53,23 +53,16 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return !cleanSession ? SessionState.SessionPresent : SessionState.CleanSession;
             }
 
-            var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref payload!,
-                $"MQTT Client {ClientId} connects to broker {server}");
-
-            NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, payload, NetworkLoggerType.Connect,
-                $"MQTT Client {ClientId} connects to broker {server}", ProtocolType, "MQTT Connect");
             _mqttCounters.PacketTypeCounters[connect.Type].Increment();
 
             var response = ConnectImplementation(server, payload);
 
             if (response == null)
             {
-                NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref payload);
                 throw new MqttException($"Unable connect to broker {server}");
             }
 
             var networkPacket = response!;
-            NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref networkPacket);
 
             OpenClientSession(cleanSession);
 
@@ -110,11 +103,6 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return true;
             }
 
-            var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref payload!,
-                $"MQTT Client {ClientId} connects to broker {server}");
-
-            NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, payload, NetworkLoggerType.Connect,
-                $"MQTT Client {ClientId} connects to broker {server}", ProtocolType, "MQTT Connect");
             _mqttCounters.PacketTypeCounters[connect.Type].Increment();
 
             var result = BeginConnectImplementation(server, payload);
@@ -176,11 +164,6 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 _packetManager.PacketToBytes(subscribe), ProtocolType, new(topicFilter, qos),
                 "MQTT Subscribe", outgoingTicks: TicksOptions.OutgoingWaitTicks);
 
-            var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref payload!,
-                $"Subscribe {Name} to {payload.To} using topic {topicFilter}");
-
-            NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, payload, NetworkLoggerType.Send,
-                $"MQTT Client {ClientId} subscribes to broker {payload.To} using topic {topicFilter}", ProtocolType, "MQTT Subscribe");
 
             var subscribeTimeout = TimeSpan.FromSeconds(60);
 
@@ -232,9 +215,6 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 MaximumQualityOfService = qos,
                 TopicFilter = topicFilter
             });
-
-
-            NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref responsePacket!);
         }
 
         public bool Publish(string topic, byte[] payload, MqttQos qos, bool retain = false)
@@ -251,9 +231,6 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 _packetManager.PacketToBytes(publish), ProtocolType, "MQTT Publish");
             var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packetPayload!,
                 $"Publish {Name} to {packetPayload.To} with topic {topic}");
-
-            NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, packetPayload, NetworkLoggerType.Send,
-                $"MQTT Client {ClientId} publishes to broker {packetPayload.To} using topic {topic}", ProtocolType, "MQTT Publish");
 
             if (!IsConnected)
             {
@@ -348,11 +325,6 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return;
             }
 
-            NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Receive,
-                $"MQTT Client {ClientId} receives Publish message from {packet.From} broker by topic {publishPacket.Topic}",
-                ProtocolType, "MQTT Publish");
-
-            NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
             SendPublishAck(packet, ClientId, publishPacket.QualityOfService, publishPacket);
 
             MessageReceived?.Invoke(this,
@@ -365,9 +337,6 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var ackPayload = _packetManager.PacketToBytes(ack) ?? Array.Empty<byte>();
 
             var reversePacket = NetworkSimulator!.GetReversePacket(packet, ackPayload.ToArray(), "MQTT PubAck");
-            NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send,
-                $"Send MQTT publish ack {packet.From} to {packet.To} with {publishPacket.Topic} (QoS={publishPacket.QualityOfService})",
-                ProtocolType, "MQTT PubAck");
 
             Send(reversePacket);
         }
@@ -494,12 +463,6 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 "MQTT Subscribe", outgoingTicks: TicksOptions.OutgoingWaitTicks);
 
 
-            var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref payload!,
-                $"Subscribe {Name} to {payload.To} using topic {topicFilter}");
-
-            NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, payload, NetworkLoggerType.Send,
-                $"MQTT Client {ClientId} subscribes to broker {payload.To} using topic {topicFilter}", ProtocolType, "MQTT Subscribe");
-
             var subscribeTimeout = TimeSpan.FromSeconds(60);
 
             _mqttCounters.PacketTypeCounters[subscribe.Type].Increment();
@@ -552,8 +515,6 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 TopicFilter = topicFilter
             });
 
-
-            NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref response!);
         }
     }
 }

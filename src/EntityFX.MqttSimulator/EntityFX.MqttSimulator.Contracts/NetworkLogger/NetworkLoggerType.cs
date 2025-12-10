@@ -4,6 +4,7 @@
     {
         Send,
         Receive,
+        Pass,
         Transfer,
         Push,
         Delivery,

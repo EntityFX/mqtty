@@ -15,11 +15,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
         private MqttReceiverCounters _receiverCounter;
         private readonly INetworkSimulatorBuilder _networkSimulatorBuilder;
         private readonly TicksOptions _ticksOptions;
-        private readonly NetworkTypeOption _networkTypeOption;
+        private readonly NetworkOptions _networkTypeOption;
 
         public MqttReceiver(INetworkSimulatorBuilder networkSimulatorBuilder, int index, string name, string address, string protocolType, string specification, 
             TicksOptions ticksOptions,
-            NetworkTypeOption networkTypeOption, MqttReceiverConfiguration? options) 
+            NetworkOptions networkTypeOption, MqttReceiverConfiguration? options) 
             : base(index, name, address, protocolType, specification, ticksOptions, options)
         {
             this._ticksOptions = ticksOptions;

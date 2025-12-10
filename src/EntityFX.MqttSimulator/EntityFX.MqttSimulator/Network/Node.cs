@@ -48,6 +48,14 @@ public abstract class Node : NodeBase
         var outgoing = _outgoingMessages.ToArray();
         foreach (var outgoingMonitoringPacket in outgoing)
         {
+            if (outgoingMonitoringPacket.PassTillNextTick && outgoingMonitoringPacket.Tick == NetworkSimulator!.TotalTicks)
+            {
+                NetworkSimulator!.Monitoring.Push(outgoingMonitoringPacket.Id, NetworkSimulator.TotalTicks, this, Network!, 
+                    outgoingMonitoringPacket.RequestPacket.Payload, NetworkLoggerType.Pass,
+                    $"Pass outgoing: {outgoingMonitoringPacket.RequestPacket.From} -> {Network!.Name}",
+                    outgoingMonitoringPacket.RequestPacket.Protocol, "Node");
+                continue;
+            }
             outgoingMonitoringPacket.ReduceWaitTicks();
             if (outgoingMonitoringPacket.WaitTicks <= 0 && !outgoingMonitoringPacket.Released)
             {
@@ -59,6 +67,14 @@ public abstract class Node : NodeBase
         var incomming = _incommingMessages.ToArray();
         foreach (var incommingMonitoringPacket in incomming)
         {
+            if (incommingMonitoringPacket.PassTillNextTick && incommingMonitoringPacket.Tick == NetworkSimulator!.TotalTicks)
+            {
+                NetworkSimulator!.Monitoring.Push(incommingMonitoringPacket.Id, NetworkSimulator.TotalTicks, this, Network!,
+                    incommingMonitoringPacket.RequestPacket.Payload, NetworkLoggerType.Pass,
+                    $"Pass incomming: {incommingMonitoringPacket.RequestPacket.From} -> {Network!.Name}", 
+                    incommingMonitoringPacket.RequestPacket.Protocol, "Node");
+                continue;
+            }
             incommingMonitoringPacket.ReduceWaitTicks();
             if (incommingMonitoringPacket.WaitTicks <= 0 && !incommingMonitoringPacket.Released)
             {
@@ -144,7 +160,7 @@ public abstract class Node : NodeBase
 
     private void PreSend(INetworkPacket packet)
     {
-        _outgoingMessages.Add(new NodeMonitoringPacket(packet, NetworkSimulator!.WaitMode)
+        _outgoingMessages.Add(new NodeMonitoringPacket(NetworkSimulator!.TotalTicks, packet, true, NetworkSimulator!.WaitMode)
         {
             WaitTicks = TicksOptions.OutgoingWaitTicks,
             Id = Guid.NewGuid(),
@@ -154,7 +170,7 @@ public abstract class Node : NodeBase
 
     private void PreReceive(INetworkPacket packet)
     {
-        _incommingMessages.Add(new NodeMonitoringPacket(packet, NetworkSimulator!.WaitMode)
+        _incommingMessages.Add(new NodeMonitoringPacket(NetworkSimulator!.TotalTicks, packet, true, NetworkSimulator!.WaitMode)
         {
             WaitTicks = TicksOptions.OutgoingWaitTicks,
             Id = Guid.NewGuid(),
