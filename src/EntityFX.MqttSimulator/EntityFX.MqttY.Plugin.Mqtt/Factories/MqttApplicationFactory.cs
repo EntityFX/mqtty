@@ -71,7 +71,7 @@ public class MqttApplicationFactory : IFactory<IApplication?, NodeBuildOptions<N
                     var receiver = new MqttReceiver
                     (networkSimulatorBuilder, options.Index, options.Name, options.Address ?? options.Name,
                         options.Protocol, options.Specification,
-                        options.Additional!.TicksOptions!, options.Additional.NetworkTypeOption!, mqttReceiverConf)
+                        options.Additional!.TicksOptions!, mqttReceiverConf)
                     {
                         Group = options.Group,
                         GroupAmount = options.GroupAmount

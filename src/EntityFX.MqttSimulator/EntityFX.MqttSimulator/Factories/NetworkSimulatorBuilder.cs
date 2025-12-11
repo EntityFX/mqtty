@@ -58,7 +58,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
     }
 
     public IClient? BuildClient(int index, string name, string protocolType, string specification,
-        INetwork network, NetworkOptions? networkTypeOption, TicksOptions? ticks,
+        INetwork network, TicksOptions? ticks,
         string? group = null, int? groupAmount = null,
         Dictionary<string, string[]>? additional = default)
     {
@@ -76,7 +76,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                     specification, null, new NetworkBuildOption()
                     {
                         TicksOptions = ticks,
-                        NetworkTypeOption = networkTypeOption
+                        NetworkTypeOption = new NetworkOptions()
                     }));
 
         if (client == null)
@@ -90,12 +90,12 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
     }
 
     public TClient? BuildClient<TClient>(int index, string name, string protocolType, string specification,
-        INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks,
+        INetwork network, TicksOptions ticks,
         string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = default)
         where TClient : IClient
     {
         return (TClient?)BuildClient(index, name, protocolType, specification, network,
-            networkTypeOption, ticks, group, groupAmount, additional);
+            ticks, group, groupAmount, additional);
     }
 
     public INetwork? BuildNetwork(int index, string name, string address, NetworkOptions networkTypeOption, TicksOptions ticks)
@@ -354,14 +354,14 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                                     index, $"{node.Key}{nc}",
                                     node.Value.Protocol ?? "tcp",
                                     node.Value.Specification ?? "tcp-client",
-                                    linkNetwork, networkTypeOption, option.Ticks,
+                                    linkNetwork, option.Ticks,
                                     node.Key, node.Value.Quantity, node.Value.Additional));
                     }
                     else
                     {
                         BuildClient(index, node.Key, node.Value.Protocol ?? "tcp",
                             node.Value.Specification ?? "tcp-client",
-                            linkNetwork, networkTypeOption, option.Ticks,
+                            linkNetwork, option.Ticks,
                             null, null, node.Value.Additional);
                     }
 

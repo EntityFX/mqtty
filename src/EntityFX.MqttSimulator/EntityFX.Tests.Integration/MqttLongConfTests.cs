@@ -12,6 +12,8 @@ using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Counter;
 using EntityFX.MqttY.Plugin.Mqtt.Counter;
 using EntityFX.MqttY.Contracts.Mqtt.Formatters;
+using EntityFX.MqttY.Contracts.Utils;
+using EntityFX.MqttY.Factories;
 
 namespace EntityFX.Tests.Integration
 {
@@ -19,6 +21,7 @@ namespace EntityFX.Tests.Integration
     public class MqttLongConfTests
     {
         private DijkstraWeightedIndexPathFinder pathFinder;
+        private readonly ActionClientBuilder clientBuilder;
         private INetworkLogger? _monitoring;
         private TicksOptions tickOptions;
         private INetworkLoggerProvider? _monitoringProvider;
@@ -35,6 +38,9 @@ namespace EntityFX.Tests.Integration
             //var pathFinder = new DijkstraPathFinder();
             //var pathFinder2 = new DijkstraIndexPathFinder();
             pathFinder = new DijkstraWeightedIndexPathFinder();
+
+
+            clientBuilder = new ActionClientBuilder(AppBuild);
 
             _monitoring = new NullNetworkLogger();
             tickOptions = new TicksOptions()
@@ -59,15 +65,20 @@ namespace EntityFX.Tests.Integration
             mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
         }
 
+        private IClient AppBuild((int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group, int? groupAmount, Dictionary<string, string[]>? additional) tuple)
+        {
+            throw new NotImplementedException();
+        }
+
         [TestInitialize]
         public void Initialize()
         {
 
 
-            var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator);
+            var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
             _graph!.Construction = true;
-            var networks = builder.BuildTree(5, 4, 10, 2, true, tickOptions, _networkOptions);
+            var networks = builder.BuildTree(5, 4, 10, 2, null, true, tickOptions, _networkOptions);
             //var networks = builder.BuildTree(3, 3, 3, 1, true, tickOptions);
             _graph.Construction = false;
             _graph.UpdateRoutes();
@@ -103,10 +114,10 @@ namespace EntityFX.Tests.Integration
         public void BuildRandomTest()
         {
             var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions);
-            var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator);
+            var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
             graph!.Construction = true;
-            var networks = builder.BuildRandomNodesTree(3, 3, (2, 10), (1, 3), true, tickOptions, _networkOptions);
+            var networks = builder.BuildRandomNodesTree(3, 3, (2, 10), (1, 3), null, true, tickOptions, _networkOptions);
             //var networks = builder.BuildTree(3, 3, 3, 1, true, tickOptions);
             graph.Construction = false;
             graph.UpdateRoutes();
@@ -119,10 +130,10 @@ namespace EntityFX.Tests.Integration
         public void BuildChainTest()
         {
             var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions);
-            var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator);
+            var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
             graph!.Construction = true;
-            var networks = builder.BuildChain(3, 10, 5, 2, true, tickOptions, _networkOptions);
+            var networks = builder.BuildChain(3, 10, 5, 2, null, true, tickOptions, _networkOptions);
             //var networks = builder.BuildTree(3, 3, 3, 1, true, tickOptions);
             graph.Construction = false;
             graph.UpdateRoutes();

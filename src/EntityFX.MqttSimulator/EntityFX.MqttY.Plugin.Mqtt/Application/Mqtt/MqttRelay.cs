@@ -70,7 +70,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
                 var nodeName = GetNodeName(group, listenServer.Key);
                 var listenerMqttClient = _networkSimulatorBuilder.BuildClient<IMqttClient>(0, nodeName, ProtocolType,
                     "mqtt-client",
-                    Network!, null, _ticksOptions, group, serverTopics.Count);
+                    Network!, _ticksOptions, group, serverTopics.Count);
                 if (listenerMqttClient == null)
                 {
                     break;

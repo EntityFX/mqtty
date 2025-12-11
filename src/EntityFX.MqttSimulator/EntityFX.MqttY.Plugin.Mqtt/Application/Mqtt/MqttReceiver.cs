@@ -13,19 +13,18 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
         private IMqttClient? _mqttClient;
 
         private MqttReceiverCounters _receiverCounter;
-        private readonly INetworkSimulatorBuilder _networkSimulatorBuilder;
+        private readonly IClientBuilder _clientBuilder;
         private readonly TicksOptions _ticksOptions;
-        private readonly NetworkOptions _networkTypeOption;
 
-        public MqttReceiver(INetworkSimulatorBuilder networkSimulatorBuilder, int index, string name, string address, string protocolType, string specification, 
+
+        public MqttReceiver(IClientBuilder clientBuilder, int index, string name, string address, string protocolType, string specification, 
             TicksOptions ticksOptions,
-            NetworkOptions networkTypeOption, MqttReceiverConfiguration? options) 
+            MqttReceiverConfiguration? options) 
             : base(index, name, address, protocolType, specification, ticksOptions, options)
         {
             this._ticksOptions = ticksOptions;
             _receiverCounter = new MqttReceiverCounters("Receiver", _ticksOptions.CounterHistoryDepth);
-            this._networkSimulatorBuilder = networkSimulatorBuilder;
-            this._networkTypeOption = networkTypeOption;
+            this._clientBuilder = clientBuilder;
             counters.AddCounter(_receiverCounter);
         }
 
@@ -60,9 +59,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
         {
             var nodeName = GetNodeName(Name, serverOption);
 
-            var listenerMqttClient = _networkSimulatorBuilder.BuildClient<IMqttClient>(0, nodeName, ProtocolType,
+            var listenerMqttClient = _clientBuilder.BuildClient<IMqttClient>(0, nodeName!, ProtocolType,
                 "mqtt-client",
-                    Network!, _networkTypeOption, _ticksOptions, null);
+                    Network!, _ticksOptions);
 
             if (listenerMqttClient == null)
             {

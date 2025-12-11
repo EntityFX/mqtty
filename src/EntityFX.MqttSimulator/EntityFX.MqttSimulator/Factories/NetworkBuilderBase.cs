@@ -2,15 +2,15 @@
 using EntityFX.MqttY.Contracts.Options;
 using System.Security.Cryptography;
 
-namespace EntityFX.MqttY.Helper
+namespace EntityFX.MqttY.Factories
 {
-    public abstract class MqttNetworkBuilderBase
+    public abstract class NetworkBuilderBase
     {
         private int _nextId = 0;
 
         protected readonly INetworkSimulator networkSimulator;
 
-        public MqttNetworkBuilderBase(INetworkSimulator networkSimulator)
+        public NetworkBuilderBase(INetworkSimulator networkSimulator)
         {
             this.networkSimulator = networkSimulator;
         }
@@ -19,7 +19,10 @@ namespace EntityFX.MqttY.Helper
 
         protected abstract IServer CreateServer(TicksOptions ticksOptions, int ix, string fullName, string address);
 
-        public Network.Network BuildChain(int branchingFactor, int length, int clientsPerNode, int serversPerNode,
+        protected abstract IApplication CreateApplication(TicksOptions ticksOptions, int ix, string name, string fullName, string address, string specification);
+
+        public Network.Network BuildChain(int branchingFactor, int length, 
+            int clientsPerNode, int serversPerNode, Dictionary<string, int>? appsPerNode,
             bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
         {
             if (length < 1)
@@ -28,7 +31,8 @@ namespace EntityFX.MqttY.Helper
             Network.Network? previous = null;
             for (int i = 0; i < length; i++)
             {
-                var network = CreateBranchingNetwork(branchingFactor, clientsPerNode, serversPerNode, createLeafNodesOnly,
+                var network = CreateBranchingNetwork(branchingFactor, 
+                    clientsPerNode, serversPerNode, appsPerNode, createLeafNodesOnly,
                 "net", networkTypeOption, ticksOptions);
 
                 if (previous != null)
@@ -43,7 +47,7 @@ namespace EntityFX.MqttY.Helper
             return previous!;
         }
 
-        public Network.Network BuildLine(int length, int clientsPerNode, int serversPerNode,
+        public Network.Network BuildLine(int length, int clientsPerNode, int serversPerNode, Dictionary<string, int>? appsPerNode,
             bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
         {
             if (length < 1)
@@ -70,27 +74,35 @@ namespace EntityFX.MqttY.Helper
             CreateClients(networks[0], clientsPerNode, ticksOptions);
             CreateServers(networks[length - 1], serversPerNode, ticksOptions);
 
+            if (appsPerNode != null)
+            {
+                CreateApplications(networks[length - 1], ticksOptions, appsPerNode);
+            }
+
             return previous!;
         }
 
-        public Network.Network BuildTree(int branchingFactor, int depth, int clientsPerNode, int serversPerNode,
+        public Network.Network BuildTree(int branchingFactor, int depth, 
+            int clientsPerNode, int serversPerNode, Dictionary<string, int>? appsPerNode,
             bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
         {
             if (branchingFactor < 1 || depth < 1)
                 throw new ArgumentException("Параметры должны быть положительными числами");
 
-            return CreateDepthNetwork(branchingFactor, depth, clientsPerNode, serversPerNode, createLeafNodesOnly,
-                "net",  ticksOptions, networkTypeOption);
+            return CreateDepthNetwork(branchingFactor, depth, clientsPerNode, 
+                serversPerNode, appsPerNode, createLeafNodesOnly,
+                "net", ticksOptions, networkTypeOption);
         }
 
         public Network.Network BuildRandomNodesTree(int branchingFactor, int depth,
             (int Min, int Max) clientsPerNode, (int Min, int Max) serversPerNode,
+            Dictionary<string, (int Min, int Max)>? appsPerNode,
             bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
         {
             if (branchingFactor < 1 || depth < 1)
                 throw new ArgumentException("Параметры должны быть положительными числами");
 
-            return CreateRandomNodesNetwork(branchingFactor, depth, clientsPerNode, serversPerNode, createLeafNodesOnly,
+            return CreateRandomNodesNetwork(branchingFactor, depth, clientsPerNode, serversPerNode, appsPerNode, createLeafNodesOnly,
                 "net", new NetworkOptions()
                 {
                     NetworkType = "eth",
@@ -115,7 +127,7 @@ namespace EntityFX.MqttY.Helper
         }
 
         private Network.Network CreateBranchingNetwork(int branchingFactor,
-            int clientsPerNode, int serversPerNode, bool createLeafNodesOnly, string namePrefix,
+            int clientsPerNode, int serversPerNode, Dictionary<string, int>? appsPerNode, bool createLeafNodesOnly, string namePrefix,
             NetworkOptions networkTypeOption, TicksOptions ticksOptions)
         {
             var ix = _nextId++;
@@ -131,6 +143,11 @@ namespace EntityFX.MqttY.Helper
                 networkSimulator.AddNetwork(child);
                 CreateClients(child, clientsPerNode, ticksOptions);
                 CreateServers(child, serversPerNode, ticksOptions);
+
+                if (appsPerNode != null)
+                {
+                    CreateApplications(child, ticksOptions, appsPerNode);
+                }
 
                 child.Link(node);
             }
@@ -148,7 +165,7 @@ namespace EntityFX.MqttY.Helper
         }
 
         private Network.Network CreateDepthNetwork(int branchingFactor, int depth,
-            int clientsPerNode, int serversPerNode, bool createLeafNodesOnly, string namePrefix,
+            int clientsPerNode, int serversPerNode, Dictionary<string, int>? appsPerNode, bool createLeafNodesOnly, string namePrefix,
             TicksOptions ticksOptions,
             NetworkOptions networkTypeOption)
         {
@@ -160,7 +177,8 @@ namespace EntityFX.MqttY.Helper
             {
                 for (int i = 0; i < branchingFactor; i++)
                 {
-                    var child = CreateDepthNetwork(branchingFactor, depth - 1, clientsPerNode, serversPerNode,
+                    var child = CreateDepthNetwork(branchingFactor, depth - 1, 
+                        clientsPerNode, serversPerNode, appsPerNode,
                         createLeafNodesOnly, name, ticksOptions,
                         networkTypeOption);
                     child.Link(node);
@@ -176,12 +194,18 @@ namespace EntityFX.MqttY.Helper
             CreateClients(node, clientsPerNode, ticksOptions);
             CreateServers(node, serversPerNode, ticksOptions);
 
+            if (appsPerNode != null)
+            {
+                CreateApplications(node, ticksOptions, appsPerNode);
+            }
+
             return node;
         }
 
         private Network.Network CreateRandomNodesNetwork(int branchingFactor, int depth,
             (int Min, int Max) clientsPerNode,
             (int Min, int Max) serversPerNode,
+            Dictionary<string, (int Min, int Max)>? appsPerNode,
             bool createLeafNodesOnly, string namePrefix,
             NetworkOptions networkTypeOption, TicksOptions ticksOptions)
         {
@@ -193,7 +217,7 @@ namespace EntityFX.MqttY.Helper
             {
                 for (int i = 0; i < branchingFactor; i++)
                 {
-                    var child = CreateRandomNodesNetwork(branchingFactor, depth - 1, clientsPerNode, serversPerNode,
+                    var child = CreateRandomNodesNetwork(branchingFactor, depth - 1, clientsPerNode, serversPerNode, appsPerNode,
                         createLeafNodesOnly, name,
                         networkTypeOption, ticksOptions);
                     child.Link(node);
@@ -206,12 +230,16 @@ namespace EntityFX.MqttY.Helper
                 return node;
             }
 
-            var clients = RandomNumberGenerator.GetInt32((clientsPerNode.Max - clientsPerNode.Min) + 1) + clientsPerNode.Min;
-            var servers = RandomNumberGenerator.GetInt32((serversPerNode.Max - serversPerNode.Min) + 1) + serversPerNode.Min;
+            var clients = RandomNumberGenerator.GetInt32(clientsPerNode.Max - clientsPerNode.Min + 1) + clientsPerNode.Min;
+            var servers = RandomNumberGenerator.GetInt32(serversPerNode.Max - serversPerNode.Min + 1) + serversPerNode.Min;
 
             CreateClients(node, clients, ticksOptions);
             CreateServers(node, servers, ticksOptions);
-
+            if (appsPerNode != null)
+            {
+                var apps = appsPerNode.ToDictionary(k => k.Key, v => RandomNumberGenerator.GetInt32(v.Value.Max - v.Value.Min + 1) + v.Value.Min);
+                CreateApplications(node, ticksOptions, apps);
+            }
             return node;
         }
 
@@ -227,6 +255,25 @@ namespace EntityFX.MqttY.Helper
                 var broker = CreateServer(ticksOptions, ix, fullName, address);
                 node.AddServer(broker);
                 networkSimulator.AddServer(broker);
+            }
+        }
+
+        private void CreateApplications(Network.Network node, TicksOptions ticksOptions, Dictionary<string, int> appsPerNode)
+        {
+            foreach (var appPerNode in appsPerNode)
+            {
+                for (int i = 0; i < appPerNode.Value; i++)
+                {
+
+                    var ix = _nextId++;
+                    var name = $"mqb{ix}";
+                    var fullName = $"{name}.{node.Name}";
+
+                    var address = $"mqtt://{name}";
+                    var application = CreateApplication(ticksOptions, ix, name, fullName, address, appPerNode.Key);
+                    node.AddApplication(application);
+                    networkSimulator.AddApplication(application);
+                }
             }
         }
     }

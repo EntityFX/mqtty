@@ -3,7 +3,7 @@ using EntityFX.MqttY.Contracts.Options;
 
 namespace EntityFX.MqttY.Contracts.Utils
 {
-    public interface INetworkSimulatorBuilder
+    public interface INetworkSimulatorBuilder : IClientBuilder
     {
         string? OptionsPath { get; set; }
 
@@ -11,17 +11,6 @@ namespace EntityFX.MqttY.Contracts.Utils
 
         INetwork? BuildNetwork(int index, string name, string address, 
             NetworkOptions networkTypeOption, TicksOptions ticks);
-
-        IClient? BuildClient(int index, string name, string protocolType, string specification,
-            INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks, 
-            string? group = null, int? groupAmount = null,
-            Dictionary<string, string[]>? additional = null);
-
-        TClient? BuildClient<TClient>(int index, string name, string protocolType, string specification,
-            INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks, 
-            string? group = null, int? groupAmount = null,
-            Dictionary<string, string[]>? additional = null)
-            where TClient : IClient;
 
         IServer? BuildServer(int index, string name, string protocolType, string specification,
             INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks, 

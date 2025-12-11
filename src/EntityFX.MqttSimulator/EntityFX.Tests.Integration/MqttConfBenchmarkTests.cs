@@ -10,6 +10,8 @@ using EntityFX.MqttY.Helper;
 using System.Security.Cryptography;
 using EntityFX.MqttY.Utils;
 using System.Text;
+using EntityFX.MqttY.Factories;
+using EntityFX.MqttY.Contracts.Utils;
 
 namespace EntityFX.Tests.Integration
 {
@@ -28,6 +30,7 @@ namespace EntityFX.Tests.Integration
         private bool IsParallelRefresh = true;
         private MqttTopicEvaluator mqttTopicEvaluator;
         private MqttNativePacketManager mqttPacketManager;
+        private IClientBuilder clientBuilder;
 
         public MqttConfBenchmarkTests()
         {
@@ -53,6 +56,8 @@ namespace EntityFX.Tests.Integration
                 Speed = 18750000
             };
 
+            clientBuilder = new ActionClientBuilder(AppBuild);
+
             _logSb = new StringBuilder();
 
             _monitoringProvider = new SimpleNetworkLoggerProvider(_monitoring, _logSb);
@@ -60,6 +65,11 @@ namespace EntityFX.Tests.Integration
 
             mqttTopicEvaluator = new MqttTopicEvaluator(true);
             mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
+        }
+
+        private IClient AppBuild((int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group, int? groupAmount, Dictionary<string, string[]>? additional) tuple)
+        {
+            throw new NotImplementedException();
         }
 
         [TestInitialize]
@@ -76,32 +86,32 @@ namespace EntityFX.Tests.Integration
             _graph!.Clear();
         }
 
-        private void InitGraphTree(int branches, int depth, int clients, int servers)
+        private void InitGraphTree(int branches, int depth, int clients, int servers, Dictionary<string, int>? appsPerNode = null)
         {
-            var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator);
+            var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
             _graph!.Construction = true;
-            var networks = builder.BuildTree(branches, depth, clients, servers, true, tickOptions, _networkOptions);
+            var networks = builder.BuildTree(branches, depth, clients, servers, appsPerNode, true, tickOptions, _networkOptions);
             _graph.Construction = false;
             _graph.UpdateRoutes();
         }
 
-        private void InitChain(int branches, int length, int clients, int servers)
+        private void InitChain(int branches, int length, int clients, int servers, Dictionary<string, int>? appsPerNod = null)
         {
-            var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator);
+            var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
             _graph!.Construction = true;
-            var networks = builder.BuildChain(branches, length, clients, servers, true, tickOptions, _networkOptions);
+            var networks = builder.BuildChain(branches, length, clients, servers, appsPerNod, true, tickOptions, _networkOptions);
             _graph.Construction = false;
             _graph.UpdateRoutes();
         }
 
-        private void InitLine(int length, int clients, int servers)
+        private void InitLine(int length, int clients, int servers, Dictionary<string, int>? appsPerNode = null)
         {
-            var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator);
+            var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
             _graph!.Construction = true;
-            var networks = builder.BuildLine(length, clients, servers, true, tickOptions, _networkOptions);
+            var networks = builder.BuildLine(length, clients, servers, appsPerNode, true, tickOptions, _networkOptions);
             _graph.Construction = false;
             _graph.UpdateRoutes();
         }
