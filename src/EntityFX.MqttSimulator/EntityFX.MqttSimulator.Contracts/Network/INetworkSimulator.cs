@@ -16,6 +16,7 @@ namespace EntityFX.MqttY.Contracts.Network
         IImmutableDictionary<string, INetwork> Networks { get; }
         IImmutableDictionary<string, IClient> Clients { get; }
         IImmutableDictionary<string, IServer> Servers { get; }
+        IImmutableDictionary<string, IApplication> Applications { get; }
 
         event EventHandler<Exception>? OnError;
 

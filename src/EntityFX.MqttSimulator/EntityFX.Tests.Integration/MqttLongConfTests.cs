@@ -14,6 +14,10 @@ using EntityFX.MqttY.Plugin.Mqtt.Counter;
 using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Factories;
+using EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt;
+using System.Xml.Linq;
+using static EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt.MqttRelayConfiguration;
+using EntityFX.MqttY.Scenarios;
 
 namespace EntityFX.Tests.Integration
 {
@@ -135,6 +139,85 @@ namespace EntityFX.Tests.Integration
             graph!.Construction = true;
             var networks = builder.BuildChain(3, 10, 5, 2, null, true, tickOptions, _networkOptions);
             //var networks = builder.BuildTree(3, 3, 3, 1, true, tickOptions);
+            graph.Construction = false;
+            graph.UpdateRoutes();
+
+            var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
+            var uml = plantUmlGraphGenerator.SerializeNetworkGraph(graph!);
+        }
+
+        [TestMethod]
+        public void BuildSimpleTreeTest()
+        {
+            var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions);
+            var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
+
+            graph!.Construction = true;
+            var networks = builder.BuildSimpleTree(3, 10, 2, 1, null, true, tickOptions, _networkOptions);
+            //var networks = builder.BuildTree(3, 3, 3, 1, true, tickOptions);
+            graph.Construction = false;
+            graph.UpdateRoutes();
+
+            var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
+            var uml = plantUmlGraphGenerator.SerializeNetworkGraph(graph!);
+        }
+
+        [TestMethod]
+        public void BuildRelayTreeTest()
+        {
+            var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions);
+            var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
+
+            var appuildOptions = new Dictionary<string, (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>()
+            {
+                ["mqtt-receiver"] = (1, (index, name, specification) => new MqttReceiverConfiguration()
+                {
+                    Topics = new string[] {
+                            "telemetry/+",
+                            "local/telemetry/+"
+                        }
+                })
+            };
+
+            graph!.Construction = true;
+            var networks = builder.BuildSimpleTree(3, 2, 2, 1, appuildOptions, true, tickOptions, _networkOptions);
+            var brokers = graph.Servers.Values.OfType<IMqttBroker>().ToArray();
+
+            var ix = 3 * 2 * 2;
+            foreach (var broker in brokers!)
+            {
+                var oppositeBrokers = brokers.Where(b => b.Name != broker.Name);
+
+                var brokerNetwork = broker.Network;
+                var relayName = $"mqrl{ix}.{brokerNetwork!.Name}";
+                var address = $"mqtt://{relayName}";
+
+                var relayRemoteTopics = oppositeBrokers.ToDictionary(k => $"rs{k.Index}",
+                    v => new MqttRelayConfigurationItem() { ReplaceRelaySegment = false, Server = v.Name, TopicPrefix = $"relay{v.Index}" });
+
+                var relay = new MqttRelay(ix, relayName, address, "mqtt", "mqtt-relay", clientBuilder, mqttTopicEvaluator, tickOptions,
+                    new MqttRelayConfiguration()
+                    {
+                        ListenTopics = new Dictionary<string, MqttRelayConfiguration.MqttListenConfigurationItem>()
+                        {
+                            ["ls1"] = new MqttRelayConfiguration.MqttListenConfigurationItem()
+                            {
+                                Server = broker.Name,
+                                Topics = new string[] { "telemetry/+" }
+                            },
+                            ["rls1"] = new MqttRelayConfiguration.MqttListenConfigurationItem()
+                            {
+                                Server = broker.Name,
+                                Topics = new string[] { $"relay{ix}/telemetry/+" }
+                            },
+                        },
+                        RelayTopics = relayRemoteTopics
+                    });
+                brokerNetwork.AddApplication(relay);
+                graph.AddApplication(relay);
+                ix++;
+            }
+
             graph.Construction = false;
             graph.UpdateRoutes();
 

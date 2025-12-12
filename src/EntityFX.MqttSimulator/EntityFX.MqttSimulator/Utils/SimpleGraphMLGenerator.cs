@@ -56,6 +56,11 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
             AddServerNode(graphEl, server.Value);
         }
 
+        foreach (var application in networkGraph.Applications)
+        {
+            AddApplicationNode(graphEl, application.Value);
+        }
+
         var visitedNetworks = new HashSet<string>();
 
         foreach (var network in networkGraph.Networks)
@@ -76,6 +81,11 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
         foreach (var server in networkGraph.Servers)
         {
             AddEdge(graphEl, server.Value, "s");
+        }
+
+        foreach (var application in networkGraph.Applications)
+        {
+            AddEdge(graphEl, application.Value, "a");
         }
 
         var wr = new StringWriter();
@@ -167,6 +177,22 @@ public class SimpleGraphMlGenerator : INetworkGraphFormatter
         foreach (var counter in allCounters)
         {
             var elemName = $"s:{counter.Key}";
+            nodeEl.Add(BuildDataElement(elemName, counter.Value.Value));
+        }
+
+        return nodeEl;
+    }
+
+    private XElement AddApplicationNode(XElement graphEl, IApplication application)
+    {
+        var nodeEl = AddNode(graphEl, application, "a", 50.0m, new NodeColor(67, 119, 249));
+
+        var allCounters = application.Counters.GetAllGenericCounters();
+        var statistics = application.Counters.GetAllGenericCountersAsShortText();
+        nodeEl.Add(BuildDataElement("statistics", statistics));
+        foreach (var counter in allCounters)
+        {
+            var elemName = $"a:{counter.Key}";
             nodeEl.Add(BuildDataElement(elemName, counter.Value.Value));
         }
 

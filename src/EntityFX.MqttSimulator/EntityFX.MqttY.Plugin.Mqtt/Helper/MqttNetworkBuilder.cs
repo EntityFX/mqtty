@@ -1,10 +1,13 @@
-﻿using EntityFX.MqttY.Contracts.Mqtt;
+﻿using EntityFX.MqttY.Application;
+using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Factories;
 using EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt;
+using Microsoft.Extensions.Options;
+using System.Net;
 using System.Xml.Linq;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Helper;
@@ -33,16 +36,25 @@ public class MqttNetworkBuilder : NetworkBuilderBase
         return new MqttClient(mqttPacketManager, ix, fullName, address, "mqtt", "mqtt", name, ticksOptions);
     }
 
-    protected override IApplication CreateApplication(TicksOptions ticksOptions, int ix, string name, string fullName, string address, string specification)
+    protected override IApplication CreateApplication(
+        TicksOptions ticksOptions, int ix, string name, string fullName, 
+        string address, string specification,
+        NetworkBuilderApplicationFunc<object>? appOptionsFunc)
     {
-        return new MqttReceiver(clientBuilder, ix, name, address, "mqtt", specification, ticksOptions,
-            new MqttReceiverConfiguration()
-            {
-                Topics = new string[] {
-                    "telemetry/+",
-                    "local/telemetry/+" 
-                }
-            }
-        );
+        switch (specification)
+        {
+            case "mqtt-relay":
+                return new MqttRelay(ix, fullName, address,
+                    "mqtt", specification, clientBuilder, mqttTopicEvaluator,
+                    ticksOptions,
+                    appOptionsFunc?.Invoke(ix, fullName, specification) as MqttRelayConfiguration);
+            case "mqtt-receiver":
+                return new MqttReceiver(clientBuilder, ix, name, address, 
+                    "mqtt", specification, ticksOptions,
+                    appOptionsFunc?.Invoke(ix, fullName, specification) as MqttReceiverConfiguration
+                );
+        }
+
+        return new Application<string>(ix, fullName, address, "mqtt", specification, ticksOptions, null);
     }
 }

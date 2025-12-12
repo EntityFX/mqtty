@@ -10,19 +10,19 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
     public class MqttRelay : Application<MqttRelayConfiguration>
     {
         private readonly Dictionary<string, IMqttClient> _listenClients = new();
-        private readonly INetworkSimulatorBuilder _networkSimulatorBuilder;
+        private readonly IClientBuilder _clientBuilder;
         private readonly IMqttTopicEvaluator _mqttTopicEvaluator;
         private readonly TicksOptions _ticksOptions;
 
         public MqttRelay(int index, string name, string address, string protocolType, string specification,
-            INetworkSimulatorBuilder networkSimulatorBuilder,
+            IClientBuilder clientBuilder,
             IMqttTopicEvaluator mqttTopicEvaluator, TicksOptions ticksOptions,
             MqttRelayConfiguration? mqttRelayConfiguration) 
             : base(index, name, address, protocolType, specification, ticksOptions, mqttRelayConfiguration)
         {
-            this._networkSimulatorBuilder = networkSimulatorBuilder;
-            this._mqttTopicEvaluator = mqttTopicEvaluator;
-            this._ticksOptions = ticksOptions;
+            _clientBuilder = clientBuilder;
+            _mqttTopicEvaluator = mqttTopicEvaluator;
+            _ticksOptions = ticksOptions;
         }
 
         public override void Start()
@@ -68,7 +68,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
             foreach (var listenServer in serverTopics!)
             {
                 var nodeName = GetNodeName(group, listenServer.Key);
-                var listenerMqttClient = _networkSimulatorBuilder.BuildClient<IMqttClient>(0, nodeName, ProtocolType,
+                var listenerMqttClient = _clientBuilder.BuildClient<IMqttClient>(0, nodeName, ProtocolType,
                     "mqtt-client",
                     Network!, _ticksOptions, group, serverTopics.Count);
                 if (listenerMqttClient == null)

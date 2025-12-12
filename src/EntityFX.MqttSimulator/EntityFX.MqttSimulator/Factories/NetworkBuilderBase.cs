@@ -1,9 +1,12 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Network;
 using System.Security.Cryptography;
 
 namespace EntityFX.MqttY.Factories
 {
+    public delegate TResult NetworkBuilderApplicationFunc<out TResult>(int index, string name, string specification);
+
     public abstract class NetworkBuilderBase
     {
         private int _nextId = 0;
@@ -19,10 +22,13 @@ namespace EntityFX.MqttY.Factories
 
         protected abstract IServer CreateServer(TicksOptions ticksOptions, int ix, string fullName, string address);
 
-        protected abstract IApplication CreateApplication(TicksOptions ticksOptions, int ix, string name, string fullName, string address, string specification);
+        protected abstract IApplication CreateApplication(
+            TicksOptions ticksOptions, int ix, string name, string fullName, 
+            string address, string specification, NetworkBuilderApplicationFunc<object>? appOptionsFunc);
 
         public Network.Network BuildChain(int branchingFactor, int length, 
-            int clientsPerNode, int serversPerNode, Dictionary<string, int>? appsPerNode,
+            int clientsPerNode, int serversPerNode, 
+            Dictionary<string, (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>? appsPerNode,
             bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
         {
             if (length < 1)
@@ -47,7 +53,8 @@ namespace EntityFX.MqttY.Factories
             return previous!;
         }
 
-        public Network.Network BuildLine(int length, int clientsPerNode, int serversPerNode, Dictionary<string, int>? appsPerNode,
+        public Network.Network BuildLine(int length, int clientsPerNode, int serversPerNode, 
+            Dictionary<string, (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>? appsPerNode,
             bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
         {
             if (length < 1)
@@ -79,11 +86,70 @@ namespace EntityFX.MqttY.Factories
                 CreateApplications(networks[length - 1], ticksOptions, appsPerNode);
             }
 
-            return previous!;
+            return networks[0]!;
+        }
+
+        public Network.Network BuildSimpleLine(int length, int clientsPerNode, int serversPerNode,
+            Dictionary<string, (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>? appsPerNode,
+            bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
+        {
+            if (length < 1)
+                throw new ArgumentException("Параметры должны быть положительными числами");
+
+            Network.Network? previous = null;
+            var networks = new Network.Network[length];
+            for (int i = 0; i < length; i++)
+            {
+                var ix = _nextId++;
+                var nodeName = $"n{ix}.net";
+                var network = new Network.Network(ix, nodeName, nodeName, "eth", networkTypeOption, ticksOptions);
+                networkSimulator.AddNetwork(network);
+
+                if (previous != null)
+                {
+                    network.Link(previous);
+                }
+
+                previous = network;
+                networks[i] = network;
+            }
+
+            CreateClients(networks[length - 1], clientsPerNode, ticksOptions);
+            CreateServers(networks[length - 1], serversPerNode, ticksOptions);
+
+            if (appsPerNode != null)
+            {
+                CreateApplications(networks[length - 1], ticksOptions, appsPerNode);
+            }
+
+            return networks[0]!;
+        }
+
+        public Network.Network BuildSimpleTree(int branchingFactor, int length,
+            int clientsPerNode, int serversPerNode,
+            Dictionary<string, (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>? appsPerNode,
+            bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
+        {
+            if (branchingFactor < 1 || length < 1)
+                throw new ArgumentException("Параметры должны быть положительными числами");
+
+            var ix = _nextId++;
+            var nodeName = $"n{ix}.global";
+            var root = new Network.Network(ix, nodeName, nodeName, "eth", networkTypeOption, ticksOptions);
+            networkSimulator.AddNetwork(root);
+
+            for (int i = 0; i < branchingFactor; i++)
+            {
+                var tail = BuildSimpleLine(length, clientsPerNode, serversPerNode, appsPerNode, createLeafNodesOnly, ticksOptions, networkTypeOption);
+                root.Link(tail);
+            }
+
+            return root;
         }
 
         public Network.Network BuildTree(int branchingFactor, int depth, 
-            int clientsPerNode, int serversPerNode, Dictionary<string, int>? appsPerNode,
+            int clientsPerNode, int serversPerNode, 
+            Dictionary<string, (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>? appsPerNode,
             bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
         {
             if (branchingFactor < 1 || depth < 1)
@@ -96,7 +162,7 @@ namespace EntityFX.MqttY.Factories
 
         public Network.Network BuildRandomNodesTree(int branchingFactor, int depth,
             (int Min, int Max) clientsPerNode, (int Min, int Max) serversPerNode,
-            Dictionary<string, (int Min, int Max)>? appsPerNode,
+            Dictionary<string, (int Min, int Max, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>? appsPerNode,
             bool createLeafNodesOnly, TicksOptions ticksOptions, NetworkOptions networkTypeOption)
         {
             if (branchingFactor < 1 || depth < 1)
@@ -127,7 +193,9 @@ namespace EntityFX.MqttY.Factories
         }
 
         private Network.Network CreateBranchingNetwork(int branchingFactor,
-            int clientsPerNode, int serversPerNode, Dictionary<string, int>? appsPerNode, bool createLeafNodesOnly, string namePrefix,
+            int clientsPerNode, int serversPerNode, 
+            Dictionary<string, (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>? appsPerNode,
+            bool createLeafNodesOnly, string namePrefix,
             NetworkOptions networkTypeOption, TicksOptions ticksOptions)
         {
             var ix = _nextId++;
@@ -165,7 +233,9 @@ namespace EntityFX.MqttY.Factories
         }
 
         private Network.Network CreateDepthNetwork(int branchingFactor, int depth,
-            int clientsPerNode, int serversPerNode, Dictionary<string, int>? appsPerNode, bool createLeafNodesOnly, string namePrefix,
+            int clientsPerNode, int serversPerNode, 
+            Dictionary<string, (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>? appsPerNode, 
+            bool createLeafNodesOnly, string namePrefix,
             TicksOptions ticksOptions,
             NetworkOptions networkTypeOption)
         {
@@ -205,7 +275,7 @@ namespace EntityFX.MqttY.Factories
         private Network.Network CreateRandomNodesNetwork(int branchingFactor, int depth,
             (int Min, int Max) clientsPerNode,
             (int Min, int Max) serversPerNode,
-            Dictionary<string, (int Min, int Max)>? appsPerNode,
+            Dictionary<string, (int Min, int Max, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>? appsPerNode,
             bool createLeafNodesOnly, string namePrefix,
             NetworkOptions networkTypeOption, TicksOptions ticksOptions)
         {
@@ -237,7 +307,8 @@ namespace EntityFX.MqttY.Factories
             CreateServers(node, servers, ticksOptions);
             if (appsPerNode != null)
             {
-                var apps = appsPerNode.ToDictionary(k => k.Key, v => RandomNumberGenerator.GetInt32(v.Value.Max - v.Value.Min + 1) + v.Value.Min);
+                var apps = appsPerNode.ToDictionary(k => k.Key, 
+                    v => (RandomNumberGenerator.GetInt32(v.Value.Max - v.Value.Min + 1) + v.Value.Min, v.Value.AppOptionsFunc));
                 CreateApplications(node, ticksOptions, apps);
             }
             return node;
@@ -258,19 +329,22 @@ namespace EntityFX.MqttY.Factories
             }
         }
 
-        private void CreateApplications(Network.Network node, TicksOptions ticksOptions, Dictionary<string, int> appsPerNode)
+        private void CreateApplications(Network.Network node, TicksOptions ticksOptions, 
+            Dictionary<string, 
+                (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)> appsPerNode)
         {
             foreach (var appPerNode in appsPerNode)
             {
-                for (int i = 0; i < appPerNode.Value; i++)
+                for (int i = 0; i < appPerNode.Value.Index; i++)
                 {
 
                     var ix = _nextId++;
-                    var name = $"mqb{ix}";
+                    var name = $"mqa{ix}";
                     var fullName = $"{name}.{node.Name}";
 
                     var address = $"mqtt://{name}";
-                    var application = CreateApplication(ticksOptions, ix, name, fullName, address, appPerNode.Key);
+                    var application = CreateApplication(ticksOptions, ix, name, fullName, address, 
+                        appPerNode.Key, appPerNode.Value.AppOptionsFunc);
                     node.AddApplication(application);
                     networkSimulator.AddApplication(application);
                 }

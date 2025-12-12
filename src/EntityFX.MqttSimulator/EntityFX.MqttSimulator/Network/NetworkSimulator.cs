@@ -63,6 +63,9 @@ public class NetworkSimulator : INetworkSimulator
     public IImmutableDictionary<string, IServer> Servers => _nodes.Where(n => n.Key.NodeType == NodeType.Server)
         .ToDictionary(k => k.Key.Address, v => (IServer)v.Value).ToImmutableDictionary();
 
+    public IImmutableDictionary<string, IApplication> Applications => _nodes.Where(n => n.Key.NodeType == NodeType.Application)
+        .ToDictionary(k => k.Key.Address, v => (IApplication)v.Value).ToImmutableDictionary();
+
     public long TotalTicks => _tick;
 
     public bool Construction { get; set; }

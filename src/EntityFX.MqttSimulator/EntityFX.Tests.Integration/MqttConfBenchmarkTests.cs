@@ -86,7 +86,8 @@ namespace EntityFX.Tests.Integration
             _graph!.Clear();
         }
 
-        private void InitGraphTree(int branches, int depth, int clients, int servers, Dictionary<string, int>? appsPerNode = null)
+        private void InitGraphTree(int branches, int depth, int clients, int servers, 
+            Dictionary<string, (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>? appsPerNode = null)
         {
             var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
@@ -96,7 +97,8 @@ namespace EntityFX.Tests.Integration
             _graph.UpdateRoutes();
         }
 
-        private void InitChain(int branches, int length, int clients, int servers, Dictionary<string, int>? appsPerNod = null)
+        private void InitChain(int branches, int length, int clients, int servers, 
+            Dictionary<string, (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>? appsPerNod = null)
         {
             var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
@@ -106,7 +108,8 @@ namespace EntityFX.Tests.Integration
             _graph.UpdateRoutes();
         }
 
-        private void InitLine(int length, int clients, int servers, Dictionary<string, int>? appsPerNode = null)
+        private void InitLine(int length, int clients, int servers, 
+            Dictionary<string, (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>? appsPerNode = null)
         {
             var builder = new MqttNetworkBuilder(_graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
