@@ -8,6 +8,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
         private readonly List<ICounter> _counters = new List<ICounter>();
         private GenericCounter _receiveCounter;
 
+        public long Received => _receiveCounter.Value;
+
         public MqttReceiverCounters(string name, int historyDepth)
             : base(name, name.Substring(0, 2), "MqttReceiver", "MC") 
         {

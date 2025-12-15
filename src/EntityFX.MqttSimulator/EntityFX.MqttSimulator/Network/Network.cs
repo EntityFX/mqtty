@@ -19,7 +19,7 @@ public class Network : NodeBase, INetwork
     /// <summary>
     /// TODO: Add max size limit
     /// </summary>
-    private List<NetworkMonitoringPacket> _monitoringPacketsQueue = new();
+    private ConcurrentBag<NetworkMonitoringPacket> _monitoringPacketsQueue = new();
     private readonly NetworkOptions _networkTypeOption;
 
     //private Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
@@ -355,14 +355,20 @@ public class Network : NodeBase, INetwork
     public override void Refresh()
     {
 
-        foreach (var pendingPacket in _monitoringPacketsQueue.ToArray())
+        foreach (var pendingPacket in _monitoringPacketsQueue)
         {
             if (pendingPacket.PassTillNextTick && pendingPacket.Tick == NetworkSimulator!.TotalTicks)
             {
+                var to = pendingPacket.Path.FirstOrDefault();
+                if (to == null)
+                {
+                    continue;
+                }
+
                 NetworkSimulator!.Monitoring.Push(pendingPacket.Packet.Id, NetworkSimulator.TotalTicks,
-                    this, pendingPacket.Path.First(),
+                    this, to,
                     pendingPacket.Packet.Payload, NetworkLoggerType.Pass,
-                    $"Pass incomming: {pendingPacket.Packet.From} -> {pendingPacket.Path.First()!.Name}",
+                    $"Pass incomming: {pendingPacket.Packet.From} -> {to!.Name}",
                     pendingPacket.Packet.Protocol, "Node");
                 continue;
             }
@@ -372,11 +378,12 @@ public class Network : NodeBase, INetwork
             {
                 pendingPacket.Released = true;
 
+                _monitoringPacketsQueue.TryTake(out _);
                 var result = ProcessTransferPacket(pendingPacket);
             }
         }
 
-        _monitoringPacketsQueue.RemoveAll(p => p.Released);
+        //_monitoringPacketsQueue.RemoveAll(p => p.Released);
 
         _networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
         NetworkSimulator!.Step();

@@ -24,6 +24,10 @@ namespace EntityFX.MqttY.Counter
 
         private IEnumerable<ICounter> _netwotkCounters = Enumerable.Empty<ICounter>();
 
+        public TimeSpan VirtualTime => _virtualTimeCounter.Value;
+
+        public TimeSpan RealTime => _realTimeCounter.Value;
+
         public NetworkSimulatorCounters(string name, string shortName, TicksOptions ticksOptions)
             : base(name, shortName, "Simulator", "SM")
         {

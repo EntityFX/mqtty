@@ -18,6 +18,7 @@
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="EntityFX.Tests.Integration" />
+		<InternalsVisibleTo Include="EntityFX.MqttY.MqttRelay.App" />
 	</ItemGroup>
 
 	<ItemGroup>

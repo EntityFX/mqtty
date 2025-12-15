@@ -6,16 +6,16 @@ namespace EntityFX.MqttY.Factories;
 
 public class ActionClientBuilder : IClientBuilder
 {
-    private readonly Func<(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group, int? groupAmount, Dictionary<string, string[]>? additional), IClient> func;
+    private readonly ClientBuilderAction func;
 
-    public ActionClientBuilder(Func<(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group, int? groupAmount, Dictionary<string, string[]>? additional), IClient> func)
+    public ActionClientBuilder(ClientBuilderAction func)
     {
         this.func = func;
     }
 
     public IClient? BuildClient(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = null)
     {
-        return func.Invoke((index, name, protocolType, specification, network, ticks, group, groupAmount, additional));
+        return func.Invoke(index, name, protocolType, specification, network, ticks, group, groupAmount, additional);
     }
 
     public TClient? BuildClient<TClient>(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = null) where TClient : IClient

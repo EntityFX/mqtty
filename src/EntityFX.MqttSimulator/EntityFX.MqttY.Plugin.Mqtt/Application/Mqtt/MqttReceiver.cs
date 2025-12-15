@@ -17,9 +17,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
         private readonly TicksOptions _ticksOptions;
 
 
-        public MqttReceiver(IClientBuilder clientBuilder, int index, string name, string address, string protocolType, string specification, 
+        public long Received => _receiverCounter.Received;
+
+        public MqttReceiver(IClientBuilder clientBuilder, int index, string name, string address, string protocolType, string specification,
             TicksOptions ticksOptions,
-            MqttReceiverConfiguration? options) 
+            MqttReceiverConfiguration? options)
             : base(index, name, address, protocolType, specification, ticksOptions, options)
         {
             this._ticksOptions = ticksOptions;
@@ -38,10 +40,31 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
             _mqttClient = AddMqttClient(Options.Server);
 
             base.Start();
+        }
 
-            SubscribeListenTopics(_mqttClient, Options.Topics);
+        public bool HasListenSubscription(string server, string topic)
+        {
+            var groupName = $"{Name}{server}";
 
+            if (_mqttClient == null)
+            {
+                return false;
+            }
 
+            var subscribtions = _mqttClient.Subscribtions.GetValueOrDefault(groupName);
+            if (subscribtions == null)
+            {
+                return false;
+            }
+
+            var hasSubscriptionToTopic = subscribtions.FirstOrDefault(s => s.TopicFilter == topic);
+
+            return hasSubscriptionToTopic != null;
+        }
+
+        public void SubscribeAll()
+        {
+            SubscribeListenTopics(_mqttClient, Options!.Topics);
         }
 
         private void SubscribeListenTopics(IMqttClient? mqttClient, string[] listenTopics)
@@ -51,7 +74,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
             foreach (var listenTopic in listenTopics)
             {
-                mqttClient.Subscribe(listenTopic!, MqttQos.AtLeastOnce);
+                mqttClient.BeginSubscribe(listenTopic!, MqttQos.AtLeastOnce);
             }
         }
 
@@ -59,9 +82,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
         {
             var nodeName = GetNodeName(Name, serverOption);
 
-            var listenerMqttClient = _clientBuilder.BuildClient<IMqttClient>(0, nodeName!, ProtocolType,
+            var listenerMqttClient = _clientBuilder.BuildClient<IMqttClient>(NetworkSimulator!.CountNodes + 1, nodeName!, ProtocolType,
                 "mqtt-client",
-                    Network!, _ticksOptions);
+                    Network!, _ticksOptions, nodeName);
 
             if (listenerMqttClient == null)
             {
@@ -72,7 +95,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
             try
             {
-                listenerMqttClient.Connect(serverOption);
+                listenerMqttClient.BeginConnect(serverOption, false);
             }
             catch (Exception)
             {
@@ -88,7 +111,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
         private void ListenerMqttClient_MessageReceived(object? sender, MqttMessage e)
         {
             NetworkSimulator!.Monitoring.Push(Guid.NewGuid(), NetworkSimulator.TotalTicks, NetworkLoggerType.Receive,
-                $"Mqtt Application {Name} receives message by topic {e.Topic} from broker {e.Broker}", 
+                $"Mqtt Application {Name} receives message by topic {e.Topic} from broker {e.Broker}",
                 Specification, "MQTT Receiver Application");
             _receiverCounter.Receive();
         }

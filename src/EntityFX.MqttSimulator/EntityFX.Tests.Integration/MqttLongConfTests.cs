@@ -18,6 +18,10 @@ using EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt;
 using System.Xml.Linq;
 using static EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt.MqttRelayConfiguration;
 using EntityFX.MqttY.Scenarios;
+using EntityFX.MqttY.Plugin.Mqtt;
+using Microsoft.Extensions.Options;
+using System.Text;
+using System.Text.Json;
 
 namespace EntityFX.Tests.Integration
 {
@@ -32,6 +36,7 @@ namespace EntityFX.Tests.Integration
         private NetworkSimulator? _graph;
         private NetworkOptions _networkOptions;
         private Exception? _testException;
+        private StringBuilder _logSb;
 
         private bool IsParallelRefresh = true;
         private MqttTopicEvaluator mqttTopicEvaluator;
@@ -62,16 +67,36 @@ namespace EntityFX.Tests.Integration
             };
 
 
-            _monitoringProvider = new NullNetworkLoggerProvider(_monitoring);
+            //_monitoringProvider = new NullNetworkLoggerProvider(_monitoring);
+            _monitoring = new NetworkLogger(false, TimeSpan.FromMilliseconds(1), new MonitoringIgnoreOption() { Category = new string[] { "Refresh", "Link" } });
+            _logSb = new StringBuilder();
+
+            _monitoringProvider = new SimpleNetworkLoggerProvider(_monitoring, _logSb);
             _monitoringProvider.Start();
 
             mqttTopicEvaluator = new MqttTopicEvaluator(true);
             mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
         }
 
-        private IClient AppBuild((int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group, int? groupAmount, Dictionary<string, string[]>? additional) tuple)
+        private IClient AppBuild(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group, int? groupAmount, Dictionary<string, string[]>? additional)
         {
-            throw new NotImplementedException();
+            var address = $"mqtt://{name}";
+            var clientName = name.Replace(".", "");
+
+            var mqttClient = new MqttClient(mqttPacketManager, index,
+            name, address,
+            protocolType, specification, clientName, ticks)
+            {
+                Group = group,
+                GroupAmount = groupAmount
+            };
+
+            //options.Network, options.NetworkGraph,
+
+            network!.AddClient(mqttClient);
+            network.NetworkSimulator!.AddClient(mqttClient);
+
+            return mqttClient;
         }
 
         [TestInitialize]
@@ -163,68 +188,177 @@ namespace EntityFX.Tests.Integration
         }
 
         [TestMethod]
-        public void BuildRelayTreeTest()
+        [DataRow(true, 5, 2, 3, 10)]
+        [DataRow(false, 5, 2, 3, 10)]
+        [DataRow(true, 5, 2, 15, 10)]
+        [DataRow(false, 5, 2, 15, 10)]
+        [DataRow(true, 5, 20, 3, 10)]
+        [DataRow(false, 5, 20, 3, 10)]
+        [DataRow(true, 15, 2, 3, 10)]
+        [DataRow(false, 15, 2, 3, 10)]
+        [DataRow(true, 5, 2, 3, 100)]
+        [DataRow(false, 5, 2, 3, 100)]
+        public void BuildRelayTreeTest(bool isParallel, int relays, int length, int clients, int sendRepeats)
         {
             var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions);
             var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
-            var appuildOptions = new Dictionary<string, (int Index, NetworkBuilderApplicationFunc<object>? AppOptionsFunc)>()
-            {
-                ["mqtt-receiver"] = (1, (index, name, specification) => new MqttReceiverConfiguration()
-                {
-                    Topics = new string[] {
-                            "telemetry/+",
-                            "local/telemetry/+"
-                        }
-                })
-            };
 
             graph!.Construction = true;
-            var networks = builder.BuildSimpleTree(3, 2, 2, 1, appuildOptions, true, tickOptions, _networkOptions);
-            var brokers = graph.Servers.Values.OfType<IMqttBroker>().ToArray();
+            var networks = builder.BuildSimpleTree(relays, length, clients, 1, null, true, tickOptions, _networkOptions);
 
-            var ix = 3 * 2 * 2;
-            foreach (var broker in brokers!)
-            {
-                var oppositeBrokers = brokers.Where(b => b.Name != broker.Name);
-
-                var brokerNetwork = broker.Network;
-                var relayName = $"mqrl{ix}.{brokerNetwork!.Name}";
-                var address = $"mqtt://{relayName}";
-
-                var relayRemoteTopics = oppositeBrokers.ToDictionary(k => $"rs{k.Index}",
-                    v => new MqttRelayConfigurationItem() { ReplaceRelaySegment = false, Server = v.Name, TopicPrefix = $"relay{v.Index}" });
-
-                var relay = new MqttRelay(ix, relayName, address, "mqtt", "mqtt-relay", clientBuilder, mqttTopicEvaluator, tickOptions,
-                    new MqttRelayConfiguration()
-                    {
-                        ListenTopics = new Dictionary<string, MqttRelayConfiguration.MqttListenConfigurationItem>()
-                        {
-                            ["ls1"] = new MqttRelayConfiguration.MqttListenConfigurationItem()
-                            {
-                                Server = broker.Name,
-                                Topics = new string[] { "telemetry/+" }
-                            },
-                            ["rls1"] = new MqttRelayConfiguration.MqttListenConfigurationItem()
-                            {
-                                Server = broker.Name,
-                                Topics = new string[] { $"relay{ix}/telemetry/+" }
-                            },
-                        },
-                        RelayTopics = relayRemoteTopics
-                    });
-                brokerNetwork.AddApplication(relay);
-                graph.AddApplication(relay);
-                ix++;
-            }
+            var brokers = builder.BuildMqttRelay(graph, tickOptions);
 
             graph.Construction = false;
             graph.UpdateRoutes();
 
+            var mqttRelays = graph.Applications.Values.OfType<MqttRelay>();
+            foreach (var mqttRelay in mqttRelays)
+            {
+                mqttRelay!.Start();
+            }
+
+            var mqttReceivers = graph.Applications.Values.OfType<MqttReceiver>();
+            foreach (var mqttReceiver in mqttReceivers)
+            {
+                mqttReceiver!.Start();
+            }
+
+
+            foreach (var broker in brokers)
+            {
+                var brokerNetwork = broker.Network!;
+                var mqttClients = brokerNetwork.Clients.Values.OfType<MqttClient>().ToArray();
+                foreach (var mqttClient in mqttClients)
+                {
+                    mqttClient.BeginConnect(broker.Name);
+                }
+            }
+
+            var allConnected = RefreshUntilConnected(isParallel, graph);
+
+            var ticks = graph.TotalTicks;
+            foreach (var mqttRelay in mqttRelays)
+            {
+                mqttRelay.SubscribeAll();
+            }
+
+            RefreshTicks(isParallel, graph, ticks);
+
+            foreach (var mqttReceiver in mqttReceivers)
+            {
+                mqttReceiver.SubscribeAll();
+            }
+
+            RefreshTicks(isParallel, graph, ticks);
+
+            //Console.WriteLine(graph.Counters.PrintCounters());
+
+            //Console.WriteLine(_logSb.ToString());
+
             var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
             var uml = plantUmlGraphGenerator.SerializeNetworkGraph(graph!);
+
+
+            ///TEST Relay subscriptions
+            var countRelaySubscribed = 0;
+            foreach (var mqttRelay in mqttRelays)
+            {
+                var options = mqttRelay.Options!;
+
+                foreach (var listenTopic in options.ListenTopics)
+                {
+                    foreach (var topic in listenTopic.Value.Topics)
+                    {
+                        var hasSubscribtion = mqttRelay.HasListenSubscription(listenTopic.Key, listenTopic.Value.Server, topic);
+
+                        if (!hasSubscribtion)
+                        {
+                            Assert.Fail($"Missing subsciption {listenTopic.Key} for server {listenTopic.Value.Server} and topic {topic}");
+                        }
+
+                        countRelaySubscribed++;
+                    }
+                }
+
+
+            }
+
+            ///Test Receiver subsciptions
+            var countReceiverSubscribed = 0;
+            foreach (var mqttReceiver in mqttReceivers)
+            {
+                var options = mqttReceiver.Options!;
+
+                foreach (var listenTopic in options.Topics)
+                {
+
+                    var hasSubscribtion = mqttReceiver.HasListenSubscription(options.Server, listenTopic);
+
+                    if (!hasSubscribtion)
+                    {
+                        Assert.Fail($"Missing subsciption for server {options.Server} and topic {listenTopic}");
+                    }
+
+                    countReceiverSubscribed++;
+                }
+
+            }
+
+
+            var data = new { Temperature = 25.0, Hummidity = 50.0, Pressure = 720.0 };
+            var dataJson = JsonSerializer.Serialize(data);
+            var bytes = Encoding.UTF8.GetBytes(dataJson);
+
+            for (int r = 0; r < 100; r++)
+            {
+                foreach (var broker in brokers)
+                {
+                    var brokerNetwork = broker.Network!;
+                    var mqttClients = brokerNetwork.Clients.Values.OfType<MqttClient>().Where(c => c.Group == null);
+
+                    foreach (var mqttClient in mqttClients)
+                    {
+                        mqttClient.Publish("telemetry/data", bytes, MqttQos.AtLeastOnce, false);
+                    }
+                }
+
+                RefreshTicks(isParallel, graph, ticks);
+                RefreshTicks(isParallel, graph, ticks);
+
+
+            }
+
+            //var receivedByAll = mqttReceivers.Sum(r => r.Received);
+
+            Console.WriteLine(graph.Counters.PrintCounters());
+            //foreach (var client in graph.Clients.Values)
+            //{
+            //    var clientMqttCounters = GetMqttCounters(client);
+            //}
         }
 
+        private static bool RefreshUntilConnected(bool isParallel, NetworkSimulator graph)
+        {
+            var allConnected = false;
+
+            while (!allConnected)
+            {
+                allConnected = graph!.Clients.All(c => c.Value.IsConnected);
+                //var nonConnected = _graph!.Clients.Where(c => !c.Value.IsConnected);
+                graph.RefreshWithCounters(isParallel);
+            }
+
+            return allConnected;
+        }
+
+        private void RefreshTicks(bool isParallel, NetworkSimulator graph, long ticks)
+        {
+            for (var i = 0; i < ticks; i++)
+            {
+                graph.RefreshWithCounters(isParallel);
+            }
+        }
 
         [TestMethod]
         public void MqttConnectTest()

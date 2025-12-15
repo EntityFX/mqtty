@@ -20,7 +20,7 @@ namespace EntityFX.MqttY.Factories
 
         protected abstract IClient CreateClient(TicksOptions ticksOptions, int ix, string name, string fullName, string address);
 
-        protected abstract IServer CreateServer(TicksOptions ticksOptions, int ix, string fullName, string address);
+        protected abstract IServer CreateServer(TicksOptions ticksOptions, int ix, string name, string fullName, string address);
 
         protected abstract IApplication CreateApplication(
             TicksOptions ticksOptions, int ix, string name, string fullName, 
@@ -323,7 +323,7 @@ namespace EntityFX.MqttY.Factories
                 var fullName = $"{name}.{node.Name}";
 
                 var address = $"mqtt://{name}";
-                var broker = CreateServer(ticksOptions, ix, fullName, address);
+                var broker = CreateServer(ticksOptions, ix, name, fullName, address);
                 node.AddServer(broker);
                 networkSimulator.AddServer(broker);
             }

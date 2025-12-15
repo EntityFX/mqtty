@@ -33,7 +33,38 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
                     kv => kv.Value.Server), $"{Name}relay");
 
             base.Start();
+        }
 
+
+        public bool HasListenSubscription(string listenServer, string server, string topic)
+        {
+            var groupName = $"{Name}listen";
+            var nodeName = GetNodeName(groupName, listenServer);
+            if (nodeName == null)
+            {
+                return false;
+            }
+
+            var mqttClient = _listenClients.GetValueOrDefault(nodeName);
+            if (mqttClient == null)
+            {
+                return false;
+            }
+
+            var clientId = $"{groupName}{listenServer}";
+            var subscribtions = mqttClient.Subscribtions.GetValueOrDefault(clientId);
+            if (subscribtions == null)
+            {
+                return false;
+            }
+
+            var hasSubscriptionToTopic = subscribtions.FirstOrDefault(s => s.TopicFilter == topic);
+
+            return hasSubscriptionToTopic != null;
+        }
+
+        public void SubscribeAll()
+        {
             SubscribeListenTopics(Options?.ListenTopics, $"{Name}listen");
         }
 
@@ -53,7 +84,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
                 foreach (var listenTopics in listenServer.Value.Topics)
                 {
-                    mqttClient.Subscribe(listenTopics!, MqttQos.AtLeastOnce);
+                    mqttClient.BeginSubscribe(listenTopics!, MqttQos.AtLeastOnce);
                 }
             }
         }
@@ -68,7 +99,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
             foreach (var listenServer in serverTopics!)
             {
                 var nodeName = GetNodeName(group, listenServer.Key);
-                var listenerMqttClient = _clientBuilder.BuildClient<IMqttClient>(0, nodeName, ProtocolType,
+                var listenerMqttClient = _clientBuilder.BuildClient<IMqttClient>(NetworkSimulator!.CountNodes+1, nodeName, ProtocolType,
                     "mqtt-client",
                     Network!, _ticksOptions, group, serverTopics.Count);
                 if (listenerMqttClient == null)
@@ -78,7 +109,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
                 AddClient(listenerMqttClient);
                 _listenClients.Add(listenerMqttClient.Name, listenerMqttClient);
-                var result = listenerMqttClient.Connect(listenServer.Value);
+                listenerMqttClient.BeginConnect(listenServer.Value, false);
 
                 listenerMqttClient.MessageReceived += ListenerMqttClient_MessageReceived;
             }

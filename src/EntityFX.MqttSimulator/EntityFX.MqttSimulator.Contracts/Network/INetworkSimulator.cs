@@ -6,9 +6,18 @@ namespace EntityFX.MqttY.Contracts.Network
 {
     public interface INetworkSimulator : IWithCounters
     {
+        public TimeSpan VirtualTime { get; }
+
+        public TimeSpan RealTime { get; }
+
+
         bool Construction { get; set; }
 
         bool WaitMode { get; }
+
+        public int CountNodes { get; }
+
+        public long Errors { get; }
 
         IPathFinder PathFinder { get; }
         INetworkLogger Monitoring { get; }

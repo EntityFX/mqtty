@@ -17,6 +17,8 @@ public class NetworkSimulator : INetworkSimulator
 
     private long _tick = 0;
     private long _step = 0;
+    private long _errors = 0;
+    private int _countNodes = 0;
 
     private CancellationTokenSource? _cancelTokenSource;
 
@@ -73,6 +75,14 @@ public class NetworkSimulator : INetworkSimulator
     public long TotalSteps => _step;
 
     public bool WaitMode { get; private set; }
+
+    public int CountNodes => _countNodes;
+
+    public TimeSpan VirtualTime => _counters.VirtualTime;
+
+    public TimeSpan RealTime => _counters.RealTime;
+
+    public long Errors => _errors;
 
     public string GetAddress(string name, string protocolType, string networkAddress)
     {
@@ -133,6 +143,7 @@ public class NetworkSimulator : INetworkSimulator
         }
 
         _nodes.Remove((clientAddress, NodeType.Client), out _);
+        Interlocked.Decrement(ref _countNodes);
     }
 
     public void RemoveNetwork(string networkAddress)
@@ -148,6 +159,7 @@ public class NetworkSimulator : INetworkSimulator
         _networks.Remove(networkAddress, out _);
 
         UpdateRoutes();
+        Interlocked.Decrement(ref _countNodes);
     }
 
     public void RemoveServer(string serverAddress)
@@ -166,6 +178,7 @@ public class NetworkSimulator : INetworkSimulator
         server.Stop();
 
         _nodes.Remove((serverAddress, NodeType.Server), out _);
+        Interlocked.Decrement(ref _countNodes);
     }
 
     public bool Refresh(bool parallel)
@@ -190,6 +203,7 @@ public class NetworkSimulator : INetworkSimulator
         }
         catch (Exception ex)
         {
+            _errors++;
             SimulationException = ex;
             return false;
         }
@@ -361,6 +375,7 @@ public class NetworkSimulator : INetworkSimulator
         {
             ((NodeBase)client).NetworkSimulator = this;
         }
+        Interlocked.Increment(ref _countNodes);
 
         return result;
     }
@@ -378,6 +393,7 @@ public class NetworkSimulator : INetworkSimulator
         {
             ((NodeBase)server).NetworkSimulator = this;
         }
+        Interlocked.Increment(ref _countNodes);
 
         return result;
     }
@@ -395,6 +411,8 @@ public class NetworkSimulator : INetworkSimulator
         {
             ((ApplicationBase)application).NetworkSimulator = this;
         }
+
+        Interlocked.Increment(ref _countNodes);
 
         return result;
     }
@@ -416,6 +434,7 @@ public class NetworkSimulator : INetworkSimulator
         UpdateRoutes();
 
         ((NodeBase)network).NetworkSimulator = this;
+        Interlocked.Increment(ref _countNodes);
 
         return result;
     }

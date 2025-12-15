@@ -6,6 +6,7 @@ using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Plugin.Mqtt.Counter;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
+using System.Collections.Immutable;
 
 namespace EntityFX.MqttY.Plugin.Mqtt
 {
@@ -38,6 +39,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         public string ClientId { get; set; }
 
         public string Server => ServerName ?? string.Empty;
+
+        public IReadOnlyDictionary<string, MqttSubscribtion[]> Subscribtions => 
+            _sessionRepository.ReadAll().ToDictionary(s => s.Id, s => s.Subscriptions.Select(cs => new MqttSubscribtion(cs.TopicFilter, cs.MaximumQualityOfService)).ToArray()).ToImmutableDictionary();
 
         public SessionState Connect(string server, bool cleanSession = false)
         {

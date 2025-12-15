@@ -9,6 +9,8 @@ namespace EntityFX.MqttY.Contracts.Mqtt
 
         string ClientId { get; }
 
+        IReadOnlyDictionary<string, MqttSubscribtion[]> Subscribtions { get; }
+
         event EventHandler<MqttMessage>? MessageReceived;
 
         SessionState Connect(string server, bool cleanSession = false);

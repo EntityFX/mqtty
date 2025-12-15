@@ -65,4 +65,9 @@ public class NullNetworkLogger : INetworkLogger
     public void Push<TContext>(long tick, NetworkPacket<TContext> packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null)
     {
     }
+
+    public static implicit operator NullNetworkLogger(NetworkLogger v)
+    {
+        throw new NotImplementedException();
+    }
 }
