@@ -19,16 +19,16 @@ namespace EntityFX.MqttY.Counter
         }
 
         public NodeCounters(string name, string shortName, 
-            string groupType, string shortGroupType, int historyDepth)
-            : base(name, shortName, groupType, shortGroupType)
+            string groupType, string shortGroupType, int historyDepth, bool enabled = true)
+            : base(name, shortName, groupType, shortGroupType, enabled)
         {
-            SendCounter = new GenericCounter("Send", "S", historyDepth);
-            ReceiveCounter = new GenericCounter("Receive", "R", historyDepth);
-            ErrorCounter = new GenericCounter("Error", "E", historyDepth);
+            SendCounter = new GenericCounter("Send", "S", historyDepth, enabled: enabled);
+            ReceiveCounter = new GenericCounter("Receive", "R", historyDepth, enabled: enabled);
+            ErrorCounter = new GenericCounter("Error", "E", historyDepth, enabled: enabled);
 
-            _outgoingQueue = new ValueCounter<long>("OutgoingQueue", "OQ", historyDepth);
-            _incommingQueue = new ValueCounter<long>("IncommingQueue", "IQ", historyDepth);
-            _receiveQueue = new ValueCounter<long>("ReceiveQueue", "RQ", historyDepth);
+            _outgoingQueue = new ValueCounter<long>("OutgoingQueue", "OQ", historyDepth, enabled: enabled);
+            _incommingQueue = new ValueCounter<long>("IncommingQueue", "IQ", historyDepth, enabled: enabled);
+            _receiveQueue = new ValueCounter<long>("ReceiveQueue", "RQ", historyDepth, enabled: enabled);
 
             _counters.Add(SendCounter);
             _counters.Add(ReceiveCounter);

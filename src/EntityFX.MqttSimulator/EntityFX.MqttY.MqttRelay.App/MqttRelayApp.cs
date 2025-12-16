@@ -1,5 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text;
 using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Plugin.Mqtt.Helper;
@@ -12,6 +11,10 @@ using EntityFX.MqttY.Plugin.Mqtt;
 using EntityFX.MqttY.Utils;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Plugin.Mqtt.Factories;
+
+record InParams(int Brokers, int Nets, int Clients, int Repeats, bool IsParallel, bool EnabledCounters);
+record OutParams(TimeSpan VirtualTime, TimeSpan RealTime, long TotalTicks, long TotalSteps, long Errors);
+record ResultItem(InParams In, OutParams Out);
 
 public class MqttRelayApp
 {
@@ -41,12 +44,12 @@ public class MqttRelayApp
         _mqttPacketManager = _builder.GetMqttPacketManager(_mqttTopicEvaluator);
     }
 
-    private INetworkSimulator BuildNetworkSimulator(int relays, int length, int clients)
+    private INetworkSimulator BuildNetworkSimulator(int relays, int length, int clients, bool enableCounters)
     {
         var pathFinder = _builder.GetPathFinder();
         var clientBuilder = _builder.GetClientBuilder(AppBuild);
 
-        var graph = new NetworkSimulator(pathFinder, _monitoring!, _tickOptions);
+        var graph = new NetworkSimulator(pathFinder, _monitoring!, _tickOptions, enableCounters);
         var networkBuilder = new MqttNetworkBuilder(graph!, _mqttPacketManager, _mqttTopicEvaluator, clientBuilder);
         graph!.Construction = true;
 
@@ -61,9 +64,9 @@ public class MqttRelayApp
 
     }
 
-    public INetworkSimulator ExecuteSimulation(bool isParallel, int relays, int length, int clients, int sendRepeats)
+    public INetworkSimulator ExecuteSimulation(bool isParallel, int relays, int length, int clients, int sendRepeats, bool enableCounters)
     {
-        var graph = BuildNetworkSimulator(relays, length, clients);
+        var graph = BuildNetworkSimulator(relays, length, clients, enableCounters);
         var brokers = graph.Servers.Values.OfType<IMqttBroker>().ToArray();
 
         var mqttRelays = ConnectMqttRelayApps(graph);

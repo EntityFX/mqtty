@@ -32,7 +32,7 @@ namespace EntityFX.Tests.Integration
                 OutgoingWaitTicks = 2,
                 TickPeriod = TimeSpan.FromMilliseconds(1)
             };
-            _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions);
+            _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions, true);
 
 
             _monitoringProvider = new ConsoleNetworkLoggerProvider(_monitoring);

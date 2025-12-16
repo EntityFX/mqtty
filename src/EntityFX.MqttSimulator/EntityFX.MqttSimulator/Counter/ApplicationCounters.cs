@@ -14,8 +14,8 @@ namespace EntityFX.MqttY.Counter
             set => _counters = value.ToList();
         }
 
-        public ApplicationCounters(string name, int historyDepth)
-            : base(name, name.Substring(0, 2), "Application", "AP")
+        public ApplicationCounters(string name, int historyDepth, bool enabled = true)
+            : base(name, name.Substring(0, 2), "Application", "AP", enabled)
         {
             InvokeCounter = new GenericCounter("Invoke", "IV", historyDepth);
             ErrorCounter = new GenericCounter("Error", "EE", historyDepth);

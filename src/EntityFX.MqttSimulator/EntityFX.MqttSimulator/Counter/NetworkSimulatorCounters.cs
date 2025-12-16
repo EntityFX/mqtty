@@ -19,26 +19,23 @@ namespace EntityFX.MqttY.Counter
         private readonly int _historyDepth;
         private readonly TicksOptions _ticksOptions;
 
-        private readonly Stopwatch _stopwatch = new Stopwatch();
-        private readonly Stopwatch _refreshStopwatch = new Stopwatch();
-
         private IEnumerable<ICounter> _netwotkCounters = Enumerable.Empty<ICounter>();
 
         public TimeSpan VirtualTime => _virtualTimeCounter.Value;
 
         public TimeSpan RealTime => _realTimeCounter.Value;
 
-        public NetworkSimulatorCounters(string name, string shortName, TicksOptions ticksOptions)
-            : base(name, shortName, "Simulator", "SM")
+        public NetworkSimulatorCounters(string name, string shortName, TicksOptions ticksOptions, bool enabled = true)
+            : base(name, shortName, "Simulator", "SM", enabled)
         {
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
             _ticksOptions = ticksOptions;
 
-            _stepsCounter = new ValueCounter<long>("Steps", "S$", ticksOptions.CounterHistoryDepth);
-            _ticksCounter = new ValueCounter<long>("Ticks", "T$",ticksOptions.CounterHistoryDepth);
-            _virtualTimeCounter = new ValueCounter<TimeSpan>("VirtualTime", "TV", ticksOptions.CounterHistoryDepth);
-            _realTimeCounter = new ValueCounter<TimeSpan>("RealTime", "TR", ticksOptions.CounterHistoryDepth);
-            _refreshTimeCounter = new ValueCounter<TimeSpan>("RefreshTime", "R$", ticksOptions.CounterHistoryDepth);
+            _stepsCounter = new ValueCounter<long>("Steps", "S$", ticksOptions.CounterHistoryDepth, enabled: enabled);
+            _ticksCounter = new ValueCounter<long>("Ticks", "T$",ticksOptions.CounterHistoryDepth, enabled: enabled);
+            _virtualTimeCounter = new ValueCounter<TimeSpan>("VirtualTime", "TV", ticksOptions.CounterHistoryDepth, enabled: enabled);
+            _realTimeCounter = new ValueCounter<TimeSpan>("RealTime", "TR", ticksOptions.CounterHistoryDepth, enabled: enabled);
+            _refreshTimeCounter = new ValueCounter<TimeSpan>("RefreshTime", "R$", ticksOptions.CounterHistoryDepth, enabled: enabled);
 
             _counters.AddRange(Counters);
             _counters.Add(_stepsCounter);
@@ -48,15 +45,19 @@ namespace EntityFX.MqttY.Counter
             _counters.Add(_refreshTimeCounter);
 
             Counters = _counters.ToArray();
-            _stopwatch.Start();
         }
 
         public override void Refresh(long totalTicks, long steps)
         {
+            _virtualTimeCounter.Set(_ticksOptions.TickPeriod * totalTicks);
+
+            if (!Enabled)
+            {
+                return;
+            }
+
             _ticksCounter.Set(totalTicks);
             _stepsCounter.Set(steps);
-            _virtualTimeCounter.Set(_ticksOptions.TickPeriod * totalTicks);
-            _realTimeCounter.Set(_stopwatch.Elapsed);
             base.Refresh(totalTicks, steps);
         }
 
@@ -79,15 +80,14 @@ namespace EntityFX.MqttY.Counter
             _counters.Add(valueCounter);
         }
 
-        internal void StartRefresh()
+        internal void SetRealTime(TimeSpan realTime)
         {
-            _refreshStopwatch.Restart();
+            _realTimeCounter.Set(realTime);
         }
 
-        internal void StopRefresh()
+        internal void SetVirtualTime(TimeSpan virtualTime)
         {
-            _refreshTimeCounter.Set(_refreshStopwatch.Elapsed);
-            _refreshStopwatch.Reset();
+            _virtualTimeCounter.Set(virtualTime);
         }
     }
 }

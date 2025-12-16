@@ -15,6 +15,8 @@
 
     public interface ICounter
     {
+        bool Enabled { get; set; }
+
         string Name { get; init; }
 
         string ShortName { get; init; }

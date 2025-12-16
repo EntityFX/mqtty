@@ -2,12 +2,13 @@
 {
     public class CounterGroup : ICounter
     {
-        public CounterGroup(string name, string shortName, string groupType, string shortGroupType)
+        public CounterGroup(string name, string shortName, string groupType, string shortGroupType, bool enabled = true)
         {
             Name = name;
             GroupType = groupType;
             ShortGroupType = shortGroupType;
             ShortName = shortName;
+            Enabled = enabled;
         }
 
         public virtual IEnumerable<ICounter> Counters { get; set; } = Enumerable.Empty<ICounter>();
@@ -33,6 +34,7 @@
 
         public KeyValuePair<long, object>? TickFirstValue { get; }
         public string ShortName { get; init; }
+        public bool Enabled { get; set; }
         KeyValuePair<long, object>? ICounter.TickPreviousValue { get; }
 
         public double Average()
@@ -50,6 +52,11 @@
 
         public virtual void Refresh(long totalTicks, long totalSteps)
         {
+            if (!Enabled)
+            {
+                return;
+            }
+
             foreach (var counter in Counters)
             {
                 counter.Refresh(totalTicks, totalSteps);

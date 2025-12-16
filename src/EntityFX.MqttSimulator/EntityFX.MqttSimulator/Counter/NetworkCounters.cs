@@ -96,6 +96,10 @@ namespace EntityFX.MqttY.Counter
 
         public override void Refresh(long totalTicks, long steps)
         {
+            if (!Enabled)
+            {
+                return;
+            }
             base.Refresh(totalTicks, steps);
 
             var ticksDiff = totalTicks - _lastTicks;

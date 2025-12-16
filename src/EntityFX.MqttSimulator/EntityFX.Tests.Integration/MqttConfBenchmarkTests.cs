@@ -47,7 +47,7 @@ namespace EntityFX.Tests.Integration
                 OutgoingWaitTicks = 5,
                 TickPeriod = TimeSpan.FromMilliseconds(1)
             };
-            _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions);
+            _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions, true);
 
             _networkOptions = new NetworkOptions()
             {
@@ -67,7 +67,7 @@ namespace EntityFX.Tests.Integration
             mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
         }
 
-        private IClient AppBuild((int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group, int? groupAmount, Dictionary<string, string[]>? additional) tuple)
+        private IClient AppBuild(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group, int? groupAmount, Dictionary<string, string[]>? additional)
         {
             throw new NotImplementedException();
         }

@@ -12,11 +12,12 @@ public abstract class Node : NodeBase
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
     private readonly Dictionary<Guid, ResponseMonitoringPacket> _responseMessages = new();
-    private readonly List<NodeMonitoringPacket> _outgoingMessages = new();
-    private readonly List<NodeMonitoringPacket> _incommingMessages = new();
+    private readonly ConcurrentBag<NodeMonitoringPacket> _outgoingMessages = new();
+    private readonly ConcurrentBag<NodeMonitoringPacket> _incommingMessages = new();
     protected readonly TicksOptions TicksOptions;
 
     protected NodeCounters counters;
+    private INetwork? network;
 
     public override CounterGroup Counters
     {
@@ -24,10 +25,22 @@ public abstract class Node : NodeBase
         set
         {
             counters = (NodeCounters)value;
+
+            if (network?.NetworkSimulator != null)
+            {
+                counters.Enabled = network!.NetworkSimulator!.EnableCounters;
+            }
         }
     }
 
-    public INetwork? Network { get; internal set; }
+    public INetwork? Network
+    {
+        get => network; internal set
+        {
+            network = value;
+            counters.Enabled = network!.NetworkSimulator!.EnableCounters;
+        }
+    }
 
     public Node(int index, string name, string address,
         TicksOptions ticksOptions) : base(index, name, address)
@@ -50,7 +63,7 @@ public abstract class Node : NodeBase
         {
             if (outgoingMonitoringPacket.PassTillNextTick && outgoingMonitoringPacket.Tick == NetworkSimulator!.TotalTicks)
             {
-                NetworkSimulator!.Monitoring.Push(outgoingMonitoringPacket.Id, NetworkSimulator.TotalTicks, this, Network!, 
+                NetworkSimulator!.Monitoring.Push(outgoingMonitoringPacket.Id, NetworkSimulator.TotalTicks, this, Network!,
                     outgoingMonitoringPacket.RequestPacket.Payload, NetworkLoggerType.Pass,
                     $"Pass outgoing: {outgoingMonitoringPacket.RequestPacket.From} -> {Network!.Name}",
                     outgoingMonitoringPacket.RequestPacket.Protocol, "Node");
@@ -59,10 +72,11 @@ public abstract class Node : NodeBase
             outgoingMonitoringPacket.ReduceWaitTicks();
             if (outgoingMonitoringPacket.WaitTicks <= 0 && !outgoingMonitoringPacket.Released)
             {
+                _outgoingMessages.TryTake(out _);
                 SendToNetwork(outgoingMonitoringPacket);
             }
         }
-        _outgoingMessages.RemoveAll(o => o.Released);
+        //_outgoingMessages.RemoveAll(o => o.Released);
 
         var incomming = _incommingMessages.ToArray();
         foreach (var incommingMonitoringPacket in incomming)
@@ -71,17 +85,18 @@ public abstract class Node : NodeBase
             {
                 NetworkSimulator!.Monitoring.Push(incommingMonitoringPacket.Id, NetworkSimulator.TotalTicks, this, Network!,
                     incommingMonitoringPacket.RequestPacket.Payload, NetworkLoggerType.Pass,
-                    $"Pass incomming: {incommingMonitoringPacket.RequestPacket.From} -> {Network!.Name}", 
+                    $"Pass incomming: {incommingMonitoringPacket.RequestPacket.From} -> {Network!.Name}",
                     incommingMonitoringPacket.RequestPacket.Protocol, "Node");
                 continue;
             }
             incommingMonitoringPacket.ReduceWaitTicks();
             if (incommingMonitoringPacket.WaitTicks <= 0 && !incommingMonitoringPacket.Released)
             {
+                _incommingMessages.TryTake(out _);
                 CompleteReceive(incommingMonitoringPacket);
             }
         }
-        _incommingMessages.RemoveAll(o => o.Released);
+        //_incommingMessages.RemoveAll(o => o.Released);
 
 
         foreach (var packet in _responseMessages)

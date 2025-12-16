@@ -12,6 +12,8 @@ public class NetworkGraphFactoryOption
 
     public string OptionsPath { get; set; } = string.Empty;
 
+    public bool EnableCounters { get; set; } = true;
+
     public INetworkSimulatorBuilder? NetworkSimulatorBuilder { get; init; }
 
     public IFactory<INetworkSimulator, NetworkGraphFactoryOption>? NetworkGraphFactory { get; init; }

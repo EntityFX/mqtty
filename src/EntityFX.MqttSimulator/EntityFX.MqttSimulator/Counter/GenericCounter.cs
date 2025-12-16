@@ -27,6 +27,8 @@ namespace EntityFX.MqttY.Counter
 
         public long LastSteps { get; private set; }
 
+        public bool Enabled { get; set; }
+
         public IEnumerable<KeyValuePair<long, long>> HistoryValues => 
             _valueHistory;
 
@@ -51,17 +53,22 @@ namespace EntityFX.MqttY.Counter
         private readonly NormalizeUnits? _normalizeUnits;
 
         public GenericCounter(string name, string shortName,
-            int historyDepth, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
+            int historyDepth, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null, bool enabled = true)
         {
             Name = name;
             ShortName = shortName;
             UnitOfMeasure = unitOfMeasure;
             this._normalizeUnits = normalizeUnits;
             _valueHistory = new(historyDepth);
+            Enabled = enabled;
         }
 
         public void Increment()
         {
+            if (!Enabled)
+            {
+                return;
+            }
             _privateValue = Value;
             Interlocked.Increment(ref _value);
             _tickPreviousValue = new KeyValuePair<long, long>(LastTicks, _privateValue);
@@ -104,6 +111,10 @@ namespace EntityFX.MqttY.Counter
 
         public void Refresh(long totalTicks, long totalSteps)
         {
+            if (!Enabled)
+            {
+                return;
+            }
             LastTicks = totalTicks;
             LastSteps = totalSteps;
         }

@@ -30,7 +30,7 @@ internal class NetworkGraphFactory : IFactory<INetworkSimulator, NetworkGraphFac
 
         var mf = _serviceProvider.GetRequiredService<IFactory<INetworkLogger, NetworkGraphFactoryOption>>();
         var monitoring = mf.Create(options);
-        var ng = new NetworkSimulator(pf, monitoring, options.TicksOption)
+        var ng = new NetworkSimulator(pf, monitoring, options.TicksOption, options.EnableCounters)
         {
             OptionsPath = options.OptionsPath
         };

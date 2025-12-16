@@ -27,8 +27,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
         }
 
         public MqttCounters(string name, string shortName, 
-            string group, string shortGroup, TicksOptions ticksOptions)
-            : base(name, shortName, group, shortGroup)
+            string group, string shortGroup, TicksOptions ticksOptions, bool enabled = true)
+            : base(name, shortName, group, shortGroup, enabled)
         {
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
             _ticksOptions = ticksOptions;
@@ -37,20 +37,23 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                 .ToDictionary(k => k, v => new GenericCounter(
                     v.GetEnumDescription(), 
                     v.GetEnumCategory(),
-                    ticksOptions.CounterHistoryDepth
+                    ticksOptions.CounterHistoryDepth,
+                    enabled: enabled
                 ));
 
             RefusedPacketTypeCounters = Enum.GetValues<MqttPacketType>()
             .ToDictionary(k => k, v => new GenericCounter(
                 v.GetEnumDescription() + "_Refused",
                 v.GetEnumCategory() + "-",
-                ticksOptions.CounterHistoryDepth
+                ticksOptions.CounterHistoryDepth,
+                    enabled: enabled
             ));
 
             RpsPacketTypeCounters = Enum.GetValues<MqttPacketType>()
             .ToDictionary(k => k, v => new ValueCounter<double>(
                 v.GetEnumDescription() + "_Rps",
-                v.GetEnumCategory() + "-", ticksOptions.CounterHistoryDepth, "Rps"
+                v.GetEnumCategory() + "-", ticksOptions.CounterHistoryDepth, "Rps",
+                    enabled: enabled
             ));
         }
 
@@ -67,6 +70,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
         public override void Refresh(long totalTicks, long totalSteps)
         {
             base.Refresh(totalTicks, totalSteps);
+            if (!Enabled)
+            {
+                return;
+            }
 
             var ticksDiff = totalTicks - _lastTicks;
 

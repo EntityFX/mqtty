@@ -66,7 +66,7 @@ namespace EntityFX.Tests.Integration
                 new TicksOptions()
                 {
                     ReceiveWaitPeriod = TimeSpan.FromMilliseconds(0.1)
-                });
+                }, true);
 
             networkSimulatorBuilder!.Configure(_graph, new NetworkGraphOption()
             {

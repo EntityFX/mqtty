@@ -28,6 +28,8 @@ namespace EntityFX.MqttY.Counter
         public long LastTicks { get; private set; }
         public long LastSteps { get; private set; }
 
+        public bool Enabled { get; set; }
+
         public IEnumerable<KeyValuePair<long, TValue>> HistoryValues => _valueHistory;
 
         public KeyValuePair<long, TValue>? TickPreviousValue => _tickPreviousValue;
@@ -51,28 +53,39 @@ namespace EntityFX.MqttY.Counter
         private KeyValuePair<long, TValue>? _tickPreviousValue;
 
         private readonly FixedSizedQueue<KeyValuePair<long, TValue>> _valueHistory;
-
-
+        private readonly int _historyDepth;
         private readonly NormalizeUnits? _normalizeUnits;
 
         public ValueCounter(string name, string shortName, int historyDepth,  
-            string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null)
+            string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null, bool enabled = true)
         {
             Name = name;
             ShortName = shortName;
+            this._historyDepth = historyDepth;
             UnitOfMeasure = unitOfMeasure;
             this._normalizeUnits = normalizeUnits;
             _valueHistory = new(historyDepth);
+            Enabled = enabled;
         }
 
         public void Refresh(long totalTicks, long totalSteps)
         {
+            if (!Enabled)
+            {
+                return;
+            }
+
             LastTicks = totalTicks;
             LastSteps = totalSteps;
         }
 
         public void Set(TValue value)
         {
+            if (!Enabled)
+            {
+                return;
+            }
+
             if (_tickFirstValue == null)
             {
                 _tickFirstValue = new KeyValuePair<long, TValue>(LastTicks, value);
@@ -80,6 +93,11 @@ namespace EntityFX.MqttY.Counter
 
             _previousValue = value;
             _value = value;
+
+            if (_historyDepth <= 0)
+            {
+                return;
+            }
             _valueHistory.Enqueue(new KeyValuePair<long, TValue>(LastTicks, value));
         }
 

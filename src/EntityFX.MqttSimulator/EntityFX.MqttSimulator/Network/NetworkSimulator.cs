@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using EntityFX.MqttY.Application;
 using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Network;
@@ -30,6 +31,10 @@ public class NetworkSimulator : INetworkSimulator
 
     private NetworkSimulatorCounters _counters;
 
+    private readonly Stopwatch _stopwatch = new Stopwatch();
+    private readonly Stopwatch _refreshStopwatch = new Stopwatch();
+    private readonly TicksOptions _ticksOptions;
+
     public CounterGroup Counters
     {
         get => _counters;
@@ -43,13 +48,15 @@ public class NetworkSimulator : INetworkSimulator
 
     public NetworkSimulator(
         IPathFinder pathFinder,
-        INetworkLogger monitoring, TicksOptions ticksOptions)
+        INetworkLogger monitoring, TicksOptions ticksOptions, bool enableCounters)
     {
         PathFinder = pathFinder;
         Monitoring = monitoring;
+        this._ticksOptions = ticksOptions;
+        this.EnableCounters = enableCounters;
         PathFinder.NetworkGraph = this;
 
-        _counters = new NetworkSimulatorCounters("NetworkSimulator", "NN", ticksOptions);
+        _counters = new NetworkSimulatorCounters("NetworkSimulator", "NN", ticksOptions, enableCounters);
     }
 
     public string? OptionsPath { get; set; }
@@ -75,12 +82,13 @@ public class NetworkSimulator : INetworkSimulator
     public long TotalSteps => _step;
 
     public bool WaitMode { get; private set; }
+    public bool EnableCounters { get; private set; }
 
     public int CountNodes => _countNodes;
 
-    public TimeSpan VirtualTime => _counters.VirtualTime;
+    public TimeSpan VirtualTime => _ticksOptions.TickPeriod * TotalTicks;
 
-    public TimeSpan RealTime => _counters.RealTime;
+    public TimeSpan RealTime => _stopwatch.Elapsed;
 
     public long Errors => _errors;
 
@@ -183,6 +191,7 @@ public class NetworkSimulator : INetworkSimulator
 
     public bool Refresh(bool parallel)
     {
+        _stopwatch.Start();
         try
         {
             var scope = Monitoring.BeginScope(TotalTicks, "Refresh sourceNetwork graph");
@@ -196,6 +205,9 @@ public class NetworkSimulator : INetworkSimulator
             {
                 RefreshImplementation(scope);
             }
+
+            _counters.SetRealTime(_stopwatch.Elapsed);
+            _counters.SetRealTime(VirtualTime);
 
             Monitoring.EndScope(TotalTicks, scope);
 
@@ -319,9 +331,9 @@ public class NetworkSimulator : INetworkSimulator
                     WaitMode = false;
                     return;
                 }
-                _counters.StartRefresh();
+                _refreshStopwatch.Restart();
                 refreshResult = Refresh(false);
-                _counters.StopRefresh();
+                _refreshStopwatch.Reset();
 
 
                 if (!refreshResult)
@@ -473,9 +485,9 @@ public class NetworkSimulator : INetworkSimulator
 
     public bool RefreshWithCounters(bool parallel)
     {
-        _counters.StartRefresh();
+        _refreshStopwatch.Restart();
         var refreshResult = Refresh(parallel);
-        _counters.StopRefresh();
+        _refreshStopwatch.Reset();
 
 
         if (!refreshResult)

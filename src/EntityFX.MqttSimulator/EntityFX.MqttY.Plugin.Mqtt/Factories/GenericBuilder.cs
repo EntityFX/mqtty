@@ -37,8 +37,8 @@ public class GenericBuilder
 
     public INetworkLogger GetNullNetworkLogger() => new NullNetworkLogger();
 
-    public INetworkSimulator GetNetworkSimulator(IPathFinder pathFinder, INetworkLogger networkLogger, TicksOptions ticksOptions) =>
-        new NetworkSimulator(pathFinder, networkLogger, ticksOptions);
+    public INetworkSimulator GetNetworkSimulator(IPathFinder pathFinder, INetworkLogger networkLogger, TicksOptions ticksOptions, bool enableCounters) =>
+        new NetworkSimulator(pathFinder, networkLogger, ticksOptions, enableCounters);
 
     public IMqttTopicEvaluator GetMqttTopicEvaluator() => new MqttTopicEvaluator(true);
 

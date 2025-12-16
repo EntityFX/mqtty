@@ -57,7 +57,7 @@ namespace EntityFX.Tests.Integration
                 OutgoingWaitTicks = 2,
                 TickPeriod = TimeSpan.FromMilliseconds(1)
             };
-            _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions);
+            _graph = new NetworkSimulator(pathFinder, _monitoring, tickOptions, true);
 
             _networkOptions = new NetworkOptions()
             {
@@ -142,7 +142,7 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void BuildRandomTest()
         {
-            var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions);
+            var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions, true);
             var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
             graph!.Construction = true;
@@ -158,7 +158,7 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void BuildChainTest()
         {
-            var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions);
+            var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions, true);
             var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
             graph!.Construction = true;
@@ -174,7 +174,7 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void BuildSimpleTreeTest()
         {
-            var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions);
+            var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions, true);
             var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
             graph!.Construction = true;
@@ -200,7 +200,7 @@ namespace EntityFX.Tests.Integration
         [DataRow(false, 5, 2, 3, 100)]
         public void BuildRelayTreeTest(bool isParallel, int relays, int length, int clients, int sendRepeats)
         {
-            var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions);
+            var graph = new NetworkSimulator(pathFinder, _monitoring!, tickOptions, true);
             var builder = new MqttNetworkBuilder(graph!, mqttPacketManager, mqttTopicEvaluator, clientBuilder);
 
 
