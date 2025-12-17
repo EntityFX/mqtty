@@ -78,14 +78,16 @@ namespace EntityFX.Tests.Integration
             mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
         }
 
-        private IClient AppBuild(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group, int? groupAmount, Dictionary<string, string[]>? additional)
+        private IClient AppBuild(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks,
+            bool enableCounters,
+            string? group, int? groupAmount, Dictionary<string, string[]>? additional)
         {
             var address = $"mqtt://{name}";
             var clientName = name.Replace(".", "");
 
             var mqttClient = new MqttClient(mqttPacketManager, index,
             name, address,
-            protocolType, specification, clientName, ticks)
+            protocolType, specification, clientName, ticks, enableCounters)
             {
                 Group = group,
                 GroupAmount = groupAmount

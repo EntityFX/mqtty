@@ -94,4 +94,5 @@ public abstract class NodeBase : ISender
     }
 
     public abstract void Reset();
+    public abstract void Clear();
 }

@@ -27,27 +27,36 @@ namespace EntityFX.MqttY.Counter
 
         public double AvgInboundThroughput { get; private set; }
 
-        public NetworkCounters(string name, string shortName, TicksOptions ticksOptions)
+        public NetworkCounters(string name, string shortName, TicksOptions ticksOptions, bool enabled = true, bool historyEnabled = false)
             : base(name, shortName, "NetworkCounters", "NC")
         {
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
 
-            _transferPacketsCounter = new GenericCounter("TransferPackets", "TP", ticksOptions.CounterHistoryDepth);
+            _transferPacketsCounter = new GenericCounter("TransferPackets", "TP", ticksOptions.CounterHistoryDepth,
+                enabled: enabled, historyEnabled: historyEnabled);
 
-            _queueCounter = new ValueCounter<long>("Queue", "NQ", ticksOptions.CounterHistoryDepth);
-            _refusedCounter = new GenericCounter("Refused", "RF", ticksOptions.CounterHistoryDepth);
+            _queueCounter = new ValueCounter<long>("Queue", "NQ", ticksOptions.CounterHistoryDepth,
+                enabled: enabled, historyEnabled: historyEnabled);
+            _refusedCounter = new GenericCounter("Refused", "RF", ticksOptions.CounterHistoryDepth,
+                enabled: enabled, historyEnabled: historyEnabled);
 
-            _inboundPacketsCounter = new GenericCounter("InboundPackets", "IP", ticksOptions.CounterHistoryDepth);
+            _inboundPacketsCounter = new GenericCounter("InboundPackets", "IP", ticksOptions.CounterHistoryDepth,
+                enabled: enabled, historyEnabled: historyEnabled);
             _inboundThroughput = new ValueCounter<double>("InboundThroughput", "IT", ticksOptions.CounterHistoryDepth, 
-                "b/s", NormalizeUnits.Bit);
+                "b/s", NormalizeUnits.Bit,
+                enabled: enabled, historyEnabled: historyEnabled);
             _inboundCounter = new GenericCounter("Inbound", "IB", ticksOptions.CounterHistoryDepth, 
-                "B", NormalizeUnits.Byte);
+                "B", NormalizeUnits.Byte,
+                enabled: enabled, historyEnabled: historyEnabled);
 
-            _outboundPacketsCounter = new GenericCounter("OutboundPackets", "OP", ticksOptions.CounterHistoryDepth);
+            _outboundPacketsCounter = new GenericCounter("OutboundPackets", "OP", ticksOptions.CounterHistoryDepth,
+                enabled: enabled, historyEnabled: historyEnabled);
             _outboundThroughput = new ValueCounter<double>("OutboundThroughput", "OT", ticksOptions.CounterHistoryDepth,
-                "b/s", NormalizeUnits.Bit);
+                "b/s", NormalizeUnits.Bit,
+                enabled: enabled, historyEnabled: historyEnabled);
             _outboundCounter = new GenericCounter("Outbound", "OB", ticksOptions.CounterHistoryDepth, 
-                "B", NormalizeUnits.Byte);
+                "B", NormalizeUnits.Byte,
+                enabled: enabled, historyEnabled: historyEnabled);
 
             _counters.Add(_transferPacketsCounter);
             _counters.Add(_queueCounter);

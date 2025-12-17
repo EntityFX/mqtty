@@ -25,6 +25,8 @@ namespace EntityFX.MqttY.Contracts.Network
 
         void Reset();
 
+        void Clear();
+
         INetworkSimulator? NetworkSimulator { get; }
 
     }

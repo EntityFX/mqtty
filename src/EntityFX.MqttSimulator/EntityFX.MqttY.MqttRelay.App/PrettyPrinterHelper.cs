@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Globalization;
+using System.Text;
 
 public static class PrettyPrinterHelper
 {
@@ -6,7 +7,7 @@ public static class PrettyPrinterHelper
 
     public record Item(string FieldName, object? Value);
 
-    public record Row(Item[] Items);
+    public record Row(Item[] Items, bool rowLine = true);
 
     public record Columns(Dictionary<string, Column> Items, bool DoubleRowLine = false);
 
@@ -59,27 +60,33 @@ public static class PrettyPrinterHelper
             PrintTableLine(header.AfterHeader.Items, sb);
         }
 
-        PrintRos(header.MainHeader.Items, rows, sb);
+        PrintRows(header.MainHeader.Items, rows, sb);
 
         PrintTableLine(header.MainHeader.Items, sb);
 
         return sb.ToString();
     }
 
-    private static void PrintRos(Dictionary<string, Column> columns, Row[] rows, StringBuilder sb)
+    private static void PrintRows(Dictionary<string, Column> columns, Row[] rows, StringBuilder sb)
     {
-        foreach (var row in rows)
+        for (int r = 0; r < rows.Length; r++)
         {
+            var row = rows[r];
             sb.Append($"|");
             foreach (var field in row.Items)
             {
                 var columnSetting = columns[field.FieldName];
                 var valueFormat = $"{{0{(columnSetting.Format != null ? $":{columnSetting.Format}" : "")}}}";
-                var fmtString = string.Format(valueFormat, field.Value);
+                var fmtString = string.Format(CultureInfo.InvariantCulture, valueFormat, field.Value);
                 fmtString = AlignString(fmtString, columnSetting.Size, columnSetting.AlignItem);
                 sb.Append($" {fmtString} {(columnSetting.DoubleColumnLine ? "||" : "|")}");
             }
             sb.AppendLine();
+
+            if (row.rowLine && r < rows.Length - 1)
+            {
+                PrintTableLine(columns, sb);
+            }
         }
     }
 

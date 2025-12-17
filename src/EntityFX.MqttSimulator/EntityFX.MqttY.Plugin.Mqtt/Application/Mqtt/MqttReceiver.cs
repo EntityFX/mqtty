@@ -21,8 +21,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
         public MqttReceiver(IClientBuilder clientBuilder, int index, string name, string address, string protocolType, string specification,
             TicksOptions ticksOptions,
-            MqttReceiverConfiguration? options)
-            : base(index, name, address, protocolType, specification, ticksOptions, options)
+            MqttReceiverConfiguration? options, bool enableCounters)
+            : base(index, name, address, protocolType, specification, ticksOptions, options, enableCounters)
         {
             this._ticksOptions = ticksOptions;
             _receiverCounter = new MqttReceiverCounters("Receiver", _ticksOptions.CounterHistoryDepth);
@@ -84,7 +84,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
             var listenerMqttClient = _clientBuilder.BuildClient<IMqttClient>(NetworkSimulator!.CountNodes + 1, nodeName!, ProtocolType,
                 "mqtt-client",
-                    Network!, _ticksOptions, nodeName);
+                    Network!, _ticksOptions, NetworkSimulator!.EnableCounters, nodeName);
 
             if (listenerMqttClient == null)
             {
@@ -117,5 +117,15 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
         }
 
         private string GetNodeName(string group, string key) => $"{group}{key}";
+
+        public override void Clear()
+        {
+            if (_mqttClient != null)
+            {
+                _mqttClient.MessageReceived -= ListenerMqttClient_MessageReceived;
+            }
+
+            base.Clear();
+        }
     }
 }

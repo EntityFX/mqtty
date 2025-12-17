@@ -28,7 +28,7 @@ public class ServerFactory : IFactory<IServer?, NodeBuildOptions<NetworkBuildOpt
         //options.Network, 
         //options.NetworkGraph, 
         var server = new Server(options.Index, options.Name, options.Address ?? options.Name,
-            options.Protocol, options.Specification, options.Additional!.TicksOptions!)
+            options.Protocol, options.Specification, options.Additional!.TicksOptions!, options.Additional!.EnableCounters)
         {
             Group = options.Group
         };

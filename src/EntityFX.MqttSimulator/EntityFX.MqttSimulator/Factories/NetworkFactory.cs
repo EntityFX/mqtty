@@ -20,7 +20,7 @@ internal class NetworkFactory : IFactory<INetwork, NodeBuildOptions<NetworkBuild
             options.Address ?? options.Name,
             options.Additional!.NetworkTypeOption!.NetworkType,
             options.Additional.NetworkTypeOption,
-            options.Additional!.TicksOptions!);
+            options.Additional!.TicksOptions!, options.Additional!.EnableCounters);
 
         options.NetworkGraph.AddNetwork(network);
 

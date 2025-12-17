@@ -53,7 +53,7 @@ public class MqttClientFactory : IFactory<IClient?, NodeBuildOptions<NetworkBuil
         var mqttClient = new MqttClient(mqttPacketManager,  options.Index,
             options.Name, options.Address ?? options.Name,
             options.Protocol, options.Specification, options.Name,
-            options.Additional!.TicksOptions!)
+            options.Additional!.TicksOptions!, options.Additional!.EnableCounters)
         {
             Group = options.Group,
             GroupAmount = options.GroupAmount

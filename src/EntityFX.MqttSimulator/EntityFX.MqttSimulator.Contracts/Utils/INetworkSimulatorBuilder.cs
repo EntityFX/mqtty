@@ -10,10 +10,10 @@ namespace EntityFX.MqttY.Contracts.Utils
         INetworkSimulator? NetworkSimulator { get; }
 
         INetwork? BuildNetwork(int index, string name, string address, 
-            NetworkOptions networkTypeOption, TicksOptions ticks);
+            NetworkOptions networkTypeOption, TicksOptions ticks, bool enableCounters);
 
         IServer? BuildServer(int index, string name, string protocolType, string specification,
-            INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks, 
+            INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks, bool enableCounters, 
             string? group = null, int? groupAmount = null,
             Dictionary<string, string[]>? additional = null);
 
@@ -21,7 +21,7 @@ namespace EntityFX.MqttY.Contracts.Utils
             Dictionary<string, string[]>? additional = null);
 
         IApplication? BuildApplication(int index, string name, string protocolType, string specification,
-            INetwork network, NetworkOptions? networkTypeOption, TicksOptions? ticks, 
+            INetwork network, NetworkOptions? networkTypeOption, TicksOptions? tick, bool enableCounterss, 
             string? group = null, int? groupAmount = null,
             Dictionary<string, string[]>? additional = default);
 

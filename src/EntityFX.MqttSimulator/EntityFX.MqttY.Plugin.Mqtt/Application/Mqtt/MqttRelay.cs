@@ -17,8 +17,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
         public MqttRelay(int index, string name, string address, string protocolType, string specification,
             IClientBuilder clientBuilder,
             IMqttTopicEvaluator mqttTopicEvaluator, TicksOptions ticksOptions,
-            MqttRelayConfiguration? mqttRelayConfiguration) 
-            : base(index, name, address, protocolType, specification, ticksOptions, mqttRelayConfiguration)
+            MqttRelayConfiguration? mqttRelayConfiguration, bool enableCounters) 
+            : base(index, name, address, protocolType, specification, ticksOptions, mqttRelayConfiguration, enableCounters)
         {
             _clientBuilder = clientBuilder;
             _mqttTopicEvaluator = mqttTopicEvaluator;
@@ -101,7 +101,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
                 var nodeName = GetNodeName(group, listenServer.Key);
                 var listenerMqttClient = _clientBuilder.BuildClient<IMqttClient>(NetworkSimulator!.CountNodes+1, nodeName, ProtocolType,
                     "mqtt-client",
-                    Network!, _ticksOptions, group, serverTopics.Count);
+                    Network!, _ticksOptions, NetworkSimulator!.EnableCounters, group, serverTopics.Count);
                 if (listenerMqttClient == null)
                 {
                     break;
@@ -172,5 +172,20 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
         }
 
         private string GetNodeName(string group, string key) => $"{group}{key}";
+
+        public override void Clear()
+        {
+            if (_listenClients != null)
+            {
+                foreach (var listenClient in _listenClients.Values)
+                {
+                    listenClient.MessageReceived -= ListenerMqttClient_MessageReceived;
+                }
+
+                _listenClients.Clear();
+            }
+
+            base.Clear();
+        }
     }
 }

@@ -15,7 +15,7 @@ namespace EntityFX.Tests.Integration
         {
             return new Application<NetworkBuildOption>(options.Index, options.Name, options.Address ?? options.Name,
                 options.Protocol, options.Specification, 
-                options.Additional!.TicksOptions!, options.Additional)
+                options.Additional!.TicksOptions!, options.Additional, options.Additional.EnableCounters)
             {
                 Group = options.Group
             };

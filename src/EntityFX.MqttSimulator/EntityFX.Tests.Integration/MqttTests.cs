@@ -43,15 +43,15 @@ namespace EntityFX.Tests.Integration
 
             var network1 = new Network(0, "net1", "net1.local", "eth", new NetworkOptions() {
                 NetworkType = "eth", TransferTicks = 3, Speed = 18750000
-            }, tickOptions);
+            }, tickOptions, true);
             _graph.AddNetwork(network1);
 
             var mqc1 = new MqttClient(mqttPacketManager, 0, "mqc1", "mqtt://mqc1.net1.local",
-                "mqtt", "mqtt", "mqc1", tickOptions);
+                "mqtt", "mqtt", "mqc1", tickOptions, true);
             network1.AddClient(mqc1);
 
             var mqs1 = new MqttBroker(mqttPacketManager, mqttTopicEvaluator, 0, "mqs1", "mqtt://mqs1.net1.local",
-                "mqtt", "mqtt", tickOptions);
+                "mqtt", "mqtt", tickOptions, true);
             network1.AddServer(mqs1);
 
             _graph.AddClient(mqc1);

@@ -43,14 +43,23 @@ public abstract class Node : NodeBase
     }
 
     public Node(int index, string name, string address,
-        TicksOptions ticksOptions) : base(index, name, address)
+        TicksOptions ticksOptions, bool enableCounters) : base(index, name, address)
     {
         TicksOptions = ticksOptions;
-        counters = new NodeCounters(Name, "N", Group ?? "Node", "NG", TicksOptions.CounterHistoryDepth);
+        counters = new NodeCounters(Name, "N", Group ?? "Node", "NG", TicksOptions.CounterHistoryDepth, enableCounters);
     }
 
     public override void Reset()
     {
+        Clear();
+    }
+
+    public override void Clear()
+    {
+        if (counters != null)
+        {
+            counters.Clear();
+        }
         _outgoingMessages.Clear();
         _incommingMessages.Clear();
         _responseMessages.Clear();
@@ -58,8 +67,8 @@ public abstract class Node : NodeBase
 
     public override void Refresh()
     {
-        var outgoing = _outgoingMessages.ToArray();
-        foreach (var outgoingMonitoringPacket in outgoing)
+        //var outgoing = _outgoingMessages.ToArray();
+        foreach (var outgoingMonitoringPacket in _outgoingMessages)
         {
             if (outgoingMonitoringPacket.PassTillNextTick && outgoingMonitoringPacket.Tick == NetworkSimulator!.TotalTicks)
             {
@@ -78,8 +87,8 @@ public abstract class Node : NodeBase
         }
         //_outgoingMessages.RemoveAll(o => o.Released);
 
-        var incomming = _incommingMessages.ToArray();
-        foreach (var incommingMonitoringPacket in incomming)
+        //var incomming = _incommingMessages.ToArray();
+        foreach (var incommingMonitoringPacket in _incommingMessages)
         {
             if (incommingMonitoringPacket.PassTillNextTick && incommingMonitoringPacket.Tick == NetworkSimulator!.TotalTicks)
             {

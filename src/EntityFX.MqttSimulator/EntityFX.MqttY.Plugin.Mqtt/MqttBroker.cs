@@ -26,16 +26,16 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         public MqttBroker(IMqttPacketManager packetManager,
             IMqttTopicEvaluator mqttTopicEvaluator,
             int index, string name, string address, string protocolType, 
-            string specification, TicksOptions ticksOptions
+            string specification, TicksOptions ticksOptions, bool enableCounters
            )
             : base(index, name, address, protocolType, specification, 
-                  ticksOptions)
+                  ticksOptions, enableCounters)
         {
             this.PacketReceived += MqttBroker_PacketReceived;
             this._packetManager = packetManager;
             this._topicEvaluator = mqttTopicEvaluator;
 
-            MqttCounters = new MqttCounters(Name, Name.Substring(0, 2), "MqttBroker", "MB", ticksOptions);
+            MqttCounters = new MqttCounters(Name, Name.Substring(0, 2), "MqttBroker", "MB", ticksOptions, enableCounters);
             counters.AddCounter(MqttCounters);
         }
 
@@ -357,6 +357,13 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         private void MqttBroker_PacketReceived(object? sender, INetworkPacket e)
         {
 
+        }
+
+        public override void Clear()
+        {
+            PacketReceived -= MqttBroker_PacketReceived;
+            _sessionRepository.Clear();
+            base.Clear();
         }
     }
 }

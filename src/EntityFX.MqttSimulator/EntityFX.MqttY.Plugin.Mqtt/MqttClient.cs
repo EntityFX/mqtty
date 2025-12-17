@@ -25,14 +25,14 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         public MqttClient(IMqttPacketManager packetManager,
             int index, string name, string address, string protocolType,
             string specification,
-            string? clientId, TicksOptions ticksOptions)
+            string? clientId, TicksOptions ticksOptions, bool enableCounters)
             : base(index, name, address, protocolType, specification,
-                ticksOptions)
+                ticksOptions, enableCounters)
         {
             this._packetManager = packetManager;
             ClientId = clientId ?? name;
 
-            _mqttCounters = new MqttCounters(Name, Name.Substring(0, 2), "MqttClient", "MC", ticksOptions);
+            _mqttCounters = new MqttCounters(Name, Name.Substring(0, 2), "MqttClient", "MC", ticksOptions, enableCounters);
             counters.AddCounter(_mqttCounters);
         }
 
@@ -519,6 +519,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 TopicFilter = topicFilter
             });
 
+        }
+
+        public override void Clear()
+        {
+            _sessionRepository.Clear();
+            base.Clear();
         }
     }
 }

@@ -19,16 +19,16 @@ namespace EntityFX.MqttY.Counter
         }
 
         public NodeCounters(string name, string shortName, 
-            string groupType, string shortGroupType, int historyDepth, bool enabled = true)
+            string groupType, string shortGroupType, int historyDepth, bool enabled = true, bool historyEnabled = false)
             : base(name, shortName, groupType, shortGroupType, enabled)
         {
-            SendCounter = new GenericCounter("Send", "S", historyDepth, enabled: enabled);
-            ReceiveCounter = new GenericCounter("Receive", "R", historyDepth, enabled: enabled);
-            ErrorCounter = new GenericCounter("Error", "E", historyDepth, enabled: enabled);
+            SendCounter = new GenericCounter("Send", "S", historyDepth, enabled: enabled, historyEnabled: historyEnabled);
+            ReceiveCounter = new GenericCounter("Receive", "R", historyDepth, enabled: enabled, historyEnabled: historyEnabled);
+            ErrorCounter = new GenericCounter("Error", "E", historyDepth, enabled: enabled, historyEnabled: historyEnabled);
 
-            _outgoingQueue = new ValueCounter<long>("OutgoingQueue", "OQ", historyDepth, enabled: enabled);
-            _incommingQueue = new ValueCounter<long>("IncommingQueue", "IQ", historyDepth, enabled: enabled);
-            _receiveQueue = new ValueCounter<long>("ReceiveQueue", "RQ", historyDepth, enabled: enabled);
+            _outgoingQueue = new ValueCounter<long>("OutgoingQueue", "OQ", historyDepth, enabled: enabled, historyEnabled: historyEnabled);
+            _incommingQueue = new ValueCounter<long>("IncommingQueue", "IQ", historyDepth, enabled: enabled, historyEnabled: historyEnabled);
+            _receiveQueue = new ValueCounter<long>("ReceiveQueue", "RQ", historyDepth, enabled: enabled, historyEnabled: historyEnabled);
 
             _counters.Add(SendCounter);
             _counters.Add(ReceiveCounter);

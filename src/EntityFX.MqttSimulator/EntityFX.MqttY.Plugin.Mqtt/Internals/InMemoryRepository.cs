@@ -21,5 +21,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals
         public void Update(T element) => _elements.AddOrUpdate(element.Id, element, (key, value) => element);
 
         public void Delete(string id) => _elements.TryRemove(id, out _);
+
+        public void Clear()
+        {
+            _elements.Clear();
+        }
     }
 }

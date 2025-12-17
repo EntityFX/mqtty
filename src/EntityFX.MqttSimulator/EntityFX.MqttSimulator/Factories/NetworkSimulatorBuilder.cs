@@ -23,7 +23,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 
     public IApplication? BuildApplication(
         int index, string name, string protocolType, string specification, INetwork network,
-        NetworkOptions? networkTypeOption, TicksOptions? ticks,
+        NetworkOptions? networkTypeOption, TicksOptions? ticks, bool enableCounters,
         string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = default)
     {
         if (NetworkSimulator == null)
@@ -58,7 +58,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
     }
 
     public IClient? BuildClient(int index, string name, string protocolType, string specification,
-        INetwork network, TicksOptions? ticks,
+        INetwork network, TicksOptions? ticks, bool enableCounters,
         string? group = null, int? groupAmount = null,
         Dictionary<string, string[]>? additional = default)
     {
@@ -76,7 +76,8 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                     specification, null, new NetworkBuildOption()
                     {
                         TicksOptions = ticks,
-                        NetworkTypeOption = new NetworkOptions()
+                        NetworkTypeOption = new NetworkOptions(),
+                        EnableCounters = enableCounters
                     }));
 
         if (client == null)
@@ -90,15 +91,15 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
     }
 
     public TClient? BuildClient<TClient>(int index, string name, string protocolType, string specification,
-        INetwork network, TicksOptions ticks,
+        INetwork network, TicksOptions ticks, bool enableCounters,
         string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = default)
         where TClient : IClient
     {
         return (TClient?)BuildClient(index, name, protocolType, specification, network,
-            ticks, group, groupAmount, additional);
+            ticks, enableCounters, group, groupAmount, additional);
     }
 
-    public INetwork? BuildNetwork(int index, string name, string address, NetworkOptions networkTypeOption, TicksOptions ticks)
+    public INetwork? BuildNetwork(int index, string name, string address, NetworkOptions networkTypeOption, TicksOptions ticks, bool enableCounters)
     {
         if (NetworkSimulator == null)
         {
@@ -113,7 +114,8 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                     {
                         TicksOptions = ticks,
                         NetworkTypeOption = networkTypeOption,
-                        Additional = new Dictionary<string, string[]>()
+                        Additional = new Dictionary<string, string[]>(),
+                        EnableCounters = enableCounters
                     }
                     ));
 
@@ -135,7 +137,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
     }
 
     public IServer? BuildServer(int index, string name, string protocolType, string specification,
-        INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks,
+        INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks, bool enableCounters,
         string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = null)
     {
         if (NetworkSimulator == null)
@@ -155,6 +157,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                         Additional = additional,
                         TicksOptions = ticks,
                         NetworkTypeOption = networkTypeOption,
+                        EnableCounters = enableCounters
                     }));
 
         if (server == null)
@@ -186,7 +189,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 
             networkType.NetworkType = networkOption.Value.NetworkType;
 
-            BuildNetwork(networkOption.Value.Index, networkOption.Key, networkOption.Key, networkType, option.Ticks);
+            BuildNetwork(networkOption.Value.Index, networkOption.Key, networkOption.Key, networkType, option.Ticks, option.EnableCounters);
         }
 
         ConfigureLinks(option);
@@ -338,7 +341,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                     BuildServer(index, node.Key, node.Value.Protocol ?? "tcp",
                         node.Value.Specification ?? "tcp-server",
                         linkNetwork,
-                        networkTypeOption!, option.Ticks,
+                        networkTypeOption!, option.Ticks, option.EnableCounters,
                         null, null, node.Value.Additional);
                     break;
 
@@ -354,14 +357,14 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                                     index, $"{node.Key}{nc}",
                                     node.Value.Protocol ?? "tcp",
                                     node.Value.Specification ?? "tcp-client",
-                                    linkNetwork, option.Ticks,
+                                    linkNetwork, option.Ticks, option.EnableCounters,
                                     node.Key, node.Value.Quantity, node.Value.Additional));
                     }
                     else
                     {
                         BuildClient(index, node.Key, node.Value.Protocol ?? "tcp",
                             node.Value.Specification ?? "tcp-client",
-                            linkNetwork, option.Ticks,
+                            linkNetwork, option.Ticks, option.EnableCounters,
                             null, null, node.Value.Additional);
                     }
 
@@ -369,7 +372,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                 case NodeOptionType.Application:
                     BuildApplication(index, node.Key, node.Value.Protocol ?? "tcp",
                         node.Value.Specification ?? "tcp-app",
-                        linkNetwork, networkTypeOption, option.Ticks,
+                        linkNetwork, networkTypeOption, option.Ticks, option.EnableCounters,
                         null, null, node.Value.Additional);
                     break;
             }

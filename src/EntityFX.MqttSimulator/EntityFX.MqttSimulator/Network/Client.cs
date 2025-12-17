@@ -23,8 +23,8 @@ public class Client : Node, IClient
 
     public Client(int index, string name, string address, string protocolType, 
         string specification,
-        TicksOptions ticksOptions)
-        : base(index, name, address, ticksOptions)
+        TicksOptions ticksOptions, bool enableCounters)
+        : base(index, name, address, ticksOptions, enableCounters)
     {
         ProtocolType = protocolType;
         Specification = specification;
@@ -183,7 +183,7 @@ public class Client : Node, IClient
 
         if (Network == null) return false;
 
-        var result = DetachClientFromServer(ServerName);
+        var result = DetachClientFromServer(ServerName!);
 
         result = Network.RemoveClient(Address);
 

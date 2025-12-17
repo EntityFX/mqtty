@@ -23,8 +23,8 @@ public class Server : Node, IServer
 
     public Server(int index, string name, string address, string protocolType,
         string specification,
-        TicksOptions ticksOptions) 
-        : base(index, name, address, ticksOptions)
+        TicksOptions ticksOptions, bool enableCounters) 
+        : base(index, name, address, ticksOptions, enableCounters)
     {
         ProtocolType = protocolType;
         Specification = specification;
@@ -119,6 +119,8 @@ public class Server : Node, IServer
         var result = Network!.RemoveServer(Address);
 
         IsStarted = !result;
+
+        Reset();
     }
 
     protected override bool CompleteReceiveImplementation(INetworkPacket packet)

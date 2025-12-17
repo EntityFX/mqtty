@@ -17,6 +17,8 @@
     {
         bool Enabled { get; set; }
 
+        bool HistoryEnabled { get; set; }
+
         string Name { get; init; }
 
         string ShortName { get; init; }

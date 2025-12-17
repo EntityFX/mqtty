@@ -25,17 +25,17 @@ namespace EntityFX.MqttY.Counter
 
         public TimeSpan RealTime => _realTimeCounter.Value;
 
-        public NetworkSimulatorCounters(string name, string shortName, TicksOptions ticksOptions, bool enabled = true)
+        public NetworkSimulatorCounters(string name, string shortName, TicksOptions ticksOptions, bool enabled = true, bool historyEnabled = false)
             : base(name, shortName, "Simulator", "SM", enabled)
         {
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
             _ticksOptions = ticksOptions;
 
-            _stepsCounter = new ValueCounter<long>("Steps", "S$", ticksOptions.CounterHistoryDepth, enabled: enabled);
-            _ticksCounter = new ValueCounter<long>("Ticks", "T$",ticksOptions.CounterHistoryDepth, enabled: enabled);
-            _virtualTimeCounter = new ValueCounter<TimeSpan>("VirtualTime", "TV", ticksOptions.CounterHistoryDepth, enabled: enabled);
-            _realTimeCounter = new ValueCounter<TimeSpan>("RealTime", "TR", ticksOptions.CounterHistoryDepth, enabled: enabled);
-            _refreshTimeCounter = new ValueCounter<TimeSpan>("RefreshTime", "R$", ticksOptions.CounterHistoryDepth, enabled: enabled);
+            _stepsCounter = new ValueCounter<long>("Steps", "S$", ticksOptions.CounterHistoryDepth, enabled: enabled, historyEnabled: historyEnabled);
+            _ticksCounter = new ValueCounter<long>("Ticks", "T$",ticksOptions.CounterHistoryDepth, enabled: enabled, historyEnabled: historyEnabled);
+            _virtualTimeCounter = new ValueCounter<TimeSpan>("VirtualTime", "TV", ticksOptions.CounterHistoryDepth, enabled: enabled, historyEnabled: historyEnabled);
+            _realTimeCounter = new ValueCounter<TimeSpan>("RealTime", "TR", ticksOptions.CounterHistoryDepth, enabled: enabled, historyEnabled: historyEnabled);
+            _refreshTimeCounter = new ValueCounter<TimeSpan>("RefreshTime", "R$", ticksOptions.CounterHistoryDepth, enabled: enabled, historyEnabled: historyEnabled);
 
             _counters.AddRange(Counters);
             _counters.Add(_stepsCounter);

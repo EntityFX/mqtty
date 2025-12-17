@@ -12,5 +12,7 @@
         void Update(T element);
 
         void Delete(string id);
+
+        void Clear();
     }
 }

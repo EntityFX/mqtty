@@ -26,45 +26,61 @@ for (int b = 0; b < brokers.Length; b++)
 
                 PrintBefore(false, brokerc, netc, clientc, repeatc, false);
                 var networkSimulator = mqttRelayApp.ExecuteSimulation(false, brokerc, netc, clientc, repeatc, false);
-                PrintStats(networkSimulator, false, brokerc, netc, clientc, repeatc);
 
-                results.Add(new ResultItem(
+                var result = new ResultItem(
                     new InParams(brokerc, netc, clientc, repeatc, false, false),
-                    new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors)));
+                    new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors), false);
+
+                PrintStatsForItem(result);
+                results.Add(result);
+                networkSimulator.Clear();
+
+
 
                 PrintBefore(true, brokerc, netc, clientc, repeatc, false);
                 networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, false);
-                PrintStats(networkSimulator, true, brokerc, netc, clientc, repeatc);
-
-                results.Add(new ResultItem(
+                result = new ResultItem(
                     new InParams(brokerc, netc, clientc, repeatc, true, false),
-                    new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors)));
+                    new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors), false);
+                PrintStatsForItem(result);
+                results.Add(result);
+                networkSimulator.Clear();
 
                 PrintBefore(true, brokerc, netc, clientc, repeatc, true);
                 networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, true);
-                PrintStats(networkSimulator, true, brokerc, netc, clientc, repeatc);
-
-                results.Add(new ResultItem(
+                result = new ResultItem(
                     new InParams(brokerc, netc, clientc, repeatc, true, true),
-                    new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors)));
+                    new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors), true);
+                PrintStatsForItem(result);
+                results.Add(result);
+                networkSimulator.Clear();
 
                 var table = PrettyPrinterHelper.PrintAsTable(
                     new PrettyPrinterHelper.Header(
                         new PrettyPrinterHelper.Columns(new Dictionary<string, PrettyPrinterHelper.Column>()
                         {
                             ["Parallel"] = new PrettyPrinterHelper.Column("Parallel", 8, 0),
+                            ["Counters"] = new PrettyPrinterHelper.Column("Counters", 8, 0),
                             ["Brokers"] = new PrettyPrinterHelper.Column("Brokers", 8, 0),
                             ["Nets"] = new PrettyPrinterHelper.Column("Net Length", 10, 0),
                             ["Clients"] = new PrettyPrinterHelper.Column("Clients", 8, 0),
                             ["Repeats"] = new PrettyPrinterHelper.Column("Repeats", 8, 0, DoubleColumnLine: true),
-                            ["VirtualTime"] = new PrettyPrinterHelper.Column("Virt Time", 9, 0),
-                            ["RealTime"] = new PrettyPrinterHelper.Column("Real Time", 9, 0),
+                            ["VirtualTime"] = new PrettyPrinterHelper.Column("Virt Time", 11, 0),
+                            ["RealTime"] = new PrettyPrinterHelper.Column("Real Time", 11, 0),
                             ["Ticks"] = new PrettyPrinterHelper.Column("Ticks", 8, 0),
                             ["Steps"] = new PrettyPrinterHelper.Column("Steps", 10, 0),
+                            ["Ste"] = new PrettyPrinterHelper.Column("Step (ms)", 9, 0, Format: "f5"),
                             ["Errors"] = new PrettyPrinterHelper.Column("Errors", 6, 0),
-                        })), results.Select(r => new PrettyPrinterHelper.Row(
+                        }),
+                        new PrettyPrinterHelper.Columns(new Dictionary<string, PrettyPrinterHelper.Column>()
+                        {
+                            ["In"] = new PrettyPrinterHelper.Column("In", 8 + 8 + 8 + 10 + 8 + 8 + 15, 0, DoubleColumnLine: true),
+                            ["Out"] = new PrettyPrinterHelper.Column("Out", 9 + 9 + 8 + 10 + 6 + 9 + 19, 0)
+                        })
+                        ), results.Select(r => new PrettyPrinterHelper.Row(
                             new PrettyPrinterHelper.Item[] {
                                 new PrettyPrinterHelper.Item("Parallel", r.In.IsParallel),
+                                new PrettyPrinterHelper.Item("Parallel", r.In.EnabledCounters),
                                 new PrettyPrinterHelper.Item("Brokers", r.In.Brokers),
                                 new PrettyPrinterHelper.Item("Nets", r.In.Nets),
                                 new PrettyPrinterHelper.Item("Clients", r.In.Clients),
@@ -73,15 +89,32 @@ for (int b = 0; b < brokers.Length; b++)
                                 new PrettyPrinterHelper.Item("RealTime", r.Out.RealTime),
                                 new PrettyPrinterHelper.Item("Ticks", r.Out.TotalTicks),
                                 new PrettyPrinterHelper.Item("Steps", r.Out.TotalSteps),
+                                new PrettyPrinterHelper.Item("Ste", r.Out.RealTime.TotalMilliseconds / r.Out.TotalSteps),
                                 new PrettyPrinterHelper.Item("Errors", r.Out.Errors),
-                            })).ToArray());
+                            }, r.rowLine)).ToArray());
 
                 Console.WriteLine(table);
+
+                GC.Collect();
             }
         }
     }
 }
 
+void PrintStats(TimeSpan v, TimeSpan r, long t, long s, long e)
+{
+    Console.WriteLine("Virtual time: {0}", v);
+    Console.WriteLine("Real time: {0}", r);
+    Console.WriteLine("Ticks: {0}", t);
+    Console.WriteLine("Steps: {0}", s);
+    Console.WriteLine("Errors: {0}", e);
+    Console.WriteLine("----------");
+}
+
+void PrintStatsForItem(ResultItem result)
+{
+    PrintStats(result.Out.VirtualTime, result.Out.RealTime, result.Out.TotalTicks, result.Out.TotalSteps, result.Out.Errors);
+}
 
 static void PrintBefore(bool parallel, int b, int n, int c, int r, bool counters)
 {
@@ -91,16 +124,7 @@ static void PrintBefore(bool parallel, int b, int n, int c, int r, bool counters
 }
 
 
-static void PrintStats(EntityFX.MqttY.Contracts.Network.INetworkSimulator networkSimulator,
-    bool parallel, int b, int n, int c, int r)
-{
-    Console.WriteLine("Virtual time: {0}", networkSimulator.VirtualTime);
-    Console.WriteLine("Real time: {0}", networkSimulator.RealTime);
-    Console.WriteLine("Ticks: {0}", networkSimulator.TotalTicks);
-    Console.WriteLine("Steps: {0}", networkSimulator.TotalSteps);
-    Console.WriteLine("Errors: {0}", networkSimulator.Errors);
-    Console.WriteLine("----------");
-}
+
 
 //Console.WriteLine(networkSimulator.Counters.PrintCounters());
 

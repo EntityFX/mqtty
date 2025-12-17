@@ -30,12 +30,12 @@ public class MqttNetworkBuilder : NetworkBuilderBase
 
     protected override IServer CreateServer(TicksOptions ticksOptions, int ix, string name, string fullName, string address)
     {
-        return new MqttBroker(mqttPacketManager, mqttTopicEvaluator, ix, name, address, "mqtt", "mqtt", ticksOptions);
+        return new MqttBroker(mqttPacketManager, mqttTopicEvaluator, ix, name, address, "mqtt", "mqtt", ticksOptions, networkSimulator.EnableCounters);
     }
 
     protected override IClient CreateClient(TicksOptions ticksOptions, int ix, string name, string fullName, string address)
     {
-        return new MqttClient(mqttPacketManager, ix, name, address, "mqtt", "mqtt", name, ticksOptions);
+        return new MqttClient(mqttPacketManager, ix, name, address, "mqtt", "mqtt", name, ticksOptions, networkSimulator.EnableCounters);
     }
 
     protected override IApplication CreateApplication(
@@ -49,15 +49,15 @@ public class MqttNetworkBuilder : NetworkBuilderBase
                 return new MqttRelay(ix, name, address,
                     "mqtt", specification, clientBuilder, mqttTopicEvaluator,
                     ticksOptions,
-                    appOptionsFunc?.Invoke(ix, fullName, specification) as MqttRelayConfiguration);
+                    appOptionsFunc?.Invoke(ix, fullName, specification) as MqttRelayConfiguration, networkSimulator.EnableCounters);
             case "mqtt-receiver":
                 return new MqttReceiver(clientBuilder, ix, name, address, 
                     "mqtt", specification, ticksOptions,
-                    appOptionsFunc?.Invoke(ix, fullName, specification) as MqttReceiverConfiguration
+                    appOptionsFunc?.Invoke(ix, fullName, specification) as MqttReceiverConfiguration, networkSimulator.EnableCounters
                 );
         }
 
-        return new Application<string>(ix, fullName, address, "mqtt", specification, ticksOptions, null);
+        return new Application<string>(ix, fullName, address, "mqtt", specification, ticksOptions, null, networkSimulator.EnableCounters);
     }
 
     public IMqttBroker[] BuildMqttRelay(NetworkSimulator graph, TicksOptions ticksOptions)
@@ -101,7 +101,7 @@ public class MqttNetworkBuilder : NetworkBuilderBase
         };
 
         var receiver = new MqttReceiver(clientBuilder, ix, receiverName, receiverAddress, "mqtt", "mqtt-receiver",
-            ticksOptions, receiverConfiguration);
+            ticksOptions, receiverConfiguration, networkSimulator.EnableCounters);
         brokerNetwork.AddApplication(receiver);
         graph.AddApplication(receiver);
         return ix;
@@ -159,7 +159,7 @@ public class MqttNetworkBuilder : NetworkBuilderBase
         };
 
         var relay = new MqttRelay(ix, relayName, address, "mqtt", "mqtt-relay", clientBuilder,
-            mqttTopicEvaluator, ticksOptions, relayConfiguration);
+            mqttTopicEvaluator, ticksOptions, relayConfiguration, networkSimulator.EnableCounters);
         brokerNetwork.AddApplication(relay);
         brokerNetwork.NetworkSimulator!.AddApplication(relay);
     }

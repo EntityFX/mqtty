@@ -29,7 +29,7 @@ public class ClientFactory : IFactory<IClient?, NodeBuildOptions<NetworkBuildOpt
         //options.Network, 
         var client = new Client(options.Index, options.Name, options.Address ?? options.Name, options.Protocol,
             options.Specification,
-            options.Additional!.TicksOptions!)
+            options.Additional!.TicksOptions!, options.Additional!.EnableCounters)
         {
             Group = options.Group
         };

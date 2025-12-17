@@ -32,7 +32,7 @@ public class ApplicationFactory : IFactory<IApplication?, NodeBuildOptions<Netwo
 
         var app = new Application.Application<object>(options.Index, options.Name, options.Address ?? options.Name,
             options.Protocol, options.Specification,
-            options.Additional!.TicksOptions!, options.Additional)
+            options.Additional!.TicksOptions!, options.Additional, options.Additional!.EnableCounters)
         {
             Group = options.Group
         };

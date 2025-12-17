@@ -9,5 +9,7 @@
 
         public TicksOptions Ticks { get; set; } = new();
 
+        public bool EnableCounters { get; set; }
+
     }
 }

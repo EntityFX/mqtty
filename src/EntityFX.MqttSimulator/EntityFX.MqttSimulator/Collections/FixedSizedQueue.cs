@@ -16,13 +16,13 @@ namespace EntityFX.MqttY.Collections
         public new void Enqueue(T obj)
         {
             base.Enqueue(obj);
-            lock (_syncObject)
-            {
+            //lock (_syncObject)
+            //{
                 while (base.Count > Size)
                 {
                     base.TryDequeue(out _);
                 }
-            }
+           // }
         }
     }
 }

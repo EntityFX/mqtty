@@ -54,7 +54,7 @@ namespace EntityFX.Tests.Integration
                 NetworkType = "eth",
                 TransferTicks = 3,
                 Speed = 18750000
-            }, tickOptions);
+            }, tickOptions, true);
             _graph.AddNetwork(netGlobal);
 
             var net1Local = new Network(1, "net1.local", "net1.local", "eth", new NetworkOptions()
@@ -62,7 +62,7 @@ namespace EntityFX.Tests.Integration
                 NetworkType = "eth",
                 TransferTicks = 3,
                 Speed = 18750000
-            }, tickOptions);
+            }, tickOptions, true);
             _graph.AddNetwork(net1Local);
 
             var net2Local = new Network(2, "net2.local", "net2.local", "eth", new NetworkOptions()
@@ -70,7 +70,7 @@ namespace EntityFX.Tests.Integration
                 NetworkType = "eth",
                 TransferTicks = 3,
                 Speed = 18750000
-            }, tickOptions);
+            }, tickOptions, true);
             _graph.AddNetwork(net2Local);
 
             var net3Local = new Network(3, "net3.local", "net3.local", "eth", new NetworkOptions()
@@ -78,7 +78,7 @@ namespace EntityFX.Tests.Integration
                 NetworkType = "eth",
                 TransferTicks = 3,
                 Speed = 18750000
-            }, tickOptions);
+            }, tickOptions, true);
             _graph.AddNetwork(net3Local);
 
             var net4Local = new Network(3, "net4.local", "net4.local", "eth", new NetworkOptions()
@@ -86,7 +86,7 @@ namespace EntityFX.Tests.Integration
                 NetworkType = "eth",
                 TransferTicks = 3,
                 Speed = 18750000
-            }, tickOptions);
+            }, tickOptions, true);
             _graph.AddNetwork(net4Local);
 
             netGlobal.Link(net1Local);
@@ -95,23 +95,23 @@ namespace EntityFX.Tests.Integration
             netGlobal.Link(net4Local);
 
             var mqc1Net2 = new MqttClient(mqttPacketManager, 0, "mqc1.net2.local", "mqtt://mqc1.net2.local",
-                "mqtt", "mqtt", "mqc1net2", tickOptions);
+                "mqtt", "mqtt", "mqc1net2", tickOptions, true);
             net2Local.AddClient(mqc1Net2);
 
             var mqc1Net4 = new MqttClient(mqttPacketManager, 0, "mqc1.net4.local", "mqtt://mqc1.net4.local",
-                "mqtt", "mqtt", "mqc1net4", tickOptions);
+                "mqtt", "mqtt", "mqc1net4", tickOptions, true);
             net4Local.AddClient(mqc1Net4);
 
             var mqc1Net3 = new MqttClient(mqttPacketManager, 0, "mqc1.net3.local", "mqtt://mqc1.net3.local",
-                "mqtt", "mqtt", "mqc1net3", tickOptions);
+                "mqtt", "mqtt", "mqc1net3", tickOptions, true);
             net3Local.AddClient(mqc1Net3);
 
             var mqs1Net1 = new MqttBroker(mqttPacketManager, mqttTopicEvaluator, 0, "mqs1.net1.local", "mqtt://mqs1.net1.local",
-                "mqtt", "mqtt", tickOptions);
+                "mqtt", "mqtt", tickOptions, true);
             net1Local.AddServer(mqs1Net1);
 
             var mqs1Net3 = new MqttBroker(mqttPacketManager, mqttTopicEvaluator, 0, "mqs1.net3.local", "mqtt://mqs1.net3.local",
-                "mqtt", "mqtt", tickOptions);
+                "mqtt", "mqtt", tickOptions, true);
             net3Local.AddServer(mqs1Net3);
 
             _graph.AddClient(mqc1Net2);

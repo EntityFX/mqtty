@@ -5,6 +5,7 @@ using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Diagnostics.Metrics;
 using NetworkLoggerType = EntityFX.MqttY.Contracts.NetworkLogger.NetworkLoggerType;
 
 namespace EntityFX.MqttY.Network;
@@ -81,13 +82,13 @@ public class Network : NodeBase, INetwork
 
     public Network(
         int index, string name, string address, string networkType,
-        NetworkOptions networkTypeOption, TicksOptions ticksOptions)
+        NetworkOptions networkTypeOption, TicksOptions ticksOptions, bool enableCounters)
         : base(index, name, address)
     {
         this._networkTypeOption = networkTypeOption;
         this._ticksOptions = ticksOptions;
-        _networkCounters = new NetworkCounters(Name, "NC", ticksOptions);
-        _counters = new CounterGroup(Name, "NN", "Network", "NG");
+        _networkCounters = new NetworkCounters(Name, "NC", ticksOptions, enableCounters);
+        _counters = new CounterGroup(Name, "NN", "Network", "NG", enableCounters);
         NetworkType = networkType;
     }
 
@@ -164,6 +165,15 @@ public class Network : NodeBase, INetwork
 
     public bool UnlinkAll()
     {
+        if (_counters != null)
+        {
+            _counters.Clear();
+        }
+
+        _applications.Clear();
+        _clients.Clear();
+        _servers.Clear();
+
         foreach (var network in _linkedNetworks.Values)
         {
             var result = network.Unlink(this);
@@ -473,5 +483,11 @@ public class Network : NodeBase, INetwork
 
     public override void Reset()
     {
+        Clear();
+    }
+
+    public override void Clear()
+    {
+        _monitoringPacketsQueue.Clear();
     }
 }

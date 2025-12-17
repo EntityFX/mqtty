@@ -8,6 +8,7 @@ using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Counter;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace EntityFX.MqttY.Network;
 
@@ -152,6 +153,7 @@ public class NetworkSimulator : INetworkSimulator
 
         _nodes.Remove((clientAddress, NodeType.Client), out _);
         Interlocked.Decrement(ref _countNodes);
+        client.Clear();
     }
 
     public void RemoveNetwork(string networkAddress)
@@ -168,6 +170,7 @@ public class NetworkSimulator : INetworkSimulator
 
         UpdateRoutes();
         Interlocked.Decrement(ref _countNodes);
+        network.Clear();
     }
 
     public void RemoveServer(string serverAddress)
@@ -187,6 +190,27 @@ public class NetworkSimulator : INetworkSimulator
 
         _nodes.Remove((serverAddress, NodeType.Server), out _);
         Interlocked.Decrement(ref _countNodes);
+        server.Clear();
+    }
+
+    private void RemoveApplication(string name)
+    {
+        if (!_nodes.ContainsKey((name, NodeType.Application)))
+        {
+            return;
+        }
+
+        var application = GetNode(name, NodeType.Application) as IApplication;
+        if (application == null)
+        {
+            return;
+        }
+
+        application.Stop();
+
+        _nodes.Remove((name, NodeType.Application), out _);
+        Interlocked.Decrement(ref _countNodes);
+        application.Clear();
     }
 
     public bool Refresh(bool parallel)
@@ -387,6 +411,7 @@ public class NetworkSimulator : INetworkSimulator
         {
             ((NodeBase)client).NetworkSimulator = this;
         }
+
         Interlocked.Increment(ref _countNodes);
 
         return result;
@@ -446,6 +471,7 @@ public class NetworkSimulator : INetworkSimulator
         UpdateRoutes();
 
         ((NodeBase)network).NetworkSimulator = this;
+
         Interlocked.Increment(ref _countNodes);
 
         return result;
@@ -502,10 +528,8 @@ public class NetworkSimulator : INetworkSimulator
 
     public void Clear()
     {
-        Reset();
         try
         {
-            Tick();
             var scope = Monitoring.BeginScope(TotalTicks, "Clear sourceNetwork graph");
             Monitoring.Push(Guid.Empty, TotalTicks, NetworkLoggerType.Disconnect, $"Clear whole sourceNetwork", "Network", "Clean", scope);
 
@@ -528,7 +552,7 @@ public class NetworkSimulator : INetworkSimulator
                         RemoveClient(node.Name);
                         break;
                     case NodeType.Application:
-
+                        RemoveApplication(node.Name);
                         break;
                     case NodeType.Other:
                         break;
@@ -544,7 +568,9 @@ public class NetworkSimulator : INetworkSimulator
                 RemoveNetwork(network.Key);
             }
 
-
+            _counters.Clear();
+            _stopwatch.Stop();
+            _refreshStopwatch.Stop();
 
             Monitoring.EndScope(TotalTicks, scope);
         }

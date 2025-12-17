@@ -14,7 +14,7 @@ using EntityFX.MqttY.Plugin.Mqtt.Factories;
 
 record InParams(int Brokers, int Nets, int Clients, int Repeats, bool IsParallel, bool EnabledCounters);
 record OutParams(TimeSpan VirtualTime, TimeSpan RealTime, long TotalTicks, long TotalSteps, long Errors);
-record ResultItem(InParams In, OutParams Out);
+record ResultItem(InParams In, OutParams Out, bool rowLine);
 
 public class MqttRelayApp
 {
@@ -250,14 +250,16 @@ public class MqttRelayApp
         }
     }
 
-    private IClient AppBuild(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group, int? groupAmount, Dictionary<string, string[]>? additional)
+    private IClient AppBuild(
+        int index, string name, string protocolType, string specification, INetwork network, 
+        TicksOptions ticks, bool enableCounters, string? group, int? groupAmount, Dictionary<string, string[]>? additional)
     {
         var address = $"mqtt://{name}";
         var clientName = name.Replace(".", "");
 
         var mqttClient = new MqttClient(_mqttPacketManager, index,
         name, address,
-        protocolType, specification, clientName, ticks)
+        protocolType, specification, clientName, ticks, enableCounters)
         {
             Group = group,
             GroupAmount = groupAmount

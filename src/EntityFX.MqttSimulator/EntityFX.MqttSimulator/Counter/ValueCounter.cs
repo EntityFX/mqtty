@@ -20,7 +20,7 @@ namespace EntityFX.MqttY.Counter
 
         public TValue PreviousValue => _previousValue;
 
-        IEnumerable<KeyValuePair<long, object>> ICounter.HistoryValues => 
+        IEnumerable<KeyValuePair<long, object>> ICounter.HistoryValues =>
             _valueHistory.Select(vh => new KeyValuePair<long, object>(vh.Key, vh.Value));
 
         object ICounter.PreviousValue => PreviousValue;
@@ -30,11 +30,13 @@ namespace EntityFX.MqttY.Counter
 
         public bool Enabled { get; set; }
 
+        public bool HistoryEnabled { get; set; }
+
         public IEnumerable<KeyValuePair<long, TValue>> HistoryValues => _valueHistory;
 
         public KeyValuePair<long, TValue>? TickPreviousValue => _tickPreviousValue;
 
-        KeyValuePair<long, object>? ICounter.TickPreviousValue => _tickPreviousValue != null 
+        KeyValuePair<long, object>? ICounter.TickPreviousValue => _tickPreviousValue != null
             ? new KeyValuePair<long, object>(_tickPreviousValue.Value.Key, _tickPreviousValue.Value.Value)
             : null;
 
@@ -43,6 +45,7 @@ namespace EntityFX.MqttY.Counter
         KeyValuePair<long, object>? ICounter.TickFirstValue => _tickFirstValue != null
             ? new KeyValuePair<long, object>(_tickFirstValue.Value.Key, _tickFirstValue.Value.Value)
             : null;
+
 
         private TValue _value = default;
 
@@ -56,8 +59,8 @@ namespace EntityFX.MqttY.Counter
         private readonly int _historyDepth;
         private readonly NormalizeUnits? _normalizeUnits;
 
-        public ValueCounter(string name, string shortName, int historyDepth,  
-            string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null, bool enabled = true)
+        public ValueCounter(string name, string shortName, int historyDepth,
+            string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null, bool enabled = true, bool historyEnabled = false)
         {
             Name = name;
             ShortName = shortName;
@@ -66,6 +69,7 @@ namespace EntityFX.MqttY.Counter
             this._normalizeUnits = normalizeUnits;
             _valueHistory = new(historyDepth);
             Enabled = enabled;
+            HistoryEnabled = historyEnabled;
         }
 
         public void Refresh(long totalTicks, long totalSteps)
@@ -98,7 +102,11 @@ namespace EntityFX.MqttY.Counter
             {
                 return;
             }
-            _valueHistory.Enqueue(new KeyValuePair<long, TValue>(LastTicks, value));
+
+            if (HistoryEnabled)
+            {
+                _valueHistory.Enqueue(new KeyValuePair<long, TValue>(LastTicks, value));
+            }
         }
 
         public double Average()
@@ -126,7 +134,7 @@ namespace EntityFX.MqttY.Counter
             _previousValue = default(TValue);
             _tickFirstValue = null;
             _tickPreviousValue = null;
-            _valueHistory.Clear(); 
+            _valueHistory.Clear();
         }
 
         public override string ToString()
@@ -137,7 +145,8 @@ namespace EntityFX.MqttY.Counter
             }
 
             var doubleValue = Convert.ToDouble(Value);
-            var stringValue = _normalizeUnits switch {
+            var stringValue = _normalizeUnits switch
+            {
                 NormalizeUnits.Bit => doubleValue.ToHumanBits(UnitOfMeasure),
                 NormalizeUnits.Byte => doubleValue.ToHumanBytes(UnitOfMeasure),
                 NormalizeUnits.BiBit => doubleValue.ToHumanBiBits(UnitOfMeasure),

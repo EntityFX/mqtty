@@ -29,6 +29,8 @@ namespace EntityFX.MqttY.Counter
 
         public bool Enabled { get; set; }
 
+        public bool HistoryEnabled { get; set; }
+
         public IEnumerable<KeyValuePair<long, long>> HistoryValues => 
             _valueHistory;
 
@@ -40,6 +42,7 @@ namespace EntityFX.MqttY.Counter
 
 
         KeyValuePair<long, object>? ICounter.TickFirstValue => _tickFirstValue != null ? new KeyValuePair<long, object>(_tickFirstValue.Value.Key, _tickFirstValue.Value.Value) : null;
+
 
         private readonly FixedSizedQueue<KeyValuePair<long, long>> _valueHistory;
 
@@ -53,13 +56,14 @@ namespace EntityFX.MqttY.Counter
         private readonly NormalizeUnits? _normalizeUnits;
 
         public GenericCounter(string name, string shortName,
-            int historyDepth, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null, bool enabled = true)
+            int historyDepth, string? unitOfMeasure = null, NormalizeUnits? normalizeUnits = null, bool enabled = true, bool historyEnabled = false)
         {
             Name = name;
             ShortName = shortName;
             UnitOfMeasure = unitOfMeasure;
             this._normalizeUnits = normalizeUnits;
             _valueHistory = new(historyDepth);
+            HistoryEnabled = historyEnabled;
             Enabled = enabled;
         }
 
@@ -78,7 +82,10 @@ namespace EntityFX.MqttY.Counter
                 _tickFirstValue = new KeyValuePair<long, long>(LastTicks, _privateValue);
             }
 
-            _valueHistory.Enqueue(_tickPreviousValue.Value);
+            if (HistoryEnabled)
+            {
+                _valueHistory.Enqueue(_tickPreviousValue.Value);
+            }
         }
 
         public void Add(long value)
@@ -92,7 +99,10 @@ namespace EntityFX.MqttY.Counter
             }
 
 
-            _valueHistory.Enqueue(new KeyValuePair<long, long>(LastTicks, _privateValue));
+            if (HistoryEnabled)
+            {
+                _valueHistory.Enqueue(new KeyValuePair<long, long>(LastTicks, _privateValue));
+            }
         }
 
         public override string ToString()

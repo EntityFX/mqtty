@@ -67,7 +67,9 @@ namespace EntityFX.Tests.Integration
             mqttPacketManager = new MqttNativePacketManager(mqttTopicEvaluator);
         }
 
-        private IClient AppBuild(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group, int? groupAmount, Dictionary<string, string[]>? additional)
+        private IClient AppBuild(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, 
+            bool enableCounters,
+            string? group, int? groupAmount, Dictionary<string, string[]>? additional)
         {
             throw new NotImplementedException();
         }

@@ -35,6 +35,7 @@
         public KeyValuePair<long, object>? TickFirstValue { get; }
         public string ShortName { get; init; }
         public bool Enabled { get; set; }
+        public bool HistoryEnabled { get; set; }
         KeyValuePair<long, object>? ICounter.TickPreviousValue { get; }
 
         public double Average()

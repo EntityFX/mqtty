@@ -50,7 +50,7 @@ public class MqttApplicationFactory : IFactory<IApplication?, NodeBuildOptions<N
                     (options.Index, options.Name, options.Address ?? options.Name,
                         options.Protocol, options.Specification, networkSimulatorBuilder, mqttTopicEvaluator,
                         options.Additional!.TicksOptions!,
-                        mqttRelayConf)
+                        mqttRelayConf, options.Additional!.EnableCounters)
                     {
                         Group = options.Group,
                         GroupAmount = options.GroupAmount
@@ -71,7 +71,7 @@ public class MqttApplicationFactory : IFactory<IApplication?, NodeBuildOptions<N
                     var receiver = new MqttReceiver
                     (networkSimulatorBuilder, options.Index, options.Name, options.Address ?? options.Name,
                         options.Protocol, options.Specification,
-                        options.Additional!.TicksOptions!, mqttReceiverConf)
+                        options.Additional!.TicksOptions!, mqttReceiverConf, options.Additional!.EnableCounters)
                     {
                         Group = options.Group,
                         GroupAmount = options.GroupAmount

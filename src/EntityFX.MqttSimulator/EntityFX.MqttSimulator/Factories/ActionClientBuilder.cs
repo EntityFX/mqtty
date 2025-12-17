@@ -13,14 +13,18 @@ public class ActionClientBuilder : IClientBuilder
         this.func = func;
     }
 
-    public IClient? BuildClient(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = null)
+    public IClient? BuildClient(int index, string name, string protocolType, string specification, INetwork network,
+        TicksOptions ticks, bool enableCounters, string? group = null, 
+        int? groupAmount = null, Dictionary<string, string[]>? additional = null)
     {
-        return func.Invoke(index, name, protocolType, specification, network, ticks, group, groupAmount, additional);
+        return func.Invoke(index, name, protocolType, specification, network, ticks, enableCounters, group, groupAmount, additional);
     }
 
-    public TClient? BuildClient<TClient>(int index, string name, string protocolType, string specification, INetwork network, TicksOptions ticks, string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = null) where TClient : IClient
+    public TClient? BuildClient<TClient>(int index, string name, string protocolType, string specification, INetwork network,
+        TicksOptions ticks, bool enableCounters, string? group = null, 
+        int? groupAmount = null, Dictionary<string, string[]>? additional = null) where TClient : IClient
     {
         return (TClient?)BuildClient(index, name, protocolType, specification, network,
-            ticks, group, groupAmount, additional);
+            ticks, enableCounters, group, groupAmount, additional);
     }
 }

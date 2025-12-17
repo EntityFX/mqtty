@@ -66,7 +66,7 @@ namespace EntityFX.MqttY.Factories
             {
                 var ix = _nextId++;
                 var nodeName = $"n{ix}.net";
-                var network = new Network.Network(ix, nodeName, nodeName, "eth", networkTypeOption, ticksOptions);
+                var network = new Network.Network(ix, nodeName, nodeName, "eth", networkTypeOption, ticksOptions, networkSimulator.EnableCounters);
                 networkSimulator.AddNetwork(network);
 
                 if (previous != null)
@@ -102,7 +102,7 @@ namespace EntityFX.MqttY.Factories
             {
                 var ix = _nextId++;
                 var nodeName = $"n{ix}.net";
-                var network = new Network.Network(ix, nodeName, nodeName, "eth", networkTypeOption, ticksOptions);
+                var network = new Network.Network(ix, nodeName, nodeName, "eth", networkTypeOption, ticksOptions, networkSimulator.EnableCounters);
                 networkSimulator.AddNetwork(network);
 
                 if (previous != null)
@@ -135,7 +135,7 @@ namespace EntityFX.MqttY.Factories
 
             var ix = _nextId++;
             var nodeName = $"n{ix}.global";
-            var root = new Network.Network(ix, nodeName, nodeName, "eth", networkTypeOption, ticksOptions);
+            var root = new Network.Network(ix, nodeName, nodeName, "eth", networkTypeOption, ticksOptions, networkSimulator.EnableCounters);
             networkSimulator.AddNetwork(root);
 
             for (int i = 0; i < branchingFactor; i++)
@@ -200,14 +200,14 @@ namespace EntityFX.MqttY.Factories
         {
             var ix = _nextId++;
             var nodeName = $"n{ix}.{namePrefix}";
-            var node = new Network.Network(ix, nodeName, nodeName, "eth", networkTypeOption, ticksOptions);
+            var node = new Network.Network(ix, nodeName, nodeName, "eth", networkTypeOption, ticksOptions, networkSimulator.EnableCounters);
             networkSimulator.AddNetwork(node);
 
             for (int i = 0; i < branchingFactor; i++)
             {
                 ix = _nextId++;
                 var childName = $"n{ix}.{nodeName}";
-                var child = new Network.Network(ix, childName, childName, "eth", networkTypeOption, ticksOptions);
+                var child = new Network.Network(ix, childName, childName, "eth", networkTypeOption, ticksOptions, networkSimulator.EnableCounters);
                 networkSimulator.AddNetwork(child);
                 CreateClients(child, clientsPerNode, ticksOptions);
                 CreateServers(child, serversPerNode, ticksOptions);
@@ -241,7 +241,7 @@ namespace EntityFX.MqttY.Factories
         {
             var ix = _nextId++;
             var name = $"n{ix}.{namePrefix}";
-            var node = new Network.Network(ix, name, name, "eth", networkTypeOption, ticksOptions);
+            var node = new Network.Network(ix, name, name, "eth", networkTypeOption, ticksOptions, networkSimulator.EnableCounters);
             networkSimulator.AddNetwork(node);
             if (depth > 1)
             {
@@ -281,7 +281,7 @@ namespace EntityFX.MqttY.Factories
         {
             var ix = _nextId++;
             var name = $"n{ix}.{namePrefix}";
-            var node = new Network.Network(ix, name, name, "eth", networkTypeOption, ticksOptions);
+            var node = new Network.Network(ix, name, name, "eth", networkTypeOption, ticksOptions, networkSimulator.EnableCounters);
             networkSimulator.AddNetwork(node);
             if (depth > 1)
             {

@@ -50,7 +50,7 @@ namespace EntityFX.MqttY.Application
         public INetworkSimulator? NetworkSimulator { get; internal set; }
 
         public ApplicationBase(int index, string name, string address, string protocolType, string specification,
-            TicksOptions ticksOptions)
+            TicksOptions ticksOptions, bool enableCounters)
         {
             Address = address;
             ProtocolType = protocolType;
@@ -58,7 +58,7 @@ namespace EntityFX.MqttY.Application
             Name = name;
             Id = Guid.NewGuid();
             Index = index;
-            counters = new ApplicationCounters(Name ?? string.Empty, ticksOptions.CounterHistoryDepth);
+            counters = new ApplicationCounters(Name ?? string.Empty, ticksOptions.CounterHistoryDepth, enableCounters);
         }
 
 
@@ -150,6 +150,12 @@ namespace EntityFX.MqttY.Application
 
             IsStarted = result != true;
         }
+
+        public virtual void Clear()
+        {
+            _clients.Clear();
+            _servers.Clear();
+        }
     }
 
     public class Application<TOptions> : ApplicationBase
@@ -157,10 +163,11 @@ namespace EntityFX.MqttY.Application
         public TOptions? Options { get; }
 
         public Application(int index, string name, string address, string protocolType, string specification,
-            TicksOptions ticksOptions, TOptions? options)
-            : base(index, name, address, protocolType, specification, ticksOptions)
+            TicksOptions ticksOptions, TOptions? options, bool enableCounters)
+            : base(index, name, address, protocolType, specification, ticksOptions, enableCounters)
         {
             Options = options;
         }
     }
+
 }
