@@ -1,6 +1,6 @@
 using System.Text;
 using EntityFX.MqttY.Contracts.Counters;
-using EntityFX.MqttY.Plugin.Scenarios.Helper;
+using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Scenarios;
 
 namespace EntityFX.MqttY.Plugin.Scenarios;

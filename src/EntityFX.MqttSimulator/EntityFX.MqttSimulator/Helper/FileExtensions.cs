@@ -1,4 +1,4 @@
-namespace EntityFX.MqttY.Plugin.Scenarios.Helper;
+namespace EntityFX.MqttY.Helper;
 
 public static class FileExtensions
 {

@@ -1,5 +1,5 @@
 using EntityFX.MqttY.Contracts.Utils;
-using EntityFX.MqttY.Plugin.Scenarios.Helper;
+using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Scenarios;
 using Microsoft.Extensions.DependencyInjection;
 

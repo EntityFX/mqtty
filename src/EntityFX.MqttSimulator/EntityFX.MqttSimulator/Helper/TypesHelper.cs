@@ -1,6 +1,6 @@
 ﻿namespace EntityFX.MqttY.Helper
 {
-    public static class TypesHeler
+    public static class TypesHelper
     {
         public static bool IsNumericType(this object o)
         {

@@ -8,10 +8,14 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\EntityFX.MqttSimulator.Contracts\EntityFX.MqttY.Contracts.csproj" />
+		<ProjectReference Include="..\EntityFX.MqttSimulator\EntityFX.MqttY.csproj" />
 		<ProjectReference Include="..\EntityFX.MqttY.Contracts.Scenarios\EntityFX.MqttY.Contracts.Scenarios.csproj" />
 	</ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
 		<PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Folder Include="Helper\" />
 	</ItemGroup>
 </Project>
