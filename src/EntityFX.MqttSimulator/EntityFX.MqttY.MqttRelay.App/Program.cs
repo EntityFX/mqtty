@@ -1,6 +1,7 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Network;
+using Microsoft.Extensions.Primitives;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
@@ -23,6 +24,7 @@ var mqttRelayApp = new MqttRelayApp();
 
 var table = string.Empty;
 
+var id = 0;
 for (int b = 0; b < brokers.Length; b++)
 {
     for (int n = 0; n < netLength.Length; n++)
@@ -31,19 +33,19 @@ for (int b = 0; b < brokers.Length; b++)
         {
             for (int r = 0, ix = 0; r < repeats.Length; r++, ix++)
             {
-                var prefixBase = $"{ix}__b_{b}__n_{n}__c_{c}__r_{r}";
-
                 var brokerc = brokers[b];
                 var netc = netLength[n];
                 var clientc = clients[c];
                 var repeatc = repeats[r];
+
+                var prefixBase = $"{ix}__b_{brokerc}__n_{netc}__c_{clientc}__r_{repeatc}";
 
                 PrintBefore(false, brokerc, netc, clientc, repeatc, false);
                 var networkSimulator = mqttRelayApp.ExecuteSimulation(false, brokerc, netc, clientc, repeatc, false);
 
                 var ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
 
-                var result = new ResultItem(
+                var result = new ResultItem(id,
                     new InParams(brokerc, netc, clientc, repeatc, false, false),
                     new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws), false);
 
@@ -52,35 +54,35 @@ for (int b = 0; b < brokers.Length; b++)
 
                 results.Add(result);
                 networkSimulator.Clear();
-
+                id++;
                 GC.Collect();
 
                 PrintBefore(true, brokerc, netc, clientc, repeatc, false);
                 networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, false);
 
                 ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
-                result = new ResultItem(
+                result = new ResultItem(id,
                     new InParams(brokerc, netc, clientc, repeatc, true, false),
                     new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws), false);
                 PrintStatsForItem(result);
                 SaveCounters(resultPath, prefixBase, networkSimulator);
                 results.Add(result);
                 networkSimulator.Clear();
-
+                id++;
                 GC.Collect();
 
                 PrintBefore(true, brokerc, netc, clientc, repeatc, true);
                 networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, true);
 
                 ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
-                result = new ResultItem(
+                result = new ResultItem(id,
                     new InParams(brokerc, netc, clientc, repeatc, true, true),
                     new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws), true);
                 PrintStatsForItem(result);
                 SaveCounters(resultPath, prefixBase, networkSimulator);
                 results.Add(result);
                 networkSimulator.Clear();
-
+                id++;
                 GC.Collect();
 
                 table = PrintTable(results);
@@ -184,6 +186,7 @@ void SaveResultsToCsv(string path, string prefixBase, List<ResultItem> results)
 {
     var sb = new StringBuilder();
 
+    sb.Append($"Id;");
     sb.Append($"IsParallel;");
     sb.Append($"EnabledCounters;");
     sb.Append($"Brokers;");
@@ -192,6 +195,7 @@ void SaveResultsToCsv(string path, string prefixBase, List<ResultItem> results)
     sb.Append($"Repeats;");
     sb.Append($"VirtualTime;");
     sb.Append($"RealTime;");
+    sb.Append($"RealTime (ms);");
     sb.Append($"TotalTicks;");
     sb.Append($"TotalSteps;");
     sb.Append($"Errors;");
@@ -200,6 +204,7 @@ void SaveResultsToCsv(string path, string prefixBase, List<ResultItem> results)
 
     foreach (var result in results)
     {
+        sb.Append($"{result.Id};");
         sb.Append($"{result.In.IsParallel};");
         sb.Append($"{result.In.EnabledCounters};");
         sb.Append($"{result.In.Brokers};");
@@ -208,6 +213,7 @@ void SaveResultsToCsv(string path, string prefixBase, List<ResultItem> results)
         sb.Append($"{result.In.Repeats};");
         sb.Append($"{result.Out.VirtualTime};");
         sb.Append($"{result.Out.RealTime};");
+        sb.Append(result.Out.RealTime.TotalMilliseconds.ToString(CultureInfo.InvariantCulture));
         sb.Append($"{result.Out.TotalTicks};");
         sb.Append($"{result.Out.TotalSteps};");
         sb.Append($"{result.Out.Errors};");
