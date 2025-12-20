@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "EntityFX.MqttY.MqttRelay.App - read": {
+      "commandName": "Project",
+      "commandLineArgs": "results\\2025_12_20__18_58_50\\0__b_4__n_5__c_3__r_10.csv"
+    }
+  }
+}

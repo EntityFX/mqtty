@@ -14,7 +14,12 @@ using EntityFX.MqttY.Plugin.Mqtt.Factories;
 
 record InParams(int Brokers, int Nets, int Clients, int Repeats, bool IsParallel, bool EnabledCounters);
 record OutParams(TimeSpan VirtualTime, TimeSpan RealTime, long TotalTicks, long TotalSteps, long Errors, double MemoryWorkingSet);
-record ResultItem(int Id, InParams In, OutParams Out, bool rowLine);
+record ResultItem(int Id, int GroupId, InParams In, OutParams Out, bool rowLine);
+
+record FlatItem(int Id, int GroupId, bool IsParallel,
+    bool EnabledCounters, int Brokers, int Nets, int Clients, int Repeats, 
+    TimeSpan VirtualTime, TimeSpan RealTime, double RealTimeMs, 
+    long TotalTicks, long TotalSteps, long Errors, double MemoryWorkingSet);
 
 public class MqttRelayApp
 {
