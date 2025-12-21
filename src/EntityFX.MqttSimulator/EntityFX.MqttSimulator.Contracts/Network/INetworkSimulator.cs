@@ -57,6 +57,8 @@ namespace EntityFX.MqttY.Contracts.Network
 
         ILeafNode? GetNode(string name, NodeType nodeType);
 
+        long GetPacketId();
+
         INetworkPacket GetReversePacket(INetworkPacket packet, byte[] payload, string? category);
 
         bool Refresh(bool parallel);

@@ -14,7 +14,7 @@ public class NetworkLogger : INetworkLogger
 
     private readonly FixedSizedQueue<NetworkLoggerItem> _storage = new(10000);
 
-    private readonly ConcurrentDictionary<Guid, NetworkLoggerScope> _scopes = new();
+    private readonly ConcurrentDictionary<long, NetworkLoggerScope> _scopes = new();
 
     private readonly ConcurrentDictionary<string, long> _countersByCategory = new();
 
@@ -32,6 +32,8 @@ public class NetworkLogger : INetworkLogger
 
     private object _stdLock = new object();
 
+    private long _scopeId = 0;
+
     public NetworkLogger(bool scopesEnabled, TimeSpan simulationTickTime, MonitoringIgnoreOption ignore)
     {
         this._scopesEnabled = scopesEnabled;
@@ -39,14 +41,14 @@ public class NetworkLogger : INetworkLogger
         this._ignore = ignore;
     }
 
-    public void Push(Guid id, long tick, NetworkLoggerType type, string message, string protocol, string? category,
+    public void Push(long id, long tick, NetworkLoggerType type, string message, string protocol, string? category,
         NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
         Push(id, tick, string.Empty, NodeType.Other, string.Empty, NodeType.Other,
             Array.Empty<byte>(), type, message, protocol, category, scope, ttl, queueLength);
     }
 
-    private void Push(Guid id, long tick, string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
+    private void Push(long id, long tick, string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
         NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
         if (ValidateIgnore(protocol, category))
@@ -101,7 +103,7 @@ public class NetworkLogger : INetworkLogger
         return false;
     }
 
-    public void Push(Guid id, long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message,
+    public void Push(long id, long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message,
         string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
         Push(id, tick, from.Name,
@@ -115,7 +117,7 @@ public class NetworkLogger : INetworkLogger
     {
         Push(packet.Id, tick, packet.From,
             packet.FromType, packet.To, packet.ToType, packet.Payload,
-            type, message, protocol, category, packet.Scope ?? scope, packet.Ttl);
+            type, message, protocol, category, scope, packet.Ttl);
     }
 
     public void Push(long tick, INetworkPacket packet, NetworkLoggerType type, string message, 
@@ -123,7 +125,7 @@ public class NetworkLogger : INetworkLogger
     {
         Push(packet.Id, tick, packet.From,
             packet.FromType, packet.To, packet.ToType, packet.Payload,
-            type, message, protocol, category, packet.Scope ?? scope, packet.Ttl);
+            type, message, protocol, category, scope, packet.Ttl);
     }
 
     public NetworkLoggerScope? BeginScope(long tick, string scope, NetworkLoggerScope? parent = null)
@@ -132,7 +134,7 @@ public class NetworkLogger : INetworkLogger
 
         var scopeItem = new NetworkLoggerScope()
         {
-            Id = Guid.NewGuid(),
+            Id = GetScopeId(),
             ScopeLabel = scope,
             Level = parent?.Level + 1 ?? 0,
             Date = DateTimeOffset.Now,
@@ -153,7 +155,7 @@ public class NetworkLogger : INetworkLogger
     {
         if (!_scopesEnabled) return;
 
-        if (packet.Scope == null)
+        if (packet.ScopeId == 0)
         {
             var newScope = BeginScope(tick, scope, null);
 
@@ -163,19 +165,19 @@ public class NetworkLogger : INetworkLogger
             newScope.Destination = packet.To;
             packet = packet with
             {
-                Scope = newScope
+                ScopeId = newScope.Id
             };
             return;
         }
 
-        var existingScope = packet.Scope;
-
+        var existingScopeId = packet.ScopeId;
+        var existingScope = _scopes.GetValueOrDefault(existingScopeId);
         if (existingScope == null)
         {
             existingScope = BeginScope(tick, scope, null);
             packet = packet with
             {
-                Scope = existingScope
+                ScopeId = existingScope!.Id
             };
             return;
         }
@@ -183,7 +185,7 @@ public class NetworkLogger : INetworkLogger
         var linkedScope = BeginScope(tick, scope, existingScope);
         packet = packet with
         {
-            Scope = linkedScope
+            ScopeId = linkedScope!.Id
         };
         return;
     }
@@ -192,19 +194,20 @@ public class NetworkLogger : INetworkLogger
     {
         if (!_scopesEnabled) return;
 
-        if (packet.Scope == null)
+        if (packet.ScopeId == 0)
         {
             return;
         }
 
-        var scope = packet.Scope;
+        var scopeId = packet.ScopeId;
+        var scope = _scopes.GetValueOrDefault(scopeId);
         if (scope != null)
         {
             EndScope(tick, scope!);
         }
         packet = packet with
         {
-            Scope = scope?.Parent
+            ScopeId = scope!.Parent!.Id
         };
         return;
     }
@@ -287,7 +290,7 @@ public class NetworkLogger : INetworkLogger
     {
         if (!_scopesEnabled) return;
 
-        if (packet.Scope == null)
+        if (packet.ScopeId == 0)
         {
             var newScope = BeginScope(tick, scope, null);
 
@@ -295,21 +298,21 @@ public class NetworkLogger : INetworkLogger
 
             newScope.Source = packet.From;
             newScope.Destination = packet.To;
-            packet.Scope = newScope;
+            packet.ScopeId = newScope.Id;
             return;
         }
 
-        var existingScope = packet.Scope;
-
+        var existingScopeId = packet.ScopeId;
+        var existingScope = _scopes.GetValueOrDefault(existingScopeId);
         if (existingScope == null)
         {
             existingScope = BeginScope(tick, scope, null);
-            packet.Scope = existingScope;
+            packet.ScopeId = existingScope!.Id;
             return;
         }
 
         var linkedScope = BeginScope(tick, scope, existingScope);
-        packet.Scope = existingScope;
+        packet.ScopeId = existingScope!.Id;
         return;
     }
 
@@ -317,17 +320,19 @@ public class NetworkLogger : INetworkLogger
     {
         if (!_scopesEnabled) return;
 
-        if (packet.Scope == null)
-        {
-            return;
-        }
 
-        var scope = packet.Scope;
+        var scopeId = packet.ScopeId;
+        var scope = _scopes.GetValueOrDefault(scopeId);
         if (scope != null)
         {
             EndScope(tick, scope!);
         }
-        packet.Scope = scope?.Parent;
         return;
+    }
+
+    private long GetScopeId()
+    {
+        Interlocked.Increment(ref _scopeId);
+        return _scopeId;
     }
 }

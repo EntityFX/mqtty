@@ -110,7 +110,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
         private void ListenerMqttClient_MessageReceived(object? sender, MqttMessage e)
         {
-            NetworkSimulator!.Monitoring.Push(Guid.NewGuid(), NetworkSimulator.TotalTicks, NetworkLoggerType.Receive,
+            NetworkSimulator!.Monitoring.Push(NetworkSimulator!.GetPacketId(), NetworkSimulator.TotalTicks, NetworkLoggerType.Receive,
                 $"Mqtt Application {Name} receives message by topic {e.Topic} from broker {e.Broker}",
                 Specification, "MQTT Receiver Application");
             _receiverCounter.Receive();

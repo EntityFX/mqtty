@@ -11,7 +11,7 @@ public abstract class Node : NodeBase
 {
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
-    private readonly Dictionary<Guid, ResponseMonitoringPacket> _responseMessages = new();
+    private readonly Dictionary<long, ResponseMonitoringPacket> _responseMessages = new();
     private readonly ConcurrentBag<NodeMonitoringPacket> _outgoingMessages = new();
     private readonly ConcurrentBag<NodeMonitoringPacket> _incommingMessages = new();
     protected readonly TicksOptions TicksOptions;
@@ -187,7 +187,7 @@ public abstract class Node : NodeBase
         _outgoingMessages.Add(new NodeMonitoringPacket(NetworkSimulator!.TotalTicks, packet, true, NetworkSimulator!.WaitMode)
         {
             WaitTicks = TicksOptions.OutgoingWaitTicks,
-            Id = Guid.NewGuid(),
+            Id = NetworkSimulator.GetPacketId(),
             SendTick = NetworkSimulator!.TotalTicks
         });
     }
@@ -197,18 +197,18 @@ public abstract class Node : NodeBase
         _incommingMessages.Add(new NodeMonitoringPacket(NetworkSimulator!.TotalTicks, packet, true, NetworkSimulator!.WaitMode)
         {
             WaitTicks = TicksOptions.OutgoingWaitTicks,
-            Id = Guid.NewGuid(),
+            Id = NetworkSimulator.GetPacketId(),
             SendTick = NetworkSimulator!.TotalTicks
         });
     }
 
-    protected ResponsePacket? WaitResponse(Guid packetId)
+    protected ResponsePacket? WaitResponse(long packetId)
     {
         return NetworkSimulator!.WaitMode ? WaitMonitorResponse(packetId) : WaitNoMonitorResponse(packetId);
     }
 
 
-    private ResponsePacket? WaitNoMonitorResponse(Guid packetId)
+    private ResponsePacket? WaitNoMonitorResponse(long packetId)
     {
         var monitorPacket = _responseMessages.GetValueOrDefault(packetId);
 
@@ -229,7 +229,7 @@ public abstract class Node : NodeBase
             monitorPacket.ResponseTick ?? 0);
     }
 
-    private ResponsePacket? WaitMonitorResponse(Guid packetId)
+    private ResponsePacket? WaitMonitorResponse(long packetId)
     {
         var monitorPacket = _responseMessages.GetValueOrDefault(packetId);
 

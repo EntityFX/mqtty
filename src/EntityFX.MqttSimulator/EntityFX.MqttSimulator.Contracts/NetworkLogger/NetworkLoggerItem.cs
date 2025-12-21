@@ -4,7 +4,7 @@ namespace EntityFX.MqttY.Contracts.NetworkLogger
 {
 
     public record NetworkLoggerItem(
-        Guid Id,
+        long Id,
         long Tick,
         TimeSpan SimulationTime,
         DateTimeOffset Date,

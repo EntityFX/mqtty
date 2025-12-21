@@ -1,6 +1,7 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Network;
+using EntityFX.MqttY.Utils;
 using Microsoft.Extensions.Primitives;
 using System;
 using System.Diagnostics;
@@ -60,6 +61,7 @@ for (int b = 0; b < brokers.Length; b++)
 
                 PrintStatsForItem(result);
                 SaveCounters(resultPath, prefixBase, networkSimulator);
+                SaveGraphML(resultPath, prefixBase, networkSimulator);
 
                 results.Add(result);
                 networkSimulator.Clear();
@@ -102,6 +104,15 @@ for (int b = 0; b < brokers.Length; b++)
             }
         }
     }
+}
+
+void SaveGraphML(string resultPath, string prefixBase, INetworkSimulator networkSimulator)
+{
+    var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
+    var graphMl = plantUmlGraphGenerator.SerializeNetworkGraph(networkSimulator);
+ 
+    var filePath = Path.Combine(resultPath, prefixBase);
+    File.WriteAllText($"{filePath}.graphml", graphMl);
 }
 
 SaveResultsToCsv(resultPath, "final", results);

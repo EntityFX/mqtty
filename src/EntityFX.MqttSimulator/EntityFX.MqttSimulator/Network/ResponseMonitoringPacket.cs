@@ -12,7 +12,7 @@ internal class ResponseMonitoringPacket
 
     public long? ResponseTick { get; set; }
 
-    public Guid Id { get; set; }
+    public long Id { get; set; }
 
     public bool WaitMode { get; }
     

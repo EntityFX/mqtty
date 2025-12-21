@@ -124,10 +124,10 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void SimpleCommunicationTest()
         {
-            var mqc1426 = _graph!.GetNode("mqc1426.n1419.n1392.n1325.n0.net", NodeType.Client) as IMqttClient;
+            var mqc1426 = _graph!.GetNode("mqc1426", NodeType.Client) as IMqttClient;
             Assert.IsNotNull(mqc1426);
 
-            var mqb782 = _graph.GetNode("mqb782.n770.n730.n663.n0.net", NodeType.Server) as IMqttBroker;
+            var mqb782 = _graph.GetNode("mqb782", NodeType.Server) as IMqttBroker;
             Assert.IsNotNull(mqb782);
 
             List<List<int[]>> adj = new List<List<int[]>>();
@@ -367,13 +367,13 @@ namespace EntityFX.Tests.Integration
         {
             _graph!.Counters.Clear();
 
-            var mqc1426 = _graph!.GetNode("mqc1426.n1419.n1392.n1325.n0.net", NodeType.Client) as IMqttClient;
+            var mqc1426 = _graph!.GetNode("mqc1426", NodeType.Client) as IMqttClient;
             Assert.IsNotNull(mqc1426);
 
-            var mqb782 = _graph.GetNode("mqb782.n770.n730.n663.n0.net", NodeType.Server) as IMqttBroker;
+            var mqb782 = _graph.GetNode("mqb782", NodeType.Server) as IMqttBroker;
             Assert.IsNotNull(mqb782);
 
-            mqc1426.BeginConnect("mqb782.n770.n730.n663.n0.net", false);
+            mqc1426.BeginConnect("mqb782", false);
 
             for (int i = 0; i < 500; i++)
             {

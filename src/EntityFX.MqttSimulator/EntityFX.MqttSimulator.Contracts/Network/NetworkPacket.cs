@@ -4,8 +4,9 @@ using static System.Formats.Asn1.AsnWriter;
 namespace EntityFX.MqttY.Contracts.Network
 {
     public record struct NetworkPacket<TContext>(
-        Guid Id,
-        Guid? RequestId,
+        long Id,
+        long? RequestId,
+        long ScopeId,
         string From, string To,
         NodeType FromType, NodeType ToType,
         int FromIndex, int ToIndex,
@@ -14,7 +15,7 @@ namespace EntityFX.MqttY.Contracts.Network
         int OutgoingTicks,
         int Ttl = 64,
         string? Category = null,
-        NetworkLoggerScope? Scope = null, TContext? TypedContext = default) : INetworkPacket
+        TContext? TypedContext = default) : INetworkPacket
     {
         private int ttl = Ttl;
 

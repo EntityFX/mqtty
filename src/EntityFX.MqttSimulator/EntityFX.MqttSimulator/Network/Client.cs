@@ -35,7 +35,7 @@ public class Client : Node, IClient
         if (IsConnected) return true;
 
         var response = ConnectImplementation(server,
-            GetPacket(Guid.NewGuid(), server, NodeType.Server, -1, new byte[] { 0xFF }, "Net", "Connect"));
+            GetPacket(NetworkSimulator!.GetPacketId(), server, NodeType.Server, -1, new byte[] { 0xFF }, "Net", "Connect"));
 
         if (response == null) return false;
 
@@ -47,7 +47,7 @@ public class Client : Node, IClient
         if (IsConnected) return true;
 
         return BeginConnectImplementation(server,
-            GetPacket(Guid.NewGuid(), server, NodeType.Server, -1, new byte[] { 0xFF }, "Net", "Connect"));
+            GetPacket(NetworkSimulator!.GetPacketId(), server, NodeType.Server, -1, new byte[] { 0xFF }, "Net", "Connect"));
     }
 
     public bool CompleteConnect(ResponsePacket response)
@@ -233,7 +233,7 @@ public class Client : Node, IClient
     {
         var result = Send(
             new NetworkPacket<int>(
-                Guid.NewGuid(), null,
+                NetworkSimulator!.GetPacketId(), null, 0,
                 Name, ServerName ?? string.Empty, NodeType.Client, NodeType.Server, 
                 Index, ServerIndex ?? -1,
             payload, ProtocolType, HeaderBytes: 0, OutgoingTicks: 0, Category: category), true);

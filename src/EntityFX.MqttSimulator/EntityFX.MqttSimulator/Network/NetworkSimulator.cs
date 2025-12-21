@@ -20,6 +20,7 @@ public class NetworkSimulator : INetworkSimulator
     private long _tick = 0;
     private long _step = 0;
     private long _errors = 0;
+    private long _packetId = 0;
     private int _countNodes = 0;
 
     private CancellationTokenSource? _cancelTokenSource;
@@ -116,8 +117,9 @@ public class NetworkSimulator : INetworkSimulator
     public INetworkPacket GetReversePacket(INetworkPacket packet, byte[] payload, string? category)
     {
         return new NetworkPacket<int>(
-            Id: Guid.NewGuid(),
+            Id: GetPacketId(),
             RequestId: packet.Id,
+            ScopeId: packet.ScopeId,
             To: packet.From,
             ToIndex: packet.ToIndex,
             From: packet.To,
@@ -128,8 +130,7 @@ public class NetworkSimulator : INetworkSimulator
             Protocol: packet.Protocol,
             OutgoingTicks: packet.OutgoingTicks,
             HeaderBytes: packet.HeaderBytes,
-            Category: category ?? packet.Category,
-            Scope: packet.Scope
+            Category: category ?? packet.Category
         );
     }
 
@@ -219,7 +220,7 @@ public class NetworkSimulator : INetworkSimulator
         try
         {
             var scope = Monitoring.BeginScope(TotalTicks, "Refresh sourceNetwork graph");
-            Monitoring.Push(Guid.Empty, TotalTicks, NetworkLoggerType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
+            Monitoring.Push(0, TotalTicks, NetworkLoggerType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
 
             if (parallel)
             {
@@ -253,7 +254,7 @@ public class NetworkSimulator : INetworkSimulator
 
         Parallel.ForEach(_networks, network =>
         {
-            Monitoring.Push(Guid.Empty, TotalTicks,
+            Monitoring.Push(0, TotalTicks,
                 network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
                 "Network", "Refresh", scope);
             network.Value.Refresh();
@@ -261,7 +262,7 @@ public class NetworkSimulator : INetworkSimulator
 
         Parallel.ForEach(_nodes, node =>
         {
-            Monitoring.Push(Guid.Empty, TotalTicks,
+            Monitoring.Push(0, TotalTicks,
                 node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
                 scope);
             node.Value.Refresh();
@@ -278,7 +279,7 @@ public class NetworkSimulator : INetworkSimulator
 
         foreach (var network in _networks)
         {
-            Monitoring.Push(Guid.Empty, TotalTicks,
+            Monitoring.Push(0, TotalTicks,
                 network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
                 "Network", "Refresh", scope);
             network.Value.Refresh();
@@ -286,7 +287,7 @@ public class NetworkSimulator : INetworkSimulator
 
         foreach (var node in _nodes)
         {
-            Monitoring.Push(Guid.Empty, TotalTicks,
+            Monitoring.Push(0, TotalTicks,
                 node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
                 scope);
             node.Value.Refresh();
@@ -300,13 +301,13 @@ public class NetworkSimulator : INetworkSimulator
         {
 
             var scope = Monitoring.BeginScope(TotalTicks, "Reset sourceNetwork graph");
-            Monitoring.Push(Guid.Empty, TotalTicks, NetworkLoggerType.Reset, $"Reset whole sourceNetwork", "Network", "Reset", scope);
+            Monitoring.Push(0, TotalTicks, NetworkLoggerType.Reset, $"Reset whole sourceNetwork", "Network", "Reset", scope);
 
             var bytes = Array.Empty<byte>();
 
             foreach (var network in _networks)
             {
-                Monitoring.Push(Guid.Empty, TotalTicks,
+                Monitoring.Push(0, TotalTicks,
                     network.Value, network.Value, bytes, NetworkLoggerType.Reset, $"Reset sourceNetwork {network.Key}",
                     "Network", "Refresh", scope);
                 network.Value.Reset();
@@ -314,7 +315,7 @@ public class NetworkSimulator : INetworkSimulator
 
             foreach (var node in _nodes)
             {
-                Monitoring.Push(Guid.Empty, TotalTicks,
+                Monitoring.Push(0, TotalTicks,
                     node.Value, node.Value, bytes, NetworkLoggerType.Reset, $"Reset node {node.Key}", "Network", "Reset",
                     scope);
                 node.Value.Reset();
@@ -531,13 +532,13 @@ public class NetworkSimulator : INetworkSimulator
         try
         {
             var scope = Monitoring.BeginScope(TotalTicks, "Clear sourceNetwork graph");
-            Monitoring.Push(Guid.Empty, TotalTicks, NetworkLoggerType.Disconnect, $"Clear whole sourceNetwork", "Network", "Clean", scope);
+            Monitoring.Push(0, TotalTicks, NetworkLoggerType.Disconnect, $"Clear whole sourceNetwork", "Network", "Clean", scope);
 
             var bytes = Array.Empty<byte>();
 
             foreach (var node in _nodes.Values)
             {
-                Monitoring.Push(Guid.Empty, TotalTicks,
+                Monitoring.Push(0, TotalTicks,
                     node, node, Array.Empty<byte>(), NetworkLoggerType.Disconnect, $"Clean {node.NodeType} {node.Name}", node.NodeType.ToString(), "Clean",
                     scope);
                 switch (node.NodeType)
@@ -561,7 +562,7 @@ public class NetworkSimulator : INetworkSimulator
 
             foreach (var network in _networks)
             {
-                Monitoring.Push(Guid.Empty, TotalTicks,
+                Monitoring.Push(0, TotalTicks,
                     network.Value, network.Value, bytes, NetworkLoggerType.Disconnect, $"Clean sourceNetwork {network.Key}",
                     "Network", "Clean", scope);
                 network.Value.Reset();
@@ -578,5 +579,11 @@ public class NetworkSimulator : INetworkSimulator
         {
             SimulationException = ex;
         }
+    }
+
+    public long GetPacketId()
+    {
+        Interlocked.Increment(ref _packetId);
+        return _packetId;
     }
 }

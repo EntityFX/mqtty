@@ -2,7 +2,7 @@
 {
     public interface INetworkLoggerItem
     {
-        Guid Id { get; }
+        long Id { get; }
 
         NetworkLoggerItemType ItemType { get; }
     }

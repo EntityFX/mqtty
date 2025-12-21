@@ -26,7 +26,7 @@ internal class NodeMonitoringPacket
 
     public bool Released { get; private set; }
     
-    public Guid Id { get; set; }
+    public long Id { get; set; }
 
     public ManualResetEventSlim ResetEventSlim { get; private set; } = new ManualResetEventSlim(false);
 

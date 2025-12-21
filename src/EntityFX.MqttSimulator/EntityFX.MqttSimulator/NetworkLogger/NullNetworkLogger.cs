@@ -2,7 +2,7 @@
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using System.Collections.Immutable;
 
-public class NullNetworkLogger : INetworkLogger
+public class NullNetworkLogger :  INetworkLogger
 {
     public IEnumerable<NetworkLoggerItem> Items => Enumerable.Empty<NetworkLoggerItem>();
 
@@ -66,8 +66,12 @@ public class NullNetworkLogger : INetworkLogger
     {
     }
 
-    public static implicit operator NullNetworkLogger(NetworkLogger v)
+    public void Push(long id, long tick, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
-        throw new NotImplementedException();
     }
+
+    public void Push(long id, long tick, INode from, INode to, byte[]? packet, NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
+    {
+    }
+
 }

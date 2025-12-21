@@ -2,7 +2,7 @@ namespace EntityFX.MqttY.Contracts.NetworkLogger;
 
 public class NetworkLoggerScope : INetworkLoggerItem
 {
-    public Guid Id { get; init; }
+    public long Id { get; init; }
 
     public string ScopeLabel { get; init; } = string.Empty;
 

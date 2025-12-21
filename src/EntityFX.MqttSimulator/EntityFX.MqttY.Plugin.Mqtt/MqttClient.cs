@@ -46,7 +46,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         public SessionState Connect(string server, bool cleanSession = false)
         {
             var connect = new ConnectPacket(ClientId, true);
-            var connectId = Guid.NewGuid();
+            var connectId = NetworkSimulator!.GetPacketId();
             var payload = GetContextPacket<(string Server, bool CleanSession)>(
                 connectId, server, NodeType.Server, ServerIndex ?? -1,
                 _packetManager.PacketToBytes(connect), ProtocolType, new(server, cleanSession),
@@ -96,7 +96,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         public bool BeginConnect(string server, bool cleanSession = false)
         {
             var connect = new ConnectPacket(ClientId, true);
-            var connectId = Guid.NewGuid();
+            var connectId = NetworkSimulator!.GetPacketId();
             var payload = GetContextPacket<(string Server, bool CleanSession)>(
                 connectId, server, NodeType.Server, ServerIndex ?? -1,
                 _packetManager.PacketToBytes(connect), ProtocolType, new(server, cleanSession),
@@ -161,7 +161,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         {
             var packetId = _packetIdProvider.GetPacketId();
             var subscribe = new SubscribePacket(packetId, new[] { new Subscription(topicFilter, qos) });
-            var subscribeId = Guid.NewGuid();
+            var subscribeId = NetworkSimulator!.GetPacketId();
 
             var payload = GetContextPacket<(string TopicFilter, MqttQos Qos)>(
                 subscribeId, ServerName ?? string.Empty, NodeType.Server, ServerIndex ?? -1,
@@ -229,7 +229,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 Payload = payload
             };
 
-            var packetPayload = GetPacket(Guid.NewGuid(), ServerName ?? string.Empty,
+            var packetPayload = GetPacket(NetworkSimulator!.GetPacketId(), ServerName ?? string.Empty,
                 NodeType.Server,
                 ServerIndex ?? -1,
                 _packetManager.PacketToBytes(publish), ProtocolType, "MQTT Publish");
@@ -459,7 +459,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         {
             var packetId = _packetIdProvider.GetPacketId();
             var subscribe = new SubscribePacket(packetId, new[] { new Subscription(topicFilter, qos) });
-            var subscribeId = Guid.NewGuid();
+            var subscribeId = NetworkSimulator!.GetPacketId();
 
             var payload = GetContextPacket<(string TopicFilter, MqttQos Qos)>(
                 subscribeId, ServerName ?? string.Empty, NodeType.Server, ServerIndex ?? -1,

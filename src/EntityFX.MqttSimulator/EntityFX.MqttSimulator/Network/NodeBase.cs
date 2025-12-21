@@ -58,29 +58,29 @@ public abstract class NodeBase : ISender
         return result;
     }
 
-    protected INetworkPacket GetPacket(Guid guid, string to, NodeType toType, int toIndex,
+    protected INetworkPacket GetPacket(long id, string to, NodeType toType, int toIndex,
         byte[] payload,
         string protocol, string? category = null, 
-        Guid? requestId = null, int outgoingTicks = 1)
-        => new NetworkPacket<int>(guid, requestId, Name, to, NodeType, toType, 
+        long? requestId = null, int outgoingTicks = 1)
+        => new NetworkPacket<int>(id, requestId, 0, Name, to, NodeType, toType, 
             Index, toIndex,
             payload, protocol, 0, outgoingTicks, Category: category)
         {
-            Id = guid,
+            Id = id,
             RequestId = requestId,
             OutgoingTicks = outgoingTicks
         };
 
     protected NetworkPacket<TContext> GetContextPacket<TContext>(
-        Guid guid, string to, NodeType toType,
+        long id, string to, NodeType toType,
         int toIndex, byte[] payload,
         string protocol, TContext context, string? category = null, 
-        Guid? requestId = null, int outgoingTicks = 1)
-        => new NetworkPacket<TContext>(guid, requestId, Name, to, NodeType, toType,
+        long? requestId = null, int outgoingTicks = 1)
+        => new NetworkPacket<TContext>(id, requestId, 0, Name, to, NodeType, toType,
             Index, toIndex,
             payload, protocol, 0, outgoingTicks, Category: category, TypedContext: context)
         {
-            Id = guid,
+            Id = id,
             RequestId = requestId,
             OutgoingTicks = outgoingTicks
         };

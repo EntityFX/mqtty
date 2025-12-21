@@ -12,18 +12,19 @@ namespace EntityFX.MqttY.Contracts.Network
         int FromIndex { get; set; }
 
         int HeaderBytes { get; set; }
-        Guid Id { get; set; }
+        long Id { get; set; }
         int PacketBytes { get; }
         byte[] Payload { get; set; }
         string Protocol { get; set; }
-        Guid? RequestId { get; set; }
-        NetworkLoggerScope? Scope { get; set; }
+        long? RequestId { get; set; }
         string To { get; set; }
         NodeType ToType { get; set; }
 
         int ToIndex { get; set; }
 
         int Ttl { get; init; }
+
+        long ScopeId { get; set; }
 
         object? Context { get; set; }
 
