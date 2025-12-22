@@ -35,7 +35,8 @@ internal class ResponseMonitoringPacket
 
     internal void ReduceWaitTicks()
     {
-        Interlocked.Decrement(ref _waitTicks);
+        //Interlocked.Decrement(ref _waitTicks);
+        _waitTicks--;
 
         if (_waitTicks <= 0)
         {

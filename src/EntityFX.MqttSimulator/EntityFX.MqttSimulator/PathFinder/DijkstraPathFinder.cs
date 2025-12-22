@@ -1,5 +1,7 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Network;
 using EntityFX.MqttY.PathFinder;
+using System.Xml.Linq;
 public class DijkstraPathFinder : IPathFinder
 {
     public INetworkSimulator? NetworkGraph { get; set; }
@@ -44,8 +46,11 @@ public class DijkstraPathFinder : IPathFinder
 
         var path = DijkstraEngine.CalculateShortestPathBetween(source.Name, destination.Name, _paths);
 
-
-        var networks = path.Select(p => NetworkGraph.Networks.GetValueOrDefault(p.Destination))
+        var networks = path.Select(p =>
+        {
+            NetworkGraph.Networks.TryGetValue(p.Destination, out var net);
+            return net; 
+        })
             .Where(n => n != null).Select(n => n!);
 
 

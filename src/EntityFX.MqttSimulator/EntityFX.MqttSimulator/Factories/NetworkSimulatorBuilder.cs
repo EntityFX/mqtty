@@ -2,6 +2,7 @@
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
+using EntityFX.MqttY.Network;
 
 namespace EntityFX.MqttY.Factories;
 
@@ -329,7 +330,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
         var index = 0;
         foreach (var node in option.Nodes)
         {
-            var linkNetwork = NetworkSimulator.Networks.GetValueOrDefault(node.Value.Network ?? string.Empty);
+            NetworkSimulator.Networks.TryGetValue(node.Value.Network ?? string.Empty, out var linkNetwork);
             if (linkNetwork == null) continue;
 
             option.NetworkTypes.TryGetValue(linkNetwork.NetworkType, out var networkTypeOption);

@@ -142,7 +142,7 @@ namespace EntityFX.Tests.Integration
 
             for (int i = 0; i < 27; i++)
             {
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
             }
 
 
@@ -193,7 +193,7 @@ namespace EntityFX.Tests.Integration
 
             for (int i = 0; i < 27; i++)
             {
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
             }
 
             Assert.IsTrue(mqc1Net2.IsConnected);
@@ -241,7 +241,7 @@ namespace EntityFX.Tests.Integration
 
             for (int i = 0; i < 27; i++)
             {
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
             }
 
             Assert.IsTrue(mqc1Net2.IsConnected);
@@ -267,7 +267,7 @@ namespace EntityFX.Tests.Integration
 
             for (int i = 0; i < 27; i++)
             {
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
             }
 
             Assert.AreEqual(m1N2C!.PacketTypeCounters[MqttPacketType.Subscribe].Value, 1);
@@ -307,7 +307,7 @@ namespace EntityFX.Tests.Integration
 
             for (int i = 0; i < 27; i++)
             {
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
             }
 
             Assert.IsTrue(mqc1Net2.IsConnected);
@@ -338,7 +338,7 @@ namespace EntityFX.Tests.Integration
 
             for (int i = 0; i < 27; i++)
             {
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
             }
 
             Assert.AreEqual(m1N2C!.PacketTypeCounters[MqttPacketType.Subscribe].Value, 1);
@@ -360,7 +360,7 @@ namespace EntityFX.Tests.Integration
 
             for (int i = 0; i < 27; i++)
             {
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
             }
 
             Console.WriteLine(_graph.Counters.PrintCounters());
@@ -389,7 +389,7 @@ namespace EntityFX.Tests.Integration
 
             for (int i = 0; i < 27; i++)
             {
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
             }
 
             Assert.IsTrue(mqc1Net2.IsConnected);
@@ -420,7 +420,7 @@ namespace EntityFX.Tests.Integration
 
             for (int i = 0; i < 27; i++)
             {
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
             }
 
             Assert.AreEqual(m1N2C!.PacketTypeCounters[MqttPacketType.Subscribe].Value, 1);
@@ -445,7 +445,7 @@ namespace EntityFX.Tests.Integration
                 mqc1Net3.Publish("/test4/data1", new byte[] { 1, 2, 3, 4, 5 }, MqttQos.AtLeastOnce);
                 for (int i = 0; i < 27; i++)
                 {
-                    _graph.RefreshWithCounters(false);
+                    _graph.RefreshWithCounters(false, 0);
                 }
             }
 

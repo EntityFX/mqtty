@@ -24,10 +24,10 @@ namespace EntityFX.MqttY.Contracts.Network
         IPathFinder PathFinder { get; }
         INetworkLogger Monitoring { get; }
 
-        IImmutableDictionary<string, INetwork> Networks { get; }
-        IImmutableDictionary<string, IClient> Clients { get; }
-        IImmutableDictionary<string, IServer> Servers { get; }
-        IImmutableDictionary<string, IApplication> Applications { get; }
+        IDictionary<string, INetwork> Networks { get; }
+        IDictionary<string, IClient> Clients { get; }
+        IDictionary<string, IServer> Servers { get; }
+        IDictionary<string, IApplication> Applications { get; }
 
         event EventHandler<Exception>? OnError;
 
@@ -61,9 +61,9 @@ namespace EntityFX.MqttY.Contracts.Network
 
         INetworkPacket GetReversePacket(INetworkPacket packet, byte[] payload, string? category);
 
-        bool Refresh(bool parallel);
+        bool Refresh(bool parallel, int strategy);
 
-        bool RefreshWithCounters(bool parallel);
+        bool RefreshWithCounters(bool parallel, int strategy);
 
         bool Reset();
 

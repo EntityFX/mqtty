@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Xml.Linq;
 using EntityFX.MqttY.Application;
 using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Network;
@@ -16,6 +17,9 @@ public class NetworkSimulator : INetworkSimulator
 {
     private readonly ConcurrentDictionary<(string Address, NodeType NodeType), ILeafNode> _nodes = new();
     private readonly ConcurrentDictionary<string, INetwork> _networks = new();
+    private readonly ConcurrentDictionary<string, IClient> _clients = new();
+    private readonly ConcurrentDictionary<string, IServer> _servers = new();
+    private readonly ConcurrentDictionary<string, IApplication> _apps = new();
 
     private long _tick = 0;
     private long _step = 0;
@@ -67,15 +71,12 @@ public class NetworkSimulator : INetworkSimulator
 
     public INetworkLogger Monitoring { get; }
 
-    public IImmutableDictionary<string, INetwork> Networks => _networks.ToImmutableDictionary();
+    public IDictionary<string, INetwork> Networks => _networks;
 
-    public IImmutableDictionary<string, IClient> Clients => _nodes.Where(n => n.Key.NodeType == NodeType.Client)
-        .ToDictionary(k => k.Key.Address, v => (IClient)v.Value).ToImmutableDictionary();
-    public IImmutableDictionary<string, IServer> Servers => _nodes.Where(n => n.Key.NodeType == NodeType.Server)
-        .ToDictionary(k => k.Key.Address, v => (IServer)v.Value).ToImmutableDictionary();
+    public IDictionary<string, IClient> Clients => _clients;
+    public IDictionary<string, IServer> Servers => _servers;
 
-    public IImmutableDictionary<string, IApplication> Applications => _nodes.Where(n => n.Key.NodeType == NodeType.Application)
-        .ToDictionary(k => k.Key.Address, v => (IApplication)v.Value).ToImmutableDictionary();
+    public IDictionary<string, IApplication> Applications => _apps;
 
     public long TotalTicks => _tick;
 
@@ -153,6 +154,7 @@ public class NetworkSimulator : INetworkSimulator
         }
 
         _nodes.Remove((clientAddress, NodeType.Client), out _);
+        _clients.Remove(clientAddress, out _);
         Interlocked.Decrement(ref _countNodes);
         client.Clear();
     }
@@ -190,6 +192,7 @@ public class NetworkSimulator : INetworkSimulator
         server.Stop();
 
         _nodes.Remove((serverAddress, NodeType.Server), out _);
+        _servers.Remove(serverAddress, out _);
         Interlocked.Decrement(ref _countNodes);
         server.Clear();
     }
@@ -210,11 +213,12 @@ public class NetworkSimulator : INetworkSimulator
         application.Stop();
 
         _nodes.Remove((name, NodeType.Application), out _);
+        _apps.Remove(name, out _);
         Interlocked.Decrement(ref _countNodes);
         application.Clear();
     }
 
-    public bool Refresh(bool parallel)
+    public bool Refresh(bool parallel, int strategy)
     {
         _stopwatch.Start();
         try
@@ -224,11 +228,11 @@ public class NetworkSimulator : INetworkSimulator
 
             if (parallel)
             {
-                ParallelRefreshImplementation(scope);
+                ParallelRefreshImplementation(scope, strategy);
             }
             else
             {
-                RefreshImplementation(scope);
+                RefreshImplementation(scope, strategy);
             }
 
             _counters.SetRealTime(_stopwatch.Elapsed);
@@ -246,52 +250,98 @@ public class NetworkSimulator : INetworkSimulator
         }
     }
 
-    private void ParallelRefreshImplementation(NetworkLoggerScope? scope)
+    private void ParallelRefreshImplementation(NetworkLoggerScope? scope, int strategy)
     {
         var bytes = Array.Empty<byte>();
 
         _counters.Refresh(TotalTicks, _step);
 
-        Parallel.ForEach(_networks, network =>
+        if (strategy == 0)
         {
-            Monitoring.Push(0, TotalTicks,
-                network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                "Network", "Refresh", scope);
-            network.Value.Refresh();
-        });
+            Parallel.ForEach(_networks, network =>
+            {
+                Monitoring.Push(0, TotalTicks,
+                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                    "Network", "Refresh", scope);
+                network.Value.Refresh();
+            });
 
-        Parallel.ForEach(_nodes, node =>
+            Parallel.ForEach(_nodes, node =>
+            {
+                Monitoring.Push(0, TotalTicks,
+                    node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                    scope);
+                node.Value.Refresh();
+            });
+        } else
         {
-            Monitoring.Push(0, TotalTicks,
-                node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
-                scope);
-            node.Value.Refresh();
-        });
+            Parallel.ForEach(_networks, network =>
+            {
+                Monitoring.Push(0, TotalTicks,
+                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                    "Network", "Refresh", scope);
+                network.Value.Refresh();
+                var nodes = network.Value.Nodes;
+                foreach (var node in nodes)
+                {
+                    Monitoring.Push(0, TotalTicks,
+                        node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                        scope);
+                    node.Value.Refresh();
+                }
+            });
+        }
+
+
 
         Tick();
     }
 
-    private void RefreshImplementation(NetworkLoggerScope? scope)
+    private void RefreshImplementation(NetworkLoggerScope? scope, int strategy)
     {
         var bytes = Array.Empty<byte>();
 
         _counters.Refresh(TotalTicks, _step);
 
-        foreach (var network in _networks)
+        if (strategy == 0)
         {
-            Monitoring.Push(0, TotalTicks,
-                network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                "Network", "Refresh", scope);
-            network.Value.Refresh();
+            foreach (var network in _networks)
+            {
+                Monitoring.Push(0, TotalTicks,
+                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                    "Network", "Refresh", scope);
+                network.Value.Refresh();
+            }
+
+            foreach (var node in _nodes)
+            {
+                Monitoring.Push(0, TotalTicks,
+                    node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                    scope);
+                node.Value.Refresh();
+            }
+        }
+        else
+        {
+            foreach (var network in _networks)
+            {
+                Monitoring.Push(0, TotalTicks,
+                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                    "Network", "Refresh", scope);
+                network.Value.Refresh();
+
+                var nodes = network.Value.Nodes;
+                foreach (var node in nodes)
+                {
+                    Monitoring.Push(0, TotalTicks,
+                        node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                        scope);
+                    node.Value.Refresh();
+                }
+            }
         }
 
-        foreach (var node in _nodes)
-        {
-            Monitoring.Push(0, TotalTicks,
-                node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
-                scope);
-            node.Value.Refresh();
-        }
+
         Tick();
     }
 
@@ -357,7 +407,7 @@ public class NetworkSimulator : INetworkSimulator
                     return;
                 }
                 _refreshStopwatch.Restart();
-                refreshResult = Refresh(false);
+                refreshResult = Refresh(false, 0);
                 _refreshStopwatch.Reset();
 
 
@@ -406,14 +456,22 @@ public class NetworkSimulator : INetworkSimulator
             return false;
         }
 
+        var cResult = _clients.TryAdd(client.Name, client);
+
+        if (!cResult)
+        {
+            return false;
+        }
+
         var result = _nodes.TryAdd((client.Name, NodeType.Client), client);
 
         if (result)
         {
             ((NodeBase)client).NetworkSimulator = this;
+            Interlocked.Increment(ref _countNodes);
         }
 
-        Interlocked.Increment(ref _countNodes);
+
 
         return result;
     }
@@ -425,13 +483,21 @@ public class NetworkSimulator : INetworkSimulator
             return false;
         }
 
+        var sResult = _servers.TryAdd(server.Name, server);
+
+        if (!sResult)
+        {
+            return false;
+        }
+
         var result = _nodes.TryAdd((server.Name, NodeType.Server), server);
 
         if (result)
         {
             ((NodeBase)server).NetworkSimulator = this;
+            Interlocked.Increment(ref _countNodes);
         }
-        Interlocked.Increment(ref _countNodes);
+
 
         return result;
     }
@@ -443,14 +509,22 @@ public class NetworkSimulator : INetworkSimulator
             return false;
         }
 
+        var aResult = _apps.TryAdd(application.Name, application);
+
+        if (!aResult)
+        {
+            return false;
+        }
+
         var result = _nodes.TryAdd((application.Name, NodeType.Application), application);
 
         if (result)
         {
             ((ApplicationBase)application).NetworkSimulator = this;
+            Interlocked.Increment(ref _countNodes);
         }
 
-        Interlocked.Increment(ref _countNodes);
+
 
         return result;
     }
@@ -510,10 +584,10 @@ public class NetworkSimulator : INetworkSimulator
         _counters.AddCounterValue(name, shortName, value);
     }
 
-    public bool RefreshWithCounters(bool parallel)
+    public bool RefreshWithCounters(bool parallel, int strategy)
     {
         _refreshStopwatch.Restart();
-        var refreshResult = Refresh(parallel);
+        var refreshResult = Refresh(parallel, strategy);
         _refreshStopwatch.Reset();
 
 

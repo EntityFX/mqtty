@@ -149,7 +149,7 @@ namespace EntityFX.Tests.Integration
             {
                 allConnected = _graph!.Clients.All(c => c.Value.IsConnected);
                 //var nonConnected = _graph!.Clients.Where(c => !c.Value.IsConnected);
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
             }
 
             //Assert.IsTrue(mqc1426.IsConnected);
@@ -197,7 +197,7 @@ namespace EntityFX.Tests.Integration
             {
                 allConnected = _graph!.Clients.All(c => c.Value.IsConnected);
                 //var nonConnected = _graph!.Clients.Where(c => !c.Value.IsConnected);
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
             }
 
             //Assert.IsTrue(mqc1426.IsConnected);
@@ -245,7 +245,7 @@ namespace EntityFX.Tests.Integration
             while (!allConnected)
             {
                 allConnected = _graph!.Clients.All(c => c.Value.IsConnected);
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
             }
 
 

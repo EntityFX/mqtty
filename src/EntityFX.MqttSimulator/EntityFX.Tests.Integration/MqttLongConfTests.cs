@@ -348,7 +348,7 @@ namespace EntityFX.Tests.Integration
             {
                 allConnected = graph!.Clients.All(c => c.Value.IsConnected);
                 //var nonConnected = _graph!.Clients.Where(c => !c.Value.IsConnected);
-                graph.RefreshWithCounters(isParallel);
+                graph.RefreshWithCounters(isParallel, 0);
             }
 
             return allConnected;
@@ -358,7 +358,7 @@ namespace EntityFX.Tests.Integration
         {
             for (var i = 0; i < ticks; i++)
             {
-                graph.RefreshWithCounters(isParallel);
+                graph.RefreshWithCounters(isParallel, 0);
             }
         }
 
@@ -377,7 +377,7 @@ namespace EntityFX.Tests.Integration
 
             for (int i = 0; i < 500; i++)
             {
-                _graph.RefreshWithCounters(IsParallelRefresh);
+                _graph.RefreshWithCounters(IsParallelRefresh, 0);
                 //_graph.Refresh(IsParallelRefresh);
             }
 

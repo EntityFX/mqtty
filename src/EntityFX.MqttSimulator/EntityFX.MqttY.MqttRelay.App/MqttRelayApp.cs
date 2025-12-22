@@ -12,7 +12,7 @@ using EntityFX.MqttY.Utils;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Plugin.Mqtt.Factories;
 
-record InParams(int Brokers, int Nets, int Clients, int Repeats, bool IsParallel, bool EnabledCounters);
+record InParams(int Brokers, int Nets, int Clients, int Repeats, bool IsParallel, bool EnabledCounters, int RefreshStrategy);
 record OutParams(TimeSpan VirtualTime, TimeSpan RealTime, long TotalTicks, long TotalSteps, long Errors, double MemoryWorkingSet);
 record ResultItem(int Id, int GroupId, InParams In, OutParams Out, bool rowLine);
 
@@ -69,7 +69,8 @@ public class MqttRelayApp
 
     }
 
-    public INetworkSimulator ExecuteSimulation(bool isParallel, int relays, int length, int clients, int sendRepeats, bool enableCounters)
+    public INetworkSimulator ExecuteSimulation(bool isParallel, int relays, int length, int clients, 
+        int sendRepeats, bool enableCounters, int strategy)
     {
         var graph = BuildNetworkSimulator(relays, length, clients, enableCounters);
         var brokers = graph.Servers.Values.OfType<IMqttBroker>().ToArray();
@@ -79,17 +80,17 @@ public class MqttRelayApp
 
         ConnectMqttClientsToBrokers(brokers);
 
-        var allConnected = RefreshUntilConnected(isParallel, graph);
+        var allConnected = RefreshUntilConnected(isParallel, graph, strategy);
 
         var ticks = graph.TotalTicks;
 
         SubscribeAllRelays(mqttRelays);
 
-        RefreshTicks(isParallel, graph, ticks);
+        RefreshTicks(isParallel, graph, ticks, strategy);
 
         SubscribeAllMqttReceivers(mqttReceivers);
 
-        RefreshTicks(isParallel, graph, ticks);
+        RefreshTicks(isParallel, graph, ticks, strategy);
 
 
         var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
@@ -117,8 +118,8 @@ public class MqttRelayApp
                 }
             }
 
-            RefreshTicks(isParallel, graph, ticks);
-            RefreshTicks(isParallel, graph, ticks);
+            RefreshTicks(isParallel, graph, ticks, strategy);
+            RefreshTicks(isParallel, graph, ticks, strategy);
 
 
         }
@@ -233,7 +234,7 @@ public class MqttRelayApp
         return mqttRelays;
     }
 
-    private static bool RefreshUntilConnected(bool isParallel, INetworkSimulator graph)
+    private static bool RefreshUntilConnected(bool isParallel, INetworkSimulator graph, int startegy)
     {
         var allConnected = false;
 
@@ -241,17 +242,17 @@ public class MqttRelayApp
         {
             allConnected = graph!.Clients.All(c => c.Value.IsConnected);
             //var nonConnected = _graph!.Clients.Where(c => !c.Value.IsConnected);
-            graph.RefreshWithCounters(isParallel);
+            graph.RefreshWithCounters(isParallel, startegy);
         }
 
         return allConnected;
     }
 
-    private void RefreshTicks(bool isParallel, INetworkSimulator graph, long ticks)
+    private void RefreshTicks(bool isParallel, INetworkSimulator graph, long ticks, int strategy)
     {
         for (var i = 0; i < ticks; i++)
         {
-            graph.RefreshWithCounters(isParallel);
+            graph.RefreshWithCounters(isParallel, strategy);
         }
     }
 

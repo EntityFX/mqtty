@@ -26,6 +26,7 @@ var brokers = new[] { 4, 5, 10, 15 };
 var netLength = new[] { 2, 5, 10, 50 };
 var clients = new[] { 3, 10, 50 };
 var repeats = new[] { 10, 100 };
+var refreshStrategies = new[] { 0, 1 };
 
 var results = new List<ResultItem>();
 
@@ -41,66 +42,69 @@ for (int b = 0; b < brokers.Length; b++)
     {
         for (int c = 0; c < clients.Length; c++)
         {
-            for (int r = 0, ix = 0; r < repeats.Length; r++, ix++)
+            for (int r = 0; r < repeats.Length; r++)
             {
-                var brokerc = brokers[b];
-                var netc = netLength[n];
-                var clientc = clients[c];
-                var repeatc = repeats[r];
+                for (int rs = 0, ix = 0; rs < refreshStrategies.Length; rs++, ix++)
+                {
+                    var brokerc = brokers[b];
+                    var netc = netLength[n];
+                    var clientc = clients[c];
+                    var repeatc = repeats[r];
 
-                var prefixBase = $"{ix}__b_{brokerc}__n_{netc}__c_{clientc}__r_{repeatc}";
+                    var prefixBase = $"{ix}__b_{brokerc}__n_{netc}__c_{clientc}__r_{repeatc}";
 
-                PrintBefore(false, brokerc, netc, clientc, repeatc, false);
-                var networkSimulator = mqttRelayApp.ExecuteSimulation(false, brokerc, netc, clientc, repeatc, false);
+                    PrintBefore(false, brokerc, netc, clientc, repeatc, false);
+                    var networkSimulator = mqttRelayApp.ExecuteSimulation(false, brokerc, netc, clientc, repeatc, false, rs);
 
-                var ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
+                    var ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
 
-                var result = new ResultItem(id, gid, 
-                    new InParams(brokerc, netc, clientc, repeatc, false, false),
-                    new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws), false);
+                    var result = new ResultItem(id, gid,
+                        new InParams(brokerc, netc, clientc, repeatc, false, false, rs),
+                        new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws), false);
 
-                PrintStatsForItem(result);
-                SaveCounters(resultPath, prefixBase, networkSimulator);
-                SaveGraphML(resultPath, prefixBase, networkSimulator);
+                    PrintStatsForItem(result);
+                    SaveCounters(resultPath, prefixBase, networkSimulator);
+                    SaveGraphML(resultPath, prefixBase, networkSimulator);
 
-                results.Add(result);
-                networkSimulator.Clear();
-                id++;
-                GC.Collect();
+                    results.Add(result);
+                    networkSimulator.Clear();
+                    id++;
+                    GC.Collect();
 
-                PrintBefore(true, brokerc, netc, clientc, repeatc, false);
-                networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, false);
+                    PrintBefore(true, brokerc, netc, clientc, repeatc, false);
+                    networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, false, rs);
 
-                ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
-                result = new ResultItem(id, gid,
-                    new InParams(brokerc, netc, clientc, repeatc, true, false),
-                    new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws), false);
-                PrintStatsForItem(result);
-                SaveCounters(resultPath, prefixBase, networkSimulator);
-                results.Add(result);
-                networkSimulator.Clear();
-                id++;
-                GC.Collect();
+                    ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
+                    result = new ResultItem(id, gid,
+                        new InParams(brokerc, netc, clientc, repeatc, true, false, rs),
+                        new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws), false);
+                    PrintStatsForItem(result);
+                    SaveCounters(resultPath, prefixBase, networkSimulator);
+                    results.Add(result);
+                    networkSimulator.Clear();
+                    id++;
+                    GC.Collect();
 
-                PrintBefore(true, brokerc, netc, clientc, repeatc, true);
-                networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, true);
+                    PrintBefore(true, brokerc, netc, clientc, repeatc, true);
+                    networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, true, rs);
 
-                ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
-                result = new ResultItem(id, gid,
-                    new InParams(brokerc, netc, clientc, repeatc, true, true),
-                    new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws), true);
-                PrintStatsForItem(result);
-                SaveCounters(resultPath, prefixBase, networkSimulator);
-                results.Add(result);
-                networkSimulator.Clear();
-                id++;
-                gid++; 
-                GC.Collect();
+                    ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
+                    result = new ResultItem(id, gid,
+                        new InParams(brokerc, netc, clientc, repeatc, true, true, rs),
+                        new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws), true);
+                    PrintStatsForItem(result);
+                    SaveCounters(resultPath, prefixBase, networkSimulator);
+                    results.Add(result);
+                    networkSimulator.Clear();
+                    id++;
+                    gid++;
+                    GC.Collect();
 
-                table = PrintTable(results);
-                SaveTableAsFile(resultPath, prefixBase, table);
-                SaveResultsToCsv(resultPath, prefixBase, results);
+                    table = PrintTable(results);
+                    SaveTableAsFile(resultPath, prefixBase, table);
+                    SaveResultsToCsv(resultPath, prefixBase, results);
 
+                }
             }
         }
     }
@@ -110,7 +114,7 @@ void SaveGraphML(string resultPath, string prefixBase, INetworkSimulator network
 {
     var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
     var graphMl = plantUmlGraphGenerator.SerializeNetworkGraph(networkSimulator);
- 
+
     var filePath = Path.Combine(resultPath, prefixBase);
     File.WriteAllText($"{filePath}.graphml", graphMl);
 }
