@@ -1,0 +1,70 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:EntityFX.MqttY.Designer.ViewModels"
+        x:Class="EntityFX.MqttY.Designer.Views.EditNetworkWindow"
+        x:DataType="vm:EditNetworkViewModel"
+        Title="Edit Network"
+        Width="500"
+        Height="450"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <Grid RowDefinitions="*,Auto" Margin="16">
+        <ScrollViewer Grid.Row="0">
+            <StackPanel Spacing="8">
+                <!-- Error message -->
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Foreground="Red"
+                           IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyConverter}}" />
+
+                <!-- Name -->
+                <Label Target="txtName" Content="Name:" />
+                <TextBox x:Name="txtName"
+                         Text="{Binding Name}"
+                         Watermark="e.g. net1.local" />
+
+                <!-- Index -->
+                <Label Target="numIndex" Content="Index:" />
+                <NumericUpDown x:Name="numIndex"
+                               Value="{Binding Index}"
+                               Minimum="0"
+                               Maximum="1000"
+                               Increment="1" />
+
+                <!-- Network Type -->
+                <Label Target="cmbNetworkType" Content="Network Type:" />
+                <ComboBox x:Name="cmbNetworkType"
+                          ItemsSource="{Binding AvailableNetworkTypes}"
+                          SelectedItem="{Binding NetworkType}" />
+
+                <!-- Links -->
+                <Label Content="Links:" Margin="0,8,0,0" />
+                <DataGrid ItemsSource="{Binding Links}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="False"
+                          MaxHeight="150"
+                          Margin="0,0,0,8">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Target Network"
+                                            Binding="{Binding TargetNetwork}" />
+                        <DataGridTextColumn Header="Weight"
+                                            Binding="{Binding Weight}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="8"
+                    Margin="0,16,0,0">
+            <Button Content="OK"
+                    Click="OnOkClick"
+                    Width="80" />
+            <Button Content="Cancel"
+                    Click="OnCancelClick"
+                    Width="80" />
+        </StackPanel>
+    </Grid>
+</Window>

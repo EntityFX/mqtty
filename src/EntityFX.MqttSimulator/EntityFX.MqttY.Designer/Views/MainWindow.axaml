@@ -1,0 +1,75 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:EntityFX.MqttY.Designer.ViewModels"
+        xmlns:views="using:EntityFX.MqttY.Designer.Views"
+        x:Class="EntityFX.MqttY.Designer.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="{Binding Title}"
+        Width="1280"
+        Height="800"
+        MinWidth="900"
+        MinHeight="600">
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Menu -->
+        <Menu Grid.Row="0">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New" Command="{Binding NewCommand}" InputGesture="Ctrl+N" />
+                <MenuItem Header="_Open..." Command="{Binding OpenCommand}" InputGesture="Ctrl+O" />
+                <Separator />
+                <MenuItem Header="_Save" Command="{Binding SaveCommand}" InputGesture="Ctrl+S" />
+                <MenuItem Header="Save _As..." Command="{Binding SaveAsCommand}" InputGesture="Ctrl+Shift+S" />
+                <Separator />
+                <MenuItem Header="_Import GraphML..." Command="{Binding ImportGraphMLCommand}" />
+                <Separator />
+                <MenuItem Header="E_xit" Command="{Binding ExitCommand}" />
+            </MenuItem>
+        </Menu>
+
+        <!-- Tab Control -->
+        <TabControl Grid.Row="1"
+                    SelectedIndex="{Binding SelectedTab}">
+            <TabItem Header="Network Editor">
+                <views:NetworkEditorView DataContext="{Binding NetworkEditor}" />
+            </TabItem>
+
+            <TabItem Header="Simulation">
+                <views:SimulationView DataContext="{Binding Simulation}" />
+            </TabItem>
+
+            <TabItem Header="Monitoring">
+                <!-- Placeholder for MonitoringView -->
+                <Grid RowDefinitions="Auto,*">
+                    <TextBlock Text="Simulation Monitoring"
+                               Classes="header"
+                               Margin="8" />
+                    <Border Grid.Row="1"
+                            Background="#1e1e1e"
+                            Margin="8">
+                        <TextBlock Text="Log viewer will be here"
+                                   Foreground="#888"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center" />
+                    </Border>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Plugins">
+                <!-- Placeholder for PluginManagerView -->
+                <Grid RowDefinitions="Auto,*">
+                    <TextBlock Text="Plugin Manager"
+                               Classes="header"
+                               Margin="8" />
+                    <Border Grid.Row="1"
+                            Background="#1e1e1e"
+                            Margin="8">
+                        <TextBlock Text="Plugin management will be here"
+                                   Foreground="#888"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center" />
+                    </Border>
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</Window>

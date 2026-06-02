@@ -1,0 +1,160 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:EntityFX.MqttY.Designer.ViewModels"
+             x:Class="EntityFX.MqttY.Designer.Views.SimulationView"
+             x:DataType="vm:SimulationViewModel">
+    <Grid RowDefinitions="Auto,Auto,*" Margin="8">
+        <!-- Status Bar -->
+        <Border Grid.Row="0"
+                Background="#2d2d2d"
+                CornerRadius="4"
+                Padding="8"
+                Margin="0,0,0,8">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                <Ellipse Grid.Column="0"
+                         Width="12"
+                         Height="12"
+                         Fill="#4caf50"
+                         Margin="0,0,8,0" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding StatusMessage}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,16,0" />
+                <TextBlock Grid.Column="2"
+                           Text="{Binding IsPaused, StringFormat='Paused: {0}'}"
+                           VerticalAlignment="Center"
+                           Foreground="#888" />
+                <TextBlock Grid.Column="3"
+                           Text="{Binding IsRunning, StringFormat='Running: {0}'}"
+                           VerticalAlignment="Center"
+                           Foreground="#888" />
+            </Grid>
+        </Border>
+
+        <!-- Control Buttons -->
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Margin="0,0,0,8">
+            <Button Content="Build"
+                    Command="{Binding BuildCommand}"
+                    Padding="16,8" />
+            <Button Content="Start"
+                    Command="{Binding StartCommand}"
+                    Padding="16,8"
+                    IsEnabled="{Binding IsBuilt}" />
+            <Button Content="Pause"
+                    Command="{Binding PauseCommand}"
+                    Padding="16,8" />
+            <Button Content="Resume"
+                    Command="{Binding ResumeCommand}"
+                    Padding="16,8" />
+            <Button Content="Stop"
+                    Command="{Binding StopCommand}"
+                    Padding="16,8" />
+        </StackPanel>
+
+        <!-- Statistics and State Viewer -->
+        <Grid Grid.Row="2"
+              RowDefinitions="Auto,*"
+              Margin="0,0,0,8">
+            <!-- Statistics -->
+            <Border Grid.Row="0"
+                    Background="#1e1e1e"
+                    CornerRadius="4"
+                    Padding="16"
+                    Margin="0,0,0,8">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                      ColumnDefinitions="Auto,*">
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="Total Ticks:"
+                               Foreground="#888"
+                               Margin="0,0,16,8" />
+                    <TextBlock Grid.Row="0" Grid.Column="1"
+                               Text="{Binding TotalTicks}"
+                               FontWeight="Bold"
+                               Margin="0,0,0,8" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0"
+                               Text="Total Steps:"
+                               Foreground="#888"
+                               Margin="0,0,16,8" />
+                    <TextBlock Grid.Row="1" Grid.Column="1"
+                               Text="{Binding TotalSteps}"
+                               FontWeight="Bold"
+                               Margin="0,0,0,8" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0"
+                               Text="Errors:"
+                               Foreground="#888"
+                               Margin="0,0,16,8" />
+                    <TextBlock Grid.Row="2" Grid.Column="1"
+                               Text="{Binding Errors}"
+                               FontWeight="Bold"
+                               Foreground="#888"
+                               Margin="0,0,0,8" />
+
+                    <TextBlock Grid.Row="3" Grid.Column="0"
+                               Text="Nodes:"
+                               Foreground="#888"
+                               Margin="0,0,16,8" />
+                    <TextBlock Grid.Row="3" Grid.Column="1"
+                               Text="{Binding CountNodes}"
+                               FontWeight="Bold"
+                               Margin="0,0,0,8" />
+
+                    <TextBlock Grid.Row="4" Grid.Column="0"
+                               Text="Built:"
+                               Foreground="#888"
+                               Margin="0,0,16,0" />
+                    <TextBlock Grid.Row="4" Grid.Column="1"
+                               Text="{Binding IsBuilt}"
+                               FontWeight="Bold" />
+                </Grid>
+            </Border>
+
+            <!-- State Viewer -->
+            <TabControl Grid.Row="1">
+                <TabItem Header="Networks">
+                    <DataGrid ItemsSource="{Binding NetworkStates}"
+                              AutoGenerateColumns="True"
+                              IsReadOnly="True"
+                              Margin="4" />
+                </TabItem>
+                <TabItem Header="Nodes (Clients/Servers/Apps)">
+                    <DataGrid ItemsSource="{Binding NodeStates}"
+                              AutoGenerateColumns="True"
+                              IsReadOnly="True"
+                              Margin="4" />
+                </TabItem>
+                <TabItem Header="Logs">
+                    <Grid RowDefinitions="Auto,*">
+                        <TextBlock Grid.Row="0"
+                                   Text="{Binding LogItems.Count, StringFormat='Total log entries: {0}'}"
+                                   Foreground="#888"
+                                   Margin="4,4,4,8" />
+                        <DataGrid Grid.Row="1"
+                                  ItemsSource="{Binding LogItems}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  Margin="4">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Tick" Binding="{Binding Tick}" Width="60" />
+                                <DataGridTextColumn Header="Time" Binding="{Binding Date, StringFormat={}{0:HH:mm:ss.fff}}" Width="80" />
+                                <DataGridTextColumn Header="From" Binding="{Binding From}" Width="100" />
+                                <DataGridTextColumn Header="To" Binding="{Binding To}" Width="100" />
+                                <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="90" />
+                                <DataGridTextColumn Header="Protocol" Binding="{Binding Protocol}" Width="70" />
+                                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*" />
+                                <DataGridTextColumn Header="Size" Binding="{Binding PacketSize}" Width="60" />
+                                <DataGridTextColumn Header="Queue" Binding="{Binding QueueLength}" Width="60" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+        </Grid>
+
+        <!-- Monitoring section placeholder removed - logs are now in the tab above -->
+    </Grid>
+</UserControl>

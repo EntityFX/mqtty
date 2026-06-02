@@ -1,0 +1,75 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:EntityFX.MqttY.Designer.ViewModels"
+        x:Class="EntityFX.MqttY.Designer.Views.NetworkTypeEditorWindow"
+        x:DataType="vm:NetworkTypeEditorViewModel"
+        Title="Edit Network Type"
+        Width="400"
+        Height="350"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <Grid RowDefinitions="*,Auto" Margin="16">
+        <ScrollViewer Grid.Row="0">
+            <StackPanel Spacing="8">
+                <!-- Error message -->
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Foreground="Red"
+                           IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyConverter}}" />
+
+                <!-- Name -->
+                <Label Target="txtName" Content="Name:" />
+                <TextBox x:Name="txtName"
+                         Text="{Binding Name}"
+                         Watermark="e.g. 10g, 1g, wifi5" />
+
+                <!-- Speed -->
+                <Label Target="numSpeed" Content="Speed (bps):" />
+                <NumericUpDown x:Name="numSpeed"
+                               Value="{Binding Speed}"
+                               Minimum="1"
+                               Maximum="10000000000"
+                               Increment="1000000"
+                               FormatString="N0" />
+
+                <!-- Refresh Ticks -->
+                <Label Target="numRefreshTicks" Content="Refresh Ticks:" />
+                <NumericUpDown x:Name="numRefreshTicks"
+                               Value="{Binding RefreshTicks}"
+                               Minimum="1"
+                               Maximum="100"
+                               Increment="1" />
+
+                <!-- Send Ticks -->
+                <Label Target="numSendTicks" Content="Send Ticks:" />
+                <NumericUpDown x:Name="numSendTicks"
+                               Value="{Binding SendTicks}"
+                               Minimum="1"
+                               Maximum="100"
+                               Increment="1" />
+
+                <!-- Queue Size -->
+                <Label Target="numQueueSize" Content="Queue Size:" />
+                <NumericUpDown x:Name="numQueueSize"
+                               Value="{Binding QueueSize}"
+                               Minimum="1"
+                               Maximum="10000000"
+                               Increment="1000"
+                               FormatString="N0" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="8"
+                    Margin="0,16,0,0">
+            <Button Content="OK"
+                    Click="OnOkClick"
+                    Width="80" />
+            <Button Content="Cancel"
+                    Click="OnCancelClick"
+                    Width="80" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,87 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:EntityFX.MqttY.Designer.ViewModels"
+        x:Class="EntityFX.MqttY.Designer.Views.NodeEditorWindow"
+        x:DataType="vm:NodeEditorViewModel"
+        Title="Edit Node"
+        Width="500"
+        Height="550"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False">
+    <Grid RowDefinitions="*,Auto" Margin="16">
+        <ScrollViewer Grid.Row="0">
+            <StackPanel Spacing="8">
+                <!-- Error message -->
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Foreground="Red"
+                           IsVisible="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyConverter}}" />
+
+                <!-- Name -->
+                <Label Target="txtName" Content="Name:" />
+                <TextBox x:Name="txtName"
+                         Text="{Binding Name}"
+                         Watermark="Enter node name..." />
+
+                <!-- Type -->
+                <Label Target="cmbType" Content="Type:" />
+                <ComboBox x:Name="cmbType"
+                          ItemsSource="{Binding AvailableTypes}"
+                          SelectedItem="{Binding Type}" />
+
+                <!-- Protocol -->
+                <Label Target="cmbProtocol" Content="Protocol:" />
+                <ComboBox x:Name="cmbProtocol"
+                          ItemsSource="{Binding AvailableProtocols}"
+                          SelectedItem="{Binding Protocol}" />
+
+                <!-- Specification -->
+                <Label Target="cmbSpecification" Content="Specification:" />
+                <ComboBox x:Name="cmbSpecification"
+                          ItemsSource="{Binding AvailableSpecifications}"
+                          SelectedItem="{Binding Specification}" />
+
+                <!-- Network -->
+                <Label Target="cmbNetwork" Content="Network:" />
+                <ComboBox x:Name="cmbNetwork"
+                          ItemsSource="{Binding AvailableNetworks}"
+                          SelectedItem="{Binding Network}" />
+
+                <!-- Connects To Server -->
+                <Label Target="txtConnectsTo" Content="Connects To Server:" />
+                <TextBox x:Name="txtConnectsTo"
+                         Text="{Binding ConnectsToServer}"
+                         Watermark="Optional: server name" />
+
+                <!-- Quantity -->
+                <Label Target="numQuantity" Content="Quantity:" />
+                <NumericUpDown x:Name="numQuantity"
+                               Value="{Binding Quantity}"
+                               Minimum="1"
+                               Maximum="1000"
+                               Increment="1" />
+
+                <!-- Index -->
+                <Label Target="numIndex" Content="Index:" />
+                <NumericUpDown x:Name="numIndex"
+                               Value="{Binding Index}"
+                               Minimum="0"
+                               Maximum="1000"
+                               Increment="1" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="8"
+                    Margin="0,16,0,0">
+            <Button Content="OK"
+                    Click="OnOkClick"
+                    Width="80" />
+            <Button Content="Cancel"
+                    Click="OnCancelClick"
+                    Width="80" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,237 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:EntityFX.MqttY.Designer.ViewModels"
+             xmlns:views="using:EntityFX.MqttY.Designer.Views"
+             x:Class="EntityFX.MqttY.Designer.Views.NetworkEditorView"
+             x:DataType="vm:NetworkEditorViewModel">
+    <Grid ColumnDefinitions="3*,2*">
+        <!-- Left: Graph Canvas -->
+        <Grid RowDefinitions="Auto,*">
+            <!-- Toolbar -->
+            <StackPanel Orientation="Horizontal"
+                        Spacing="4"
+                        Margin="8">
+                <Button Content="Add Network Type"
+                        Command="{Binding AddNetworkTypeCommand}" />
+                <Button Content="Add Network"
+                        Command="{Binding AddNetworkCommand}" />
+                <Button Content="Add Client"
+                        Command="{Binding AddNodeCommand}" />
+                <Button Content="Add Server"
+                        Command="{Binding AddServerCommand}" />
+                <Button Content="Add Application"
+                        Command="{Binding AddApplicationCommand}" />
+                <Separator Width="8" />
+                <Button Content="Delete"
+                        Command="{Binding DeleteSelectedCommand}" />
+                <Separator Width="8" />
+                <Button Content="Generate Random"
+                        Command="{Binding GenerateRandomNetworkCommand}" />
+                <Button Content="Arrange">
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuItem Header="Circular"
+                                      Command="{Binding ArrangeCircularCommand}" />
+                            <MenuItem Header="Force-Directed"
+                                      Command="{Binding ArrangeForceDirectedCommand}" />
+                            <MenuItem Header="Grid"
+                                      Command="{Binding ArrangeGridCommand}" />
+                            <MenuItem Header="Hierarchical"
+                                      Command="{Binding ArrangeHierarchicalCommand}" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+                <Separator Width="8" />
+                <TextBlock Text="Zoom:"
+                           VerticalAlignment="Center" />
+                <Button Content="-"
+                        Command="{Binding ZoomOutCommand}"
+                        Width="28"
+                        Height="28"
+                        Padding="0" />
+                <TextBlock Text="{Binding ZoomLevel, StringFormat={}{0:P0}}"
+                           VerticalAlignment="Center"
+                           Width="50" />
+                <Button Content="+"
+                        Command="{Binding ZoomInCommand}"
+                        Width="28"
+                        Height="28"
+                        Padding="0" />
+            </StackPanel>
+
+            <!-- Canvas -->
+            <views:NetworkGraphCanvas x:Name="GraphCanvas"
+                                      Grid.Row="1"
+                                      Margin="8" />
+        </Grid>
+
+        <!-- Right: Inspector + Network Types table -->
+        <TabControl Grid.Column="1"
+                    Margin="0,8,8,8">
+            <!-- Inspector Tab: shows properties of the selected graph element -->
+            <TabItem Header="Inspector">
+                <ScrollViewer>
+                    <StackPanel Spacing="8" Margin="8">
+                        <TextBlock Text="Selected Element"
+                                   FontWeight="Bold"
+                                   FontSize="14" />
+                        <Rectangle Height="1" Fill="#444" />
+
+                        <!-- No selection message -->
+                        <TextBlock Text="No element selected. Click on a graph item to inspect its properties."
+                                   TextWrapping="Wrap"
+                                   Foreground="#888"
+                                   IsVisible="{Binding HasNoSelection}" />
+
+                        <!-- Graph item info -->
+                        <StackPanel IsVisible="{Binding IsGraphItemSelected}"
+                                    Spacing="6">
+                            <TextBlock Text="Graph Item Info"
+                                       FontWeight="Bold"
+                                       FontSize="12"
+                                       Foreground="#888" />
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedGraphItem.Name}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Type:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedGraphItem.ItemType}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Position:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedGraphItem.Position}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Size:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedGraphItem.Size}" Margin="0,0,0,4" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Node properties -->
+                        <StackPanel IsVisible="{Binding IsNodeSelected}"
+                                    Spacing="6">
+                            <TextBlock Text="Node Properties"
+                                       FontWeight="Bold"
+                                       FontSize="12"
+                                       Foreground="#4caf50" />
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedNode.Name}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Type:" Foreground="#888" Margin="0,0,8,4" />
+                                <ComboBox Grid.Row="1" Grid.Column="1"
+                                          ItemsSource="{Binding NodeOptionTypes}"
+                                          SelectedItem="{Binding SelectedNode.Type}"
+                                          Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Protocol:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedNode.Protocol}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Specification:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SelectedNode.Specification}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Network:" Foreground="#888" Margin="0,0,8,4" />
+                                <ComboBox Grid.Row="4" Grid.Column="1"
+                                          ItemsSource="{Binding NetworkNames}"
+                                          SelectedItem="{Binding SelectedNode.Network}"
+                                          Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="Connects To:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding SelectedNode.ConnectsToServer}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="Quantity:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding SelectedNode.Quantity}" Margin="0,0,0,4" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Network properties -->
+                        <StackPanel IsVisible="{Binding IsNetworkSelected}"
+                                    Spacing="6">
+                            <TextBlock Text="Network Properties"
+                                       FontWeight="Bold"
+                                       FontSize="12"
+                                       Foreground="#2196F3" />
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedNetwork.Name}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Index:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedNetwork.Index}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Network Type:" Foreground="#888" Margin="0,0,8,4" />
+                                <ComboBox Grid.Row="2" Grid.Column="1"
+                                          ItemsSource="{Binding NetworkTypeNames}"
+                                          SelectedItem="{Binding SelectedNetwork.NetworkType}"
+                                          Margin="0,0,0,4" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Network Type properties -->
+                        <StackPanel IsVisible="{Binding IsNetworkTypeSelected}"
+                                    Spacing="6">
+                            <TextBlock Text="Network Type Properties"
+                                       FontWeight="Bold"
+                                       FontSize="12"
+                                       Foreground="#FF9800" />
+                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SelectedNetworkType.Name}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Speed:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedNetworkType.Speed}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Refresh Ticks:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedNetworkType.RefreshTicks}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Send Ticks:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SelectedNetworkType.SendTicks}" Margin="0,0,0,4" />
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Queue Size:" Foreground="#888" Margin="0,0,8,4" />
+                                <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding SelectedNetworkType.QueueSize}" Margin="0,0,0,4" />
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Network Types table -->
+            <TabItem Header="Network Types">
+                <Grid RowDefinitions="Auto,*,Auto">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="4"
+                                Margin="0,0,0,4">
+                        <Button Content="Add"
+                                Command="{Binding AddNetworkTypeCommand}" />
+                        <Button Content="Delete"
+                                Command="{Binding DeleteNetworkTypeCommand}"
+                                CommandParameter="{Binding SelectedNetworkType}" />
+                    </StackPanel>
+
+                    <DataGrid x:Name="NetworkTypesGrid"
+                              Grid.Row="1"
+                              ItemsSource="{Binding NetworkTypes}"
+                              SelectedItem="{Binding SelectedNetworkType}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Name"
+                                                Binding="{Binding Name}" />
+                            <DataGridTextColumn Header="Speed"
+                                                Binding="{Binding Speed}" />
+                            <DataGridTextColumn Header="Refresh Ticks"
+                                                Binding="{Binding RefreshTicks}" />
+                            <DataGridTextColumn Header="Send Ticks"
+                                                Binding="{Binding SendTicks}" />
+                            <DataGridTextColumn Header="Queue Size"
+                                                Binding="{Binding QueueSize}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <TextBlock Grid.Row="2"
+                               Text="Network types define speed and behavior of network links"
+                               TextWrapping="Wrap"
+                               Foreground="#888"
+                               Margin="0,4,0,0" />
+                </Grid>
+            </TabItem>
+        </TabControl>
+    </Grid>
+</UserControl>
