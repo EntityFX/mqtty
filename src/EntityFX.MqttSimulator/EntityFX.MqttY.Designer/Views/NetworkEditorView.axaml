@@ -9,25 +9,62 @@
         <Grid RowDefinitions="Auto,*">
             <!-- Toolbar -->
             <StackPanel Orientation="Horizontal"
-                        Spacing="4"
+                        Spacing="2"
                         Margin="8">
-                <Button Content="Add Network Type"
-                        Command="{Binding AddNetworkTypeCommand}" />
-                <Button Content="Add Network"
-                        Command="{Binding AddNetworkCommand}" />
-                <Button Content="Add Client"
-                        Command="{Binding AddNodeCommand}" />
-                <Button Content="Add Server"
-                        Command="{Binding AddServerCommand}" />
-                <Button Content="Add Application"
-                        Command="{Binding AddApplicationCommand}" />
-                <Separator Width="8" />
-                <Button Content="Delete"
-                        Command="{Binding DeleteSelectedCommand}" />
-                <Separator Width="8" />
-                <Button Content="Generate Random"
-                        Command="{Binding GenerateRandomNetworkCommand}" />
-                <Button Content="Arrange">
+                <!-- Add Network Type -->
+                <Button Command="{Binding AddNetworkTypeCommand}"
+                        Width="36" Height="32" Padding="2"
+                        FontSize="16"
+                        ToolTip.Tip="Add Network Type"
+                        Content="&#x1F4E6;" />
+                <!-- Add Network -->
+                <Button Command="{Binding AddNetworkCommand}"
+                        Width="36" Height="32" Padding="2"
+                        FontSize="16"
+                        ToolTip.Tip="Add Network"
+                        Content="&#x1F3E1;" />
+                <!-- Add Client -->
+                <Button Command="{Binding AddNodeCommand}"
+                        Width="36" Height="32" Padding="2"
+                        FontSize="16"
+                        ToolTip.Tip="Add Client"
+                        Content="&#x1F4BB;" />
+                <!-- Add Server -->
+                <Button Command="{Binding AddServerCommand}"
+                        Width="36" Height="32" Padding="2"
+                        FontSize="16"
+                        ToolTip.Tip="Add Server"
+                        Content="&#x1F5A5;" />
+                <!-- Add Application -->
+                <Button Command="{Binding AddApplicationCommand}"
+                        Width="36" Height="32" Padding="2"
+                        FontSize="16"
+                        ToolTip.Tip="Add Application"
+                        Content="&#x1F4C4;" />
+
+                <Separator Width="6" />
+
+                <!-- Delete -->
+                <Button Command="{Binding DeleteSelectedCommand}"
+                        Width="36" Height="32" Padding="2"
+                        FontSize="16"
+                        ToolTip.Tip="Delete Selected"
+                        Content="&#x1F5D1;" />
+
+                <Separator Width="6" />
+
+                <!-- Generate Random -->
+                <Button Command="{Binding GenerateRandomNetworkCommand}"
+                        Width="36" Height="32" Padding="2"
+                        FontSize="16"
+                        ToolTip.Tip="Generate Random Network"
+                        Content="&#x1F3B2;" />
+
+                <!-- Arrange flyout -->
+                <Button Width="36" Height="32" Padding="2"
+                        FontSize="16"
+                        ToolTip.Tip="Arrange Layout"
+                        Content="&#x1F9E9;">
                     <Button.Flyout>
                         <MenuFlyout>
                             <MenuItem Header="Circular"
@@ -41,22 +78,33 @@
                         </MenuFlyout>
                     </Button.Flyout>
                 </Button>
-                <Separator Width="8" />
-                <TextBlock Text="Zoom:"
-                           VerticalAlignment="Center" />
-                <Button Content="-"
-                        Command="{Binding ZoomOutCommand}"
-                        Width="28"
-                        Height="28"
-                        Padding="0" />
+
+                <Separator Width="6" />
+
+                <!-- Zoom Out -->
+                <Button Command="{Binding ZoomOutCommand}"
+                        Width="32" Height="28" Padding="2"
+                        FontSize="14"
+                        ToolTip.Tip="Zoom Out"
+                        Content="&#x1F50D;" />
+                <!-- Zoom level -->
                 <TextBlock Text="{Binding ZoomLevel, StringFormat={}{0:P0}}"
                            VerticalAlignment="Center"
-                           Width="50" />
-                <Button Content="+"
-                        Command="{Binding ZoomInCommand}"
-                        Width="28"
-                        Height="28"
-                        Padding="0" />
+                           Width="45"
+                           TextAlignment="Center"
+                           FontSize="12" />
+                <!-- Zoom In -->
+                <Button Command="{Binding ZoomInCommand}"
+                        Width="32" Height="28" Padding="2"
+                        FontSize="14"
+                        ToolTip.Tip="Zoom In"
+                        Content="&#x1F50E;" />
+                <!-- Zoom to Fit -->
+                <Button Command="{Binding ZoomToFitCommand}"
+                        Width="32" Height="28" Padding="2"
+                        FontSize="14"
+                        ToolTip.Tip="Zoom to Fit"
+                        Content="&#x26F6;" />
             </StackPanel>
 
             <!-- Canvas -->

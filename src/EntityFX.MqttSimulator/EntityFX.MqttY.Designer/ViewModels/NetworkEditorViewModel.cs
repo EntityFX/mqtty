@@ -22,6 +22,7 @@ public class NetworkEditorViewModel : ReactiveObject
     private NetworkNodeDesignModel? _selectedNetwork;
     private NetworkTypeModel? _selectedNetworkType;
     private double _zoomLevel = 1.0;
+    private IReadOnlySet<GraphItem> _multiSelectedItems = new HashSet<GraphItem>();
 
     // Inspector visibility flags
     private bool _isNodeSelected;
@@ -171,6 +172,7 @@ public class NetworkEditorViewModel : ReactiveObject
     public ICommand DeleteLinkCommand { get; }
     public ICommand ZoomInCommand { get; }
     public ICommand ZoomOutCommand { get; }
+    public ICommand ZoomToFitCommand { get; }
     public ICommand GenerateRandomNetworkCommand { get; }
     public ICommand DeleteGraphItemCommand { get; }
     public ICommand DeleteSelectedCommand { get; }
@@ -179,6 +181,11 @@ public class NetworkEditorViewModel : ReactiveObject
     public ICommand ArrangeGridCommand { get; }
     public ICommand ArrangeHierarchicalCommand { get; }
     public ICommand AddGraphItemAtPositionCommand { get; }
+
+    /// <summary>
+    /// Event raised when the canvas should zoom to fit all items.
+    /// </summary>
+    public event Action? ZoomToFitRequested;
 
     public NetworkEditorViewModel(IGraphLayoutService graphLayoutService, IDialogService dialogService)
     {
@@ -197,6 +204,7 @@ public class NetworkEditorViewModel : ReactiveObject
         DeleteLinkCommand = ReactiveCommand.Create<LinkDesignModel>(DeleteLink);
         ZoomInCommand = ReactiveCommand.Create(() => ZoomLevel = Math.Min(ZoomLevel + 0.1, 5.0));
         ZoomOutCommand = ReactiveCommand.Create(() => ZoomLevel = Math.Max(ZoomLevel - 0.1, 0.1));
+        ZoomToFitCommand = ReactiveCommand.Create(() => ZoomToFitRequested?.Invoke());
         GenerateRandomNetworkCommand = ReactiveCommand.Create(GenerateRandomNetwork);
         DeleteGraphItemCommand = ReactiveCommand.Create<GraphItem>(DeleteGraphItem);
         DeleteSelectedCommand = ReactiveCommand.Create(DeleteSelected);
@@ -216,6 +224,20 @@ public class NetworkEditorViewModel : ReactiveObject
 
         // Calculate layout for new items only (existing positions preserved)
         _layout = _graphLayoutService.CalculateLayout(DesignModel);
+        BuildGraphItems();
+        BuildGraphLinks();
+    }
+
+    /// <summary>
+    /// Rebuilds graph items and links preserving all current positions.
+    /// Does NOT recalculate layout — existing positions are kept intact.
+    /// Use this for add/delete/edit operations to avoid repositioning.
+    /// </summary>
+    private void RebuildGraphPreservePositions()
+    {
+        if (DesignModel == null) return;
+
+        SaveCurrentPositions();
         BuildGraphItems();
         BuildGraphLinks();
     }
@@ -246,13 +268,13 @@ public class NetworkEditorViewModel : ReactiveObject
         {
             var networks = Networks.Select(n => n.Name).ToList();
             var changed = await _dialogService.ShowNodeEditorAsync(node, networks);
-            if (changed) RebuildGraph();
+            if (changed) RebuildGraphPreservePositions();
         }
         else if (item.Tag is NetworkNodeDesignModel network)
         {
             var networkTypes = NetworkTypes.Select(nt => nt.Name).ToList();
             var changed = await _dialogService.ShowNetworkEditorAsync(network, networkTypes);
-            if (changed) RebuildGraph();
+            if (changed) RebuildGraphPreservePositions();
         }
     }
 
@@ -414,7 +436,7 @@ public class NetworkEditorViewModel : ReactiveObject
     private void DeleteNetwork(NetworkNodeDesignModel network)
     {
         Networks.Remove(network);
-        RebuildGraph();
+        RebuildGraphPreservePositions();
     }
 
     private void AddNode()
@@ -502,7 +524,7 @@ public class NetworkEditorViewModel : ReactiveObject
     private void DeleteNode(NodeDesignModel node)
     {
         Nodes.Remove(node);
-        RebuildGraph();
+        RebuildGraphPreservePositions();
     }
 
     private void AddLink(NetworkNodeDesignModel network)
@@ -515,7 +537,7 @@ public class NetworkEditorViewModel : ReactiveObject
             TargetNetwork = target.Name,
             Weight = 1
         });
-        RebuildGraph();
+        RebuildGraphPreservePositions();
     }
 
     private void DeleteLink(LinkDesignModel link)
@@ -524,7 +546,7 @@ public class NetworkEditorViewModel : ReactiveObject
         {
             network.Links.Remove(link);
         }
-        RebuildGraph();
+        RebuildGraphPreservePositions();
     }
 
     /// <summary>
@@ -551,7 +573,7 @@ public class NetworkEditorViewModel : ReactiveObject
             Networks.Remove(network);
         }
 
-        RebuildGraph();
+        RebuildGraphPreservePositions();
     }
 
     /// <summary>
@@ -673,12 +695,22 @@ public class NetworkEditorViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// Deletes the currently selected graph item (node or network).
+    /// Deletes the currently selected graph item(s).
+    /// If multiple items are selected, deletes all of them.
     /// Called from the toolbar Delete button.
     /// </summary>
     private void DeleteSelected()
     {
-        if (SelectedGraphItem != null)
+        if (_multiSelectedItems.Count > 1)
+        {
+            // Delete all multi-selected items
+            foreach (var item in _multiSelectedItems.ToList())
+            {
+                DeleteGraphItem(item);
+            }
+            _multiSelectedItems = new HashSet<GraphItem>();
+        }
+        else if (SelectedGraphItem != null)
         {
             DeleteGraphItem(SelectedGraphItem);
         }
@@ -743,6 +775,32 @@ public class NetworkEditorViewModel : ReactiveObject
         _layout = _graphLayoutService.CalculateHierarchicalLayout(DesignModel);
         BuildGraphItems();
         BuildGraphLinks();
+    }
+
+    /// <summary>
+    /// Called when the canvas multi-selection changes.
+    /// Updates the inspector to show the primary selected item
+    /// and stores the full set for bulk operations (e.g. Delete).
+    /// </summary>
+    public void OnMultiSelectionChanged(IReadOnlySet<GraphItem> selectedItems)
+    {
+        _multiSelectedItems = selectedItems;
+
+        if (selectedItems.Count == 0)
+        {
+            SelectedGraphItem = null;
+        }
+        else if (selectedItems.Count == 1)
+        {
+            SelectedGraphItem = selectedItems.First();
+        }
+        else
+        {
+            // Multiple items selected: show the last selected one in inspector
+            // but keep the multi-selection active
+            var primary = selectedItems.Last();
+            SelectedGraphItem = primary;
+        }
     }
 
     /// <summary>

@@ -22,6 +22,14 @@ public class NetworkGraphCanvas : Control
     private Point _offset;
     private double _zoom = 1.0;
 
+    // Multi-selection state
+    private HashSet<GraphItem> _selectedItems = new();
+    private bool _isRubberBanding;
+    private Point _rubberBandStart;
+    private Point _rubberBandEnd;
+    private bool _isDraggingMultiple;
+    private Dictionary<GraphItem, Point> _multiDragOriginalPositions = new();
+
     // Link creation state
     private bool _isCreatingLink;
     private GraphItem? _linkSource;
@@ -33,24 +41,31 @@ public class NetworkGraphCanvas : Control
     private static readonly Color ClientColor = Color.FromRgb(80, 200, 80);
     private static readonly Color ApplicationColor = Color.FromRgb(240, 160, 60);
     private static readonly Color SelectedColor = Color.FromRgb(255, 215, 0);
+    private static readonly Color MultiSelectedColor = Color.FromRgb(100, 180, 255);
     private static readonly Color LinkColor = Color.FromRgb(180, 180, 180);
     private static readonly Color BackgroundColor = Color.FromRgb(30, 30, 30);
     private static readonly Color GridColor = Color.FromRgb(50, 50, 50);
     private static readonly Color TextColor = Colors.White;
+    private static readonly Color RubberBandFill = Color.FromArgb(40, 100, 180, 255);
+    private static readonly Color RubberBandBorder = Color.FromArgb(180, 100, 180, 255);
 
     private static readonly IBrush NetworkBrush = new ImmutableSolidColorBrush(NetworkColor);
     private static readonly IBrush ServerBrush = new ImmutableSolidColorBrush(ServerColor);
     private static readonly IBrush ClientBrush = new ImmutableSolidColorBrush(ClientColor);
     private static readonly IBrush ApplicationBrush = new ImmutableSolidColorBrush(ApplicationColor);
     private static readonly IBrush SelectedBrush = new ImmutableSolidColorBrush(SelectedColor);
+    private static readonly IBrush MultiSelectedBrush = new ImmutableSolidColorBrush(MultiSelectedColor);
     private static readonly IBrush LinkBrush = new ImmutableSolidColorBrush(LinkColor);
     private static readonly IBrush BackgroundBrush = new ImmutableSolidColorBrush(BackgroundColor);
     private static readonly IBrush GridBrush = new ImmutableSolidColorBrush(GridColor);
     private static readonly IBrush TextBrush = new ImmutableSolidColorBrush(TextColor);
+    private static readonly IBrush RubberBandFillBrush = new ImmutableSolidColorBrush(RubberBandFill);
+    private static readonly IBrush RubberBandBorderBrush = new ImmutableSolidColorBrush(RubberBandBorder);
 
     private static readonly IPen LinkPen = new Pen(LinkBrush, 2);
     private static readonly IPen SelectedLinkPen = new Pen(new ImmutableSolidColorBrush(Colors.Yellow), 2);
     private static readonly IPen GridPen = new Pen(GridBrush, 0.5);
+    private static readonly IPen RubberBandPen = new Pen(RubberBandBorderBrush, 1);
 
     // Events
     public event EventHandler<GraphItem>? ItemSelected;
@@ -58,6 +73,7 @@ public class NetworkGraphCanvas : Control
     public event EventHandler<(GraphItem Source, GraphItem Target)>? LinkCreated;
     public event EventHandler<GraphItem>? ItemDeleteRequested;
     public event EventHandler<(GraphItemType Type, Point Position)>? ItemAddRequested;
+    public event EventHandler<IReadOnlySet<GraphItem>>? SelectionChanged;
 
     public NetworkGraphCanvas()
     {
@@ -99,6 +115,65 @@ public class NetworkGraphCanvas : Control
         }
     }
 
+    /// <summary>
+    /// Returns the set of all selected items (multi-selection).
+    /// </summary>
+    public IReadOnlySet<GraphItem> SelectedItems => _selectedItems;
+
+    /// <summary>
+    /// Zooms and pans to fit all graph items within the viewport.
+    /// </summary>
+    public void ZoomToFit()
+    {
+        if (_items.Count == 0) return;
+
+        double minX = double.MaxValue, minY = double.MaxValue;
+        double maxX = double.MinValue, maxY = double.MinValue;
+
+        foreach (var item in _items)
+        {
+            if (item.Position.X < minX) minX = item.Position.X;
+            if (item.Position.Y < minY) minY = item.Position.Y;
+            if (item.Position.X + item.Size.Width > maxX) maxX = item.Position.X + item.Size.Width;
+            if (item.Position.Y + item.Size.Height > maxY) maxY = item.Position.Y + item.Size.Height;
+        }
+
+        var contentWidth = maxX - minX;
+        var contentHeight = maxY - minY;
+
+        if (contentWidth <= 0 || contentHeight <= 0) return;
+
+        var padding = 40;
+        var viewWidth = Bounds.Width - padding * 2;
+        var viewHeight = Bounds.Height - padding * 2;
+
+        if (viewWidth <= 0 || viewHeight <= 0) return;
+
+        var zoomX = viewWidth / contentWidth;
+        var zoomY = viewHeight / contentHeight;
+        _zoom = Math.Clamp(Math.Min(zoomX, zoomY), 0.1, 5.0);
+
+        // Center the content
+        var contentCenterX = (minX + maxX) / 2;
+        var contentCenterY = (minY + maxY) / 2;
+        _offset = new Point(
+            Bounds.Width / 2 - contentCenterX * _zoom,
+            Bounds.Height / 2 - contentCenterY * _zoom);
+
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Clears multi-selection and resets to single-item mode.
+    /// </summary>
+    public void ClearMultiSelection()
+    {
+        _selectedItems.Clear();
+        _isRubberBanding = false;
+        _isDraggingMultiple = false;
+        InvalidateVisual();
+    }
+
     public override void Render(DrawingContext context)
     {
         // Draw background
@@ -111,6 +186,7 @@ public class NetworkGraphCanvas : Control
         DrawLinks(context);
         DrawLinkCreation(context);
         DrawItems(context);
+        DrawRubberBand(context);
 
         zoomTransform.Dispose();
         baseTransform.Dispose();
@@ -182,7 +258,8 @@ public class NetworkGraphCanvas : Control
         foreach (var item in _items)
         {
             var isSelected = item == _selectedItem;
-            var brush = GetBrushForItem(item, isSelected);
+            var isMultiSelected = _selectedItems.Contains(item);
+            var brush = GetBrushForItem(item, isSelected, isMultiSelected);
             var rect = new Rect(item.Position, item.Size);
 
             if (item.ItemType == GraphItemType.Network)
@@ -202,9 +279,10 @@ public class NetworkGraphCanvas : Control
             }
 
             // Draw border for selected
-            if (isSelected)
+            if (isSelected || isMultiSelected)
             {
-                var borderPen = new Pen(SelectedBrush, 2);
+                var borderColor = isSelected ? SelectedColor : MultiSelectedColor;
+                var borderPen = new Pen(new ImmutableSolidColorBrush(borderColor), 2);
                 if (item.ItemType == GraphItemType.Client)
                     context.DrawEllipse(null, borderPen, rect.Center, rect.Width / 2 + 2, rect.Height / 2 + 2);
                 else
@@ -219,6 +297,25 @@ public class NetworkGraphCanvas : Control
             var textY = item.Position.Y + (item.Size.Height - ft.Height) / 2;
             context.DrawText(ft, new Point(textX, textY));
         }
+    }
+
+    private void DrawRubberBand(DrawingContext context)
+    {
+        if (!_isRubberBanding) return;
+
+        var canvasStart = ScreenToCanvas(_rubberBandStart);
+        var canvasEnd = ScreenToCanvas(_rubberBandEnd);
+
+        var x = Math.Min(canvasStart.X, canvasEnd.X);
+        var y = Math.Min(canvasStart.Y, canvasEnd.Y);
+        var w = Math.Abs(canvasEnd.X - canvasStart.X);
+        var h = Math.Abs(canvasEnd.Y - canvasStart.Y);
+
+        if (w < 1 || h < 1) return;
+
+        var rect = new Rect(x, y, w, h);
+        context.FillRectangle(RubberBandFillBrush, rect);
+        context.DrawRectangle(RubberBandPen, rect);
     }
 
     private void DrawArrow(DrawingContext context, Point from, Point to)
@@ -252,9 +349,10 @@ public class NetworkGraphCanvas : Control
         context.DrawGeometry(LinkBrush, null, arrowGeometry);
     }
 
-    private static IBrush GetBrushForItem(GraphItem item, bool isSelected)
+    private static IBrush GetBrushForItem(GraphItem item, bool isSelected, bool isMultiSelected)
     {
         if (isSelected) return SelectedBrush;
+        if (isMultiSelected) return MultiSelectedBrush;
         return item.ItemType switch
         {
             GraphItemType.Network => NetworkBrush,
@@ -279,6 +377,21 @@ public class NetworkGraphCanvas : Control
         return null;
     }
 
+    /// <summary>
+    /// Returns all items whose bounding box intersects the given rectangle (in canvas coordinates).
+    /// </summary>
+    private List<GraphItem> HitTestRect(Rect rect)
+    {
+        var result = new List<GraphItem>();
+        foreach (var item in _items)
+        {
+            var itemRect = new Rect(item.Position, item.Size);
+            if (rect.Intersects(itemRect))
+                result.Add(item);
+        }
+        return result;
+    }
+
     private Point ScreenToCanvas(Point screenPoint)
     {
         return new Point(
@@ -290,14 +403,21 @@ public class NetworkGraphCanvas : Control
     {
         var point = e.GetPosition(this);
         var hitItem = HitTest(point);
+        var isCtrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
 
         if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed)
         {
             // Context menu
             if (hitItem != null)
             {
-                _selectedItem = hitItem;
-                ItemSelected?.Invoke(this, hitItem);
+                if (!_selectedItems.Contains(hitItem))
+                {
+                    // If right-click on non-selected item, select it alone
+                    ClearMultiSelection();
+                    _selectedItem = hitItem;
+                    _selectedItems.Add(hitItem);
+                    ItemSelected?.Invoke(this, hitItem);
+                }
                 InvalidateVisual();
             }
             ShowContextMenu(point, hitItem);
@@ -306,12 +426,72 @@ public class NetworkGraphCanvas : Control
 
         if (hitItem != null)
         {
-            _selectedItem = hitItem;
-            ItemSelected?.Invoke(this, hitItem);
-            _draggedItem = hitItem;
-            _dragStart = point;
-            _itemOriginalPosition = hitItem.Position;
+            if (isCtrl)
+            {
+                // Ctrl+Click: toggle item in multi-selection
+                if (_selectedItems.Contains(hitItem))
+                {
+                    _selectedItems.Remove(hitItem);
+                    if (_selectedItems.Count == 0)
+                    {
+                        _selectedItem = null;
+                        ItemSelected?.Invoke(this, null!);
+                    }
+                    else
+                    {
+                        // Keep the last selected item as the primary
+                        _selectedItem = hitItem;
+                    }
+                }
+                else
+                {
+                    _selectedItems.Add(hitItem);
+                    _selectedItem = hitItem;
+                    ItemSelected?.Invoke(this, hitItem);
+                }
+
+                // Start multi-drag if we have multiple items
+                if (_selectedItems.Count > 1)
+                {
+                    _isDraggingMultiple = true;
+                    _dragStart = point;
+                    _multiDragOriginalPositions = _selectedItems.ToDictionary(i => i, i => i.Position);
+                }
+                else
+                {
+                    _draggedItem = hitItem;
+                    _dragStart = point;
+                    _itemOriginalPosition = hitItem.Position;
+                }
+
+                InvalidateVisual();
+                NotifySelectionChanged();
+                return;
+            }
+
+            // Without Ctrl: single selection
+            if (_selectedItems.Count > 1 && _selectedItems.Contains(hitItem))
+            {
+                // Clicking on a multi-selected item: start multi-drag
+                _isDraggingMultiple = true;
+                _dragStart = point;
+                _multiDragOriginalPositions = _selectedItems.ToDictionary(i => i, i => i.Position);
+            }
+            else
+            {
+                // Single selection
+                ClearMultiSelection();
+                _selectedItem = hitItem;
+                _selectedItems.Add(hitItem);
+                ItemSelected?.Invoke(this, hitItem);
+
+                _draggedItem = hitItem;
+                _dragStart = point;
+                _itemOriginalPosition = hitItem.Position;
+            }
+
             InvalidateVisual();
+            NotifySelectionChanged();
 
             // Check for double click
             if (e.ClickCount == 2)
@@ -321,18 +501,53 @@ public class NetworkGraphCanvas : Control
         }
         else
         {
-            // Start panning
+            if (isCtrl)
+            {
+                // Ctrl+Click on empty space: start rubber band selection
+                _isRubberBanding = true;
+                _rubberBandStart = point;
+                _rubberBandEnd = point;
+                _draggedItem = null;
+                return;
+            }
+
+            // Click on empty space: clear selection, start panning
+            ClearMultiSelection();
+            _selectedItem = null;
+            _selectedItems.Clear();
+            ItemSelected?.Invoke(this, null!);
             _panStart = point;
             _draggedItem = null;
-            _selectedItem = null;
-            ItemSelected?.Invoke(this, null!);
             InvalidateVisual();
+            NotifySelectionChanged();
         }
     }
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
         var point = e.GetPosition(this);
+
+        if (_isRubberBanding)
+        {
+            _rubberBandEnd = point;
+            InvalidateVisual();
+            return;
+        }
+
+        if (_isDraggingMultiple)
+        {
+            var delta = point - _dragStart;
+            var deltaCanvas = new Point(delta.X / _zoom, delta.Y / _zoom);
+
+            foreach (var kvp in _multiDragOriginalPositions)
+            {
+                kvp.Key.Position = new Point(
+                    kvp.Value.X + deltaCanvas.X,
+                    kvp.Value.Y + deltaCanvas.Y);
+            }
+            InvalidateVisual();
+            return;
+        }
 
         if (_draggedItem != null)
         {
@@ -360,6 +575,47 @@ public class NetworkGraphCanvas : Control
 
     private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        if (_isRubberBanding)
+        {
+            _isRubberBanding = false;
+
+            // Find all items inside the rubber band rectangle
+            var canvasStart = ScreenToCanvas(_rubberBandStart);
+            var canvasEnd = ScreenToCanvas(_rubberBandEnd);
+            var x = Math.Min(canvasStart.X, canvasEnd.X);
+            var y = Math.Min(canvasStart.Y, canvasEnd.Y);
+            var w = Math.Abs(canvasEnd.X - canvasStart.X);
+            var h = Math.Abs(canvasEnd.Y - canvasStart.Y);
+
+            if (w > 5 && h > 5)
+            {
+                var rect = new Rect(x, y, w, h);
+                var hitItems = HitTestRect(rect);
+
+                if (hitItems.Count > 0)
+                {
+                    _selectedItems.Clear();
+                    foreach (var item in hitItems)
+                    {
+                        _selectedItems.Add(item);
+                    }
+                    _selectedItem = hitItems.Last();
+                    ItemSelected?.Invoke(this, _selectedItem);
+                    NotifySelectionChanged();
+                }
+            }
+
+            InvalidateVisual();
+            return;
+        }
+
+        if (_isDraggingMultiple)
+        {
+            _isDraggingMultiple = false;
+            _multiDragOriginalPositions.Clear();
+            return;
+        }
+
         if (_isCreatingLink && _linkSource != null)
         {
             var point = e.GetPosition(this);
@@ -391,6 +647,11 @@ public class NetworkGraphCanvas : Control
         InvalidateVisual();
     }
 
+    private void NotifySelectionChanged()
+    {
+        SelectionChanged?.Invoke(this, _selectedItems);
+    }
+
     private void ShowContextMenu(Point screenPoint, GraphItem? item)
     {
         var menu = new ContextMenu();
@@ -403,7 +664,19 @@ public class NetworkGraphCanvas : Control
             menu.Items.Add(editItem);
 
             var deleteItem = new MenuItem { Header = "Delete" };
-            deleteItem.Click += (_, _) => ItemDeleteRequested?.Invoke(this, item);
+            deleteItem.Click += (_, _) =>
+            {
+                // If multiple items selected, delete all; otherwise delete the clicked item
+                if (_selectedItems.Count > 1 && _selectedItems.Contains(item))
+                {
+                    foreach (var si in _selectedItems.ToList())
+                        ItemDeleteRequested?.Invoke(this, si);
+                }
+                else
+                {
+                    ItemDeleteRequested?.Invoke(this, item);
+                }
+            };
             menu.Items.Add(deleteItem);
 
             menu.Items.Add(new Separator());

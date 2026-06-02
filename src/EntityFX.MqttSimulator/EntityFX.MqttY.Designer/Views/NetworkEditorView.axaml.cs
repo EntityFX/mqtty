@@ -65,6 +65,12 @@ public partial class NetworkEditorView : ReactiveUserControl<NetworkEditorViewMo
                 ViewModel.AddGraphItemAtPositionCommand.Execute(args);
             };
 
+            // Multi-selection changed
+            GraphCanvas.SelectionChanged += (_, selectedItems) =>
+            {
+                ViewModel.OnMultiSelectionChanged(selectedItems);
+            };
+
             // Selection sync: ViewModel -> Canvas
             ViewModel.WhenAnyValue(vm => vm.SelectedGraphItem)
                 .Subscribe(item => GraphCanvas.SelectedItem = item)
@@ -74,6 +80,12 @@ public partial class NetworkEditorView : ReactiveUserControl<NetworkEditorViewMo
             ViewModel.WhenAnyValue(vm => vm.ZoomLevel)
                 .Subscribe(zoom => GraphCanvas.SetZoom(zoom))
                 .DisposeWith(disposables);
+
+            // Zoom to fit
+            ViewModel.ZoomToFitRequested += () =>
+            {
+                GraphCanvas.ZoomToFit();
+            };
 
             // Double-click on Network Types DataGrid to open editor
             SubscribeDataGridDoubleClick(NetworkTypesGrid, async () =>
