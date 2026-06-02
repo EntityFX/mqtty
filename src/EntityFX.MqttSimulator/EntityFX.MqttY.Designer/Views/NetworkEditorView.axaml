@@ -240,6 +240,29 @@
                 </ScrollViewer>
             </TabItem>
 
+            <!-- Nodes list tab -->
+            <TabItem Header="Nodes">
+                <Grid RowDefinitions="Auto,*">
+                    <TextBlock Text="{Binding Nodes.Count, StringFormat='Total nodes: {0}'}"
+                               Foreground="#888"
+                               Margin="8,4" />
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding Nodes}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              Margin="4">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                            <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="70" />
+                            <DataGridTextColumn Header="Protocol" Binding="{Binding Protocol}" Width="60" />
+                            <DataGridTextColumn Header="Specification" Binding="{Binding Specification}" Width="80" />
+                            <DataGridTextColumn Header="Network" Binding="{Binding Network}" Width="80" />
+                            <DataGridTextColumn Header="Qty" Binding="{Binding Quantity}" Width="40" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
             <!-- Network Types table -->
             <TabItem Header="Network Types">
                 <Grid RowDefinitions="Auto,*,Auto">

@@ -3,7 +3,7 @@
              xmlns:vm="using:EntityFX.MqttY.Designer.ViewModels"
              x:Class="EntityFX.MqttY.Designer.Views.SimulationView"
              x:DataType="vm:SimulationViewModel">
-    <Grid RowDefinitions="Auto,Auto,*" Margin="8">
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="8">
         <!-- Status Bar -->
         <Border Grid.Row="0"
                 Background="#2d2d2d"
@@ -155,6 +155,24 @@
             </TabControl>
         </Grid>
 
-        <!-- Monitoring section placeholder removed - logs are now in the tab above -->
+        <!-- Log file path -->
+        <Border Grid.Row="3"
+                Background="#1a1a1a"
+                CornerRadius="4"
+                Padding="8"
+                Margin="0,4,0,0">
+            <Grid ColumnDefinitions="Auto,*">
+                <TextBlock Text="Log file: "
+                           Foreground="#888"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding LogFilePath}"
+                           Foreground="#4caf50"
+                           FontSize="11"
+                           TextWrapping="NoWrap"
+                           ToolTip.Tip="{Binding LogFilePath}"
+                           VerticalAlignment="Center" />
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

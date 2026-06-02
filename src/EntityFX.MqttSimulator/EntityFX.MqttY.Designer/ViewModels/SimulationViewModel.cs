@@ -87,6 +87,13 @@ public class SimulationViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _isBuilt, value);
     }
 
+    private string _logFilePath = string.Empty;
+    public string LogFilePath
+    {
+        get => _logFilePath;
+        set => this.RaiseAndSetIfChanged(ref _logFilePath, value);
+    }
+
     public ObservableCollection<NetworkStateItem> NetworkStates
     {
         get => _networkStates;
@@ -205,6 +212,7 @@ public class SimulationViewModel : ReactiveObject
             StatusMessage = "Simulation built. Ready to start.";
             UpdateCounters();
             SubscribeToMonitoring();
+            LogFilePath = _simulationService.FileLog.LogFilePath;
         }
         else
         {
@@ -247,37 +255,52 @@ public class SimulationViewModel : ReactiveObject
 
     private void OnSimulationRefresh(object? sender, long ticks)
     {
-        UpdateCounters();
-        UpdateStateView();
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            UpdateCounters();
+            UpdateStateView();
+        });
     }
 
     private void OnSimulationError(object? sender, Exception ex)
     {
-        Errors = _simulationService.NetworkSimulator?.Errors ?? 0;
-        StatusMessage = $"Error: {ex.Message}";
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            Errors = _simulationService.NetworkSimulator?.Errors ?? 0;
+            StatusMessage = $"Error: {ex.Message}";
+        });
     }
 
     private void OnSimulationStopped(object? sender, EventArgs e)
     {
-        IsRunning = false;
-        IsPaused = false;
-        StatusMessage = "Stopped";
-        UpdateCounters();
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            IsRunning = false;
+            IsPaused = false;
+            StatusMessage = "Stopped";
+            UpdateCounters();
+        });
     }
 
     private void OnSimulationPaused(object? sender, EventArgs e)
     {
-        IsPaused = true;
-        IsRunning = true;
-        StatusMessage = "Paused";
-        UpdateStateView();
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            IsPaused = true;
+            IsRunning = true;
+            StatusMessage = "Paused";
+            UpdateStateView();
+        });
     }
 
     private void OnSimulationResumed(object? sender, EventArgs e)
     {
-        IsPaused = false;
-        IsRunning = true;
-        StatusMessage = "Running...";
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            IsPaused = false;
+            IsRunning = true;
+            StatusMessage = "Running...";
+        });
     }
 
     private void UpdateCounters()

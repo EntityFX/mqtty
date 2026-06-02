@@ -55,6 +55,7 @@ public partial class App : Avalonia.Application
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<SimulationService>();
         services.AddSingleton<GraphMLImporterService>();
+        services.AddSingleton<FileLogService>();
 
         // MqttY Core registrations
         services.ConfigureServices();
