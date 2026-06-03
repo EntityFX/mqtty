@@ -13,6 +13,13 @@ using static System.Net.Mime.MediaTypeNames;
 
 namespace EntityFX.MqttY.Network;
 
+public enum SimulationRunMode
+{
+    Turbo,
+    RealTime,
+    FastForward
+}
+
 public class NetworkSimulator : INetworkSimulator
 {
     private readonly ConcurrentDictionary<(string Address, NodeType NodeType), ILeafNode> _nodes = new();
@@ -26,6 +33,9 @@ public class NetworkSimulator : INetworkSimulator
     private long _errors = 0;
     private long _packetId = 0;
     private int _countNodes = 0;
+
+    public SimulationRunMode RunMode { get; set; } = SimulationRunMode.RealTime;
+    public double SpeedMultiplier { get; set; } = 1.0;
 
     private CancellationTokenSource? _cancelTokenSource;
 
@@ -292,8 +302,6 @@ public class NetworkSimulator : INetworkSimulator
             });
         }
 
-
-
         Tick();
     }
 
@@ -341,7 +349,6 @@ public class NetworkSimulator : INetworkSimulator
             }
         }
 
-
         Tick();
     }
 
@@ -349,7 +356,6 @@ public class NetworkSimulator : INetworkSimulator
     {
         try
         {
-
             var scope = Monitoring.BeginScope(TotalTicks, "Reset sourceNetwork graph");
             Monitoring.Push(0, TotalTicks, NetworkLoggerType.Reset, $"Reset whole sourceNetwork", "Network", "Reset", scope);
 
@@ -384,18 +390,19 @@ public class NetworkSimulator : INetworkSimulator
         }
     }
 
-    public Task StartPeriodicRefreshAsync()
+    public async Task StartPeriodicRefreshAsync()
     {
         if (_cancelTokenSource != null && _cancelTokenSource.IsCancellationRequested)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         _cancelTokenSource = new CancellationTokenSource();
 
         _timer = new Timer(Refreshed, this, 0, 1000);
         WaitMode = true;
-        return Task.Run(() =>
+
+        _ = Task.Run(async () =>
         {
             bool refreshResult = true;
 
@@ -406,20 +413,32 @@ public class NetworkSimulator : INetworkSimulator
                     WaitMode = false;
                     return;
                 }
+
                 _refreshStopwatch.Restart();
                 refreshResult = Refresh(false, 0);
                 _refreshStopwatch.Reset();
 
-
                 if (!refreshResult)
                 {
                     Reset();
-
                     _cancelTokenSource.Cancel();
-
                     OnError?.Invoke(this, SimulationException!);
                     WaitMode = false;
                     break;
+                }
+
+                switch (RunMode)
+                {
+                    case SimulationRunMode.Turbo:
+                        await Task.Yield();
+                        break;
+                    case SimulationRunMode.RealTime:
+                        await Task.Delay(_ticksOptions.TickPeriod, _cancelTokenSource.Token);
+                        break;
+                    case SimulationRunMode.FastForward:
+                        var delayTicks = (long)(_ticksOptions.TickPeriod.Ticks / Math.Max(1.0, SpeedMultiplier));
+                        await Task.Delay(TimeSpan.FromTicks(delayTicks), _cancelTokenSource.Token);
+                        break;
                 }
             }
         }, _cancelTokenSource.Token);
@@ -472,7 +491,6 @@ public class NetworkSimulator : INetworkSimulator
         }
 
 
-
         return result;
     }
 
@@ -498,7 +516,6 @@ public class NetworkSimulator : INetworkSimulator
             Interlocked.Increment(ref _countNodes);
         }
 
-
         return result;
     }
 
@@ -523,7 +540,6 @@ public class NetworkSimulator : INetworkSimulator
             ((ApplicationBase)application).NetworkSimulator = this;
             Interlocked.Increment(ref _countNodes);
         }
-
 
 
         return result;

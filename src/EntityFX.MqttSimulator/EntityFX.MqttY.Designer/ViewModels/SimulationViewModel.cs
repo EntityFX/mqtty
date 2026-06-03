@@ -5,6 +5,7 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Designer.Models;
 using EntityFX.MqttY.Designer.Services;
+using EntityFX.MqttY.Network;
 using ReactiveUI;
 
 namespace EntityFX.MqttY.Designer.ViewModels;
@@ -87,6 +88,20 @@ public class SimulationViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _isBuilt, value);
     }
 
+    private SimulationRunMode _runMode = SimulationRunMode.RealTime;
+    public SimulationRunMode RunMode
+    {
+        get => _runMode;
+        set => this.RaiseAndSetIfChanged(ref _runMode, value);
+    }
+
+    private double _speedMultiplier = 1.0;
+    public double SpeedMultiplier
+    {
+        get => _speedMultiplier;
+        set => this.RaiseAndSetIfChanged(ref _speedMultiplier, value);
+    }
+
     private string _logFilePath = string.Empty;
     public string LogFilePath
     {
@@ -111,6 +126,8 @@ public class SimulationViewModel : ReactiveObject
         get => _logItems;
         set => this.RaiseAndSetIfChanged(ref _logItems, value);
     }
+
+    public SimulationRunMode[] AvailableRunModes => (SimulationRunMode[])Enum.GetValues(typeof(SimulationRunMode));
 
     public ReactiveCommand<Unit, Unit> BuildCommand { get; }
     public ReactiveCommand<Unit, Unit> StartCommand { get; }
@@ -227,7 +244,7 @@ public class SimulationViewModel : ReactiveObject
         StatusMessage = "Running...";
         IsRunning = true;
         IsPaused = false;
-        await _simulationService.StartAsync();
+        await _simulationService.StartAsync(this.RunMode, this.SpeedMultiplier);
     }
 
     private void Stop()

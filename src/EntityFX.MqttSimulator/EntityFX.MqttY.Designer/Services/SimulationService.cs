@@ -82,9 +82,15 @@ public class SimulationService : IDisposable
         }
     }
 
-    public async Task StartAsync()
+    public async Task StartAsync(SimulationRunMode mode = SimulationRunMode.RealTime, double multiplier = 1.0)
     {
         if (_networkSimulator == null || _isRunning) return;
+
+        if (_networkSimulator is NetworkSimulator concreteSim)
+        {
+            concreteSim.RunMode = mode;
+            concreteSim.SpeedMultiplier = multiplier;
+        }
 
         _isRunning = true;
         _isPaused = false;

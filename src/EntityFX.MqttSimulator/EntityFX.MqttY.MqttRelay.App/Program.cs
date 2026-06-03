@@ -1,4 +1,5 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Utils;
@@ -12,7 +13,7 @@ using System.Threading.Tasks;
 
 
 
-if (args.Length > 0)
+if (args.Length > 0 && args[0] != "original")
 {
     ProcessResults(args[0]);
     return;
@@ -27,10 +28,31 @@ var netLength = new[] { 2, 5, 10, 50 };
 var clients = new[] { 3, 10, 50 };
 var repeats = new[] { 10, 100 };
 var refreshStrategies = new[] { 0, 1 };
+int? bytes = null;
+
+TicksOptions? tickOptions = null;
+
+NetworkOptions? networkOptions = null;
+
+if (args.Length > 0 && args[0] == "original")
+{
+    brokers = new[] { 4 };
+    clients = new[] { 15 };
+    repeats = new[] { 131 };
+    netLength = new[] { 1 };
+    refreshStrategies = new[] { 0 };
+    bytes = 8;
+
+    tickOptions = new TicksOptions()
+    {
+        OutgoingWaitTicks = 5,
+        TickPeriod = TimeSpan.FromMilliseconds(0.1)
+    };
+}
 
 var results = new List<ResultItem>();
 
-var mqttRelayApp = new MqttRelayApp();
+var mqttRelayApp = new MqttRelayApp(tickOptions, networkOptions);
 
 var table = string.Empty;
 
@@ -54,7 +76,7 @@ for (int b = 0; b < brokers.Length; b++)
                     var prefixBase = $"{ix}__b_{brokerc}__n_{netc}__c_{clientc}__r_{repeatc}";
 
                     PrintBefore(false, brokerc, netc, clientc, repeatc, false);
-                    var networkSimulator = mqttRelayApp.ExecuteSimulation(false, brokerc, netc, clientc, repeatc, false, rs);
+                    var networkSimulator = mqttRelayApp.ExecuteSimulation(false, brokerc, netc, clientc, repeatc, false, rs, bytes);
 
                     var ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
 
@@ -72,7 +94,7 @@ for (int b = 0; b < brokers.Length; b++)
                     GC.Collect();
 
                     PrintBefore(true, brokerc, netc, clientc, repeatc, false);
-                    networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, false, rs);
+                    networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, false, rs, bytes);
 
                     ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
                     result = new ResultItem(id, gid,
@@ -86,7 +108,7 @@ for (int b = 0; b < brokers.Length; b++)
                     GC.Collect();
 
                     PrintBefore(true, brokerc, netc, clientc, repeatc, true);
-                    networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, true, rs);
+                    networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, true, rs, bytes);
 
                     ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
                     result = new ResultItem(id, gid,

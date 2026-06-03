@@ -221,7 +221,7 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void MqttLineTest()
         {
-            InitLine(2, 1, 1);
+            InitLine(3, 1, 1);
 
             var netsWithClients = _graph!.Networks.Values.Where(n => n.Clients.Count > 0).ToArray();
 

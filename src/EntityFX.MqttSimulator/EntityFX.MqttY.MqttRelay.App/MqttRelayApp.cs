@@ -11,6 +11,7 @@ using EntityFX.MqttY.Plugin.Mqtt;
 using EntityFX.MqttY.Utils;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Plugin.Mqtt.Factories;
+using System.Security.Cryptography;
 
 record InParams(int Brokers, int Nets, int Clients, int Repeats, bool IsParallel, bool EnabledCounters, int RefreshStrategy);
 record OutParams(TimeSpan VirtualTime, TimeSpan RealTime, long TotalTicks, long TotalSteps, long Errors, double MemoryWorkingSet);
@@ -34,13 +35,12 @@ public class MqttRelayApp
     private IMqttPacketManager _mqttPacketManager;
 
 
-
-    public MqttRelayApp()
+    public MqttRelayApp(TicksOptions? ticksOptions, NetworkOptions? networkOptions)
     {
         _builder = new GenericBuilder();
 
-        _tickOptions = _builder.GetDefaultTickOptions();
-        _networkOptions = _builder.GetDefaultNetworkOptions();
+        _tickOptions = ticksOptions ?? _builder.GetDefaultTickOptions();
+        _networkOptions = networkOptions ?? _builder.GetDefaultNetworkOptions();
 
         //_monitoring = _builder.GetNetworkLogger();
         _monitoring = _builder.GetNullNetworkLogger();
@@ -69,42 +69,34 @@ public class MqttRelayApp
 
     }
 
-    public INetworkSimulator ExecuteSimulation(bool isParallel, int relays, int length, int clients, 
-        int sendRepeats, bool enableCounters, int strategy)
+    public INetworkSimulator ExecuteSimulation(bool isParallel, int brokersCount, int length, int clients, 
+        int sendRepeats, bool enableCounters, int strategy, int? bytesTelemetry)
     {
-        var graph = BuildNetworkSimulator(relays, length, clients, enableCounters);
+        //Build graphs
+        var graph = BuildNetworkSimulator(brokersCount, length, clients, enableCounters);
         var brokers = graph.Servers.Values.OfType<IMqttBroker>().ToArray();
 
-        var mqttRelays = ConnectMqttRelayApps(graph);
-        var mqttReceivers = ConnectMqttReceiverApps(graph);
-
-        ConnectMqttClientsToBrokers(brokers);
-
-        var allConnected = RefreshUntilConnected(isParallel, graph, strategy);
+        //Connect all nodes
+        var (mqttRelays, mqttReceivers) = ConnectAll(isParallel, strategy, graph, brokers);
 
         var ticks = graph.TotalTicks;
 
-        SubscribeAllRelays(mqttRelays);
-
-        RefreshTicks(isParallel, graph, ticks, strategy);
-
-        SubscribeAllMqttReceivers(mqttReceivers);
-
-        RefreshTicks(isParallel, graph, ticks, strategy);
-
+        //subscribe all mqtt clients
+        SubscribeAll(isParallel, strategy, graph, mqttRelays, mqttReceivers, ticks);
 
         var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
         var uml = plantUmlGraphGenerator.SerializeNetworkGraph(graph!);
 
+        var bytes = GenerateTelemetry(bytesTelemetry);
 
-        ///TEST Relay subscriptions
-        var (relayWithSubscription, relaysWithoutSubscription) = VerifyAllMqttRelaysSubscribed(mqttRelays);
-        var (countRelaySubscribed, withoutSubsciption) = VerifyAllMqttReceiversSubscibed(mqttReceivers);
+        //publish all
+        PublishAll(isParallel, sendRepeats, strategy, graph, brokers, ticks, bytes);
 
-        var data = new { Temperature = 25.0, Hummidity = 50.0, Pressure = 720.0 };
-        var dataJson = JsonSerializer.Serialize(data);
-        var bytes = Encoding.UTF8.GetBytes(dataJson);
+        return graph;
+    }
 
+    private void PublishAll(bool isParallel, int sendRepeats, int strategy, INetworkSimulator graph, IMqttBroker[] brokers, long ticks, byte[] bytes)
+    {
         for (int r = 0; r < sendRepeats; r++)
         {
             foreach (var broker in brokers)
@@ -120,11 +112,52 @@ public class MqttRelayApp
 
             RefreshTicks(isParallel, graph, ticks, strategy);
             RefreshTicks(isParallel, graph, ticks, strategy);
+        }
+    }
 
+    private byte[] GenerateTelemetry(int? bytesTelemetry)
+    {
+        byte[] bytes;
+        if (bytesTelemetry.HasValue)
+        {
+            bytes = RandomNumberGenerator.GetBytes(bytesTelemetry.Value);
+        }
+        else
+        {
+            var data = new { Temperature = 25.0, Hummidity = 50.0, Pressure = 720.0 };
+            var dataJson = JsonSerializer.Serialize(data);
+
+            bytes = Encoding.UTF8.GetBytes(dataJson);
 
         }
 
-        return graph;
+        return bytes;
+    }
+
+    private (IEnumerable<MqttRelay> Relays, IEnumerable<MqttReceiver> Receivers) ConnectAll(bool isParallel, int strategy, INetworkSimulator graph, IMqttBroker[] brokers)
+    {
+        var mqttRelays = ConnectMqttRelayApps(graph);
+        var mqttReceivers = ConnectMqttReceiverApps(graph);
+        ConnectMqttClientsToBrokers(brokers);
+
+        var allConnected = RefreshUntilConnected(isParallel, graph, strategy);
+
+        return (mqttRelays, mqttReceivers);
+    }
+
+    private void SubscribeAll(bool isParallel, int strategy, INetworkSimulator graph, IEnumerable<MqttRelay> mqttRelays, IEnumerable<MqttReceiver> mqttReceivers, long ticks)
+    {
+        SubscribeAllRelays(mqttRelays);
+
+        RefreshTicks(isParallel, graph, ticks, strategy);
+
+        SubscribeAllMqttReceivers(mqttReceivers);
+
+        RefreshTicks(isParallel, graph, ticks, strategy);
+
+        //Verify subscriptions
+        var (relayWithSubscription, relaysWithoutSubscription) = VerifyAllMqttRelaysSubscribed(mqttRelays);
+        var (countRelaySubscribed, withoutSubsciption) = VerifyAllMqttReceiversSubscibed(mqttReceivers);
     }
 
     private static (int Subscribed, int WithoutSubscription) VerifyAllMqttReceiversSubscibed(IEnumerable<MqttReceiver> mqttReceivers)
