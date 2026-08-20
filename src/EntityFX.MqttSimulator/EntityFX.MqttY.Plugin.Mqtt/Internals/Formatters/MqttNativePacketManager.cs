@@ -1,4 +1,4 @@
-﻿using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 
@@ -20,6 +20,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
                     MqttPacketType.PublishAck, id => new PublishAckPacket(id)),
                 [MqttPacketType.PublishReceived] = new FlowPacketFormatter<PublishReceivedPacket>(
                     MqttPacketType.PublishReceived, id => new PublishReceivedPacket(id)),
+                [MqttPacketType.PublishRelease] = new FlowPacketFormatter<PublishReleasePacket>(
+                    MqttPacketType.PublishRelease, id => new PublishReleasePacket(id)),
                 [MqttPacketType.PublishComplete] = new FlowPacketFormatter<PublishCompletePacket>(
                     MqttPacketType.PublishComplete, id => new PublishCompletePacket(id)),
             };

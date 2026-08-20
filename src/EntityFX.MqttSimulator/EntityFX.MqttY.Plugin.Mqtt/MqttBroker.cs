@@ -15,7 +15,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
     {
         private readonly IRepository<ClientSession> _sessionRepository = new InMemoryRepository<ClientSession>();
 
-        private readonly MqttQos _maximumQualityOfService = MqttQos.AtLeastOnce;
+        private readonly MqttQos _maximumQualityOfService = MqttQos.ExactlyOnce;
         private readonly IMqttPacketManager _packetManager;
         private readonly IMqttTopicEvaluator _topicEvaluator;
 
@@ -74,6 +74,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                     ProcessFromClientPublish(packet, _packetManager.BytesToPacket<PublishPacket>(packet.Payload));
                     break;
                 case MqttPacketType.PublishReceived:
+                    break;
+                case MqttPacketType.PublishRelease:
+                    ProcessFromClientPublishRelease(packet, _packetManager.BytesToPacket<PublishReleasePacket>(packet.Payload));
                     break;
                 case MqttPacketType.PublishComplete:
                     break;
@@ -149,7 +152,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             ValidatePublish(clientId, publishPacket);
 
-            var qos = _maximumQualityOfService;
+            var qos = publishPacket.QualityOfService > _maximumQualityOfService
+                ? _maximumQualityOfService
+                : publishPacket.QualityOfService;
 
             var session = _sessionRepository.Read(clientId);
 
@@ -158,12 +163,29 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 throw new MqttException($"Client Session {clientId} Not Found");
             }
 
-            if (qos == MqttQos.ExactlyOnce && session.GetPendingAcknowledgements()
-                .Any(ack => ack.Type == MqttPacketType.PublishReceived && ack.PacketId == publishPacket?.PacketId))
+            if (qos == MqttQos.AtMostOnce)
             {
+                return;
             }
 
-            if (qos == MqttQos.AtLeastOnce)
+            if (qos == MqttQos.ExactlyOnce)
+            {
+                if (session.GetPendingAcknowledgements()
+                    .Any(ack => ack.Type == MqttPacketType.PublishReceived && ack.PacketId == publishPacket!.PacketId))
+                {
+                    return; // Повторная доставка — уже обработана.
+                }
+
+                session.AddPendingAcknowledgement(new PendingAcknowledgement
+                {
+                    Type = MqttPacketType.PublishReceived,
+                    PacketId = publishPacket!.PacketId ?? 0
+                });
+                _sessionRepository.Update(session);
+
+                SendPublishReceived(packet, publishPacket);
+            }
+            else if (qos == MqttQos.AtLeastOnce)
             {
                 SendPublishAck(packet, clientId, qos, publishPacket);
             }
@@ -285,6 +307,46 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             Send(reversePacket);
             NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref reversePacket);
             MqttCounters.PacketTypeCounters[ack.Type].Increment();
+        }
+
+        private void SendPublishReceived(INetworkPacket packet, PublishPacket publishPacket)
+        {
+            var received = new PublishReceivedPacket(publishPacket.PacketId ?? 0);
+            var payload = _packetManager.PacketToBytes(received) ?? Array.Empty<byte>();
+            var reversePacket = NetworkSimulator!.GetReversePacket(packet, payload.ToArray(), "MQTT PubRec");
+
+            Send(reversePacket);
+            MqttCounters.PacketTypeCounters[received.Type].Increment();
+        }
+
+        private void ProcessFromClientPublishRelease(INetworkPacket packet, PublishReleasePacket? publishReleasePacket)
+        {
+            if (publishReleasePacket == null)
+            {
+                return;
+            }
+
+            var clientId = packet.From;
+            var session = _sessionRepository.Read(clientId);
+
+            if (session == null)
+            {
+                throw new MqttException($"Client Session {clientId} Not Found");
+            }
+
+            var pendingAck = session
+                .GetPendingAcknowledgements()
+                .FirstOrDefault(ack => ack.Type == MqttPacketType.PublishReceived && ack.PacketId == publishReleasePacket.PacketId);
+
+            session.RemovePendingAcknowledgement(pendingAck);
+            _sessionRepository.Update(session);
+
+            var complete = new PublishCompletePacket(publishReleasePacket.PacketId);
+            var payload = _packetManager.PacketToBytes(complete) ?? Array.Empty<byte>();
+            var reversePacket = NetworkSimulator!.GetReversePacket(packet, payload.ToArray(), "MQTT PubComp");
+
+            Send(reversePacket);
+            MqttCounters.PacketTypeCounters[complete.Type].Increment();
         }
 
         private void ValidatePublish(string clientId, PublishPacket publishPacket)

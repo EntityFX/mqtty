@@ -6,45 +6,64 @@ namespace EntityFX.Tests.Integration
     [TestClass]
     public class BrokerRateLimiterTests
     {
-        [TestMethod]
-        public void TryAcquire_AllowsFirstToken()
+        // Имитирует поступление attemptsPerTick публикаций в каждом тике.
+        private static int CountAcquired(BrokerRateLimiter limiter, long totalTicks, int attemptsPerTick)
         {
-            var limiter = new BrokerRateLimiter(1000.0, TimeSpan.FromMilliseconds(0.1));
-
-            Assert.IsTrue(limiter.TryAcquire(0));
+            var acquired = 0;
+            for (long t = 0; t < totalTicks; t++)
+            {
+                for (var i = 0; i < attemptsPerTick; i++)
+                {
+                    if (limiter.TryAcquire(t))
+                    {
+                        acquired++;
+                    }
+                }
+            }
+            return acquired;
         }
 
         [TestMethod]
-        public void TryAcquire_RejectsWithinInterval()
+        public void TryAcquire_ApproximatesConfiguredRate_LowRps()
         {
-            // 1000 RPS при тике 0.1 мс => 10 тиков на токен.
+            var rps = 1000.0;
+            var tickPeriod = TimeSpan.FromMilliseconds(0.1);
+            var limiter = new BrokerRateLimiter(rps, tickPeriod);
+
+            const long totalTicks = 100_000; // 10 виртуальных секунд.
+            var acquired = CountAcquired(limiter, totalTicks, attemptsPerTick: 1);
+
+            var expected = rps * (totalTicks * tickPeriod.TotalSeconds); // 10 000.
+            Assert.AreEqual(expected, acquired, expected * 0.02);
+        }
+
+        [TestMethod]
+        public void TryAcquire_SupportsRatesAboveTickFrequency()
+        {
+            // tickPeriod 0.1 мс => частота тиков 10 000/с; 80 000 RPS требует ~8 токенов/тик.
+            var rps = 80_000.0;
+            var tickPeriod = TimeSpan.FromMilliseconds(0.1);
+            var limiter = new BrokerRateLimiter(rps, tickPeriod);
+
+            const long totalTicks = 50_000; // 5 виртуальных секунд.
+            // 80 000 RPS => ~8 токенов/тик, поэтому имитируем всплеск публикаций.
+            var acquired = CountAcquired(limiter, totalTicks, attemptsPerTick: 16);
+
+            var expected = rps * (totalTicks * tickPeriod.TotalSeconds); // 400 000.
+            Assert.AreEqual(expected, acquired, expected * 0.02);
+        }
+
+        [TestMethod]
+        public void TryAcquire_PassesWholeTokenOnly()
+        {
+            // 0.1 токена/тик -> первый токен накапливается только к 10-му тику.
             var limiter = new BrokerRateLimiter(1000.0, TimeSpan.FromMilliseconds(0.1));
 
-            Assert.IsTrue(limiter.TryAcquire(0));
-            for (var tick = 1; tick < 10; tick++)
+            for (var t = 0; t < 10; t++)
             {
-                Assert.IsFalse(limiter.TryAcquire(tick));
+                Assert.IsFalse(limiter.TryAcquire(t));
             }
             Assert.IsTrue(limiter.TryAcquire(10));
-        }
-
-        [TestMethod]
-        public void TryAcquire_UnlimitedRate_AlwaysAllows()
-        {
-            var limiter = new BrokerRateLimiter(double.MaxValue, TimeSpan.FromMilliseconds(0.1));
-
-            Assert.IsTrue(limiter.TryAcquire(0));
-            Assert.IsTrue(limiter.TryAcquire(1));
-            Assert.IsTrue(limiter.TryAcquire(2));
-        }
-
-        [TestMethod]
-        public void Update_ZeroRps_ClampsToSingleTick()
-        {
-            var limiter = new BrokerRateLimiter(0.0, TimeSpan.FromMilliseconds(0.1));
-
-            Assert.IsTrue(limiter.TryAcquire(0));
-            Assert.IsTrue(limiter.TryAcquire(1));
         }
     }
 

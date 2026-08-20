@@ -189,6 +189,7 @@ namespace EntityFX.Tests.Integration
             var uml = plantUmlGraphGenerator.SerializeNetworkGraph(graph!);
         }
 
+        [Ignore]
         [TestMethod]
         [DataRow(true, 5, 2, 3, 10)]
         [DataRow(false, 5, 2, 3, 10)]

@@ -1,14 +1,17 @@
 namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
 {
     /// <summary>
-    /// Интервальный регулятор пропускной способности (токен-бакет с интервалом
-    /// поступления, выраженным в тиках). Ограничивает максимальный RPS брокера
-    /// для одного уровня QoS.
+    /// Дробный токен-бакет без накопительного дрейфа. Доступные токены вычисляются
+    /// от абсолютного стартового тика, что исключает накопление ошибки округления.
+    /// Позволяет воспроизводить RPS как ниже, так и выше частоты тиков (при
+    /// tickPeriod = 0.1 мс частота тиков 10 000/с, тогда как бенчмарк даёт RPS до ~82 000/с).
     /// </summary>
     internal sealed class BrokerRateLimiter
     {
-        private long _ticksPerToken = 1;
-        private long _lastAcquireTick = -1;
+        private double _tokensPerTick;
+        private double _burstTokens;
+        private long _startTick = -1;
+        private double _consumed;
 
         public BrokerRateLimiter(double maxRps, TimeSpan tickPeriod)
         {
@@ -17,27 +20,28 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
 
         public void Update(double maxRps, TimeSpan tickPeriod)
         {
-            if (maxRps <= 0 || tickPeriod <= TimeSpan.Zero)
-            {
-                _ticksPerToken = 1;
-                return;
-            }
+            _tokensPerTick = maxRps > 0 && tickPeriod > TimeSpan.Zero
+                ? maxRps * tickPeriod.TotalSeconds
+                : 1.0;
 
-            var ticksPerSecond = 1.0 / tickPeriod.TotalSeconds;
-            _ticksPerToken = Math.Max(1, (long)Math.Floor(ticksPerSecond / maxRps));
+            _burstTokens = Math.Max(1.0, _tokensPerTick);
+            _startTick = -1;
+            _consumed = 0.0;
         }
 
         public bool TryAcquire(long currentTick)
         {
-            if (_lastAcquireTick < 0)
+            if (_startTick < 0)
             {
-                _lastAcquireTick = currentTick;
-                return true;
+                _startTick = currentTick;
             }
 
-            if (currentTick - _lastAcquireTick >= _ticksPerToken)
+            var elapsed = currentTick - _startTick;
+            var available = Math.Min(_burstTokens, elapsed * _tokensPerTick - _consumed);
+
+            if (available >= 1.0)
             {
-                _lastAcquireTick = currentTick;
+                _consumed += 1.0;
                 return true;
             }
 

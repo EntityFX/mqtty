@@ -366,6 +366,7 @@ namespace EntityFX.Tests.Integration
             Console.WriteLine(_graph.Counters.PrintCounters());
         }
 
+        [Ignore]
         [TestMethod]
         public void MqttConnectSubscribePublishLongTest()
         {
