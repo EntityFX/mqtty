@@ -1,8 +1,10 @@
 using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt.BrokerProfile;
 using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Utils;
 using EntityFX.MqttY.Network;
+using EntityFX.MqttY.Plugin.Mqtt.BrokerProfile;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Factories;
@@ -10,10 +12,17 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Factories;
 public class MqttServerFactory : IFactory<IServer?, NodeBuildOptions<NetworkBuildOption>>
 {
     private readonly IServiceProvider _serviceProvider;
+    private readonly IBrokerBenchmarkRepository _repository;
 
     public MqttServerFactory(IServiceProvider serviceProvider)
+        : this(serviceProvider, new BrokerBenchmarkRepository())
+    {
+    }
+
+    public MqttServerFactory(IServiceProvider serviceProvider, IBrokerBenchmarkRepository repository)
     {
         _serviceProvider = serviceProvider;
+        _repository = repository;
     }
 
     public IServer? Configure(NodeBuildOptions<NetworkBuildOption> options, IServer? service)
@@ -29,6 +38,10 @@ public class MqttServerFactory : IFactory<IServer?, NodeBuildOptions<NetworkBuil
             return null;
         }
 
+        var profile = !string.IsNullOrEmpty(options.Additional?.BrokerType)
+            ? _repository.Get(options.Additional.BrokerType)
+            : null;
+
         var mqttTopicEvaluator = _serviceProvider.GetRequiredService<IMqttTopicEvaluator>();
         //            options.Network, options.NetworkGraph, 
         var mqttPacketManager = options.ServiceProvider.GetRequiredService<IMqttPacketManager>();
@@ -36,7 +49,8 @@ public class MqttServerFactory : IFactory<IServer?, NodeBuildOptions<NetworkBuil
             mqttTopicEvaluator,
             options.Index, options.Name, options.Address ?? options.Name,
             options.Protocol, options.Specification,
-            options.Additional!.TicksOptions!, options.Additional.EnableCounters);
+            options.Additional!.TicksOptions!, options.Additional.EnableCounters,
+            profile);
 
         options.Network.AddServer(mqttBroker);
         options.NetworkGraph.AddServer(mqttBroker);

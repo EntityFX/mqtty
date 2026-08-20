@@ -20,4 +20,8 @@
 	  <Folder Include="Contracts\" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<EmbeddedResource Include="Data\broker-benchmark.json" />
+	</ItemGroup>
+
 </Project>

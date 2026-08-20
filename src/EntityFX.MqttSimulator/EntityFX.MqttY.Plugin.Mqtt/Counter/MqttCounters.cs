@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Counters;
+using EntityFX.MqttY.Contracts.Counters;
+using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
@@ -18,11 +19,28 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
 
         public Dictionary<MqttPacketType, ValueCounter<double>> RpsPacketTypeCounters { get; }
 
+        public Dictionary<MqttQos, GenericCounter> PublishByQos { get; }
+
+        public Dictionary<MqttQos, ValueCounter<double>> PublishRpsByQos { get; }
+
+        public Dictionary<MqttQos, GenericCounter> RefusedByRateLimit { get; }
+
+        public Dictionary<MqttQos, GenericCounter> RefusedByFailRate { get; }
+
+        public ValueCounter<double> LatencyMs { get; }
+
+        public ValueCounter<double> LatencyP99 { get; }
+
         public override IEnumerable<ICounter> Counters
         {
             get => PacketTypeCounters.Values.ToArray<GenericCounter>()
                 .Concat(RefusedPacketTypeCounters.Values).Cast<ICounter>().ToArray()
-                .Concat(RpsPacketTypeCounters.Values).ToArray();
+                .Concat(RpsPacketTypeCounters.Values).ToArray()
+                .Concat(PublishByQos.Values).ToArray()
+                .Concat(PublishRpsByQos.Values).ToArray()
+                .Concat(RefusedByRateLimit.Values).ToArray()
+                .Concat(RefusedByFailRate.Values).ToArray()
+                .Append(LatencyMs).Append(LatencyP99).ToArray();
             set => base.Counters = value;
         }
 
@@ -55,6 +73,76 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                 v.GetEnumCategory() + "-", ticksOptions.CounterHistoryDepth, "Rps",
                     enabled: enabled
             ));
+
+            PublishByQos = Enum.GetValues<MqttQos>()
+                .ToDictionary(k => k, v => new GenericCounter(
+                    $"PublishQos{(byte)v}",
+                    $"PQ{(byte)v}",
+                    ticksOptions.CounterHistoryDepth,
+                    enabled: enabled,
+                    historyEnabled: true
+                ));
+
+            PublishRpsByQos = Enum.GetValues<MqttQos>()
+                .ToDictionary(k => k, v => new ValueCounter<double>(
+                    $"PublishQos{(byte)v}_Rps",
+                    $"PQ{(byte)v}-",
+                    ticksOptions.CounterHistoryDepth,
+                    "Rps",
+                    enabled: enabled,
+                    historyEnabled: true
+                ));
+
+            RefusedByRateLimit = Enum.GetValues<MqttQos>()
+                .ToDictionary(k => k, v => new GenericCounter(
+                    $"PublishQos{(byte)v}_RefusedByRateLimit",
+                    $"PR{(byte)v}",
+                    ticksOptions.CounterHistoryDepth,
+                    enabled: enabled,
+                    historyEnabled: true
+                ));
+
+            RefusedByFailRate = Enum.GetValues<MqttQos>()
+                .ToDictionary(k => k, v => new GenericCounter(
+                    $"PublishQos{(byte)v}_RefusedByFailRate",
+                    $"PF{(byte)v}",
+                    ticksOptions.CounterHistoryDepth,
+                    enabled: enabled,
+                    historyEnabled: true
+                ));
+
+            LatencyMs = new ValueCounter<double>(
+                "BrokerLatencyMs",
+                "BL",
+                ticksOptions.CounterHistoryDepth,
+                "ms",
+                enabled: enabled,
+                historyEnabled: true
+            );
+
+            LatencyP99 = new ValueCounter<double>(
+                "BrokerLatencyP99",
+                "BL99",
+                ticksOptions.CounterHistoryDepth,
+                "ms",
+                enabled: enabled,
+                historyEnabled: true
+            );
+        }
+
+        public void IncrementPublish(MqttQos qos)
+        {
+            PublishByQos[qos].Increment();
+        }
+
+        public void RefuseByRateLimit(MqttQos qos)
+        {
+            RefusedByRateLimit[qos].Increment();
+        }
+
+        public void RefuseByFailRate(MqttQos qos)
+        {
+            RefusedByFailRate[qos].Increment();
         }
 
         public void Increment(MqttPacketType mqttPacketType)

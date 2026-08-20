@@ -1,9 +1,11 @@
-﻿using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt.BrokerProfile;
 using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Plugin.Mqtt.BrokerProfile;
 using EntityFX.MqttY.Plugin.Mqtt.Counter;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
 
@@ -17,6 +19,14 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         private readonly IMqttPacketManager _packetManager;
         private readonly IMqttTopicEvaluator _topicEvaluator;
 
+        private readonly MqttBrokerProfile? _profile;
+        private readonly BrokerRateLimiter[] _rateLimiters = new BrokerRateLimiter[3];
+        private readonly BrokerProcessingQueue _processingQueue = new();
+        private readonly BrokerFailModel _failModel;
+        private readonly TimeSpan _tickPeriod;
+        private readonly int[] _processingTicks = new int[3];
+        private readonly double[] _failProb = new double[3];
+
         public override NodeType NodeType => NodeType.Server;
 
         private readonly PacketIdProvider _packetIdProvider = new();
@@ -26,17 +36,28 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         public MqttBroker(IMqttPacketManager packetManager,
             IMqttTopicEvaluator mqttTopicEvaluator,
             int index, string name, string address, string protocolType, 
-            string specification, TicksOptions ticksOptions, bool enableCounters
+            string specification, TicksOptions ticksOptions, bool enableCounters,
+            MqttBrokerProfile? brokerProfile = null
            )
             : base(index, name, address, protocolType, specification, 
                   ticksOptions, enableCounters)
         {
             this.PacketReceived += MqttBroker_PacketReceived;
+            this.ClientConnected += (_, _) => UpdateProfileFromClients();
             this._packetManager = packetManager;
             this._topicEvaluator = mqttTopicEvaluator;
 
             MqttCounters = new MqttCounters(Name, Name.Substring(0, 2), "MqttBroker", "MB", ticksOptions, enableCounters);
             counters.AddCounter(MqttCounters);
+
+            _profile = brokerProfile;
+            _tickPeriod = ticksOptions.TickPeriod;
+            _failModel = new BrokerFailModel(seed: BrokerSeed(name));
+
+            if (brokerProfile != null)
+            {
+                UpdateProfileFromClients();
+            }
         }
 
         protected override void OnReceived(INetworkPacket packet)
@@ -87,6 +108,41 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return;
             }
 
+            // Обратная совместимость: без профиля брокер обрабатывает сообщения
+            // без ограничений по RPS, задержке и отказам.
+            if (_profile == null)
+            {
+                ProcessFromClientPublishCore(packet, publishPacket);
+                return;
+            }
+
+            var qosIndex = (int)publishPacket.QualityOfService;
+
+            // 1. Лимитер RPS (пропускная способность).
+            if (!_rateLimiters[qosIndex].TryAcquire(NetworkSimulator!.TotalTicks))
+            {
+                MqttCounters.RefuseByRateLimit(publishPacket.QualityOfService);
+                return;
+            }
+
+            // 2. Вероятностный отказ.
+            if (_failModel.ShouldFail(_failProb[qosIndex]))
+            {
+                MqttCounters.RefuseByFailRate(publishPacket.QualityOfService);
+                return;
+            }
+
+            // 3. Постановка в очередь обработки с задержкой.
+            _processingQueue.Enqueue(packet, _processingTicks[qosIndex]);
+        }
+
+        private void ProcessFromClientPublishCore(INetworkPacket packet, PublishPacket? publishPacket)
+        {
+            if (publishPacket == null)
+            {
+                return;
+            }
+
             NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
 
             var clientId = packet.From;
@@ -123,7 +179,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 ProcessToClientPublish(packet, subscription, publishPacket);
             }
 
-            return;
+            MqttCounters.IncrementPublish(publishPacket.QualityOfService);
         }
 
         private bool ProcessToClientPublish(
@@ -359,10 +415,71 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         }
 
+        public override void Refresh()
+        {
+            base.Refresh();
+
+            foreach (var packet in _processingQueue.DrainReady())
+            {
+                var publishPacket = _packetManager.BytesToPacket<PublishPacket>(packet.Payload);
+                ProcessFromClientPublishCore(packet, publishPacket);
+            }
+        }
+
+        private void UpdateProfileFromClients()
+        {
+            if (_profile == null)
+            {
+                return;
+            }
+
+            var clients = GetServerClients().Count();
+
+            var sample0 = _profile.Qos0.Interpolate(clients);
+            var sample1 = _profile.Qos1.Interpolate(clients);
+            var sample2 = _profile.Qos2.Interpolate(clients);
+
+            _rateLimiters[0] = new BrokerRateLimiter(sample0.Rps, _tickPeriod);
+            _rateLimiters[1] = new BrokerRateLimiter(sample1.Rps, _tickPeriod);
+            _rateLimiters[2] = new BrokerRateLimiter(sample2.Rps, _tickPeriod);
+
+            _processingTicks[0] = TicksFromMs(sample0.LatencyMs);
+            _processingTicks[1] = TicksFromMs(sample1.LatencyMs);
+            _processingTicks[2] = TicksFromMs(sample2.LatencyMs);
+
+            _failProb[0] = sample0.FailRate;
+            _failProb[1] = sample1.FailRate;
+            _failProb[2] = sample2.FailRate;
+        }
+
+        private int TicksFromMs(double latencyMs)
+        {
+            if (_tickPeriod <= TimeSpan.Zero)
+            {
+                return 1;
+            }
+
+            return Math.Max(1, (int)Math.Ceiling(latencyMs / _tickPeriod.TotalMilliseconds));
+        }
+
+        private static int BrokerSeed(string name)
+        {
+            unchecked
+            {
+                var hash = 17;
+                foreach (var c in name)
+                {
+                    hash = hash * 31 + c;
+                }
+                return hash;
+            }
+        }
+
         public override void Clear()
         {
             PacketReceived -= MqttBroker_PacketReceived;
             _sessionRepository.Clear();
+            _processingQueue.Clear();
             base.Clear();
         }
     }

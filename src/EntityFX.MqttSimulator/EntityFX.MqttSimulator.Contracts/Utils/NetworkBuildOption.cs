@@ -1,4 +1,4 @@
-﻿using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Contracts.Options;
 
 namespace EntityFX.MqttY.Contracts.Utils;
 
@@ -9,4 +9,7 @@ public class NetworkBuildOption
     public bool EnableCounters { get; set; }
 
     public Dictionary<string, string[]>? Additional { get; set; } = new();
+
+    /// <summary>Имя профиля брокера, разрезолвится в MqttServerFactory.</summary>
+    public string? BrokerType { get; set; }
 }

@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Contracts.Utils;
@@ -139,7 +139,8 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
 
     public IServer? BuildServer(int index, string name, string protocolType, string specification,
         INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks, bool enableCounters,
-        string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = null)
+        string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = null,
+        string? brokerType = null)
     {
         if (NetworkSimulator == null)
         {
@@ -158,7 +159,8 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                         Additional = additional,
                         TicksOptions = ticks,
                         NetworkTypeOption = networkTypeOption,
-                        EnableCounters = enableCounters
+                        EnableCounters = enableCounters,
+                        BrokerType = brokerType
                     }));
 
         if (server == null)
@@ -343,7 +345,8 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                         node.Value.Specification ?? "tcp-server",
                         linkNetwork,
                         networkTypeOption!, option.Ticks, option.EnableCounters,
-                        null, null, node.Value.Additional);
+                        null, null, node.Value.Additional,
+                        brokerType: node.Value.Broker);
                     break;
 
                 case NodeOptionType.Client:

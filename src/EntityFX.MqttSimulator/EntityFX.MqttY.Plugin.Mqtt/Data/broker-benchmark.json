@@ -1,0 +1,166 @@
+{
+  "Mosquitto": {
+    "Qos0": [
+      { "clients": 1, "rps": 57087.5, "latencyMs": 0.02, "failRate": 0.006004817166630173 },
+      { "clients": 2, "rps": 75324.3, "latencyMs": 0.18, "failRate": 0.0503879227942478 },
+      { "clients": 4, "rps": 81467.5, "latencyMs": 0.07, "failRate": 0.14977629115905117 },
+      { "clients": 8, "rps": 25151.9, "latencyMs": 19.5, "failRate": 0.0757424555070061 },
+      { "clients": 12, "rps": 31682.0, "latencyMs": 19.33, "failRate": 0.10218620227447522 },
+      { "clients": 16, "rps": 36809.3, "latencyMs": 19.15, "failRate": 0.0 },
+      { "clients": 24, "rps": 47322.4, "latencyMs": 18.94, "failRate": 0.00043179018237324 },
+      { "clients": 32, "rps": 52806.3, "latencyMs": 19.14, "failRate": 0.0018697264025946399 },
+      { "clients": 48, "rps": 59545.1, "latencyMs": 21.22, "failRate": 0.004043436008132776 },
+      { "clients": 64, "rps": 63557.4, "latencyMs": 29.14, "failRate": 0.01098166854860407 },
+      { "clients": 128, "rps": 67934.4, "latencyMs": 55.65, "failRate": 0.06960051147406492 }
+    ],
+    "Qos1": [
+      { "clients": 1, "rps": 3916.4, "latencyMs": 0.34, "failRate": 0.0 },
+      { "clients": 2, "rps": 4254.5, "latencyMs": 0.82, "failRate": 0.0 },
+      { "clients": 4, "rps": 4667.7, "latencyMs": 1.23, "failRate": 0.0 },
+      { "clients": 8, "rps": 5499.2, "latencyMs": 2.1, "failRate": 0.0 },
+      { "clients": 12, "rps": 6011.5, "latencyMs": 2.94, "failRate": 0.0 },
+      { "clients": 16, "rps": 7256.4, "latencyMs": 3.84, "failRate": 0.0 },
+      { "clients": 24, "rps": 9019.0, "latencyMs": 5.57, "failRate": 0.023927353096622302 },
+      { "clients": 32, "rps": 22572.1, "latencyMs": 7.02, "failRate": 0.20829992187996096 },
+      { "clients": 48, "rps": 37277.9, "latencyMs": 6.22, "failRate": 0.5891828670606445 },
+      { "clients": 64, "rps": 35941.3, "latencyMs": 7.54, "failRate": 0.7087788514420272 },
+      { "clients": 128, "rps": 53374.7, "latencyMs": 11.81, "failRate": 0.8807099497889136 }
+    ],
+    "Qos2": [
+      { "clients": 1, "rps": 2104.2, "latencyMs": 0.56, "failRate": 0.0 },
+      { "clients": 2, "rps": 2387.7, "latencyMs": 1.4, "failRate": 0.0 },
+      { "clients": 4, "rps": 2598.1, "latencyMs": 2.52, "failRate": 0.0 },
+      { "clients": 8, "rps": 4170.6, "latencyMs": 4.32, "failRate": 0.0 },
+      { "clients": 12, "rps": 5886.3, "latencyMs": 6.22, "failRate": 0.0 },
+      { "clients": 16, "rps": 8437.7, "latencyMs": 7.13, "failRate": 0.006613202702168846 },
+      { "clients": 24, "rps": 13167.9, "latencyMs": 5.3, "failRate": 0.1024666106380178 },
+      { "clients": 32, "rps": 16297.5, "latencyMs": 6.13, "failRate": 0.30078580398669735 },
+      { "clients": 48, "rps": 24439.2, "latencyMs": 7.04, "failRate": 0.6960638427010122 },
+      { "clients": 64, "rps": 24517.9, "latencyMs": 8.72, "failRate": 0.7996894789936074 },
+      { "clients": 128, "rps": 34052.0, "latencyMs": 13.01, "failRate": 0.9322947919899056 }
+    ]
+  },
+  "ActiveMQ": {
+    "Qos0": [
+      { "clients": 1, "rps": 48974.2, "latencyMs": 0.02, "failRate": 0.0 },
+      { "clients": 2, "rps": 13372.4, "latencyMs": 0.04, "failRate": 0.0 },
+      { "clients": 4, "rps": 30286.0, "latencyMs": 0.08, "failRate": 0.0 },
+      { "clients": 8, "rps": 46586.1, "latencyMs": 0.67, "failRate": 0.0 },
+      { "clients": 12, "rps": 57689.7, "latencyMs": 2.1, "failRate": 0.0 },
+      { "clients": 16, "rps": 58505.3, "latencyMs": 10.86, "failRate": 0.0 },
+      { "clients": 24, "rps": 50242.0, "latencyMs": 16.85, "failRate": 0.0 },
+      { "clients": 32, "rps": 68007.5, "latencyMs": 16.8, "failRate": 0.0 },
+      { "clients": 48, "rps": 52746.1, "latencyMs": 18.26, "failRate": 0.08439986754163338 },
+      { "clients": 64, "rps": 15958.7, "latencyMs": 17.44, "failRate": 0.5358644501118512 },
+      { "clients": 128, "rps": 20948.7, "latencyMs": 54.46, "failRate": 0.5873131549719792 }
+    ],
+    "Qos1": [
+      { "clients": 1, "rps": 3511.0, "latencyMs": 0.35, "failRate": 0.0 },
+      { "clients": 2, "rps": 4068.1, "latencyMs": 0.83, "failRate": 0.0 },
+      { "clients": 4, "rps": 4975.9, "latencyMs": 1.24, "failRate": 0.0 },
+      { "clients": 8, "rps": 5219.9, "latencyMs": 2.18, "failRate": 0.0 },
+      { "clients": 12, "rps": 6308.5, "latencyMs": 3.03, "failRate": 0.0 },
+      { "clients": 16, "rps": 7083.5, "latencyMs": 3.96, "failRate": 0.0 },
+      { "clients": 24, "rps": 8842.4, "latencyMs": 5.65, "failRate": 0.0 },
+      { "clients": 32, "rps": 14596.1, "latencyMs": 7.1, "failRate": 0.0 },
+      { "clients": 48, "rps": 27624.4, "latencyMs": 6.41, "failRate": 0.0 },
+      { "clients": 64, "rps": 42301.3, "latencyMs": 7.22, "failRate": 0.0 },
+      { "clients": 128, "rps": 49392.0, "latencyMs": 11.35, "failRate": 0.0 }
+    ],
+    "Qos2": [
+      { "clients": 1, "rps": 2301.7, "latencyMs": 0.52, "failRate": 0.0 },
+      { "clients": 2, "rps": 2552.4, "latencyMs": 0.52, "failRate": 0.0 },
+      { "clients": 4, "rps": 7205.4, "latencyMs": 1.48, "failRate": 0.0 },
+      { "clients": 8, "rps": 13968.0, "latencyMs": 1.38, "failRate": 0.0 },
+      { "clients": 12, "rps": 20086.6, "latencyMs": 1.46, "failRate": 0.0 },
+      { "clients": 16, "rps": 25716.2, "latencyMs": 2.64, "failRate": 0.0 },
+      { "clients": 24, "rps": 33145.4, "latencyMs": 4.51, "failRate": 0.0 },
+      { "clients": 32, "rps": 27239.7, "latencyMs": 14.16, "failRate": 0.0 },
+      { "clients": 48, "rps": 27784.4, "latencyMs": 18.48, "failRate": 0.0 },
+      { "clients": 64, "rps": 23949.1, "latencyMs": 22.4, "failRate": 0.0 },
+      { "clients": 128, "rps": 22723.5, "latencyMs": 41.54, "failRate": 0.0 }
+    ]
+  },
+  "Aedes": {
+    "Qos0": [
+      { "clients": 1, "rps": 17642.4, "latencyMs": 0.02, "failRate": 0.0 },
+      { "clients": 2, "rps": 18293.2, "latencyMs": 0.04, "failRate": 0.0 },
+      { "clients": 4, "rps": 18187.3, "latencyMs": 0.07, "failRate": 0.0 },
+      { "clients": 8, "rps": 17485.3, "latencyMs": 0.1, "failRate": 0.0 },
+      { "clients": 12, "rps": 17761.3, "latencyMs": 0.23, "failRate": 0.0 },
+      { "clients": 16, "rps": 18566.2, "latencyMs": 0.39, "failRate": 0.0 },
+      { "clients": 24, "rps": 18298.8, "latencyMs": 1.24, "failRate": 0.0 },
+      { "clients": 32, "rps": 19364.5, "latencyMs": 2.08, "failRate": 0.0 },
+      { "clients": 48, "rps": 20437.1, "latencyMs": 8.18, "failRate": 0.0 },
+      { "clients": 64, "rps": 22356.2, "latencyMs": 11.81, "failRate": 0.0 },
+      { "clients": 128, "rps": 27041.9, "latencyMs": 24.16, "failRate": 0.16784323586730224 }
+    ],
+    "Qos1": [
+      { "clients": 1, "rps": 3491.2, "latencyMs": 0.45, "failRate": 0.0 },
+      { "clients": 2, "rps": 3537.7, "latencyMs": 0.92, "failRate": 0.0 },
+      { "clients": 4, "rps": 4684.6, "latencyMs": 1.34, "failRate": 0.0 },
+      { "clients": 8, "rps": 5825.6, "latencyMs": 1.99, "failRate": 0.0 },
+      { "clients": 12, "rps": 5881.8, "latencyMs": 2.84, "failRate": 0.0 },
+      { "clients": 16, "rps": 5736.2, "latencyMs": 3.5, "failRate": 0.0 },
+      { "clients": 24, "rps": 5897.7, "latencyMs": 5.07, "failRate": 0.0 },
+      { "clients": 32, "rps": 5963.0, "latencyMs": 7.28, "failRate": 0.0 },
+      { "clients": 48, "rps": 6165.2, "latencyMs": 12.07, "failRate": 0.0 },
+      { "clients": 64, "rps": 6866.3, "latencyMs": 18.69, "failRate": 0.0 },
+      { "clients": 128, "rps": 6981.8, "latencyMs": 38.24, "failRate": 0.0 }
+    ],
+    "Qos2": [
+      { "clients": 1, "rps": 1418.3, "latencyMs": 0.91, "failRate": 0.0 },
+      { "clients": 2, "rps": 1736.0, "latencyMs": 1.85, "failRate": 0.0 },
+      { "clients": 4, "rps": 2026.4, "latencyMs": 3.37, "failRate": 0.0 },
+      { "clients": 8, "rps": 2486.0, "latencyMs": 5.8, "failRate": 0.0 },
+      { "clients": 12, "rps": 2545.4, "latencyMs": 8.04, "failRate": 0.0 },
+      { "clients": 16, "rps": 2921.4, "latencyMs": 9.37, "failRate": 0.0 },
+      { "clients": 24, "rps": 3401.6, "latencyMs": 12.68, "failRate": 0.0 },
+      { "clients": 32, "rps": 3464.0, "latencyMs": 16.18, "failRate": 0.0 },
+      { "clients": 48, "rps": 3569.7, "latencyMs": 21.47, "failRate": 0.0 },
+      { "clients": 64, "rps": 3512.8, "latencyMs": 24.54, "failRate": 0.0 },
+      { "clients": 128, "rps": 3577.4, "latencyMs": 42.78, "failRate": 0.0 }
+    ]
+  },
+  "EMQX": {
+    "Qos0": [
+      { "clients": 1, "rps": 14569.7, "latencyMs": 0.02, "failRate": 0.0 },
+      { "clients": 2, "rps": 27405.2, "latencyMs": 0.05, "failRate": 0.0 },
+      { "clients": 4, "rps": 35767.7, "latencyMs": 0.18, "failRate": 0.0 },
+      { "clients": 8, "rps": 47862.1, "latencyMs": 0.96, "failRate": 0.0 },
+      { "clients": 12, "rps": 40933.7, "latencyMs": 16.24, "failRate": 0.2952348999846907 },
+      { "clients": 16, "rps": 50518.5, "latencyMs": 16.59, "failRate": 0.34440343267214496 },
+      { "clients": 24, "rps": 59018.6, "latencyMs": 17.28, "failRate": 0.970886579259194 },
+      { "clients": 32, "rps": 63016.9, "latencyMs": 16.93, "failRate": 0.9871616382069139 },
+      { "clients": 48, "rps": 68871.2, "latencyMs": 18.98, "failRate": 0.9981008017385118 },
+      { "clients": 64, "rps": 78823.7, "latencyMs": 20.9, "failRate": 0.9990463950985977 },
+      { "clients": 128, "rps": 82345.4, "latencyMs": 39.65, "failRate": 0.9997129976444757 }
+    ],
+    "Qos1": [
+      { "clients": 1, "rps": 3157.6, "latencyMs": 0.39, "failRate": 0.0 },
+      { "clients": 2, "rps": 5927.1, "latencyMs": 0.51, "failRate": 0.0 },
+      { "clients": 4, "rps": 10247.8, "latencyMs": 0.63, "failRate": 0.0 },
+      { "clients": 8, "rps": 17348.9, "latencyMs": 1.01, "failRate": 0.28227588353513966 },
+      { "clients": 12, "rps": 27643.8, "latencyMs": 1.92, "failRate": 0.8574446559983987 },
+      { "clients": 16, "rps": 36460.6, "latencyMs": 2.16, "failRate": 0.9718426391251919 },
+      { "clients": 24, "rps": 46292.9, "latencyMs": 3.89, "failRate": 0.9860619475398693 },
+      { "clients": 32, "rps": 49467.6, "latencyMs": 4.79, "failRate": 0.9905635140061468 },
+      { "clients": 48, "rps": 51360.6, "latencyMs": 5.77, "failRate": 0.9935307132116102 },
+      { "clients": 64, "rps": 51032.5, "latencyMs": 7.02, "failRate": 0.992903215271314 },
+      { "clients": 128, "rps": 54819.1, "latencyMs": 12.43, "failRate": 0.995370832046271 }
+    ],
+    "Qos2": [
+      { "clients": 1, "rps": 1757.4, "latencyMs": 0.77, "failRate": 0.0 },
+      { "clients": 2, "rps": 3420.3, "latencyMs": 1.07, "failRate": 0.0 },
+      { "clients": 4, "rps": 6036.2, "latencyMs": 1.4, "failRate": 0.0 },
+      { "clients": 8, "rps": 10824.5, "latencyMs": 4.15, "failRate": 0.8014356277098936 },
+      { "clients": 12, "rps": 16515.0, "latencyMs": 3.38, "failRate": 0.9492986174185084 },
+      { "clients": 16, "rps": 20351.5, "latencyMs": 3.66, "failRate": 0.9663940145378072 },
+      { "clients": 24, "rps": 26622.2, "latencyMs": 4.42, "failRate": 0.9845542635416262 },
+      { "clients": 32, "rps": 27678.8, "latencyMs": 4.99, "failRate": 0.9901862433989872 },
+      { "clients": 48, "rps": 27911.0, "latencyMs": 6.87, "failRate": 0.990202201996582 },
+      { "clients": 64, "rps": 27899.6, "latencyMs": 9.08, "failRate": 0.992275874922938 },
+      { "clients": 128, "rps": 29006.5, "latencyMs": 13.99, "failRate": 0.9912169212453287 }
+    ]
+  }
+}

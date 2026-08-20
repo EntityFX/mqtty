@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Scenarios;
@@ -67,7 +67,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Scenarios
 
                     foreach (var item in mqttClients!)
                     {
-                        var publishResult = item.Client.Publish(item.Options.Topic, item.Options.Payload, MqttQos.AtLeastOnce);
+                        var publishResult = item.Client.Publish(item.Options.Topic, item.Options.Payload, item.Options.Qos);
 
                         if (publishResult)
                         {

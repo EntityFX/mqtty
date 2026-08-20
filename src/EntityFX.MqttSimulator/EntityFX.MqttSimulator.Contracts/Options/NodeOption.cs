@@ -1,4 +1,4 @@
-﻿namespace EntityFX.MqttY.Contracts.Options
+namespace EntityFX.MqttY.Contracts.Options
 {
     public class NodeOption
     {
@@ -18,6 +18,9 @@
         public int SendTicks { get; set; }
 
         public Dictionary<string, string[]> Additional { get; init; } = new Dictionary<string, string[]>();
+
+        /// <summary>Тип реального брокера: Mosquitto, Aedes, ActiveMQ, EMQX.</summary>
+        public string? Broker { get; set; }
 
         public object? Configuration { get; set; }
     }
