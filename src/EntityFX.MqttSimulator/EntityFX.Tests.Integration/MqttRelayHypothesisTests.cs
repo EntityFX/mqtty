@@ -8,6 +8,7 @@ using EntityFX.MqttY.Factories;
 using EntityFX.MqttY.Helper;
 using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Plugin.Mqtt;
+using EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt;
 using EntityFX.MqttY.Plugin.Mqtt.Helper;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
 using EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters;
@@ -104,6 +105,64 @@ namespace EntityFX.Tests.Integration
 
             Assert.IsTrue(IsConnected(graph), "All clients should be connected to their local broker");
             Assert.AreEqual(3, graph.Servers.Count, "Expected 3 brokers");
+        }
+
+        [Ignore("Тяжёлый сценарий доставки; соответствует Ignore-тесту MqttLongConfTests.BuildRelayTreeTest.")]
+        [TestMethod]
+        public void RelayTopology_DeliversTelemetry_BetweenAreas()
+        {
+            var graph = new NetworkSimulator(_pathFinder, _monitoring, _ticks, true);
+            var builder = new MqttNetworkBuilder(graph, _packetManager, _topicEvaluator,
+                new ActionClientBuilder((ix, name, protocolType, specification, network, ticks, enableCounters, group, groupAmount, additional) =>
+                {
+                    var client = new EntityFX.MqttY.Plugin.Mqtt.MqttClient(_packetManager, ix, name, $"mqtt://{name}",
+                        protocolType, specification, name, ticks, enableCounters)
+                    { Group = group, GroupAmount = groupAmount };
+                    network.AddClient(client);
+                    graph.AddClient(client);
+                    return client;
+                }));
+
+            graph.Construction = true;
+            builder.BuildSimpleTree(3, 2, 1, 1, null, true, _ticks, _networkOptions);
+            var brokers = builder.BuildMqttRelay(graph, _ticks);
+            graph.Construction = false;
+            graph.UpdateRoutes();
+
+            var relays = graph.Applications.Values.OfType<MqttRelay>().ToArray();
+            var receivers = graph.Applications.Values.OfType<MqttReceiver>().ToArray();
+
+            foreach (var relay in relays) relay.Start();
+            foreach (var receiver in receivers) receiver.Start();
+
+            foreach (var broker in brokers)
+            {
+                foreach (var client in broker.Network!.Clients.Values.OfType<MqttClient>().Where(c => c.Group == null))
+                {
+                    client.BeginConnect(broker.Name);
+                }
+            }
+
+            RunUntil(graph, () => IsConnected(graph));
+            Assert.IsTrue(IsConnected(graph), "All clients should connect");
+
+            foreach (var relay in relays) relay.SubscribeAll();
+            foreach (var receiver in receivers) receiver.SubscribeAll();
+
+            var data = new byte[] { 1, 2, 3, 4, 5 };
+            foreach (var broker in brokers)
+            {
+                foreach (var client in broker.Network!.Clients.Values.OfType<MqttClient>().Where(c => c.Group == null))
+                {
+                    client.Publish("telemetry/data", data, MqttQos.AtLeastOnce);
+                }
+            }
+
+            RunUntil(graph, () => receivers.Any(r => r.Received > 0));
+
+            var totalReceived = receivers.Sum(r => r.Received);
+            Assert.IsTrue(totalReceived > 0,
+                "Receivers must receive telemetry relayed between areas");
         }
     }
 }
