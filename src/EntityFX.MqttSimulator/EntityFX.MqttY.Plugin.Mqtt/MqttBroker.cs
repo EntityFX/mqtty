@@ -11,7 +11,7 @@ using EntityFX.MqttY.Plugin.Mqtt.Internals;
 
 namespace EntityFX.MqttY.Plugin.Mqtt
 {
-    internal class MqttBroker : Server, IMqttBroker
+    internal class MqttBroker : Server, IMqttBroker, IMeasurementSource, IMqttBrokerMetricsSink
     {
         private readonly IRepository<ClientSession> _sessionRepository = new InMemoryRepository<ClientSession>();
 
@@ -26,6 +26,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         private readonly TimeSpan _tickPeriod;
         private readonly int[] _processingTicks = new int[3];
         private readonly double[] _failProb = new double[3];
+        private readonly BrokerMeasurement _measurement = new();
 
         public override NodeType NodeType => NodeType.Server;
 
@@ -37,6 +38,26 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         private readonly PacketIdProvider _packetIdProvider = new();
 
         protected readonly MqttCounters MqttCounters;
+
+        public BrokerMetricsSnapshot GetMetrics()
+        {
+            var snapshot = _measurement.Snapshot(NetworkSimulator?.TotalTicks ?? 0, _tickPeriod);
+            MqttCounters.ApplyMeasurement(snapshot);
+            return snapshot;
+        }
+
+        public void ResetMeasurement(long startTick) => _measurement.Reset(startTick);
+
+        void IMqttBrokerMetricsSink.CompletePublisher(
+            string publisher, MqttQos qos, ushort packetId, long tick)
+        {
+            var elapsedTicks = _measurement.CompletePublisher(publisher, qos, packetId, tick);
+            if (elapsedTicks.HasValue)
+                MqttCounters.ObserveLatency(elapsedTicks.Value * _tickPeriod.TotalMilliseconds);
+        }
+
+        void IMqttBrokerMetricsSink.CompleteDelivery(long outgoingPublishPacketId) =>
+            _measurement.DeliveryCompleted(outgoingPublishPacketId);
 
         public MqttBroker(IMqttPacketManager packetManager,
             IMqttTopicEvaluator mqttTopicEvaluator,
@@ -130,10 +151,19 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return;
             }
 
+            var tracker = _measurement.BeginAttempt(packet.From, publishPacket.QualityOfService,
+                publishPacket.PacketId, packet.Id, NetworkSimulator!.TotalTicks);
+            if (tracker.Admitted)
+            {
+                ProcessFromClientPublishCore(packet, publishPacket);
+                return;
+            }
+
             // Обратная совместимость: без профиля брокер обрабатывает сообщения
             // без ограничений по RPS, задержке и отказам.
             if (_profile == null)
             {
+                _measurement.Admit(tracker);
                 ProcessFromClientPublishCore(packet, publishPacket);
                 return;
             }
@@ -144,6 +174,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             if (!_rateLimiters[qosIndex].TryAcquire(NetworkSimulator!.TotalTicks))
             {
                 MqttCounters.RefuseByRateLimit(publishPacket.QualityOfService);
+                _measurement.RejectByRate(tracker);
                 return;
             }
 
@@ -151,10 +182,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             if (_failModel.ShouldFail(_failProb[qosIndex]))
             {
                 MqttCounters.RefuseByFailRate(publishPacket.QualityOfService);
+                _measurement.FailPublish(tracker);
                 return;
             }
 
             // 3. Постановка в очередь обработки с задержкой.
+            _measurement.Admit(tracker);
             _processingQueue.Enqueue(packet, _processingTicks[qosIndex]);
         }
 
@@ -212,6 +245,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         private void FanOutAndCount(INetworkPacket packet, PublishPacket publishPacket)
         {
+            var tracker = _measurement.Find(packet.From, publishPacket.QualityOfService,
+                publishPacket.PacketId, packet.Id);
             var subscriptions = _sessionRepository
                 .ReadAll()
                 .SelectMany(s => s.GetSubscriptions())
@@ -220,14 +255,16 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             foreach (var subscription in subscriptions)
             {
-                ProcessToClientPublish(packet, subscription, publishPacket);
+                ProcessToClientPublish(packet, subscription, publishPacket, tracker);
             }
 
             MqttCounters.IncrementPublish(publishPacket.QualityOfService);
+            _measurement.CompleteFanOut(tracker);
         }
 
         private bool ProcessToClientPublish(
-            INetworkPacket packet, ClientSubscription subscription, PublishPacket? publishPacket)
+            INetworkPacket packet, ClientSubscription subscription, PublishPacket? publishPacket,
+            BrokerMeasurement.PublishTracker? tracker)
         {
             if (publishPacket == null)
             {
@@ -247,6 +284,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var packetPayload = GetPacket(
                 NetworkSimulator!.GetPacketId(), subscription.ClientId, NodeType.Client, packet.FromIndex,
                     _packetManager.PacketToBytes(subscriptionPublish), ProtocolType, "MQTT Publish");
+            _measurement.ExpectDelivery(tracker, packetPayload.Id);
 
             if (subscriptionPublish.QualityOfService > MqttQos.AtMostOnce)
             {
@@ -260,6 +298,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             MqttCounters.PacketTypeCounters[subscriptionPublish.Type].Increment();
             
             var sendResult = Send(packetPayload);
+            if (!sendResult)
+                _measurement.DeliveryDropped(packetPayload.Id);
             return sendResult;
         }
 

@@ -45,7 +45,7 @@ namespace EntityFX.Tests.Integration
             Qos2 = new MqttQosProfile { Samples = new[] { new MqttQosSample(1, 1.0, 0.0, 0.0) } },
         };
 
-        private static (NetworkSimulator Graph, MqttClient Publisher, IServer Broker) Build(MqttBrokerProfile? profile)
+        private static (NetworkSimulator Graph, MqttClient Publisher, IMqttBroker Broker) Build(MqttBrokerProfile? profile)
         {
             var ticks = Ticks;
             var pathFinder = new DijkstraPathFinder();
@@ -95,6 +95,7 @@ namespace EntityFX.Tests.Integration
             publisher.BeginConnect("mqs1");
             Refresh(graph, 2_000);
             Assert.IsTrue(publisher.IsConnected, "Publisher must connect");
+            graph.ResetMeasurement();
 
             const int total = 100;
             for (var i = 0; i < total; i++)
@@ -116,6 +117,13 @@ namespace EntityFX.Tests.Integration
             Assert.IsTrue(refusedByFail > 0, "Fail-rate model must refuse the majority of publishes");
             Assert.AreEqual(total, refusedByFail + refusedByRate,
                 "Every publish must be either refused (fail/rate) or accepted");
+
+            var metrics = broker.GetMetrics().ByQos[MqttQos.AtLeastOnce];
+            Assert.AreEqual(total, metrics.Attempted);
+            Assert.AreEqual(0L, metrics.Admitted);
+            Assert.AreEqual(0L, metrics.Completed);
+            Assert.IsTrue(metrics.PublishFailed > 0);
+            Assert.AreEqual(total, metrics.PublishFailed + metrics.RateRejected);
         }
 
         [TestMethod]
@@ -126,6 +134,7 @@ namespace EntityFX.Tests.Integration
             publisher.BeginConnect("mqs1");
             Refresh(graph, 2_000);
             Assert.IsTrue(publisher.IsConnected, "Publisher must connect");
+            graph.ResetMeasurement();
 
             const int total = 200;
             for (var i = 0; i < total; i++)
@@ -142,6 +151,12 @@ namespace EntityFX.Tests.Integration
 
             Assert.IsTrue(accepted < total - 1, "Low-RPS profile must reject the excess");
             Assert.IsTrue(refusedByRate > 0, "Rate limiter must produce refusals");
+
+            var metrics = broker.GetMetrics().ByQos[MqttQos.AtLeastOnce];
+            Assert.AreEqual(total, metrics.Attempted);
+            Assert.AreEqual(0L, metrics.PublishFailed);
+            Assert.IsTrue(metrics.RateRejected > 0);
+            Assert.AreEqual(metrics.Attempted, metrics.Admitted + metrics.RateRejected);
         }
     }
 }

@@ -155,6 +155,24 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
             RefusedPacketTypeCounters[mqttPacketType].Increment();
         }
 
+        public void ObserveLatency(double milliseconds)
+        {
+            LatencyMs.Set(milliseconds);
+        }
+
+        public void ApplyMeasurement(BrokerMetricsSnapshot snapshot)
+        {
+            foreach (var (qos, metrics) in snapshot.ByQos)
+                PublishRpsByQos[qos].Set(metrics.Rps);
+
+            var p99 = snapshot.ByQos.Values
+                .Where(metrics => metrics.LatencyP99Ms.HasValue)
+                .Select(metrics => metrics.LatencyP99Ms!.Value)
+                .DefaultIfEmpty(0)
+                .Max();
+            LatencyP99.Set(p99);
+        }
+
         public override void Refresh(long totalTicks, long totalSteps)
         {
             base.Refresh(totalTicks, totalSteps);
@@ -186,6 +204,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
 
                 RpsPacketTypeCounters[rpsPaketPair.Key].Set(ticksRps * valueDiff);
             }
+
+            _lastTicks = totalTicks;
         }
     }
 }

@@ -17,5 +17,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals
         public ushort? PacketId { get; set; }
 
         public byte[] Payload { get; set; } = Array.Empty<byte>();
+
+        public long? CorrelationId { get; set; }
     }
 }

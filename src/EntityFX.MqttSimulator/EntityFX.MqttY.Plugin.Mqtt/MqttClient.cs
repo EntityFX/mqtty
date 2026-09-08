@@ -369,7 +369,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                     message.Status == PendingMessageStatus.AwaitingPublishRelease);
                 if (pendingMessage == null)
                 {
-                    SaveMessage(publishPacket, Name, PendingMessageStatus.AwaitingPublishRelease);
+                    SaveMessage(publishPacket, Name, PendingMessageStatus.AwaitingPublishRelease, packet.Id);
                 }
 
                 SendPublishReceived(packet, publishPacket.PacketId ?? 0);
@@ -383,6 +383,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             MessageReceived?.Invoke(this,
                 new MqttMessage(publishPacket.Topic, publishPacket.Payload, publishPacket.QualityOfService, packet.From));
+            CompleteDelivery(packet.From, packet.Id);
         }
 
         private void SendPublishAck(INetworkPacket packet, string clientId, MqttQos qos, PublishPacket publishPacket)
@@ -458,6 +459,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 MessageReceived?.Invoke(this,
                     new MqttMessage(pendingMessage.Topic, pendingMessage.Payload,
                         pendingMessage.QualityOfService, packet.From));
+                if (pendingMessage.CorrelationId.HasValue)
+                    CompleteDelivery(packet.From, pendingMessage.CorrelationId.Value);
             }
 
             var complete = new PublishCompletePacket(publishReleasePacket.PacketId);
@@ -481,6 +484,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 message.Status == PendingMessageStatus.AwaitingPublishComplete);
             session.RemovePendingMessage(pendingMessage);
             _sessionRepository.Update(session);
+            CompletePublisher(packet.From, MqttQos.ExactlyOnce,
+                publishCompletePacket.PacketId, NetworkSimulator!.TotalTicks);
         }
 
         private ClientSession GetSession()
@@ -511,6 +516,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             session.RemovePendingMessage(pendingMessage);
 
             _sessionRepository.Update(session);
+
+            CompletePublisher(payload.From, MqttQos.AtLeastOnce,
+                publishAckPacket.PacketId, NetworkSimulator!.TotalTicks);
 
             NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref payload);
         }
@@ -569,7 +577,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             _sessionRepository.Update(session);
         }
 
-        private void SaveMessage(PublishPacket message, string clientId, PendingMessageStatus status)
+        private void SaveMessage(PublishPacket message, string clientId, PendingMessageStatus status,
+            long? correlationId = null)
         {
             if (message.QualityOfService == MqttQos.AtMostOnce)
             {
@@ -591,7 +600,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 Retain = message.Retain,
                 Topic = message.Topic,
                 PacketId = message.PacketId,
-                Payload = message.Payload
+                Payload = message.Payload,
+                CorrelationId = correlationId
             };
 
             session.AddPendingMessage(savedMessage);
@@ -663,6 +673,18 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             UpsertSubscription(session, topicFilter, qos);
 
             _sessionRepository.Update(session);
+        }
+
+        private void CompletePublisher(string brokerName, MqttQos qos, ushort packetId, long tick)
+        {
+            if (NetworkSimulator!.GetNode(brokerName, NodeType.Server) is IMqttBrokerMetricsSink sink)
+                sink.CompletePublisher(Name, qos, packetId, tick);
+        }
+
+        private void CompleteDelivery(string brokerName, long outgoingPublishPacketId)
+        {
+            if (NetworkSimulator!.GetNode(brokerName, NodeType.Server) is IMqttBrokerMetricsSink sink)
+                sink.CompleteDelivery(outgoingPublishPacketId);
         }
 
         private void UpsertSubscription(ClientSession session, string topicFilter, MqttQos qos)

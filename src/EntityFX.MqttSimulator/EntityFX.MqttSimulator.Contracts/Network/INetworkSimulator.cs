@@ -70,6 +70,9 @@ namespace EntityFX.MqttY.Contracts.Network
 
         bool Reset();
 
+        /// <summary>Starts a new measurement generation without changing topology or protocol state.</summary>
+        void ResetMeasurement();
+
         void Clear();
 
         Task StartPeriodicRefreshAsync();

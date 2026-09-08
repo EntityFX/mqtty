@@ -36,6 +36,7 @@ public class NetworkSimulator : INetworkSimulator
     private long _errors = 0;
     private long _packetId = 0;
     private int _countNodes = 0;
+    private readonly object _measurementResetLock = new();
 
     public SimulationRunMode RunMode { get; set; } = SimulationRunMode.RealTime;
     public double SpeedMultiplier { get; set; } = 1.0;
@@ -461,6 +462,23 @@ public class NetworkSimulator : INetworkSimulator
     public void Step()
     {
         Interlocked.Increment(ref _step);
+    }
+
+    public void ResetMeasurement()
+    {
+        lock (_measurementResetLock)
+        {
+            var startTick = TotalTicks;
+            var sources = _nodes.Values.Cast<object>()
+                .Concat(_networks.Values)
+                .OfType<IMeasurementSource>()
+                .Distinct()
+                .ToArray();
+            foreach (var source in sources)
+            {
+                source.ResetMeasurement(startTick);
+            }
+        }
     }
 
 
