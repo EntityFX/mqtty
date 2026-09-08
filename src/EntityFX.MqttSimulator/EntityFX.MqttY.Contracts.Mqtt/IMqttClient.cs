@@ -9,7 +9,11 @@ namespace EntityFX.MqttY.Contracts.Mqtt
 
         string ClientId { get; }
 
+        SessionState? CurrentSessionState { get; }
+
         IReadOnlyDictionary<string, MqttSubscribtion[]> Subscribtions { get; }
+
+        bool IsSubscribed(string topicFilter);
 
         event EventHandler<MqttMessage>? MessageReceived;
 

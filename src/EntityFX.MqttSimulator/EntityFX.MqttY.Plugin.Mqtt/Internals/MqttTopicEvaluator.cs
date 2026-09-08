@@ -42,6 +42,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals
         /// <returns>A boolean value that indicates if the topic filter is valid or not</returns>
         public bool IsValidTopicFilter(string topicFilter)
         {
+            if (string.IsNullOrEmpty(topicFilter))
+                return false;
+
             if (!AllowWildcardsInTopicFilters)
             {
                 if (topicFilter.Contains(SingleLevelTopicWildcard) ||
@@ -50,10 +53,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals
 
             }
 
-            if (string.IsNullOrEmpty(topicFilter))
-                return false;
-
-            if (topicFilter.Length > 65536)
+            if (topicFilter.Length > ushort.MaxValue)
                 return false;
 
             var topicFilterParts = topicFilter.Split('/');
@@ -81,7 +81,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals
         public bool IsValidTopicName(string topicName)
         {
             return !string.IsNullOrEmpty(topicName) &&
-                topicName.Length <= 65536 &&
+                topicName.Length <= ushort.MaxValue &&
                 !topicName.Contains("#") &&
                 !topicName.Contains("+");
         }

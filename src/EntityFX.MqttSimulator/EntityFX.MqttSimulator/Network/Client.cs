@@ -184,20 +184,13 @@ public class Client : Node, IClient
         if (Network == null) return false;
 
         var result = DetachClientFromServer(ServerName!);
-
-        result = Network.RemoveClient(Address);
-
-        if (!result)
-        {
-            IsConnected = true;
-            return false;
-        }
-
-        ServerName = string.Empty;
-
         IsConnected = false;
+        ServerName = null;
+        ServerIndex = null;
 
-        return result;
+        var removed = Network.RemoveClient(Name);
+
+        return result && removed;
     }
 
     private bool DetachClientFromServer(string serverName)
@@ -208,7 +201,7 @@ public class Client : Node, IClient
         var serverNode = node as IServer;
         if (serverNode == null) return false;
 
-        return serverNode.AttachClient(this);
+        return serverNode.DetachClient(Name);
     }
 
 

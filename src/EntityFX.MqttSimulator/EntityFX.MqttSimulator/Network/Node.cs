@@ -13,7 +13,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
     public virtual bool IsQuiescent => _outgoingMessages.IsEmpty && _incommingMessages.IsEmpty;
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
-    private readonly Dictionary<long, ResponseMonitoringPacket> _responseMessages = new();
+    private readonly ConcurrentDictionary<long, ResponseMonitoringPacket> _responseMessages = new();
     private readonly ConcurrentQueue<NodeMonitoringPacket> _outgoingMessages = new();
     private readonly ConcurrentQueue<NodeMonitoringPacket> _incommingMessages = new();
     protected readonly TicksOptions TicksOptions;
@@ -130,13 +130,6 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
         var packet = outgoing.RequestPacket;
         NetworkSimulator!.Monitoring.Push(packet.Id, NetworkSimulator.TotalTicks, this, Network!, packet.Payload, NetworkLoggerType.Push,
             $"Push message: {packet.From} -> {Network!.Name}", packet.Protocol, "Node");
-        _responseMessages[packet.Id] = new ResponseMonitoringPacket(NetworkSimulator!.WaitMode)
-        {
-            RequestPacket = packet,
-            RequestTick = outgoing.SendTick,
-            Marker = packet.Category ?? string.Empty,
-            Id = packet.Id
-        };
         outgoing.Release();
 
         Network?.Send(packet);
@@ -174,7 +167,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
             return false;
         }
 
-        var monitorMessage = _responseMessages.GetValueOrDefault(packet.RequestId.Value);
+        _responseMessages.TryGetValue(packet.RequestId.Value, out var monitorMessage);
 
         if (monitorMessage == null)
         {
@@ -191,12 +184,20 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
 
     private void PreSend(INetworkPacket packet)
     {
-        _outgoingMessages.Enqueue(new NodeMonitoringPacket(NetworkSimulator!.TotalTicks, packet, true, NetworkSimulator!.WaitMode)
+        var outgoing = new NodeMonitoringPacket(NetworkSimulator!.TotalTicks, packet, true, NetworkSimulator!.WaitMode)
         {
             WaitTicks = TicksOptions.OutgoingWaitTicks,
             Id = NetworkSimulator.GetPacketId(),
             SendTick = NetworkSimulator!.TotalTicks
-        });
+        };
+        _responseMessages[packet.Id] = new ResponseMonitoringPacket(NetworkSimulator.WaitMode)
+        {
+            RequestPacket = packet,
+            RequestTick = outgoing.SendTick,
+            Marker = packet.Category ?? string.Empty,
+            Id = packet.Id
+        };
+        _outgoingMessages.Enqueue(outgoing);
     }
 
     private void PreReceive(INetworkPacket packet)
@@ -217,14 +218,14 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
 
     private ResponsePacket? WaitNoMonitorResponse(long packetId)
     {
-        var monitorPacket = _responseMessages.GetValueOrDefault(packetId);
+        _responseMessages.TryGetValue(packetId, out var monitorPacket);
 
         if (monitorPacket == null)
         {
             return null;
         }
 
-        _responseMessages.Remove(packetId);
+        _responseMessages.TryRemove(packetId, out _);
 
         if (monitorPacket.IsExpired == true)
         {
@@ -238,7 +239,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
 
     private ResponsePacket? WaitMonitorResponse(long packetId)
     {
-        var monitorPacket = _responseMessages.GetValueOrDefault(packetId);
+        _responseMessages.TryGetValue(packetId, out var monitorPacket);
 
         if (monitorPacket == null)
         {
@@ -256,7 +257,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
                 return null;
             }
 
-            monitorPacket = _responseMessages.GetValueOrDefault(packetId);
+            _responseMessages.TryGetValue(packetId, out monitorPacket);
 
             if (monitorPacket == null)
             {
@@ -266,7 +267,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
 
         var isSet = monitorPacket.WaitIsSet(TimeSpan.FromMinutes(1));
 
-        _responseMessages.Remove(packetId);
+        _responseMessages.TryRemove(packetId, out _);
 
         if (isSet != true)
         {

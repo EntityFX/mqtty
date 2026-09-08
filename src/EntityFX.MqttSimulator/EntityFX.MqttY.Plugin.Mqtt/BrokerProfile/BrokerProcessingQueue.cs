@@ -12,6 +12,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
 
         public int Count => _items.Count;
 
+        public bool IsEmpty => _items.Count == 0;
+
         public void Enqueue(INetworkPacket packet, int processingTicks)
         {
             _items.Enqueue(new PendingItem(packet, Math.Max(1, processingTicks)));

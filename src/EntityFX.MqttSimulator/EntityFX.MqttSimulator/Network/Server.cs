@@ -39,13 +39,9 @@ public class Server : Node, IServer
         return result;
     }
 
-    public bool DetachClient(string address)
+    public bool DetachClient(string name)
     {
-        var node = Network!.FindNode(address, NodeType.Client);
-
-        var client = node as IClient;
-
-        if (client == null) return false;
+        if (!_serverClients.TryGetValue(name, out var client)) return false;
 
         var result = DetachClientFromServer(client);
 
@@ -62,9 +58,9 @@ public class Server : Node, IServer
     private bool AttachClientToServer(IClient client)
     {
 
-        if (_serverClients.ContainsKey(client.Address))
+        if (_serverClients.TryGetValue(client.Name, out var existingClient))
         {
-            return false;
+            return ReferenceEquals(existingClient, client);
         }
 
         _serverClients[client.Name] = client;
@@ -75,14 +71,7 @@ public class Server : Node, IServer
 
     private bool DetachClientFromServer(IClient client)
     {
-        if (!_serverClients.ContainsKey(client.Address))
-        {
-            return false;
-        }
-
-        _serverClients.Remove(client.Address);
-
-        return true;
+        return _serverClients.Remove(client.Name);
     }
 
     protected virtual void OnReceived(INetworkPacket packet)

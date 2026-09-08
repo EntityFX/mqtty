@@ -104,9 +104,9 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
     {
         if (client == null) throw new ArgumentNullException(nameof(client));
 
-        if (_clients.ContainsKey(client.Address))
+        if (_clients.TryGetValue(client.Name, out var existingClient))
         {
-            return false;
+            return ReferenceEquals(existingClient, client);
         }
         _clients[client.Name] = client;
 

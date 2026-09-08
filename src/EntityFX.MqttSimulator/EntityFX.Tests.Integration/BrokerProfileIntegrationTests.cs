@@ -84,7 +84,9 @@ namespace EntityFX.Tests.Integration
 
             RunUntil(graph, () => publisher.IsConnected && subscriber.IsConnected);
 
-            subscriber.Subscribe("test/+", MqttQos.AtLeastOnce);
+            Assert.IsTrue(subscriber.BeginSubscribe("test/+", MqttQos.AtLeastOnce));
+            RunUntil(graph, () => subscriber.IsSubscribed("test/+"));
+            Assert.IsTrue(subscriber.IsSubscribed("test/+"), "SUBACK must be received before publishing");
 
             var received = 0;
             subscriber.MessageReceived += (_, _) => received++;
@@ -106,7 +108,9 @@ namespace EntityFX.Tests.Integration
 
             RunUntil(graph, () => publisher.IsConnected && subscriber.IsConnected);
 
-            subscriber.Subscribe("test/+", MqttQos.AtLeastOnce);
+            Assert.IsTrue(subscriber.BeginSubscribe("test/+", MqttQos.AtLeastOnce));
+            RunUntil(graph, () => subscriber.IsSubscribed("test/+"));
+            Assert.IsTrue(subscriber.IsSubscribed("test/+"), "SUBACK must be received before publishing");
 
             var received = 0;
             subscriber.MessageReceived += (_, _) => received++;
@@ -120,6 +124,29 @@ namespace EntityFX.Tests.Integration
             }
 
             Assert.AreEqual(0, received);
+        }
+
+        [TestMethod]
+        public void BrokerWithoutProfile_Qos0FansOutWithoutAcknowledgement()
+        {
+            var (graph, publisher, subscriber) = Build(profile: null);
+            Assert.IsTrue(publisher.BeginConnect("mqs1"));
+            Assert.IsTrue(subscriber.BeginConnect("mqs1"));
+            RunUntil(graph, () => publisher.IsConnected && subscriber.IsConnected);
+            Assert.IsTrue(subscriber.BeginSubscribe("test/+", MqttQos.AtMostOnce));
+            RunUntil(graph, () => subscriber.IsSubscribed("test/+"));
+
+            var received = 0;
+            subscriber.MessageReceived += (_, message) =>
+            {
+                Assert.AreEqual(MqttQos.AtMostOnce, message.Qos);
+                received++;
+            };
+
+            Assert.IsTrue(publisher.Publish("test/data", new byte[] { 1, 2, 3 }, MqttQos.AtMostOnce));
+            RunUntil(graph, () => received > 0);
+
+            Assert.AreEqual(1, received);
         }
     }
 }
