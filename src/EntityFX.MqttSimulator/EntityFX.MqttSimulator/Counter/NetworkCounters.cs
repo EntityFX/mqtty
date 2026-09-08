@@ -24,13 +24,16 @@ namespace EntityFX.MqttY.Counter
         private readonly TicksOptions _ticksOptions;
 
         private long _lastTicks;
+        private readonly int _throughputWindowTicks;
 
         public double AvgInboundThroughput { get; private set; }
 
-        public NetworkCounters(string name, string shortName, TicksOptions ticksOptions, bool enabled = true, bool historyEnabled = false)
+        public NetworkCounters(string name, string shortName, TicksOptions ticksOptions, bool enabled = true, bool historyEnabled = false,
+            int throughputWindowTicks = 100)
             : base(name, shortName, "NetworkCounters", "NC")
         {
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
+            _throughputWindowTicks = throughputWindowTicks;
 
             _transferPacketsCounter = new GenericCounter("TransferPackets", "TP", ticksOptions.CounterHistoryDepth,
                 enabled: enabled, historyEnabled: historyEnabled);
@@ -113,7 +116,7 @@ namespace EntityFX.MqttY.Counter
 
             var ticksDiff = totalTicks - _lastTicks;
 
-            if (ticksDiff < 100) return;
+            if (ticksDiff < _throughputWindowTicks) return;
 
             var inboundFirstTick = _inboundCounter.TickFirstValue;
 

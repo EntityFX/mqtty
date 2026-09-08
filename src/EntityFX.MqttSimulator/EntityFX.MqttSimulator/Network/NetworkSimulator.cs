@@ -22,6 +22,9 @@ public enum SimulationRunMode
 
 public class NetworkSimulator : INetworkSimulator
 {
+    public bool IsQuiescent => _networks.Values.All(n => n.QueueSize == 0 &&
+            (n is not IQuiescenceParticipant participant || participant.IsQuiescent)) &&
+        _nodes.Values.OfType<IQuiescenceParticipant>().All(n => n.IsQuiescent);
     private readonly ConcurrentDictionary<(string Address, NodeType NodeType), ILeafNode> _nodes = new();
     private readonly ConcurrentDictionary<string, INetwork> _networks = new();
     private readonly ConcurrentDictionary<string, IClient> _clients = new();
@@ -66,6 +69,7 @@ public class NetworkSimulator : INetworkSimulator
         IPathFinder pathFinder,
         INetworkLogger monitoring, TicksOptions ticksOptions, bool enableCounters)
     {
+        ticksOptions.Validate();
         PathFinder = pathFinder;
         Monitoring = monitoring;
         this._ticksOptions = ticksOptions;
@@ -246,7 +250,7 @@ public class NetworkSimulator : INetworkSimulator
             }
 
             _counters.SetRealTime(_stopwatch.Elapsed);
-            _counters.SetRealTime(VirtualTime);
+            _counters.SetVirtualTime(VirtualTime);
 
             Monitoring.EndScope(TotalTicks, scope);
 

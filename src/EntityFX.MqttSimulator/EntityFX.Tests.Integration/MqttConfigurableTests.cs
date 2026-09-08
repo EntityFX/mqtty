@@ -62,14 +62,18 @@ namespace EntityFX.Tests.Integration
             var networkBuilder = _serviceProvider?.GetRequiredService<INodesBuilder>();
             var networkSimulatorBuilder = _serviceProvider?.GetRequiredService<INetworkSimulatorBuilder>();
 
+            var ticksOptions = new TicksOptions()
+            {
+                TickPeriod = TimeSpan.FromMilliseconds(0.1),
+                ReceiveWaitPeriod = TimeSpan.FromMilliseconds(0.1),
+                OutgoingWaitTicks = 1
+            };
             _graph = new NetworkSimulator(new DijkstraWeightedIndexPathFinder(), _monitoring!,
-                new TicksOptions()
-                {
-                    ReceiveWaitPeriod = TimeSpan.FromMilliseconds(0.1)
-                }, true);
+                ticksOptions, true);
 
             networkSimulatorBuilder!.Configure(_graph, new NetworkGraphOption()
             {
+                Ticks = ticksOptions,
                 Networks = new SortedDictionary<string, NetworkNodeOption>()
                 {
                     ["n1"] = new NetworkNodeOption() { Index = 0, NetworkType = "1g", Links = new NetworkLinkOption[] { new NetworkLinkOption() { Network = "n2" } } },

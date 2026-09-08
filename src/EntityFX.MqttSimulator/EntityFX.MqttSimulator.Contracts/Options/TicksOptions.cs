@@ -8,5 +8,11 @@
         public int OutgoingWaitTicks { get; set; }
         
         public int CounterHistoryDepth { get; set; }
+
+        public void Validate()
+        {
+            if (TickPeriod <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(TickPeriod));
+            if (OutgoingWaitTicks <= 0) throw new ArgumentOutOfRangeException(nameof(OutgoingWaitTicks));
+        }
     }
 }

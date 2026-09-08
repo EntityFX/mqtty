@@ -6,6 +6,9 @@ namespace EntityFX.MqttY.Contracts.Network
 {
     public interface INetworkSimulator : IWithCounters
     {
+        /// <summary>True when transport queues and all participating components have no pending work.</summary>
+        bool IsQuiescent { get; }
+
         public TimeSpan VirtualTime { get; }
 
         public TimeSpan RealTime { get; }

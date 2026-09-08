@@ -1,4 +1,4 @@
-﻿using EntityFX.MqttY.Contracts.Counters;
+using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Counter;
@@ -7,13 +7,15 @@ using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using System.Net.Sockets;
 
-public abstract class Node : NodeBase
+public abstract class Node : NodeBase, IQuiescenceParticipant
 {
+    /// <summary>Overrides should combine base.IsQuiescent with their processing/handshake state.</summary>
+    public virtual bool IsQuiescent => _outgoingMessages.IsEmpty && _incommingMessages.IsEmpty;
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
     private readonly Dictionary<long, ResponseMonitoringPacket> _responseMessages = new();
-    private readonly ConcurrentBag<NodeMonitoringPacket> _outgoingMessages = new();
-    private readonly ConcurrentBag<NodeMonitoringPacket> _incommingMessages = new();
+    private readonly ConcurrentQueue<NodeMonitoringPacket> _outgoingMessages = new();
+    private readonly ConcurrentQueue<NodeMonitoringPacket> _incommingMessages = new();
     protected readonly TicksOptions TicksOptions;
 
     protected NodeCounters counters;
@@ -45,6 +47,7 @@ public abstract class Node : NodeBase
     public Node(int index, string name, string address,
         TicksOptions ticksOptions, bool enableCounters) : base(index, name, address)
     {
+        ticksOptions.Validate();
         TicksOptions = ticksOptions;
         counters = new NodeCounters(Name, "N", Group ?? "Node", "NG", TicksOptions.CounterHistoryDepth, enableCounters);
     }
@@ -68,7 +71,9 @@ public abstract class Node : NodeBase
     public override void Refresh()
     {
         //var outgoing = _outgoingMessages.ToArray();
-        foreach (var outgoingMonitoringPacket in _outgoingMessages)
+        var outgoingCount = _outgoingMessages.Count;
+        var incomingCount = _incommingMessages.Count;
+        for (var i = 0; i < outgoingCount && _outgoingMessages.TryDequeue(out var outgoingMonitoringPacket); i++)
         {
             if (outgoingMonitoringPacket.PassTillNextTick && outgoingMonitoringPacket.Tick == NetworkSimulator!.TotalTicks)
             {
@@ -76,19 +81,20 @@ public abstract class Node : NodeBase
                     outgoingMonitoringPacket.RequestPacket.Payload, NetworkLoggerType.Pass,
                     $"Pass outgoing: {outgoingMonitoringPacket.RequestPacket.From} -> {Network!.Name}",
                     outgoingMonitoringPacket.RequestPacket.Protocol, "Node");
+                _outgoingMessages.Enqueue(outgoingMonitoringPacket);
                 continue;
             }
             outgoingMonitoringPacket.ReduceWaitTicks();
             if (outgoingMonitoringPacket.WaitTicks <= 0 && !outgoingMonitoringPacket.Released)
             {
-                _outgoingMessages.TryTake(out _);
                 SendToNetwork(outgoingMonitoringPacket);
             }
+            else _outgoingMessages.Enqueue(outgoingMonitoringPacket);
         }
         //_outgoingMessages.RemoveAll(o => o.Released);
 
         //var incomming = _incommingMessages.ToArray();
-        foreach (var incommingMonitoringPacket in _incommingMessages)
+        for (var i = 0; i < incomingCount && _incommingMessages.TryDequeue(out var incommingMonitoringPacket); i++)
         {
             if (incommingMonitoringPacket.PassTillNextTick && incommingMonitoringPacket.Tick == NetworkSimulator!.TotalTicks)
             {
@@ -96,14 +102,15 @@ public abstract class Node : NodeBase
                     incommingMonitoringPacket.RequestPacket.Payload, NetworkLoggerType.Pass,
                     $"Pass incomming: {incommingMonitoringPacket.RequestPacket.From} -> {Network!.Name}",
                     incommingMonitoringPacket.RequestPacket.Protocol, "Node");
+                _incommingMessages.Enqueue(incommingMonitoringPacket);
                 continue;
             }
             incommingMonitoringPacket.ReduceWaitTicks();
             if (incommingMonitoringPacket.WaitTicks <= 0 && !incommingMonitoringPacket.Released)
             {
-                _incommingMessages.TryTake(out _);
                 CompleteReceive(incommingMonitoringPacket);
             }
+            else _incommingMessages.Enqueue(incommingMonitoringPacket);
         }
         //_incommingMessages.RemoveAll(o => o.Released);
 
@@ -184,7 +191,7 @@ public abstract class Node : NodeBase
 
     private void PreSend(INetworkPacket packet)
     {
-        _outgoingMessages.Add(new NodeMonitoringPacket(NetworkSimulator!.TotalTicks, packet, true, NetworkSimulator!.WaitMode)
+        _outgoingMessages.Enqueue(new NodeMonitoringPacket(NetworkSimulator!.TotalTicks, packet, true, NetworkSimulator!.WaitMode)
         {
             WaitTicks = TicksOptions.OutgoingWaitTicks,
             Id = NetworkSimulator.GetPacketId(),
@@ -194,7 +201,7 @@ public abstract class Node : NodeBase
 
     private void PreReceive(INetworkPacket packet)
     {
-        _incommingMessages.Add(new NodeMonitoringPacket(NetworkSimulator!.TotalTicks, packet, true, NetworkSimulator!.WaitMode)
+        _incommingMessages.Enqueue(new NodeMonitoringPacket(NetworkSimulator!.TotalTicks, packet, true, NetworkSimulator!.WaitMode)
         {
             WaitTicks = TicksOptions.OutgoingWaitTicks,
             Id = NetworkSimulator.GetPacketId(),

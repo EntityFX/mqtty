@@ -6,6 +6,30 @@ namespace EntityFX.Tests.Integration
     [TestClass]
     public class BrokerRateLimiterTests
     {
+        [TestMethod]
+        public void RateLimiter_RejectsInvalidRateAndTickValues()
+        {
+            foreach (var invalid in new[] { 0.0, -1.0, double.NaN, double.PositiveInfinity })
+                Assert.ThrowsException<ArgumentOutOfRangeException>(() => new BrokerRateLimiter(invalid, TimeSpan.FromSeconds(1)));
+            foreach (var invalid in new[] { 0, -1 })
+                Assert.ThrowsException<ArgumentOutOfRangeException>(() => new BrokerRateLimiter(1, TimeSpan.FromTicks(invalid)));
+            var limiter = new BrokerRateLimiter(1, TimeSpan.FromSeconds(1));
+            Assert.ThrowsException<ArgumentOutOfRangeException>(() => limiter.TryAcquire(-1));
+            limiter.TryAcquire(10);
+            Assert.ThrowsException<ArgumentOutOfRangeException>(() => limiter.TryAcquire(9));
+        }
+
+        [TestMethod]
+        public void TryAcquire_LongIdleGrantsOnlyOneBoundedBurst()
+        {
+            var limiter = new BrokerRateLimiter(8, TimeSpan.FromSeconds(1));
+            Assert.IsFalse(limiter.TryAcquire(0));
+            for (var i = 0; i < 8; i++) Assert.IsTrue(limiter.TryAcquire(1000000));
+            Assert.IsFalse(limiter.TryAcquire(1000000));
+            for (var i = 0; i < 8; i++) Assert.IsTrue(limiter.TryAcquire(1000001));
+            Assert.IsFalse(limiter.TryAcquire(1000001));
+        }
+
         // Имитирует поступление attemptsPerTick публикаций в каждом тике.
         private static int CountAcquired(BrokerRateLimiter limiter, long totalTicks, int attemptsPerTick)
         {
