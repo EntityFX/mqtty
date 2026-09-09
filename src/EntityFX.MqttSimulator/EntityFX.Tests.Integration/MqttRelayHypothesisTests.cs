@@ -21,6 +21,7 @@ namespace EntityFX.Tests.Integration
     /// между областями через приложение-ретранслятор вручную.
     /// </summary>
     [TestClass]
+    [TestCategory(TestCategories.MqttRelay)]
     public class MqttRelayHypothesisTests
     {
         private DijkstraWeightedIndexPathFinder _pathFinder = null!;
@@ -107,7 +108,7 @@ namespace EntityFX.Tests.Integration
             Assert.AreEqual(3, graph.Servers.Count, "Expected 3 brokers");
         }
 
-        [Ignore("Тяжёлый сценарий доставки; соответствует Ignore-тесту MqttLongConfTests.BuildRelayTreeTest.")]
+        [TestCategory(TestCategories.LongRunning)]
         [TestMethod]
         public void RelayTopology_DeliversTelemetry_BetweenAreas()
         {

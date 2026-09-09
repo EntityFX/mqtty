@@ -6,6 +6,7 @@ namespace EntityFX.Tests.Integration
 {
     /// <summary>Checks the legacy observations preserved in the provisional v2 fixture.</summary>
     [TestClass]
+    [TestCategory(TestCategories.Fidelity)]
     public class BrokerHypothesisTests
     {
         private readonly BrokerBenchmarkRepository _repository = new();

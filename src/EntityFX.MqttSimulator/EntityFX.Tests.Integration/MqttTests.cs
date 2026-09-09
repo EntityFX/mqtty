@@ -13,6 +13,7 @@ namespace EntityFX.Tests.Integration
 {
 
     [TestClass]
+    [TestCategory(TestCategories.Regression)]
     public class MqttTests
     {
         private ServiceProvider? _serviceProvider;

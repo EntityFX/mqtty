@@ -1,38 +1,81 @@
-# This workflow will build a .NET project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
-
-name: .NET
+name: build-and-verify
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
+  schedule:
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+    inputs:
+      run_long_running:
+        description: Run the LongRunning suite
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  SOLUTION: src/EntityFX.MqttSimulator/EntityFX.Mqtty.sln
+  TEST_PROJECT: src/EntityFX.MqttSimulator/EntityFX.Tests.Integration/EntityFX.Tests.Integration.csproj
+  BUILD_FLAGS: --disable-build-servers -m:1 -p:UseSharedCompilation=false
 
 jobs:
-  build:
-
+  commit-gates:
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 6.0.x
-    - name: Restore dependencies
-      run: dotnet restore
-      working-directory: src/EntityFX.MqttSimulator
-    - name: Build
-      run: dotnet build --no-restore
-      working-directory: src/EntityFX.MqttSimulator
-    - name: Test
-      run: dotnet test EntityFX.Tests.Integration.csproj --no-restore
-      working-directory: src/EntityFX.MqttSimulator/EntityFX.Tests.Integration
-    - name: Publish
-      run:  dotnet publish src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/EntityFX.MqttY.Cli.csproj -c Release --no-restore
-    - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: mqtty-net6.0
-        path: src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/bin/Release/net6.0/publish/
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.0.x
+            8.0.x
+      - name: Restore
+        run: dotnet restore "$SOLUTION" $BUILD_FLAGS
+      - name: Build
+        run: dotnet build "$SOLUTION" --configuration Release --no-restore $BUILD_FLAGS
+      - name: Mechanism, protocol and regression
+        run: >-
+          dotnet test "$TEST_PROJECT" --configuration Release --no-build
+          --filter "(TestCategory=Mechanism|TestCategory=Protocol|TestCategory=Regression)&TestCategory!=LongRunning"
+          $BUILD_FLAGS
+      - name: Synthetic fidelity matrix
+        run: >-
+          dotnet test "$TEST_PROJECT" --configuration Release --no-build
+          --filter "TestCategory=Fidelity&TestCategory!=LongRunning"
+          $BUILD_FLAGS
+      - name: MqttRelay E2E
+        run: >-
+          dotnet test "$TEST_PROJECT" --configuration Release --no-build
+          --filter "TestCategory=MqttRelay&TestCategory!=LongRunning"
+          $BUILD_FLAGS
+      - name: Publish CLI
+        run: >-
+          dotnet publish src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/EntityFX.MqttY.Cli.csproj
+          --configuration Release --no-build $BUILD_FLAGS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mqtty-net6.0
+          path: src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/bin/Release/net6.0/publish/
+
+  long-running:
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.run_long_running)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.0.x
+            8.0.x
+      - name: Long-running verification
+        run: >-
+          dotnet test "$TEST_PROJECT" --configuration Release
+          --filter "TestCategory=LongRunning"
+          $BUILD_FLAGS

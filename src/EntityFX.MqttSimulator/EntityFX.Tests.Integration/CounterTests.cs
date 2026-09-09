@@ -5,6 +5,7 @@ using EntityFX.MqttY.Counter;
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
+    [TestCategory(TestCategories.Mechanism)]
     public class CounterTests
     {
         [TestMethod]

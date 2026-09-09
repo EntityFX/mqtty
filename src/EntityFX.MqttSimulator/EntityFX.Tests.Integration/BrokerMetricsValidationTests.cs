@@ -18,6 +18,7 @@ namespace EntityFX.Tests.Integration
     /// вероятностных отказов по уровням QoS.
     /// </summary>
     [TestClass]
+    [TestCategory(TestCategories.Regression)]
     public class BrokerMetricsValidationTests
     {
         private static TicksOptions Ticks => new()

@@ -17,6 +17,7 @@ namespace EntityFX.Tests.Integration
 {
 
     [TestClass]
+    [TestCategory(TestCategories.Regression)]
     public class MqttStagedTests
     {
         private INetworkLogger? _monitoring;
@@ -366,7 +367,7 @@ namespace EntityFX.Tests.Integration
             Console.WriteLine(_graph.Counters.PrintCounters());
         }
 
-        [Ignore]
+        [TestCategory(TestCategories.LongRunning)]
         [TestMethod]
         public void MqttConnectSubscribePublishLongTest()
         {

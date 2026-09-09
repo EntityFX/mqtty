@@ -5,6 +5,7 @@ using EntityFX.MqttY.Plugin.Mqtt.BrokerProfile;
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
+    [TestCategory(TestCategories.Regression)]
     public class BrokerProfileV2Tests
     {
         private static LatencyQuantiles Latency(double value) =>

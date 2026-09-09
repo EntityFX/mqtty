@@ -16,6 +16,7 @@ using EntityFX.MqttY.Contracts.Utils;
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
+    [TestCategory(TestCategories.Fidelity)]
     public class MqttConfBenchmarkTests
     {
         private DijkstraWeightedIndexPathFinder pathFinder;

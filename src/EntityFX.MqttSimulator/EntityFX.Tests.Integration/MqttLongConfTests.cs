@@ -26,6 +26,7 @@ using System.Text.Json;
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
+    [TestCategory(TestCategories.Regression)]
     public class MqttLongConfTests
     {
         private DijkstraWeightedIndexPathFinder pathFinder;
@@ -189,7 +190,7 @@ namespace EntityFX.Tests.Integration
             var uml = plantUmlGraphGenerator.SerializeNetworkGraph(graph!);
         }
 
-        [Ignore]
+        [TestCategory(TestCategories.LongRunning)]
         [TestMethod]
         [DataRow(true, 5, 2, 3, 10)]
         [DataRow(false, 5, 2, 3, 10)]

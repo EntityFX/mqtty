@@ -12,6 +12,7 @@ using EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters;
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
+    [TestCategory(TestCategories.Regression)]
     public class BrokerProfileIntegrationTests
     {
         private static TicksOptions Ticks => new()

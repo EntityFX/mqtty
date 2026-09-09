@@ -4,6 +4,7 @@ using EntityFX.MqttY.Plugin.Mqtt.BrokerProfile;
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
+    [TestCategory(TestCategories.Mechanism)]
     public class BrokerRateLimiterTests
     {
         [TestMethod]
@@ -92,6 +93,7 @@ namespace EntityFX.Tests.Integration
     }
 
     [TestClass]
+    [TestCategory(TestCategories.Mechanism)]
     public class BrokerProcessingQueueTests
     {
         private static INetworkPacket CreatePacket(long id)

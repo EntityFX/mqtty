@@ -3,6 +3,7 @@ using EntityFX.MqttY.Plugin.Mqtt.Internals;
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
+    [TestCategory(TestCategories.Protocol)]
     public class MqttTopicEvaluatorTests
     {
         private readonly MqttTopicEvaluator _evaluator = new(allowWildcardsInTopicFilters: true);

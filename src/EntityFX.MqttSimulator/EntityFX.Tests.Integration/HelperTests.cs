@@ -3,6 +3,7 @@
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
+    [TestCategory(TestCategories.Mechanism)]
     public class HelperTests
     {
         [TestMethod]

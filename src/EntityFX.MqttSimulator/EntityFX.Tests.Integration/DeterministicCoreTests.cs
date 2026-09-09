@@ -5,6 +5,7 @@ using EntityFX.MqttY.Network;
 namespace EntityFX.Tests.Integration;
 
 [TestClass]
+[TestCategory(TestCategories.Mechanism)]
 public class DeterministicCoreTests
 {
     private static TicksOptions Ticks() => new()

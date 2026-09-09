@@ -11,6 +11,7 @@ using EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters;
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
+    [TestCategory(TestCategories.Protocol)]
     public class BrokerQos2Tests
     {
         private static TicksOptions Ticks => new()

@@ -6,6 +6,7 @@ using EntityFX.MqttY.Plugin.Mqtt.Experiments;
 namespace EntityFX.Tests.Integration;
 
 [TestClass]
+[TestCategory(TestCategories.MqttRelay)]
 public class MqttRelayExperimentTests
 {
     private static MqttRelayExperimentOptions Options() => new()
@@ -108,6 +109,49 @@ public class MqttRelayExperimentTests
 
             Assert.AreEqual(JsonSerializer.Serialize(first.Summary),
                 JsonSerializer.Serialize(second.Summary));
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void SequentialAndParallelPerformanceModes_ProduceSameOutcomes()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"mqtty-relay-{Guid.NewGuid():N}");
+        try
+        {
+            var sequentialOptions = Options();
+            sequentialOptions.FidelityMode = false;
+            var parallelOptions = Options();
+            parallelOptions.FidelityMode = false;
+            parallelOptions.Parallel = true;
+            var provenance = new ExperimentProvenance("mqtt-y-sha", "benchmark-sha", "profile-sha");
+            var sequential = new MqttRelayExperimentRunner(TestTicks(), TestNetwork())
+                .Run(sequentialOptions, root, provenance);
+            var parallel = new MqttRelayExperimentRunner(TestTicks(), TestNetwork())
+                .Run(parallelOptions, root, provenance);
+
+            Assert.AreEqual(ExperimentRunStatus.Completed, sequential.Summary.Status,
+                sequential.Summary.Error);
+            Assert.AreEqual(ExperimentRunStatus.Completed, parallel.Summary.Status,
+                parallel.Summary.Error);
+            var left = sequential.Summary.Simulated;
+            var right = parallel.Summary.Simulated;
+            Assert.AreEqual(left.Attempted, right.Attempted);
+            Assert.AreEqual(left.Admitted, right.Admitted);
+            Assert.AreEqual(left.Completed, right.Completed);
+            Assert.AreEqual(left.ExpectedDeliveries, right.ExpectedDeliveries);
+            Assert.AreEqual(left.Delivered, right.Delivered);
+            Assert.AreEqual(left.RateRejected, right.RateRejected);
+            Assert.AreEqual(left.PublishFailed, right.PublishFailed);
+            Assert.AreEqual(left.DeliveryDropped, right.DeliveryDropped);
+            if (left.LatencyP99Ms.HasValue && right.LatencyP99Ms.HasValue)
+                Assert.IsTrue(Math.Abs(left.LatencyP99Ms.Value - right.LatencyP99Ms.Value) <=
+                    TestTicks().TickPeriod.TotalMilliseconds);
+            else
+                Assert.AreEqual(left.LatencyP99Ms, right.LatencyP99Ms);
         }
         finally
         {

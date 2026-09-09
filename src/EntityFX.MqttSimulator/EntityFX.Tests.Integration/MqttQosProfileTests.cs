@@ -5,6 +5,7 @@ using EntityFX.MqttY.Plugin.Mqtt.BrokerProfile;
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
+    [TestCategory(TestCategories.Protocol)]
     public class MqttQosProfileTests
     {
         private static CalibratedMqttQosProfile CreateProfile() => new(new[]

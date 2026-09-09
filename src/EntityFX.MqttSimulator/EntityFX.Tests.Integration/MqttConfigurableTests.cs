@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
+    [TestCategory(TestCategories.Regression)]
     public class MqttConfigurableTests
     {
         private ServiceProvider? _serviceProvider;

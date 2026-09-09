@@ -33,3 +33,22 @@
     * Диаграмма связей (топологии) сети
     * Диаграмма последовательности (на каждую передачу сообщений)
     * Необходим для удобства визуализации
+
+## Воспроизводимый эксперимент MqttRelay
+
+Пример полной конфигурации находится в
+`config/mqtt-relay-experiment.example.json`. Запуск из корня репозитория:
+
+```powershell
+dotnet run --project src/EntityFX.MqttSimulator/EntityFX.MqttY.MqttRelay.App -- `
+  experiment --config config/mqtt-relay-experiment.example.json --output results/mqtt-relay
+```
+
+Команда требует чистые рабочие деревья MqttY и MqttBenchmark. Она сама записывает
+их точные commit SHA и SHA-256 профиля в manifest. Каждый запуск получает новый
+каталог с `experiment-manifest.json`, `summary.json`, `counters.json`, histogram,
+GraphML и PlantUML. Код возврата `2` означает ошибку фазы, `3` — непройденный
+критерий fidelity.
+
+Быстрые CI-наборы запускаются по категориям `Mechanism`, `Protocol`, `Regression`,
+`Fidelity` и `MqttRelay`. Категория `LongRunning` выполняется nightly и вручную.

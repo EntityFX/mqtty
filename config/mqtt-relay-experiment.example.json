@@ -1,0 +1,37 @@
+{
+  "experiment": {
+    "brokers": 4,
+    "networkLength": 2,
+    "clientsPerBroker": 1,
+    "publishQos": "atLeastOnce",
+    "subscribeQos": "atLeastOnce",
+    "payloadBytes": 16,
+    "brokerAssignmentMode": "mixed",
+    "mixedBrokerTypes": ["Mosquitto", "ActiveMQ", "Aedes", "EMQX"],
+    "warmupTicks": 50000,
+    "measurementTicks": 300000,
+    "drainTimeoutTicks": 100000,
+    "offeredRps": 10000,
+    "randomSeed": 42,
+    "parallel": false,
+    "refreshStrategy": 0,
+    "enableCounters": true,
+    "fidelityMode": true
+  },
+  "ticks": {
+    "tickPeriod": "00:00:00.0001000",
+    "receiveWaitPeriod": "00:00:01",
+    "outgoingWaitTicks": 1,
+    "counterHistoryDepth": 100
+  },
+  "network": {
+    "capacityBytesPerSecond": 100000000,
+    "throughputWindowTicks": 100,
+    "queueCapacity": 100000,
+    "transferTicks": 1,
+    "networkType": "ethernet"
+  },
+  "mqttYRepository": ".",
+  "mqttBenchmarkRepository": "../MqttBenchmark",
+  "brokerProfilePath": "src/EntityFX.MqttSimulator/EntityFX.MqttY.Plugin.Mqtt/Data/broker-benchmark.v2.json"
+}

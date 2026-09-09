@@ -5,6 +5,7 @@ using EntityFX.MqttY.Plugin.Mqtt.Internals;
 namespace EntityFX.Tests.Integration
 {
     [TestClass]
+    [TestCategory(TestCategories.Protocol)]
     public class MqttProtocolTests
     {
 
