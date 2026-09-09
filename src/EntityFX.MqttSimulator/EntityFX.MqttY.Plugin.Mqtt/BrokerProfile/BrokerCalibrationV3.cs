@@ -228,9 +228,19 @@ public static class BrokerCalibrationV3
         var mean = Number(value, "mean");
         var half = Number(value, "ci95HalfWidth");
         var deviation = Number(value, "standardDeviation");
+        var min = Number(value, "min");
+        var max = Number(value, "max");
+        // Averaging three binary64 values rounds the additions and division. Allow a
+        // small multiple of machine epsilon at the data's scale, not an absolute
+        // floor of 1 (which would hide large relative errors in very small rates).
+        const double meanRelativeTolerance = 8 * 2.2204460492503131e-16;
+        // Scale each comparison separately: a large maximum must not conceal a
+        // mean materially below a tiny positive minimum.
+        var lowerTolerance = Math.Max(double.Epsilon, meanRelativeTolerance * Math.Max(Math.Abs(mean), Math.Abs(min)));
+        var upperTolerance = Math.Max(double.Epsilon, meanRelativeTolerance * Math.Max(Math.Abs(mean), Math.Abs(max)));
         if (Integer(value, "count") != 3 || deviation < 0 || half < 0 ||
-            Number(value, "min") < 0 || Number(value, "max") > maximum ||
-            Number(value, "min") > mean || Number(value, "max") < mean)
+            min < 0 || max > maximum || min > max || mean < 0 || mean > maximum ||
+            min - mean > lowerTolerance || mean - max > upperTolerance)
             throw Invalid("Invalid statistics/count.");
         Equal(4.30265272975 * deviation / Math.Sqrt(3), half, "Invalid Student-t CI95 for three repeats.");
         Equal(mean - half, Number(value, "ci95Lower"), "Invalid CI lower bound.");

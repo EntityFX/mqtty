@@ -13,6 +13,11 @@ latency quantiles/statistics must be null. Provenance requires the campaign ID,
 configuration/stand hashes, deployment and CPU modes, benchmark commit, and input
 hash map. Unknown/missing/duplicate fields, points and incompatible modes fail.
 
+The mean/min/max check allows floating-point averaging roundoff: eight binary64
+machine epsilons at the magnitude of the mean and the compared bound (with only a smallest-subnormal
+floor). It preserves the calculated mean rather than clamping it. Finite values,
+physical ranges and ordering of min/max remain strict.
+
 The output has schemaVersion 3, artifactType `broker-calibration`, runCount 288,
 profileClientCountMode `publishers`, provenance and points. Each point retains its
 broker/messageBytes/qos/publishers/repeats key and contains:
