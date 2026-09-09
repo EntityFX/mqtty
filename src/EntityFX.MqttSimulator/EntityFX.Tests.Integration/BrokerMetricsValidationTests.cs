@@ -28,22 +28,12 @@ namespace EntityFX.Tests.Integration
             CounterHistoryDepth = 1000
         };
 
-        private static MqttBrokerProfile RejectAllProfile() => new()
-        {
-            BrokerType = "Validation-RejectAll",
-            // Высокий RPS, чтобы лимитер не отсекал публикации до вероятностного отказа.
-            Qos0 = new MqttQosProfile { Samples = new[] { new MqttQosSample(1, 1_000_000.0, 0.0, 1.0) } },
-            Qos1 = new MqttQosProfile { Samples = new[] { new MqttQosSample(1, 1_000_000.0, 0.0, 1.0) } },
-            Qos2 = new MqttQosProfile { Samples = new[] { new MqttQosSample(1, 1_000_000.0, 0.0, 1.0) } },
-        };
+        private static MqttBrokerProfile RejectAllProfile() =>
+            BrokerProfileTestData.Create("Validation-RejectAll", 1, 1_000_000,
+                publishFailureRate: 1);
 
-        private static MqttBrokerProfile VeryLowRpsProfile() => new()
-        {
-            BrokerType = "Validation-LowRps",
-            Qos0 = new MqttQosProfile { Samples = new[] { new MqttQosSample(1, 1.0, 0.0, 0.0) } },
-            Qos1 = new MqttQosProfile { Samples = new[] { new MqttQosSample(1, 1.0, 0.0, 0.0) } },
-            Qos2 = new MqttQosProfile { Samples = new[] { new MqttQosSample(1, 1.0, 0.0, 0.0) } },
-        };
+        private static MqttBrokerProfile VeryLowRpsProfile() =>
+            BrokerProfileTestData.Create("Validation-LowRps", 1, 1);
 
         private static (NetworkSimulator Graph, MqttClient Publisher, IMqttBroker Broker) Build(MqttBrokerProfile? profile)
         {

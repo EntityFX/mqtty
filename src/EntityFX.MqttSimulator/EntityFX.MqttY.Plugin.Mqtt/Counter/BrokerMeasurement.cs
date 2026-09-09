@@ -25,6 +25,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
             public long NetworkPacketId { get; init; }
             public long Generation { get; init; }
             public long StartTick { get; init; }
+            public long LocalPublishSequence { get; init; }
+            public int MessageBytes { get; init; }
+            public double ConditionalDeliveryLossRate { get; set; }
             public bool Admitted { get; set; }
         }
 
@@ -36,7 +39,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
         private long _startTick;
 
         public PublishTracker BeginAttempt(
-            string publisher, MqttQos qos, ushort? packetId, long networkPacketId, long startTick)
+            string publisher, MqttQos qos, ushort? packetId, long networkPacketId, long startTick,
+            long localPublishSequence = 0, int messageBytes = 0)
         {
             lock (_sync)
             {
@@ -50,7 +54,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                     PacketId = packetId,
                     NetworkPacketId = networkPacketId,
                     Generation = _generation,
-                    StartTick = startTick
+                    StartTick = startTick,
+                    LocalPublishSequence = localPublishSequence,
+                    MessageBytes = messageBytes
                 };
                 _publishes[key] = tracker;
                 _accumulators[(int)qos].Attempted++;

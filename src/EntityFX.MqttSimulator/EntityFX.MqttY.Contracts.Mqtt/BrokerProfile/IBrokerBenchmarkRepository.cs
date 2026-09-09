@@ -5,6 +5,6 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
     /// </summary>
     public interface IBrokerBenchmarkRepository
     {
-        MqttBrokerProfile? Get(string brokerType);
+        MqttBrokerProfile Get(string brokerType);
     }
 }

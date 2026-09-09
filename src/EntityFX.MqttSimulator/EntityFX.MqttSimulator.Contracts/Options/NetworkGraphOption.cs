@@ -11,5 +11,7 @@
 
         public bool EnableCounters { get; set; }
 
+        public int RandomSeed { get; set; }
+
     }
 }

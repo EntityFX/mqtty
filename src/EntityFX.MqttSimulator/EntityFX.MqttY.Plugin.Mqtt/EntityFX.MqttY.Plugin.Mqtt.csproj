@@ -21,7 +21,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<EmbeddedResource Include="Data\broker-benchmark.json" />
+		<EmbeddedResource Include="Data\broker-benchmark.v2.json" />
 	</ItemGroup>
 
 </Project>

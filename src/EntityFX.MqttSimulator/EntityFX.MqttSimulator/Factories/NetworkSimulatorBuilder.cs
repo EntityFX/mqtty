@@ -140,7 +140,7 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
     public IServer? BuildServer(int index, string name, string protocolType, string specification,
         INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks, bool enableCounters,
         string? group = null, int? groupAmount = null, Dictionary<string, string[]>? additional = null,
-        string? brokerType = null)
+        string? brokerType = null, int randomSeed = 0)
     {
         if (NetworkSimulator == null)
         {
@@ -160,7 +160,8 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                         TicksOptions = ticks,
                         NetworkTypeOption = networkTypeOption,
                         EnableCounters = enableCounters,
-                        BrokerType = brokerType
+                        BrokerType = brokerType,
+                        RandomSeed = randomSeed
                     }));
 
         if (server == null)
@@ -346,7 +347,8 @@ public class NetworkSimulatorBuilder : INetworkSimulatorBuilder
                         linkNetwork,
                         networkTypeOption!, option.Ticks, option.EnableCounters,
                         null, null, node.Value.Additional,
-                        brokerType: node.Value.Broker);
+                        brokerType: node.Value.Broker,
+                        randomSeed: option.RandomSeed);
                     break;
 
                 case NodeOptionType.Client:

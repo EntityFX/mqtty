@@ -12,4 +12,7 @@ public class NetworkBuildOption
 
     /// <summary>Имя профиля брокера, разрезолвится в MqttServerFactory.</summary>
     public string? BrokerType { get; set; }
+
+    /// <summary>Seed for deterministic calibrated MQTT sampling.</summary>
+    public int RandomSeed { get; set; }
 }

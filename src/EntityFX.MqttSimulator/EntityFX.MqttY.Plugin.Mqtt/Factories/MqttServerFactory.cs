@@ -50,7 +50,7 @@ public class MqttServerFactory : IFactory<IServer?, NodeBuildOptions<NetworkBuil
             options.Index, options.Name, options.Address ?? options.Name,
             options.Protocol, options.Specification,
             options.Additional!.TicksOptions!, options.Additional.EnableCounters,
-            profile);
+            profile, options.Additional.RandomSeed);
 
         options.Network.AddServer(mqttBroker);
         options.NetworkGraph.AddServer(mqttBroker);

@@ -16,7 +16,7 @@ namespace EntityFX.MqttY.Contracts.Utils
             INetwork network, NetworkOptions networkTypeOption, TicksOptions ticks, bool enableCounters, 
             string? group = null, int? groupAmount = null,
             Dictionary<string, string[]>? additional = null,
-            string? brokerType = null);
+            string? brokerType = null, int randomSeed = 0);
 
         ILeafNode? BuildNode(int index, string name, string address, NodeType nodeType, string? group = null, int? groupAmount = null,
             Dictionary<string, string[]>? additional = null);

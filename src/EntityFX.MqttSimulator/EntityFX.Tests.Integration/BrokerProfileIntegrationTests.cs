@@ -5,6 +5,7 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Plugin.Mqtt;
+using EntityFX.MqttY.Plugin.Mqtt.BrokerProfile;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
 using EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters;
 
@@ -21,16 +22,11 @@ namespace EntityFX.Tests.Integration
             CounterHistoryDepth = 1000
         };
 
-        private static MqttBrokerProfile RejectAllProfile() => new()
-        {
-            BrokerType = "Test",
-            Qos0 = new MqttQosProfile { Samples = new[] { new MqttQosSample(1, 1.0, 0.0, 1.0) } },
-            Qos1 = new MqttQosProfile { Samples = new[] { new MqttQosSample(1, 1.0, 0.0, 1.0) } },
-            Qos2 = new MqttQosProfile { Samples = new[] { new MqttQosSample(1, 1.0, 0.0, 1.0) } },
-        };
+        private static MqttBrokerProfile RejectAllProfile() =>
+            BrokerProfileTestData.Create("Test", 3, 1_000_000, publishFailureRate: 1);
 
-        private static (NetworkSimulator Graph, MqttClient Publisher, MqttClient Subscriber)
-            Build(MqttBrokerProfile? profile)
+        private static (NetworkSimulator Graph, MqttClient Publisher, MqttClient Subscriber, IMqttBroker Broker)
+            Build(MqttBrokerProfile? profile, int randomSeed = 0)
         {
             var ticks = Ticks;
             var pathFinder = new DijkstraPathFinder();
@@ -49,7 +45,7 @@ namespace EntityFX.Tests.Integration
 
             var broker = new MqttBroker(mqttPacketManager, mqttTopicEvaluator,
                 0, "mqs1", "mqtt://mqs1.net1.local", "mqtt", "mqtt-server",
-                ticks, true, profile);
+                ticks, true, profile, randomSeed);
             network.AddServer(broker);
             graph.AddServer(broker);
 
@@ -63,7 +59,7 @@ namespace EntityFX.Tests.Integration
             network.AddClient(subscriber);
             graph.AddClient(subscriber);
 
-            return (graph, publisher, subscriber);
+            return (graph, publisher, subscriber, broker);
         }
 
         private static void RunUntil(NetworkSimulator graph, Func<bool> condition, int maxRefresh = 10_000)
@@ -77,7 +73,7 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void BrokerWithoutProfile_DeliversMessage()
         {
-            var (graph, publisher, subscriber) = Build(profile: null);
+            var (graph, publisher, subscriber, _) = Build(profile: null);
 
             publisher.BeginConnect("mqs1");
             subscriber.BeginConnect("mqs1");
@@ -101,7 +97,7 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void BrokerWithRejectAllProfile_DoesNotDeliverMessage()
         {
-            var (graph, publisher, subscriber) = Build(RejectAllProfile());
+            var (graph, publisher, subscriber, _) = Build(RejectAllProfile());
 
             publisher.BeginConnect("mqs1");
             subscriber.BeginConnect("mqs1");
@@ -129,7 +125,7 @@ namespace EntityFX.Tests.Integration
         [TestMethod]
         public void BrokerWithoutProfile_Qos0FansOutWithoutAcknowledgement()
         {
-            var (graph, publisher, subscriber) = Build(profile: null);
+            var (graph, publisher, subscriber, _) = Build(profile: null);
             Assert.IsTrue(publisher.BeginConnect("mqs1"));
             Assert.IsTrue(subscriber.BeginConnect("mqs1"));
             RunUntil(graph, () => publisher.IsConnected && subscriber.IsConnected);
@@ -147,6 +143,66 @@ namespace EntityFX.Tests.Integration
             RunUntil(graph, () => received > 0);
 
             Assert.AreEqual(1, received);
+        }
+
+        [TestMethod]
+        public void DeliveryLoss_IsCountedAfterSuccessfulQos1Handshake()
+        {
+            var profile = BrokerProfileTestData.Create(
+                "DropDelivery", 3, 1_000_000, deliveryLossRate: 1, latencyMs: 0.1);
+            var (graph, publisher, subscriber, broker) = Build(profile);
+            Assert.IsTrue(publisher.BeginConnect("mqs1"));
+            Assert.IsTrue(subscriber.BeginConnect("mqs1"));
+            RunUntil(graph, () => publisher.IsConnected && subscriber.IsConnected);
+            Assert.IsTrue(subscriber.BeginSubscribe("test/+", MqttQos.AtLeastOnce));
+            RunUntil(graph, () => subscriber.IsSubscribed("test/+"));
+            graph.ResetMeasurement();
+
+            var received = 0;
+            subscriber.MessageReceived += (_, _) => received++;
+            Assert.IsTrue(publisher.Publish("test/data", new byte[] { 1, 2, 3 }, MqttQos.AtLeastOnce));
+            RunUntil(graph, () => broker.GetMetrics().ByQos[MqttQos.AtLeastOnce].Completed == 1);
+
+            var metrics = broker.GetMetrics().ByQos[MqttQos.AtLeastOnce];
+            Assert.AreEqual(1L, metrics.Attempted);
+            Assert.AreEqual(1L, metrics.Admitted);
+            Assert.AreEqual(1L, metrics.Completed,
+                "PUBACK must complete independently of subscriber delivery");
+            Assert.AreEqual(1L, metrics.ExpectedDeliveries);
+            Assert.AreEqual(0L, metrics.Delivered);
+            Assert.AreEqual(1L, metrics.DeliveryDropped);
+            Assert.AreEqual(0, received);
+        }
+
+        [TestMethod]
+        public void PublishFailure_UsesExplicitSeedAndLocalPublishSequence()
+        {
+            const int seed = 73;
+            const int attempts = 25;
+            var profile = BrokerProfileTestData.Create(
+                "SeededFailure", 3, 1_000_000, publishFailureRate: 0.5, latencyMs: 0.1);
+            var (graph, publisher, _, broker) = Build(profile, seed);
+            Assert.IsTrue(publisher.BeginConnect("mqs1"));
+            RunUntil(graph, () => publisher.IsConnected);
+            graph.ResetMeasurement();
+
+            for (var sequence = 1; sequence <= attempts; sequence++)
+            {
+                Assert.IsTrue(publisher.Publish(
+                    "test/data", new byte[] { 1, 2, 3 }, MqttQos.AtLeastOnce));
+                for (var tick = 0; tick < 20; tick++) graph.Refresh(false, 0);
+            }
+
+            var expectedFailures = Enumerable.Range(1, attempts).LongCount(sequence =>
+                DeterministicMqttSampler.Uniform(
+                    seed, "mqs1", "pub", sequence, "publish-failure") < 0.5);
+            var metrics = broker.GetMetrics().ByQos[MqttQos.AtLeastOnce];
+            Assert.AreEqual(attempts, metrics.Attempted);
+            Assert.AreEqual(expectedFailures, metrics.PublishFailed);
+            Assert.AreEqual(0L, metrics.RateRejected);
+            Assert.AreEqual(attempts - expectedFailures, metrics.Admitted);
+            RunUntil(graph, () => graph.IsQuiescent);
+            Assert.IsTrue(graph.IsQuiescent, "Profile failures must not leave an orphaned MQTT handshake");
         }
     }
 }

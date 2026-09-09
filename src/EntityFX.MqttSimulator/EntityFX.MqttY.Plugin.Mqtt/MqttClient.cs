@@ -10,13 +10,14 @@ using System.Collections.Immutable;
 
 namespace EntityFX.MqttY.Plugin.Mqtt
 {
-    public class MqttClient : Client, IMqttClient
+    public class MqttClient : Client, IMqttClient, IMqttClientPublishStateSink
     {
         private readonly PacketIdProvider _packetIdProvider = new();
 
         private readonly IRepository<ClientSession> _sessionRepository
             = new InMemoryRepository<ClientSession>();
         private readonly IMqttPacketManager _packetManager;
+        private long _localPublishSequence;
 
         public event EventHandler<MqttMessage>? MessageReceived;
 
@@ -244,16 +245,18 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         public bool Publish(string topic, byte[] payload, MqttQos qos, bool retain = false)
         {
+            ArgumentNullException.ThrowIfNull(payload);
+            var localPublishSequence = Interlocked.Increment(ref _localPublishSequence);
             ushort? packetId = qos == MqttQos.AtMostOnce ? null : (ushort?)_packetIdProvider.GetPacketId();
             var publish = new PublishPacket(topic, qos, retain, duplicated: false, packetId: packetId)
             {
                 Payload = payload
             };
 
-            var packetPayload = GetPacket(NetworkSimulator!.GetPacketId(), ServerName ?? string.Empty,
+            INetworkPacket packetPayload = GetContextPacket(NetworkSimulator!.GetPacketId(), ServerName ?? string.Empty,
                 NodeType.Server,
                 ServerIndex ?? -1,
-                _packetManager.PacketToBytes(publish), ProtocolType, "MQTT Publish");
+                _packetManager.PacketToBytes(publish), ProtocolType, localPublishSequence, "MQTT Publish");
             var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packetPayload!,
                 $"Publish {Name} to {packetPayload.To} with topic {topic}");
 
@@ -686,6 +689,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             if (NetworkSimulator!.GetNode(brokerName, NodeType.Server) is IMqttBrokerMetricsSink sink)
                 sink.CompleteDelivery(outgoingPublishPacketId);
         }
+
+        void IMqttClientPublishStateSink.FailPublish(ushort packetId) =>
+            RemovePendingMessage(Name, packetId);
 
         private void UpsertSubscription(ClientSession session, string topicFilter, MqttQos qos)
         {
