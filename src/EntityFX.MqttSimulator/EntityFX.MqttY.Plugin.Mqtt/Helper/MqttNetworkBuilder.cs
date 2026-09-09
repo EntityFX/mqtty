@@ -141,7 +141,7 @@ public class MqttNetworkBuilder : NetworkBuilderBase
         var ix = graph!.CountNodes + 1;
 
         var relayRemoteTopics = oppositeBrokers.ToDictionary(k => $"rs{k.Index}",
-            v => new MqttRelayConfigurationItem() { ReplaceRelaySegment = false, Server = v.Name, TopicPrefix = $"relay{v.Index}" });
+            v => new MqttRelayConfigurationItem() { ReplaceRelaySegment = false, Server = v.Name, TopicPrefix = $"relay{v.Index}/" });
 
         var lsMap = relayRemoteTopics.Keys.ToArray();
 

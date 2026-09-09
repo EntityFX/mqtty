@@ -108,9 +108,11 @@ namespace EntityFX.Tests.Integration
             Assert.AreEqual(3, graph.Servers.Count, "Expected 3 brokers");
         }
 
-        [TestCategory(TestCategories.LongRunning)]
-        [TestMethod]
-        public void RelayTopology_DeliversTelemetry_BetweenAreas()
+        [DataTestMethod]
+        [DataRow(MqttQos.AtMostOnce)]
+        [DataRow(MqttQos.AtLeastOnce)]
+        [DataRow(MqttQos.ExactlyOnce)]
+        public void RelayTopology_DeliversTelemetry_BetweenAreas(MqttQos qos)
         {
             var graph = new NetworkSimulator(_pathFinder, _monitoring, _ticks, true);
             var builder = new MqttNetworkBuilder(graph, _packetManager, _topicEvaluator,
@@ -149,21 +151,16 @@ namespace EntityFX.Tests.Integration
 
             foreach (var relay in relays) relay.SubscribeAll();
             foreach (var receiver in receivers) receiver.SubscribeAll();
+            for (var i = 0; i < 1000; i++) graph.Refresh(false, 0);
 
             var data = new byte[] { 1, 2, 3, 4, 5 };
-            foreach (var broker in brokers)
-            {
-                foreach (var client in broker.Network!.Clients.Values.OfType<MqttClient>().Where(c => c.Group == null))
-                {
-                    client.Publish("telemetry/data", data, MqttQos.AtLeastOnce);
-                }
-            }
-
-            RunUntil(graph, () => receivers.Any(r => r.Received > 0));
-
-            var totalReceived = receivers.Sum(r => r.Received);
-            Assert.IsTrue(totalReceived > 0,
-                "Receivers must receive telemetry relayed between areas");
+            var source = brokers[0];
+            var publisher = source.Network!.Clients.Values.OfType<MqttClient>().First(c => c.Group == null);
+            publisher.Publish("telemetry/data", data, qos);
+            RunUntil(graph, () => receivers.All(r => r.Received == 1), 10000);
+            foreach (var receiver in receivers)
+                Assert.AreEqual(1L, receiver.Received,
+                    $"A single source publish must reach receiver {receiver.Name}, including remote areas.");
         }
     }
 }
