@@ -2,7 +2,10 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text;
+using System.Globalization;
 using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Plugin.Mqtt.BrokerProfile;
 using EntityFX.MqttY.Plugin.Mqtt.Experiments;
 
 namespace EntityFX.MqttY.MqttRelay.App;
@@ -27,12 +30,16 @@ internal static class MqttRelayExperimentCommand
                 ?? throw new InvalidDataException("Experiment configuration is empty.");
             configuration.Validate();
 
+            var profileBytes = File.ReadAllBytes(Path.GetFullPath(configuration.BrokerProfilePath));
+            using var profileStream = new MemoryStream(profileBytes, writable: false);
+            using var profileReader = new StreamReader(profileStream, new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: true);
+            var profileJson = profileReader.ReadToEnd();
+            var profiles = new BrokerBenchmarkRepository(profileJson);
             var provenance = new ExperimentProvenance(
                 ResolveCleanCommit(configuration.MqttYRepository),
                 ResolveCleanCommit(configuration.MqttBenchmarkRepository),
-                Convert.ToHexString(SHA256.HashData(
-                    File.ReadAllBytes(Path.GetFullPath(configuration.BrokerProfilePath)))));
-            var result = new MqttRelayExperimentRunner(configuration.Ticks, configuration.Network)
+                Convert.ToHexString(SHA256.HashData(profileBytes)));
+            var result = new MqttRelayExperimentRunner(configuration.Ticks, configuration.Network, profiles)
                 .Run(configuration.Experiment, outputPath, provenance);
 
             Console.WriteLine($"Run directory: {result.RunDirectory}");
@@ -45,6 +52,36 @@ internal static class MqttRelayExperimentCommand
         {
             Console.Error.WriteLine(exception.Message);
             PrintUsage();
+            return 1;
+        }
+    }
+
+    public static int RunCalibration(string[] args)
+    {
+        try
+        {
+            var arguments = ParseArguments(args);
+            if (arguments.Keys.Any(key => key is not ("observations" or "output" or "mqtty-repository" or "rate-rejection-rate")))
+                throw new ArgumentException("Unknown calibration argument.");
+            var inputPath = Path.GetFullPath(Required(arguments, "observations"));
+            var outputPath = Path.GetFullPath(Required(arguments, "output"));
+            if (string.Equals(inputPath, outputPath, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Observations and calibration must be separate files.");
+            var rate = arguments.TryGetValue("rate-rejection-rate", out var text)
+                ? double.Parse(text, CultureInfo.InvariantCulture) : 0;
+            var bytes = BrokerCalibrationV3.Calibrate(File.ReadAllBytes(inputPath),
+                ResolveCleanCommit(Required(arguments, "mqtty-repository")), rate);
+            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+            using var stream = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            stream.Write(bytes);
+            stream.Flush(true);
+            Console.WriteLine($"Calibration: {outputPath}");
+            return 0;
+        }
+        catch (Exception error)
+        {
+            Console.Error.WriteLine(error.Message);
+            Console.Error.WriteLine("Usage: EntityFX.MqttY.MqttRelay.App calibrate --observations <broker-observations.v3.json> --output <broker-calibration.v3.json> --mqtty-repository <clean-repository> [--rate-rejection-rate <0..1>]");
             return 1;
         }
     }

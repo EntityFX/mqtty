@@ -39,6 +39,17 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
             BrokerBenchmarkV2Dto dto;
             try
             {
+                using (var document = JsonDocument.Parse(json))
+                {
+                    if (document.RootElement.ValueKind != JsonValueKind.Object)
+                        throw new InvalidDataException("Broker calibration must be a JSON object.");
+                    if (document.RootElement.TryGetProperty("schemaVersion", out var version))
+                    {
+                        if (version.ValueKind != JsonValueKind.Number || !version.TryGetInt32(out var number))
+                            throw new InvalidDataException("schemaVersion must be an integer.");
+                        if (number == 3) return BrokerCalibrationV3.ReadProfiles(System.Text.Encoding.UTF8.GetBytes(json));
+                    }
+                }
                 dto = JsonSerializer.Deserialize<BrokerBenchmarkV2Dto>(json,
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                     ?? throw new InvalidDataException("Broker calibration JSON is empty.");

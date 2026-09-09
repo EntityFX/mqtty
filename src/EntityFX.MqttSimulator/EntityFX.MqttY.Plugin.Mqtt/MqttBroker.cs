@@ -26,6 +26,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         private readonly BrokerProcessingQueue _processingQueue = new();
         private readonly TimeSpan _tickPeriod;
         private readonly int _randomSeed;
+        private readonly int? _profileClientCount;
         private readonly BrokerMeasurement _measurement = new();
 
         public override NodeType NodeType => NodeType.Server;
@@ -63,7 +64,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             IMqttTopicEvaluator mqttTopicEvaluator,
             int index, string name, string address, string protocolType, 
             string specification, TicksOptions ticksOptions, bool enableCounters,
-            MqttBrokerProfile? brokerProfile = null, int randomSeed = 0
+            MqttBrokerProfile? brokerProfile = null, int randomSeed = 0, int? profileClientCount = null
            )
             : base(index, name, address, protocolType, specification, 
                   ticksOptions, enableCounters)
@@ -89,6 +90,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             _profile = brokerProfile;
             _tickPeriod = ticksOptions.TickPeriod;
             _randomSeed = randomSeed;
+            if (profileClientCount is <= 0) throw new ArgumentOutOfRangeException(nameof(profileClientCount));
+            _profileClientCount = profileClientCount;
 
             if (brokerProfile != null)
             {
@@ -170,7 +173,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return;
             }
 
-            var clients = Math.Max(1, GetServerClients().Count());
+            var clients = _profileClientCount ?? Math.Max(1, GetServerClients().Count());
             var sample = _profile.For(publishPacket.Payload.Length,
                 publishPacket.QualityOfService, clients);
 

@@ -27,7 +27,14 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
                     Lerp(lower.CapacityRps, upper.CapacityRps, ratio),
                     Lerp(lower.PublishFailureRate, upper.PublishFailureRate, ratio),
                     Lerp(lower.ConditionalDeliveryLossRate, upper.ConditionalDeliveryLossRate, ratio),
-                    Interpolate(lower.ProcessingLatencyQuantiles, upper.ProcessingLatencyQuantiles, ratio));
+                    Interpolate(lower.ProcessingLatencyQuantiles, upper.ProcessingLatencyQuantiles, ratio))
+                {
+                    AttemptedRps = Interpolate(lower.AttemptedRps, upper.AttemptedRps, ratio),
+                    TargetCompletedRps = Interpolate(lower.TargetCompletedRps, upper.TargetCompletedRps, ratio),
+                    TargetPublishFailureRate = Interpolate(lower.TargetPublishFailureRate, upper.TargetPublishFailureRate, ratio),
+                    ObservedLatencyQuantiles = Interpolate(lower.ObservedLatencyQuantiles, upper.ObservedLatencyQuantiles, ratio),
+                    RttBaselineMs = Interpolate(lower.RttBaselineMs, upper.RttBaselineMs, ratio)
+                };
             }
 
             throw new InvalidDataException("Calibration samples are not strictly increasing by client count.");
@@ -50,5 +57,8 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
 
         private static double Lerp(double lower, double upper, double ratio) =>
             lower + ratio * (upper - lower);
+
+        private static double? Interpolate(double? lower, double? upper, double ratio) =>
+            lower.HasValue && upper.HasValue ? Lerp(lower.Value, upper.Value, ratio) : null;
     }
 }

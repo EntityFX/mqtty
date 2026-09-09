@@ -23,12 +23,13 @@ public class MqttNetworkBuilder : NetworkBuilderBase
     private readonly Func<int, MqttBrokerProfile?>? brokerProfileResolver;
     private readonly int randomSeed;
     private readonly MqttQos subscribeQos;
+    private readonly int? profileClientCount;
     private int brokerOrdinal;
 
     public MqttNetworkBuilder(INetworkSimulator networkSimulator, IMqttPacketManager mqttPacketManager,
         IMqttTopicEvaluator mqttTopicEvaluator, IClientBuilder clientBuilder,
         Func<int, MqttBrokerProfile?>? brokerProfileResolver = null,
-        int randomSeed = 0, MqttQos subscribeQos = MqttQos.AtLeastOnce)
+        int randomSeed = 0, MqttQos subscribeQos = MqttQos.AtLeastOnce, int? profileClientCount = null)
         : base(networkSimulator)
     {
         this.mqttPacketManager = mqttPacketManager;
@@ -37,13 +38,14 @@ public class MqttNetworkBuilder : NetworkBuilderBase
         this.brokerProfileResolver = brokerProfileResolver;
         this.randomSeed = randomSeed;
         this.subscribeQos = subscribeQos;
+        this.profileClientCount = profileClientCount;
     }
 
     protected override IServer CreateServer(TicksOptions ticksOptions, int ix, string name, string fullName, string address)
     {
         var profile = brokerProfileResolver?.Invoke(brokerOrdinal++);
         return new MqttBroker(mqttPacketManager, mqttTopicEvaluator, ix, name, address,
-            "mqtt", "mqtt", ticksOptions, networkSimulator.EnableCounters, profile, randomSeed);
+            "mqtt", "mqtt", ticksOptions, networkSimulator.EnableCounters, profile, randomSeed, profileClientCount);
     }
 
     protected override IClient CreateClient(TicksOptions ticksOptions, int ix, string name, string fullName, string address)
@@ -91,6 +93,12 @@ public class MqttNetworkBuilder : NetworkBuilderBase
         }
 
         return brokers;
+    }
+
+    public void BuildBrokerFidelity(NetworkSimulator graph, TicksOptions ticksOptions)
+    {
+        foreach (var broker in graph.Servers.Values.OfType<IMqttBroker>())
+            CreateReceiver(ticksOptions, broker, clientBuilder);
     }
 
     private int CreateReceiver(TicksOptions ticksOptions, IMqttBroker broker, IClientBuilder clientBuilder)

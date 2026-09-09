@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\EntityFX.MqttY.MqttRelay.App\MqttRelayExperimentCommand.cs" Link="Commands\MqttRelayExperimentCommand.cs" />
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
   </ItemGroup>
 

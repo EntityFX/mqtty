@@ -13,6 +13,12 @@ using System.Threading.Tasks;
 
 
 
+if (args.Length > 0 && args[0].Equals("calibrate", StringComparison.OrdinalIgnoreCase))
+{
+    Environment.ExitCode = MqttRelayExperimentCommand.RunCalibration(args.Skip(1).ToArray());
+    return;
+}
+
 if (args.Length > 0 && args[0].Equals("experiment", StringComparison.OrdinalIgnoreCase))
 {
     Environment.ExitCode = MqttRelayExperimentCommand.Run(args.Skip(1).ToArray());

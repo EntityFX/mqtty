@@ -145,7 +145,7 @@ public sealed class MqttRelayExperimentRunner
         {
             if (name == null) return null;
             var profile = _profiles.Get(name);
-            profile.For(options.PayloadBytes, options.PublishQos, options.ClientsPerBroker);
+            profile.For(options.PayloadBytes, options.PublishQos, options.ResolveProfileClientCount());
             return profile;
         }).ToArray();
     }
@@ -172,11 +172,15 @@ public sealed class MqttRelayExperimentRunner
             return client;
         });
         var builder = new MqttNetworkBuilder(graph, packetManager, evaluator, clientBuilder,
-            ordinal => profiles[ordinal], options.RandomSeed, options.SubscribeQos);
+            ordinal => profiles[ordinal], options.RandomSeed, options.SubscribeQos,
+            options.ProfileClientCountMode == ProfileClientCountMode.Publishers ? options.ClientsPerBroker : null);
         graph.Construction = true;
         builder.BuildSimpleTree(options.Brokers, options.NetworkLength,
             options.ClientsPerBroker, 1, null, true, _ticks, _network);
-        builder.BuildMqttRelay((NetworkSimulator)graph, _ticks);
+        if (options.TopologyMode == ExperimentTopologyMode.BrokerFidelity)
+            builder.BuildBrokerFidelity(graph, _ticks);
+        else
+            builder.BuildMqttRelay(graph, _ticks);
         graph.Construction = false;
         graph.UpdateRoutes();
         return graph;
@@ -295,13 +299,17 @@ public sealed class MqttRelayExperimentRunner
     {
         if (profiles.All(profile => profile == null)) return null;
         var samples = profiles.Select(profile => profile!.For(
-            options.PayloadBytes, options.PublishQos, options.ClientsPerBroker)).ToArray();
-        var capacity = samples.Sum(sample => sample.CapacityRps);
+            options.PayloadBytes, options.PublishQos, options.ResolveProfileClientCount())).ToArray();
+        double Throughput(CalibratedMqttQosSample sample) => sample.TargetCompletedRps ?? sample.CapacityRps;
+        var capacity = samples.Sum(Throughput);
+        var attempted = samples.Sum(sample => sample.AttemptedRps ?? sample.CapacityRps);
         double? p99 = options.PublishQos == MqttQos.AtMostOnce ? null :
-            samples.Sum(sample => sample.ProcessingLatencyQuantiles!.P99Ms * sample.CapacityRps) / capacity;
+            capacity == 0 ? null : samples.Sum(sample =>
+                (sample.ObservedLatencyQuantiles ?? sample.ProcessingLatencyQuantiles)!.P99Ms * Throughput(sample)) / capacity;
         return new ExperimentMetricSummary(0, 0, 0, 0, 0, 0, 0, 0, capacity,
-            samples.Sum(sample => sample.PublishFailureRate * sample.CapacityRps) / capacity,
-            samples.Sum(sample => sample.ConditionalDeliveryLossRate * sample.CapacityRps) / capacity,
+            samples.Sum(sample => (sample.TargetPublishFailureRate ?? sample.PublishFailureRate) *
+                (sample.AttemptedRps ?? sample.CapacityRps)) / attempted,
+            capacity == 0 ? 0 : samples.Sum(sample => sample.ConditionalDeliveryLossRate * Throughput(sample)) / capacity,
             p99);
     }
 
@@ -355,7 +363,10 @@ public sealed class MqttRelayExperimentRunner
         var manifest = new ExperimentManifest(runId, DateTimeOffset.UtcNow, options,
             assignedTypes, provenance, RuntimeInformation.OSDescription,
             RuntimeInformation.FrameworkDescription, Environment.ProcessorCount,
-            _ticks.TickPeriod, phases, summary.MeasurementStartTick, summary.MeasurementEndTick);
+            _ticks.TickPeriod, phases, summary.MeasurementStartTick, summary.MeasurementEndTick,
+            graph?.Servers.Values.OfType<IMqttBroker>().Select(broker => new BrokerClientCount(
+                broker.Name, broker.GetServerClients().Count(), options.ResolveProfileClientCount())).ToArray()
+                ?? Array.Empty<BrokerClientCount>());
         WriteJsonNew(Path.Combine(directory, "experiment-manifest.json"), manifest);
         WriteJsonNew(Path.Combine(directory, "summary.json"), summary);
         WriteJsonNew(Path.Combine(directory, "counters.json"), new
@@ -418,6 +429,7 @@ public sealed class MqttRelayExperimentRunner
     }
 
     private sealed record ExperimentPhaseBoundary(string Name, long StartTick, long EndTick, string Status);
+    private sealed record BrokerClientCount(string Broker, int ConnectedClients, int ProfileClients);
 
     private sealed record ExperimentManifest(
         string RunId,
@@ -431,5 +443,6 @@ public sealed class MqttRelayExperimentRunner
         TimeSpan TickPeriod,
         IReadOnlyList<ExperimentPhaseBoundary> Phases,
         long MeasurementStartTick,
-        long MeasurementEndTick);
+        long MeasurementEndTick,
+        IReadOnlyList<BrokerClientCount> BrokerClientCounts);
 }

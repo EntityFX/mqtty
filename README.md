@@ -52,3 +52,22 @@ GraphML и PlantUML. Код возврата `2` означает ошибку �
 
 Быстрые CI-наборы запускаются по категориям `Mechanism`, `Protocol`, `Regression`,
 `Fidelity` и `MqttRelay`. Категория `LongRunning` выполняется nightly и вручную.
+
+## Калибровка v3 и BrokerFidelity
+
+Команда принимает полный `broker-observations.v3.json` MqttBenchmark (96 точек,
+288 успешных запусков, три повтора) и создаёт отдельный, не перезаписываемый файл:
+
+```powershell
+dotnet run -c Release --project src/EntityFX.MqttSimulator/EntityFX.MqttY.MqttRelay.App -- `
+  calibrate --observations results/broker-observations.v3.json `
+  --output results/broker-calibration.v3.json --mqtty-repository .
+```
+
+Полный контракт и ограничения описаны в [doc/calibration-v3.md](doc/calibration-v3.md).
+Для сопоставления с брокером задайте `experiment.topologyMode: "brokerFidelity"`,
+`experiment.profileClientCountMode: "publishers"`, `brokers: 1` и путь к новому
+файлу в `brokerProfilePath`. `clientsPerBroker` означает число publishers;
+единственный subscriber создаётся дополнительно. `offeredRps` для точки должен
+соответствовать её `attemptedRps`; параметры сети необходимо согласовать с RTT.
+Встроенный профиль четырёх брокеров v2 сохраняется для существующих сценариев.

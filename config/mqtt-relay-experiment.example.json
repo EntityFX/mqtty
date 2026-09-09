@@ -1,5 +1,7 @@
 {
   "experiment": {
+    "topologyMode": "mqttRelay",
+    "profileClientCountMode": "connectedClients",
     "brokers": 4,
     "networkLength": 2,
     "clientsPerBroker": 1,

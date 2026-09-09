@@ -2,6 +2,9 @@ using EntityFX.MqttY.Contracts.Mqtt;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Experiments;
 
+public enum ExperimentTopologyMode { BrokerFidelity, MqttRelay }
+public enum ProfileClientCountMode { Publishers, ConnectedClients }
+
 public enum MqttBrokerAssignmentMode
 {
     Ideal,
@@ -14,6 +17,8 @@ public enum MqttBrokerAssignmentMode
 
 public sealed class MqttRelayExperimentOptions
 {
+    public ExperimentTopologyMode TopologyMode { get; set; } = ExperimentTopologyMode.MqttRelay;
+    public ProfileClientCountMode ProfileClientCountMode { get; set; } = ProfileClientCountMode.ConnectedClients;
     public int Brokers { get; set; }
     public int NetworkLength { get; set; }
     public int ClientsPerBroker { get; set; }
@@ -34,6 +39,9 @@ public sealed class MqttRelayExperimentOptions
 
     public void Validate()
     {
+        if (!Enum.IsDefined(typeof(ExperimentTopologyMode), TopologyMode) ||
+            !Enum.IsDefined(typeof(ProfileClientCountMode), ProfileClientCountMode))
+            throw new InvalidDataException("Unknown topology or profile client-count mode.");
         if (Brokers <= 0 || NetworkLength <= 0 || ClientsPerBroker <= 0 || PayloadBytes <= 0)
             throw new InvalidDataException(
                 "Brokers, NetworkLength, ClientsPerBroker and PayloadBytes must be positive.");
@@ -64,6 +72,9 @@ public sealed class MqttRelayExperimentOptions
             throw new InvalidDataException("MixedBrokerTypes is only valid in Mixed assignment mode.");
         }
     }
+
+    public int ResolveProfileClientCount() => ProfileClientCountMode == ProfileClientCountMode.Publishers
+        ? ClientsPerBroker : ClientsPerBroker + (TopologyMode == ExperimentTopologyMode.BrokerFidelity ? 1 : Brokers + 3);
 
     public IReadOnlyList<string?> ResolveBrokerTypes()
     {

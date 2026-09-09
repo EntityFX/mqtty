@@ -5,5 +5,12 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
         double CapacityRps,
         double PublishFailureRate,
         double ConditionalDeliveryLossRate,
-        LatencyQuantiles? ProcessingLatencyQuantiles);
+        LatencyQuantiles? ProcessingLatencyQuantiles)
+    {
+        public double? AttemptedRps { get; init; }
+        public double? TargetCompletedRps { get; init; }
+        public double? TargetPublishFailureRate { get; init; }
+        public LatencyQuantiles? ObservedLatencyQuantiles { get; init; }
+        public double? RttBaselineMs { get; init; }
+    }
 }
