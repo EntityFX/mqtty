@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 namespace EntityFX.MqttY.Plugin.Mqtt.Counter
 {
     internal sealed class LatencyHistogram
@@ -27,5 +29,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
 
             return _counts.Last().Key;
         }
+
+        public IReadOnlyDictionary<long, long> Snapshot() =>
+            new ReadOnlyDictionary<long, long>(new SortedDictionary<long, long>(_counts));
     }
 }

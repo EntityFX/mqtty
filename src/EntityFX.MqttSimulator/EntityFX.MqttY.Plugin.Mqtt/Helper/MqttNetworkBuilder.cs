@@ -1,5 +1,6 @@
 ﻿using EntityFX.MqttY.Application;
 using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt.BrokerProfile;
 using EntityFX.MqttY.Contracts.Mqtt.Formatters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
@@ -19,18 +20,30 @@ public class MqttNetworkBuilder : NetworkBuilderBase
     private readonly IMqttPacketManager mqttPacketManager;
     private readonly IMqttTopicEvaluator mqttTopicEvaluator;
     private readonly IClientBuilder clientBuilder;
+    private readonly Func<int, MqttBrokerProfile?>? brokerProfileResolver;
+    private readonly int randomSeed;
+    private readonly MqttQos subscribeQos;
+    private int brokerOrdinal;
 
-    public MqttNetworkBuilder(INetworkSimulator networkSimulator, IMqttPacketManager mqttPacketManager, IMqttTopicEvaluator mqttTopicEvaluator, IClientBuilder clientBuilder)
+    public MqttNetworkBuilder(INetworkSimulator networkSimulator, IMqttPacketManager mqttPacketManager,
+        IMqttTopicEvaluator mqttTopicEvaluator, IClientBuilder clientBuilder,
+        Func<int, MqttBrokerProfile?>? brokerProfileResolver = null,
+        int randomSeed = 0, MqttQos subscribeQos = MqttQos.AtLeastOnce)
         : base(networkSimulator)
     {
         this.mqttPacketManager = mqttPacketManager;
         this.mqttTopicEvaluator = mqttTopicEvaluator;
         this.clientBuilder = clientBuilder;
+        this.brokerProfileResolver = brokerProfileResolver;
+        this.randomSeed = randomSeed;
+        this.subscribeQos = subscribeQos;
     }
 
     protected override IServer CreateServer(TicksOptions ticksOptions, int ix, string name, string fullName, string address)
     {
-        return new MqttBroker(mqttPacketManager, mqttTopicEvaluator, ix, name, address, "mqtt", "mqtt", ticksOptions, networkSimulator.EnableCounters);
+        var profile = brokerProfileResolver?.Invoke(brokerOrdinal++);
+        return new MqttBroker(mqttPacketManager, mqttTopicEvaluator, ix, name, address,
+            "mqtt", "mqtt", ticksOptions, networkSimulator.EnableCounters, profile, randomSeed);
     }
 
     protected override IClient CreateClient(TicksOptions ticksOptions, int ix, string name, string fullName, string address)
@@ -94,6 +107,7 @@ public class MqttNetworkBuilder : NetworkBuilderBase
         var receiverConfiguration = new MqttReceiverConfiguration()
         {
             Server = broker.Name,
+            Qos = subscribeQos,
             Topics = new string[] {
                             "telemetry/+",
                             "local/telemetry/+"
@@ -146,11 +160,13 @@ public class MqttNetworkBuilder : NetworkBuilderBase
                 [$"ls{rix}"] = new MqttRelayConfiguration.MqttListenConfigurationItem()
                 {
                     Server = broker.Name,
+                    Qos = subscribeQos,
                     Topics = new string[] { "telemetry/+" }
                 },
                 [$"rls{rix}"] = new MqttRelayConfiguration.MqttListenConfigurationItem()
                 {
                     Server = broker.Name,
+                    Qos = subscribeQos,
                     Topics = new string[] { $"relay{rix}/telemetry/+" }
                 },
             },

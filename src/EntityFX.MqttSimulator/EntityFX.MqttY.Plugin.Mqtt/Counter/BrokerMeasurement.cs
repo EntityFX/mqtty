@@ -188,7 +188,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                         seconds > 0 ? accumulator.Completed / seconds : 0,
                         qos == MqttQos.AtMostOnce ? null : ToMs(accumulator.Latency.NearestRank(0.50)),
                         qos == MqttQos.AtMostOnce ? null : ToMs(accumulator.Latency.NearestRank(0.95)),
-                        qos == MqttQos.AtMostOnce ? null : ToMs(accumulator.Latency.NearestRank(0.99)));
+                        qos == MqttQos.AtMostOnce ? null : ToMs(accumulator.Latency.NearestRank(0.99)))
+                    {
+                        LatencyHistogramTicks = accumulator.Latency.Snapshot()
+                    };
                 });
 
                 return new BrokerMetricsSnapshot(_startTick, endTick, BrokerMetricsSnapshot.ReadOnly(values));

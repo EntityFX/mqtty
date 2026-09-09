@@ -84,7 +84,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
                 foreach (var listenTopics in listenServer.Value.Topics)
                 {
-                    mqttClient.BeginSubscribe(listenTopics!, MqttQos.AtLeastOnce);
+                    mqttClient.BeginSubscribe(listenTopics!, listenServer.Value.Qos);
                 }
             }
         }

@@ -14,7 +14,11 @@ namespace EntityFX.MqttY.Contracts.Mqtt
         double Rps,
         double? LatencyP50Ms,
         double? LatencyP95Ms,
-        double? LatencyP99Ms);
+        double? LatencyP99Ms)
+    {
+        public IReadOnlyDictionary<long, long> LatencyHistogramTicks { get; init; }
+            = new ReadOnlyDictionary<long, long>(new Dictionary<long, long>());
+    }
 
     public sealed record BrokerMetricsSnapshot(
         long MeasurementStartTick,
