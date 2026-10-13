@@ -36,6 +36,14 @@ Get-FileHash results/broker-calibration.v3.json -Algorithm SHA256
 
 Для запуска скриптом используйте [RunSimulation.ps1](examples/RunSimulation.ps1): с `-ObservationsPath` он вызывает эту же calibrate, генерирует brokerFidelity config выбранной точки и запускает experiment. Если calibration уже есть, задайте `-CalibrationPath` без ObservationsPath. Скрипт не восполняет отсутствующую матрицу и не ослабляет проверки.
 
+Для машины только с runtime предварительно опубликуйте CLI на машине с SDK. Из корня чистого mqtty:
+
+```powershell
+dotnet publish src/EntityFX.MqttSimulator/EntityFX.MqttY.MqttRelay.App -c Release -o ../simulator-portable/bin
+```
+
+Перенесите **весь** каталог `simulator-portable/bin`, входные JSON и чистые Git checkout обоих проектов. На целевой Linux/Windows-машине нужны .NET6 runtime, Git и PowerShell7. Добавьте к вызову скрипта `-SimulatorCliPath ../simulator-portable/bin/EntityFX.MqttY.MqttRelay.App.dll`; сборка исходников на целевой машине тогда не выполняется. Без этого параметра скрипт использует `dotnet run` и требует SDK. Ручной эквивалент каждого вызова — `dotnet ../simulator-portable/bin/EntityFX.MqttY.MqttRelay.App.dll calibrate ...` или `experiment ...` с теми же аргументами ниже/в [руководстве сетей](network-experiments.md). Ожидаются тот же calibration artifact и новый run bundle; остановка длительного experiment — Ctrl+C, после неё неполный bundle не считается успешным результатом.
+
 ## 3. Что преобразуется
 
 | Поле calibration | Источник / формула |
