@@ -14,6 +14,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 {
     internal class MqttBroker : Server, IMqttBroker, IMeasurementSource, IMqttBrokerMetricsSink
     {
+        protected override bool ShouldTrackResponse(INetworkPacket packet) => false;
         private readonly IRepository<ClientSession> _sessionRepository = new InMemoryRepository<ClientSession>();
 
         private readonly MqttQos _maximumQualityOfService = MqttQos.ExactlyOnce;

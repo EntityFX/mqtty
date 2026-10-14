@@ -77,6 +77,24 @@ namespace EntityFX.Tests.Integration
             RefreshUntil(graph, () => subscribers.All(item => item.IsSubscribed("measure/#")));
         }
 
+        [DataTestMethod]
+        [DataRow(0)]
+        [DataRow(1)]
+        [DataRow(2)]
+        public void PublishBurst_DoesNotAccumulateGenericResponseWaiters(int qos)
+        {
+            var (graph, broker, publisher, subscribers) = Build(1);
+            ConnectAndSubscribe(graph,publisher,subscribers,(MqttQos)qos);
+            for (var i=0;i<1000;i++) Assert.IsTrue(publisher.Publish("measure/burst",new byte[16],(MqttQos)qos));
+            RefreshUntil(graph,()=>graph.IsQuiescent);
+            Assert.IsTrue(Convert.ToInt64(publisher.Counters.Counters.Single(c=>c.Name=="ReceiveQueue").Value)<=2);
+            Assert.IsTrue(Convert.ToInt64(subscribers[0].Counters.Counters.Single(c=>c.Name=="ReceiveQueue").Value)<=2);
+            Assert.AreEqual(0L,Convert.ToInt64(broker.Counters.Counters.Single(c=>c.Name=="ReceiveQueue").Value));
+            var snapshot=broker.GetMetrics().ByQos[(MqttQos)qos];
+            Assert.AreEqual(1000L,snapshot.Completed);
+            Assert.AreEqual(1000L,snapshot.Delivered);
+        }
+
         [TestMethod]
         public void Qos0Snapshot_SeparatesDeliveryAndUsesExactMeasurementWindow()
         {

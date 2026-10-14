@@ -8,6 +8,25 @@ namespace EntityFX.Tests.Integration;
 [TestCategory(TestCategories.Mechanism)]
 public class DeterministicCoreTests
 {
+    private sealed class ResponseProbe : Server
+    {
+        public ResponseProbe(TicksOptions ticks) : base(8,"probe","probe","test","test",ticks,true) { }
+        public ResponsePacket? Take(long id) => WaitResponse(id);
+    }
+
+    [TestMethod]
+    public void GenericResponseTimeout_PreservesRefreshBoundaryWithoutGraphTickAdvance()
+    {
+        var ticks=Ticks();var (graph,network,_)=Build(configuredTicks:ticks);
+        var probe=new ResponseProbe(ticks);network.AddServer(probe);graph.AddServer(probe);
+        probe.Send(Packet(100));probe.Send(Packet(101));
+        for (var i=0;i<599999;i++) probe.Refresh();
+        Assert.IsNotNull(probe.Take(100));
+        probe.Refresh();
+        Assert.IsNull(probe.Take(101));
+        probe.Clear();probe.Send(Packet(102));probe.Refresh();
+        Assert.IsNotNull(probe.Take(102));
+    }
     private static TicksOptions Ticks() => new()
     {
         TickPeriod = TimeSpan.FromSeconds(1), OutgoingWaitTicks = 1,

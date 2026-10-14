@@ -19,29 +19,16 @@ internal class ResponseMonitoringPacket
 
     public bool ReceiveIsSet { get; private set; }
 
-    public bool IsExpired { get; private set; } = false;
-
-    internal long WaitTicks => _waitTicks;
-    
-    private long _waitTicks = 600000;
+    private readonly long _createdRefresh;
+    internal bool HasExpired(long currentRefresh) => currentRefresh - _createdRefresh >= 600000;
 
     public string Marker { get; set; } = string.Empty;
     public ManualResetEventSlim ResetEventSlim { get; private set; } = new ManualResetEventSlim(false);
 
-    public ResponseMonitoringPacket(bool waitMode)
+    public ResponseMonitoringPacket(bool waitMode, long createdRefresh)
     {
         WaitMode = waitMode;
-    }
-
-    internal void ReduceWaitTicks()
-    {
-        //Interlocked.Decrement(ref _waitTicks);
-        _waitTicks--;
-
-        if (_waitTicks <= 0)
-        {
-            IsExpired = true;
-        }
+        _createdRefresh = createdRefresh;
     }
 
     public bool WaitIsSet(TimeSpan timeSpan)

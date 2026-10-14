@@ -14,6 +14,10 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
     private readonly ConcurrentDictionary<long, ResponseMonitoringPacket> _responseMessages = new();
+    private long _responseRefreshCount;
+    // MQTT publish handshakes have their own state machine; only legacy blocking
+    // request APIs need the generic transport response table.
+    protected virtual bool ShouldTrackResponse(INetworkPacket packet) => true;
     private readonly ConcurrentQueue<NodeMonitoringPacket> _outgoingMessages = new();
     private readonly ConcurrentQueue<NodeMonitoringPacket> _incommingMessages = new();
     protected readonly TicksOptions TicksOptions;
@@ -66,6 +70,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
         _outgoingMessages.Clear();
         _incommingMessages.Clear();
         _responseMessages.Clear();
+        _responseRefreshCount = 0;
     }
 
     public override void Refresh()
@@ -115,10 +120,9 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
         //_incommingMessages.RemoveAll(o => o.Released);
 
 
-        foreach (var packet in _responseMessages)
-        {
-            packet.Value.ReduceWaitTicks();
-        }
+        // Preserve the old timeout's number of Node.Refresh calls, including
+        // repeated refreshes within one graph tick, without visiting every waiter.
+        Interlocked.Increment(ref _responseRefreshCount);
         base.Refresh();
         counters.SetOutgoingQueueLength(_outgoingMessages.Count);
         counters.SetIncommingQueueLength(_incommingMessages.Count);
@@ -190,7 +194,8 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
             Id = NetworkSimulator.GetPacketId(),
             SendTick = NetworkSimulator!.TotalTicks
         };
-        _responseMessages[packet.Id] = new ResponseMonitoringPacket(NetworkSimulator.WaitMode)
+        if (ShouldTrackResponse(packet))
+        _responseMessages[packet.Id] = new ResponseMonitoringPacket(NetworkSimulator.WaitMode, Volatile.Read(ref _responseRefreshCount))
         {
             RequestPacket = packet,
             RequestTick = outgoing.SendTick,
@@ -227,7 +232,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
 
         _responseMessages.TryRemove(packetId, out _);
 
-        if (monitorPacket.IsExpired == true)
+        if (monitorPacket.HasExpired(Volatile.Read(ref _responseRefreshCount)))
         {
             return null;
         }
@@ -274,7 +279,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant
             return null;
         }
 
-        if (monitorPacket.IsExpired == true)
+        if (monitorPacket.HasExpired(Volatile.Read(ref _responseRefreshCount)))
         {
             return null;
         }

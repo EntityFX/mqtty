@@ -12,6 +12,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 {
     public class MqttClient : Client, IMqttClient, IMqttClientPublishStateSink
     {
+        protected override bool ShouldTrackResponse(INetworkPacket packet) =>
+            packet.Category is not ("MQTT Publish" or "MQTT PubAck" or "MQTT PubRec" or "MQTT PubRel" or "MQTT PubComp");
         private readonly PacketIdProvider _packetIdProvider = new();
 
         private readonly IRepository<ClientSession> _sessionRepository
