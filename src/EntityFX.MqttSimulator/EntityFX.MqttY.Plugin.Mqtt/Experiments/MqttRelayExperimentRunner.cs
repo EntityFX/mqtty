@@ -193,9 +193,9 @@ public sealed class MqttRelayExperimentRunner
         StartAndConnect(INetworkSimulator graph)
     {
         var publishers = graph.Clients.Values.OfType<MqttClient>()
-            .Where(client => client.Group == null).ToArray();
-        var relays = graph.Applications.Values.OfType<MqttRelay>().ToArray();
-        var receivers = graph.Applications.Values.OfType<MqttReceiver>().ToArray();
+            .Where(client => client.Group == null).OrderBy(client=>client.Name,StringComparer.Ordinal).ToArray();
+        var relays = graph.Applications.Values.OfType<MqttRelay>().OrderBy(relay=>relay.Name,StringComparer.Ordinal).ToArray();
+        var receivers = graph.Applications.Values.OfType<MqttReceiver>().OrderBy(receiver=>receiver.Name,StringComparer.Ordinal).ToArray();
         foreach (var relay in relays) relay.Start();
         foreach (var receiver in receivers) receiver.Start();
         foreach (var publisher in publishers)

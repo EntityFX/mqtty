@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Xml.Linq;
@@ -36,6 +36,10 @@ public class NetworkSimulator : INetworkSimulator
     private long _errors = 0;
     private long _packetId = 0;
     private int _countNodes = 0;
+    private long _topologyVersion;
+    private long _orderedTopologyVersion = -1;
+    private KeyValuePair<string, INetwork>[] _orderedNetworks = Array.Empty<KeyValuePair<string, INetwork>>();
+    private KeyValuePair<(string Address, NodeType NodeType), ILeafNode>[] _orderedNodes = Array.Empty<KeyValuePair<(string Address, NodeType NodeType), ILeafNode>>();
     private readonly object _measurementResetLock = new();
 
     public SimulationRunMode RunMode { get; set; } = SimulationRunMode.RealTime;
@@ -171,6 +175,7 @@ public class NetworkSimulator : INetworkSimulator
         _nodes.Remove((clientAddress, NodeType.Client), out _);
         _clients.Remove(clientAddress, out _);
         Interlocked.Decrement(ref _countNodes);
+        Interlocked.Increment(ref _topologyVersion);
         client.Clear();
     }
 
@@ -188,6 +193,7 @@ public class NetworkSimulator : INetworkSimulator
 
         UpdateRoutes();
         Interlocked.Decrement(ref _countNodes);
+        Interlocked.Increment(ref _topologyVersion);
         network.Clear();
     }
 
@@ -209,6 +215,7 @@ public class NetworkSimulator : INetworkSimulator
         _nodes.Remove((serverAddress, NodeType.Server), out _);
         _servers.Remove(serverAddress, out _);
         Interlocked.Decrement(ref _countNodes);
+        Interlocked.Increment(ref _topologyVersion);
         server.Clear();
     }
 
@@ -230,6 +237,7 @@ public class NetworkSimulator : INetworkSimulator
         _nodes.Remove((name, NodeType.Application), out _);
         _apps.Remove(name, out _);
         Interlocked.Decrement(ref _countNodes);
+        Interlocked.Increment(ref _topologyVersion);
         application.Clear();
     }
 
@@ -313,12 +321,19 @@ public class NetworkSimulator : INetworkSimulator
     private void RefreshImplementation(NetworkLoggerScope? scope, int strategy)
     {
         var bytes = Array.Empty<byte>();
+        var version = Volatile.Read(ref _topologyVersion);
+        if (_orderedTopologyVersion != version)
+        {
+            _orderedNetworks = _networks.OrderBy(item=>item.Key,StringComparer.Ordinal).ToArray();
+            _orderedNodes = _nodes.OrderBy(item=>item.Key.Address,StringComparer.Ordinal).ThenBy(item=>item.Key.NodeType).ToArray();
+            _orderedTopologyVersion = version;
+        }
 
         _counters.Refresh(TotalTicks, _step);
 
         if (strategy == 0)
         {
-            foreach (var network in _networks)
+            foreach (var network in _orderedNetworks)
             {
                 Monitoring.Push(0, TotalTicks,
                     network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
@@ -326,7 +341,7 @@ public class NetworkSimulator : INetworkSimulator
                 network.Value.Refresh();
             }
 
-            foreach (var node in _nodes)
+            foreach (var node in _orderedNodes)
             {
                 Monitoring.Push(0, TotalTicks,
                     node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
@@ -336,7 +351,7 @@ public class NetworkSimulator : INetworkSimulator
         }
         else
         {
-            foreach (var network in _networks)
+            foreach (var network in _orderedNetworks)
             {
                 Monitoring.Push(0, TotalTicks,
                     network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
@@ -510,6 +525,7 @@ public class NetworkSimulator : INetworkSimulator
         {
             ((NodeBase)client).NetworkSimulator = this;
             Interlocked.Increment(ref _countNodes);
+        Interlocked.Increment(ref _topologyVersion);
         }
 
 
@@ -536,6 +552,7 @@ public class NetworkSimulator : INetworkSimulator
         {
             ((NodeBase)server).NetworkSimulator = this;
             Interlocked.Increment(ref _countNodes);
+        Interlocked.Increment(ref _topologyVersion);
         }
 
         return result;
@@ -561,6 +578,7 @@ public class NetworkSimulator : INetworkSimulator
         {
             ((ApplicationBase)application).NetworkSimulator = this;
             Interlocked.Increment(ref _countNodes);
+        Interlocked.Increment(ref _topologyVersion);
         }
 
 
@@ -586,6 +604,7 @@ public class NetworkSimulator : INetworkSimulator
         ((NodeBase)network).NetworkSimulator = this;
 
         Interlocked.Increment(ref _countNodes);
+        Interlocked.Increment(ref _topologyVersion);
 
         return result;
     }

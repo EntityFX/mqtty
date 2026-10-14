@@ -279,6 +279,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 .ReadAll()
                 .SelectMany(s => s.GetSubscriptions())
                 .Where(x => _topicEvaluator.Matches(publishPacket.Topic, x.TopicFilter))
+                .OrderBy(x => x.ClientId, StringComparer.Ordinal)
+                .ThenBy(x => x.TopicFilter, StringComparer.Ordinal)
                 .ToArray();
 
             foreach (var subscription in subscriptions)
