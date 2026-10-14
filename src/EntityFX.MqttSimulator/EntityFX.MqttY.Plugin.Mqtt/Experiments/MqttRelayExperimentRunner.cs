@@ -41,7 +41,8 @@ public sealed class MqttRelayExperimentRunner
     }
 
     public MqttRelayExperimentResult Run(
-        MqttRelayExperimentOptions options, string outputRoot, ExperimentProvenance provenance)
+        MqttRelayExperimentOptions options, string outputRoot, ExperimentProvenance provenance,
+        ExperimentMetricSummary? independentReference = null)
     {
         var runId = $"{DateTimeOffset.UtcNow:yyyyMMddTHHmmssfffZ}-{Guid.NewGuid():N}";
         var runDirectory = Path.Combine(Path.GetFullPath(outputRoot), runId);
@@ -57,6 +58,7 @@ public sealed class MqttRelayExperimentRunner
             new Dictionary<string, BrokerMetricsSnapshot>();
         var simulated = EmptyMetrics();
         ExperimentMetricSummary? reference = null;
+        var receiverBaselines = new Dictionary<string, long>();
 
         try
         {
@@ -91,6 +93,7 @@ public sealed class MqttRelayExperimentRunner
             phases.Add(new ExperimentPhaseBoundary("warmup", phaseStart, graph.TotalTicks, "completed"));
 
             graph.ResetMeasurement();
+            receiverBaselines = receivers.ToDictionary(receiver => receiver.Name, receiver => receiver.Received);
             measurementStart = graph.TotalTicks;
             phases.Add(new ExperimentPhaseBoundary("resetMeasurement",
                 measurementStart, measurementStart, "completed"));
@@ -108,7 +111,7 @@ public sealed class MqttRelayExperimentRunner
 
             snapshots = NormalizeSnapshots(graph, measurementStart, measurementEnd);
             simulated = AggregateSnapshots(snapshots);
-            reference = BuildReference(options, assignedProfiles);
+            reference = independentReference ?? BuildReference(options, assignedProfiles);
             status = ExperimentRunStatus.Completed;
         }
         catch (ExperimentPhaseException exception)
@@ -129,11 +132,11 @@ public sealed class MqttRelayExperimentRunner
             snapshots = NormalizeSnapshots(graph, measurementStart, measurementEnd);
             simulated = AggregateSnapshots(snapshots);
         }
-        var criteria = Evaluate(options, reference, simulated);
+        var criteria = Evaluate(options, options.TopologyMode == ExperimentTopologyMode.BrokerFidelity ? reference : null, simulated);
         var summary = new MqttRelayExperimentSummary(status, measurementStart, measurementEnd,
             simulated, reference, criteria, error);
         Export(runDirectory, runId, options, provenance, assignedTypes, phases,
-            graph, snapshots, summary);
+            graph, snapshots, summary, receiverBaselines);
         graph?.Clear();
         return new MqttRelayExperimentResult(runDirectory, summary);
     }
@@ -358,7 +361,7 @@ public sealed class MqttRelayExperimentRunner
         ExperimentProvenance provenance, IReadOnlyList<string?> assignedTypes,
         IReadOnlyList<ExperimentPhaseBoundary> phases, INetworkSimulator? graph,
         IReadOnlyDictionary<string, BrokerMetricsSnapshot> snapshots,
-        MqttRelayExperimentSummary summary)
+        MqttRelayExperimentSummary summary, IReadOnlyDictionary<string, long> receiverBaselines)
     {
         var manifest = new ExperimentManifest(runId, DateTimeOffset.UtcNow, options,
             assignedTypes, provenance, RuntimeInformation.OSDescription,
@@ -372,6 +375,9 @@ public sealed class MqttRelayExperimentRunner
         WriteJsonNew(Path.Combine(directory, "counters.json"), new
         {
             brokers = snapshots,
+            receivers = graph?.Applications.Values.OfType<MqttReceiver>()
+                .ToDictionary(receiver => receiver.Name, receiver => receiver.Received - receiverBaselines.GetValueOrDefault(receiver.Name)),
+            receiverScope = "receipts after measurement reset through drain; warmup in-flight arrivals can cross the boundary",
             graph = graph?.Counters.Dump() ?? string.Empty
         });
         WriteJsonNew(Path.Combine(directory, "latency-histogram.json"),

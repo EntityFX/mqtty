@@ -30,17 +30,25 @@ internal static class MqttRelayExperimentCommand
                 ?? throw new InvalidDataException("Experiment configuration is empty.");
             configuration.Validate();
 
-            var profileBytes = File.ReadAllBytes(Path.GetFullPath(configuration.BrokerProfilePath));
-            using var profileStream = new MemoryStream(profileBytes, writable: false);
-            using var profileReader = new StreamReader(profileStream, new UTF8Encoding(false, true), detectEncodingFromByteOrderMarks: true);
-            var profileJson = profileReader.ReadToEnd();
-            var profiles = new BrokerBenchmarkRepository(profileJson);
+            var profiles = new BrokerProfileSet(configuration.ProfilePaths());
+            var mqttYCommit = ResolveCleanCommit(configuration.MqttYRepository);
             var provenance = new ExperimentProvenance(
-                ResolveCleanCommit(configuration.MqttYRepository),
+                mqttYCommit,
                 ResolveCleanCommit(configuration.MqttBenchmarkRepository),
-                Convert.ToHexString(SHA256.HashData(profileBytes)));
+                profiles.Sha256.ToUpperInvariant()) { BrokerProfiles = profiles.Artifacts };
+            ExperimentMetricSummary? reference = null;
+            if (!string.IsNullOrWhiteSpace(configuration.ReferenceObservationsPath))
+            {
+                if (configuration.Experiment.TopologyMode != ExperimentTopologyMode.BrokerFidelity || configuration.Experiment.Brokers != 1)
+                    throw new InvalidDataException("Independent observations require one BrokerFidelity broker.");
+                var bytes = File.ReadAllBytes(Path.GetFullPath(configuration.ReferenceObservationsPath));
+                var broker = configuration.Experiment.ResolveBrokerTypes().Single()!;
+                IndependentObservationReference.EnsureIndependent(bytes, profiles.Artifacts);
+                reference = IndependentObservationReference.Read(bytes, broker, configuration.Experiment, mqttYCommit);
+                provenance = provenance with { ReferenceObservationsSha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant() };
+            }
             var result = new MqttRelayExperimentRunner(configuration.Ticks, configuration.Network, profiles)
-                .Run(configuration.Experiment, outputPath, provenance);
+                .Run(configuration.Experiment, outputPath, provenance, reference);
 
             Console.WriteLine($"Run directory: {result.RunDirectory}");
             Console.WriteLine($"Status: {result.Summary.Status}");
@@ -61,7 +69,7 @@ internal static class MqttRelayExperimentCommand
         try
         {
             var arguments = ParseArguments(args);
-            if (arguments.Keys.Any(key => key is not ("observations" or "output" or "mqtty-repository" or "rate-rejection-rate")))
+            if (arguments.Keys.Any(key => key is not ("observations" or "output" or "mqtty-repository" or "rate-rejection-rate" or "broker")))
                 throw new ArgumentException("Unknown calibration argument.");
             var inputPath = Path.GetFullPath(Required(arguments, "observations"));
             var outputPath = Path.GetFullPath(Required(arguments, "output"));
@@ -70,7 +78,8 @@ internal static class MqttRelayExperimentCommand
             var rate = arguments.TryGetValue("rate-rejection-rate", out var text)
                 ? double.Parse(text, CultureInfo.InvariantCulture) : 0;
             var bytes = BrokerCalibrationV3.Calibrate(File.ReadAllBytes(inputPath),
-                ResolveCleanCommit(Required(arguments, "mqtty-repository")), rate);
+                ResolveCleanCommit(Required(arguments, "mqtty-repository")), rate,
+                arguments.TryGetValue("broker", out var broker) ? broker : null);
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
             using var stream = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
             stream.Write(bytes);
@@ -81,7 +90,7 @@ internal static class MqttRelayExperimentCommand
         catch (Exception error)
         {
             Console.Error.WriteLine(error.Message);
-            Console.Error.WriteLine("Usage: EntityFX.MqttY.MqttRelay.App calibrate --observations <broker-observations.v3.json> --output <broker-calibration.v3.json> --mqtty-repository <clean-repository> [--rate-rejection-rate <0..1>]");
+            Console.Error.WriteLine("Usage: EntityFX.MqttY.MqttRelay.App calibrate --observations <broker-observations.v3.json> --output <broker-calibration.v3.json> --mqtty-repository <clean-repository> [--rate-rejection-rate <0..1>] [--broker <name>]");
             return 1;
         }
     }
@@ -151,6 +160,15 @@ internal sealed class MqttRelayExperimentRunConfiguration
     public string MqttYRepository { get; set; } = ".";
     public string MqttBenchmarkRepository { get; set; } = string.Empty;
     public string BrokerProfilePath { get; set; } = string.Empty;
+    public string[] BrokerProfilePaths { get; set; } = Array.Empty<string>();
+    public string? ReferenceObservationsPath { get; set; }
+
+    public string[] ProfilePaths()
+    {
+        if (!string.IsNullOrWhiteSpace(BrokerProfilePath) == (BrokerProfilePaths.Length > 0))
+            throw new InvalidDataException("Specify exactly one of brokerProfilePath and brokerProfilePaths.");
+        return string.IsNullOrWhiteSpace(BrokerProfilePath) ? BrokerProfilePaths : new[] { BrokerProfilePath };
+    }
 
     public void Validate()
     {
@@ -158,11 +176,11 @@ internal sealed class MqttRelayExperimentRunConfiguration
         Ticks.Validate();
         Network.Validate();
         if (string.IsNullOrWhiteSpace(MqttYRepository) ||
-            string.IsNullOrWhiteSpace(MqttBenchmarkRepository) ||
-            string.IsNullOrWhiteSpace(BrokerProfilePath))
+            string.IsNullOrWhiteSpace(MqttBenchmarkRepository))
             throw new InvalidDataException(
                 "MqttYRepository, MqttBenchmarkRepository and BrokerProfilePath are required.");
-        if (!File.Exists(Path.GetFullPath(BrokerProfilePath)))
-            throw new FileNotFoundException("Broker profile was not found.", BrokerProfilePath);
+        foreach (var path in ProfilePaths())
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(Path.GetFullPath(path)))
+                throw new FileNotFoundException("Broker profile was not found.", path);
     }
 }

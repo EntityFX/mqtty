@@ -14,16 +14,17 @@ public static class BrokerCalibrationV3
     private static readonly string[] Brokers = { "Aedes", "Mosquitto", "EMQX", "ActiveMQ" };
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
 
-    public static byte[] Calibrate(byte[] observationsBytes, string mqttYCommitSha, double rateRejectionRate = 0)
+    public static byte[] Calibrate(byte[] observationsBytes, string mqttYCommitSha, double rateRejectionRate = 0, string? broker = null)
     {
         Hash(mqttYCommitSha, 40);
         Rate(rateRejectionRate);
         var source = Parse(observationsBytes);
         Fields(source, "schemaVersion", "runCount", "provenance", "points");
-        Header(source);
+        Header(source, broker == null ? 288 : 72);
+        if (broker != null && !Brokers.Contains(broker)) throw Invalid("Unknown calibration broker.");
         ValidateObservationProvenance(Object(source, "provenance"));
         var outputPoints = new JsonArray();
-        foreach (var point in Points(source))
+        foreach (var point in Points(source, broker))
         {
             Fields(point, "broker", "messageBytes", "qos", "publishers", "repeats", "attemptedRps", "completedRps",
                 "publishFailureRate", "deliveryLossRate", "observedLatencyQuantiles", "observedLatencyStatistics", "rttBaselineMs");
@@ -64,7 +65,7 @@ public static class BrokerCalibrationV3
         }
         var output = new JsonObject
         {
-            ["schemaVersion"] = 3, ["artifactType"] = "broker-calibration", ["runCount"] = 288,
+            ["schemaVersion"] = 3, ["artifactType"] = "broker-calibration", ["runCount"] = Integer(source, "runCount"),
             ["profileClientCountMode"] = "publishers",
             ["provenance"] = new JsonObject
             {
@@ -82,7 +83,9 @@ public static class BrokerCalibrationV3
     {
         var source = Parse(bytes);
         Fields(source, "schemaVersion", "artifactType", "runCount", "profileClientCountMode", "provenance", "points");
-        Header(source);
+        var scope = Integer(source, "runCount") == 72
+            ? Text(ObjectInPoints(source), "broker") : null;
+        Header(source, scope == null ? 288 : 72);
         if (Text(source, "artifactType") != "broker-calibration" || Text(source, "profileClientCountMode") != "publishers")
             throw Invalid("Expected broker-calibration artifact indexed by publishers.");
         var provenance = Object(source, "provenance");
@@ -92,7 +95,7 @@ public static class BrokerCalibrationV3
         if (Text(provenance, "method") != "conditional-failure-rtt-v1") throw Invalid("Unknown calibration method.");
         ValidateObservationProvenance(Object(provenance, "observations"));
         var profiles = new Dictionary<string, MqttBrokerProfile>(StringComparer.Ordinal);
-        var points = Points(source).ToArray();
+        var points = Points(source, scope).ToArray();
         foreach (var point in points)
         {
             Fields(point, "broker", "messageBytes", "qos", "publishers", "repeats", "attemptedRps", "targetCompletedRps",
@@ -181,25 +184,30 @@ public static class BrokerCalibrationV3
         return result;
     }
 
-    private static IEnumerable<JsonObject> Points(JsonObject source)
+    private static JsonObject ObjectInPoints(JsonObject source) =>
+        source["points"] is JsonArray { Count: > 0 } points && points[0] is JsonObject first
+            ? first : throw Invalid("Calibration points are required.");
+
+    private static IEnumerable<JsonObject> Points(JsonObject source, string? broker = null)
     {
-        if (source["points"] is not JsonArray points || points.Count != 96) throw Invalid("Requires all 96 points / 288 runs.");
+        var count = broker == null ? 96 : 24;
+        if (source["points"] is not JsonArray points || points.Count != count) throw Invalid($"Requires all {count} points / {count * 3} runs.");
         var keys = new HashSet<(string, int, int, int)>();
         foreach (var value in points)
         {
             if (value is not JsonObject point) throw Invalid("Point must be an object.");
             var key = (Text(point, "broker"), Integer(point, "messageBytes"), Integer(point, "qos"), Integer(point, "publishers"));
-            if (!Brokers.Contains(key.Item1) || key.Item2 is not (16 or 256) || key.Item3 is < 0 or > 2 ||
+            if (!Brokers.Contains(key.Item1) || (broker != null && key.Item1 != broker) || key.Item2 is not (16 or 256) || key.Item3 is < 0 or > 2 ||
                 key.Item4 is not (1 or 16 or 64 or 128) || Integer(point, "repeats") != 3 || !keys.Add(key))
                 throw Invalid("Unknown or duplicate point key, or wrong repeats.");
             yield return point;
         }
     }
 
-    private static void Header(JsonObject source)
+    private static void Header(JsonObject source, int runCount = 288)
     {
-        if (Integer(source, "schemaVersion") != 3 || Integer(source, "runCount") != 288)
-            throw Invalid("Expected schemaVersion 3 and 288 successful runs.");
+        if (Integer(source, "schemaVersion") != 3 || Integer(source, "runCount") != runCount)
+            throw Invalid($"Expected schemaVersion 3 and {runCount} successful runs.");
     }
 
     private static void ValidateObservationProvenance(JsonObject provenance)

@@ -12,7 +12,13 @@ public enum ExperimentRunStatus
 public sealed record ExperimentProvenance(
     string MqttYCommitSha,
     string MqttBenchmarkCommitSha,
-    string BrokerProfileSha256);
+    string BrokerProfileSha256)
+{
+    public IReadOnlyList<BrokerProfileArtifact> BrokerProfiles { get; init; } = Array.Empty<BrokerProfileArtifact>();
+    public string? ReferenceObservationsSha256 { get; init; }
+}
+
+public sealed record BrokerProfileArtifact(string Path, string Sha256, System.Text.Json.JsonElement? Provenance);
 
 public sealed record ExperimentMetricSummary(
     long Attempted,

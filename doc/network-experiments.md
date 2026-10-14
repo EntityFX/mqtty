@@ -35,6 +35,18 @@ ConfigPath — новый файл. Run output — общий parent; runner с�
 
 ## MqttRelay: смешанная сеть
 
+Для отдельных calibrated файлов задайте `brokerProfilePaths: ["<aedes.json>", "<mosquitto.json>", "<activemq.json>", "<emqx.json>"]`
+вместо `brokerProfilePath`. Поля взаимоисключающие. Дубли брокеров и несовместимые
+source commits/CPU/deployment modes отклоняются; manifest хранит SHA-256 и provenance
+каждого исходного файла. Их campaign identities не объединяются.
+
+Для независимого BrokerFidelity используйте `referenceObservationsPath` с полной
+72/24 observations одного брокера другой кампании той же установки. Профиль
+сохраняется неизменным; reference применяется только к критериям сравнения.
+Для relay критерии натурной fidelity имеют статус notApplicable;
+single-broker reference остаётся диагностическим. `counters.json` экспортирует
+receipts каждого receiver после measurement reset через drain.
+
 Скопируйте [mqtt-relay.v3.json](examples/mqtt-relay.v3.json) в `results/relay.local.json`, проверьте путь внешнего профиля и два source repositories. В примере четыре области с Mosquitto/ActiveMQ/Aedes/EMQX, по одному publisher; networkLength=2, topologyMode=mqttRelay, assignment=mixed. У mixedBrokerTypes ровно B элементов; имена с учётом регистра как в calibration. Для single assignment JSON enum использует camelCase, например mosquitto.
 
 ```powershell
