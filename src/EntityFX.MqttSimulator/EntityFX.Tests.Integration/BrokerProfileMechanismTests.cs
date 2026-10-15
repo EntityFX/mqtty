@@ -25,7 +25,8 @@ namespace EntityFX.Tests.Integration
         {
             var limiter = new BrokerRateLimiter(8, TimeSpan.FromSeconds(1));
             Assert.IsFalse(limiter.TryAcquire(0));
-            for (var i = 0; i < 8; i++) Assert.IsTrue(limiter.TryAcquire(1000000));
+            // Idle credit is bounded to one tick plus one message, not all idle time.
+            for (var i = 0; i < 9; i++) Assert.IsTrue(limiter.TryAcquire(1000000));
             Assert.IsFalse(limiter.TryAcquire(1000000));
             for (var i = 0; i < 8; i++) Assert.IsTrue(limiter.TryAcquire(1000001));
             Assert.IsFalse(limiter.TryAcquire(1000001));
@@ -46,6 +47,73 @@ namespace EntityFX.Tests.Integration
                 }
             }
             return acquired;
+        }
+
+        [DataTestMethod]
+        [DataRow(3333.3)]
+        [DataRow(9999.9)]
+        [DataRow(10000.1)]
+        [DataRow(36087.894937787474)]
+        [DataRow(54981.25)]
+        public void TryAcquire_FractionalCapacityIsPreservedUnderSustainedOverload(double rps)
+        {
+            var tickPeriod = TimeSpan.FromMilliseconds(0.1);
+            var limiter = new BrokerRateLimiter(rps, tickPeriod);
+            const int ticks = 100_000;
+            var attemptsPerTick = (int)Math.Ceiling(rps * tickPeriod.TotalSeconds) + 2;
+            var admitted = CountAcquired(limiter, ticks + 1, attemptsPerTick);
+            var expected = rps * ticks * tickPeriod.TotalSeconds;
+
+            Assert.AreEqual(expected, admitted, 1.0,
+                "Overload must consume the fractional capacity without exceeding the configured rate.");
+        }
+
+        [DataTestMethod]
+        [DataRow(3333.3)]
+        [DataRow(10000.1)]
+        [DataRow(36087.894937787474)]
+        public void TryAcquire_TickBatchesAtConfiguredRateAreNotRejected(double rps)
+        {
+            var tokensPerTick = rps * 0.0001;
+            var limiter = new BrokerRateLimiter(rps, TimeSpan.FromMilliseconds(0.1));
+            long previousOffered = 0;
+            for (var tick = 1; tick <= 100_000; tick++)
+            {
+                var offered = (long)Math.Floor(tick * tokensPerTick);
+                for (var i = previousOffered; i < offered; i++)
+                    Assert.IsTrue(limiter.TryAcquire(tick), $"Spurious rejection at tick {tick}, RPS {rps}");
+                previousOffered = offered;
+            }
+        }
+
+        [TestMethod]
+        public void TryAcquire_FractionalRateStillBoundsIdleBurstAndSubsequentOverload()
+        {
+            var limiter = new BrokerRateLimiter(36087.894937787474, TimeSpan.FromMilliseconds(0.1));
+            const long idleTick = 1_000_000;
+            var admitted = 0;
+            for (var i = 0; i < 100; i++)
+                if (limiter.TryAcquire(idleTick)) admitted++;
+            Assert.AreEqual(4, admitted, "Long idle must not accumulate unbounded capacity.");
+            for (var tick = idleTick + 1; tick <= idleTick + 10_000; tick++)
+            {
+                for (var i = 0; i < 10; i++)
+                    if (limiter.TryAcquire(tick)) admitted++;
+                Assert.IsTrue(admitted <= Math.Floor(limiter.BurstTokens +
+                    (tick - idleTick) * 3.6087894937787474 + 1e-9),
+                    "Admission must stay within initial burst plus accrued capacity.");
+            }
+        }
+
+        [TestMethod]
+        public void Update_ResetsCreditAndUsesNewFractionalRate()
+        {
+            var limiter = new BrokerRateLimiter(80_000, TimeSpan.FromMilliseconds(0.1));
+            Assert.IsTrue(limiter.TryAcquire(100));
+            limiter.Update(3333.3, TimeSpan.FromMilliseconds(0.1));
+            Assert.IsFalse(limiter.TryAcquire(0));
+            var admitted = CountAcquired(limiter, 100_001, 2);
+            Assert.AreEqual(33333.0, admitted, 1.0);
         }
 
         [TestMethod]

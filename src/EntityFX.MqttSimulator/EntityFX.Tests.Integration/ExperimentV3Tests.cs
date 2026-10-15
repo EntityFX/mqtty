@@ -37,6 +37,44 @@ public class ExperimentV3Tests
     }
     private static string Temp() => Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "mqtty-v3-" + Guid.NewGuid().ToString("N"))).FullName;
 
+    [DataTestMethod]
+    [DataRow(MqttQos.AtMostOnce)]
+    [DataRow(MqttQos.AtLeastOnce)]
+    [DataRow(MqttQos.ExactlyOnce)]
+    public void BrokerFidelity_FractionalCapacityDoesNotCreatePublishFailures(MqttQos qos)
+    {
+        var root = Temp();
+        try
+        {
+            const double capacity = 36087.894937787474;
+            var options = Options();
+            options.TopologyMode = ExperimentTopologyMode.BrokerFidelity;
+            options.ProfileClientCountMode = ProfileClientCountMode.Publishers;
+            options.ClientsPerBroker = 1;
+            options.PublishQos = qos;
+            options.SubscribeQos = qos;
+            options.OfferedRps = capacity;
+            options.WarmupTicks = 100;
+            options.MeasurementTicks = 1000;
+            options.DrainTimeoutTicks = 1000;
+            var ticks = Ticks();
+            ticks.TickPeriod = TimeSpan.FromMilliseconds(0.1);
+            var profile = BrokerProfileTestData.Create("Mosquitto", 16, capacity);
+            var runner = new MqttRelayExperimentRunner(ticks, Network(), new Repository(profile));
+            var first = runner.Run(options, root, new("y", "b", "p"));
+            var second = runner.Run(options, root, new("y", "b", "p"));
+            Assert.AreEqual(ExperimentRunStatus.Completed, first.Summary.Status, first.Summary.Error);
+            var metrics = first.Summary.Simulated;
+            Assert.IsTrue(metrics.Attempted > 3600, "The full fractional offered rate must reach the broker.");
+            Assert.AreEqual(0L, metrics.RateRejected, "The calibrated capacity must not create artificial failures.");
+            Assert.AreEqual(0L, metrics.PublishFailed);
+            Assert.AreEqual(metrics.Attempted, metrics.Completed);
+            Assert.AreEqual(metrics.ExpectedDeliveries, metrics.Delivered);
+            Assert.AreEqual(JsonSerializer.Serialize(first.Summary), JsonSerializer.Serialize(second.Summary));
+        }
+        finally { Cleanup(root); }
+    }
+
     [TestMethod]
     public void Options_RejectUnknownTopologyAndProfileCountMode()
     {
