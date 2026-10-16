@@ -35,7 +35,8 @@ public sealed class BrokerProfileSet : IBrokerBenchmarkRepository
                 var key = string.Join("/", identity.GetProperty("cpuMode").GetString(),
                     identity.GetProperty("deploymentMode").GetString(),
                     identity.GetProperty("mqttBenchmarkCommitSha").GetString(),
-                    provenance.Value.GetProperty("mqttYCommitSha").GetString());
+                    provenance.Value.GetProperty("mqttYCommitSha").GetString(),
+                    provenance.Value.TryGetProperty("coverageProtocol", out var coverage) ? coverage.GetString() : "full-v3");
                 if (compatibility != null && compatibility != key)
                     throw new InvalidDataException("Profile source commits, deployment and CPU modes must match.");
                 compatibility = key;

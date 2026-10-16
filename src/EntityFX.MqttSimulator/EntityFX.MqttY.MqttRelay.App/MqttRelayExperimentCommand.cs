@@ -43,8 +43,8 @@ internal static class MqttRelayExperimentCommand
                     throw new InvalidDataException("Independent observations require one BrokerFidelity broker.");
                 var bytes = File.ReadAllBytes(Path.GetFullPath(configuration.ReferenceObservationsPath));
                 var broker = configuration.Experiment.ResolveBrokerTypes().Single()!;
-                IndependentObservationReference.EnsureIndependent(bytes, profiles.Artifacts);
-                reference = IndependentObservationReference.Read(bytes, broker, configuration.Experiment, mqttYCommit);
+                IndependentObservationReference.EnsureIndependent(bytes, profiles.Artifacts, configuration.ReferenceCoverageProtocol);
+                reference = IndependentObservationReference.Read(bytes, broker, configuration.Experiment, mqttYCommit, configuration.ReferenceCoverageProtocol);
                 provenance = provenance with { ReferenceObservationsSha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant() };
             }
             var result = new MqttRelayExperimentRunner(configuration.Ticks, configuration.Network, profiles)
@@ -69,7 +69,7 @@ internal static class MqttRelayExperimentCommand
         try
         {
             var arguments = ParseArguments(args);
-            if (arguments.Keys.Any(key => key is not ("observations" or "output" or "mqtty-repository" or "rate-rejection-rate" or "broker")))
+            if (arguments.Keys.Any(key => key is not ("observations" or "output" or "mqtty-repository" or "rate-rejection-rate" or "broker" or "coverage-protocol")))
                 throw new ArgumentException("Unknown calibration argument.");
             var inputPath = Path.GetFullPath(Required(arguments, "observations"));
             var outputPath = Path.GetFullPath(Required(arguments, "output"));
@@ -79,7 +79,8 @@ internal static class MqttRelayExperimentCommand
                 ? double.Parse(text, CultureInfo.InvariantCulture) : 0;
             var bytes = BrokerCalibrationV3.Calibrate(File.ReadAllBytes(inputPath),
                 ResolveCleanCommit(Required(arguments, "mqtty-repository")), rate,
-                arguments.TryGetValue("broker", out var broker) ? broker : null);
+                arguments.TryGetValue("broker", out var broker) ? broker : null,
+                arguments.TryGetValue("coverage-protocol", out var coverage) ? coverage : null);
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
             using var stream = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
             stream.Write(bytes);
@@ -90,7 +91,7 @@ internal static class MqttRelayExperimentCommand
         catch (Exception error)
         {
             Console.Error.WriteLine(error.Message);
-            Console.Error.WriteLine("Usage: EntityFX.MqttY.MqttRelay.App calibrate --observations <broker-observations.v3.json> --output <broker-calibration.v3.json> --mqtty-repository <clean-repository> [--rate-rejection-rate <0..1>] [--broker <name>]");
+            Console.Error.WriteLine("Usage: EntityFX.MqttY.MqttRelay.App calibrate --observations <broker-observations.v3.json> --output <broker-calibration.v3.json> --mqtty-repository <clean-repository> [--rate-rejection-rate <0..1>] [--broker <name>] [--coverage-protocol compact-v1]");
             return 1;
         }
     }
@@ -162,6 +163,7 @@ internal sealed class MqttRelayExperimentRunConfiguration
     public string BrokerProfilePath { get; set; } = string.Empty;
     public string[] BrokerProfilePaths { get; set; } = Array.Empty<string>();
     public string? ReferenceObservationsPath { get; set; }
+    public string? ReferenceCoverageProtocol { get; set; }
 
     public string[] ProfilePaths()
     {
@@ -172,6 +174,9 @@ internal sealed class MqttRelayExperimentRunConfiguration
 
     public void Validate()
     {
+        if (ReferenceCoverageProtocol != null &&
+            (ReferenceCoverageProtocol != "compact-v1" || string.IsNullOrWhiteSpace(ReferenceObservationsPath)))
+            throw new InvalidDataException("Reference coverage requires compact-v1 and an observations path.");
         Experiment.Validate();
         Ticks.Validate();
         Network.Validate();

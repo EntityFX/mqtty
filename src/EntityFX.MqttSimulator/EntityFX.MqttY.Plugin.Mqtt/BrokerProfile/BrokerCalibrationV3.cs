@@ -14,17 +14,20 @@ public static class BrokerCalibrationV3
     private static readonly string[] Brokers = { "Aedes", "Mosquitto", "EMQX", "ActiveMQ" };
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, WriteIndented = true };
 
-    public static byte[] Calibrate(byte[] observationsBytes, string mqttYCommitSha, double rateRejectionRate = 0, string? broker = null)
+    public static byte[] Calibrate(byte[] observationsBytes, string mqttYCommitSha, double rateRejectionRate = 0, string? broker = null,
+        string? coverageProtocol = null)
     {
+        var compact = Compact(coverageProtocol);
+        if (compact && broker == null) throw Invalid("compact-v1 requires an explicit single broker.");
         Hash(mqttYCommitSha, 40);
         Rate(rateRejectionRate);
         var source = Parse(observationsBytes);
         Fields(source, "schemaVersion", "runCount", "provenance", "points");
-        Header(source, broker == null ? 288 : 72);
+        Header(source, compact ? 36 : broker == null ? 288 : 72);
         if (broker != null && !Brokers.Contains(broker)) throw Invalid("Unknown calibration broker.");
         ValidateObservationProvenance(Object(source, "provenance"));
         var outputPoints = new JsonArray();
-        foreach (var point in Points(source, broker))
+        foreach (var point in Points(source, broker, compact))
         {
             Fields(point, "broker", "messageBytes", "qos", "publishers", "repeats", "attemptedRps", "completedRps",
                 "publishFailureRate", "deliveryLossRate", "observedLatencyQuantiles", "observedLatencyStatistics", "rttBaselineMs");
@@ -65,7 +68,7 @@ public static class BrokerCalibrationV3
         }
         var output = new JsonObject
         {
-            ["schemaVersion"] = 3, ["artifactType"] = "broker-calibration", ["runCount"] = Integer(source, "runCount"),
+            ["schemaVersion"] = 3, ["artifactType"] = compact ? "broker-calibration-compact-v1" : "broker-calibration", ["runCount"] = Integer(source, "runCount"),
             ["profileClientCountMode"] = "publishers",
             ["provenance"] = new JsonObject
             {
@@ -76,6 +79,7 @@ public static class BrokerCalibrationV3
             },
             ["points"] = outputPoints
         };
+        if (compact) output["provenance"]!["coverageProtocol"] = "compact-v1";
         return JsonSerializer.SerializeToUtf8Bytes(output, Json);
     }
 
@@ -83,19 +87,25 @@ public static class BrokerCalibrationV3
     {
         var source = Parse(bytes);
         Fields(source, "schemaVersion", "artifactType", "runCount", "profileClientCountMode", "provenance", "points");
-        var scope = Integer(source, "runCount") == 72
+        var compact = Text(source, "artifactType") == "broker-calibration-compact-v1";
+        var scope = compact || Integer(source, "runCount") == 72
             ? Text(ObjectInPoints(source), "broker") : null;
-        Header(source, scope == null ? 288 : 72);
-        if (Text(source, "artifactType") != "broker-calibration" || Text(source, "profileClientCountMode") != "publishers")
+        Header(source, compact ? 36 : scope == null ? 288 : 72);
+        if ((!compact && Text(source, "artifactType") != "broker-calibration") || Text(source, "profileClientCountMode") != "publishers")
             throw Invalid("Expected broker-calibration artifact indexed by publishers.");
         var provenance = Object(source, "provenance");
-        Fields(provenance, "observationsSha256", "mqttYCommitSha", "method", "observations");
+        if (compact)
+        {
+            Fields(provenance, "observationsSha256", "mqttYCommitSha", "method", "observations", "coverageProtocol");
+            if (!Compact(Text(provenance, "coverageProtocol"))) throw Invalid("Compact coverage must be explicit.");
+        }
+        else Fields(provenance, "observationsSha256", "mqttYCommitSha", "method", "observations");
         Hash(Text(provenance, "observationsSha256"), 64);
         Hash(Text(provenance, "mqttYCommitSha"), 40);
         if (Text(provenance, "method") != "conditional-failure-rtt-v1") throw Invalid("Unknown calibration method.");
         ValidateObservationProvenance(Object(provenance, "observations"));
         var profiles = new Dictionary<string, MqttBrokerProfile>(StringComparer.Ordinal);
-        var points = Points(source, scope).ToArray();
+        var points = Points(source, scope, compact).ToArray();
         foreach (var point in points)
         {
             Fields(point, "broker", "messageBytes", "qos", "publishers", "repeats", "attemptedRps", "targetCompletedRps",
@@ -188,9 +198,16 @@ public static class BrokerCalibrationV3
         source["points"] is JsonArray { Count: > 0 } points && points[0] is JsonObject first
             ? first : throw Invalid("Calibration points are required.");
 
-    private static IEnumerable<JsonObject> Points(JsonObject source, string? broker = null)
+    private static bool Compact(string? protocol) => protocol switch
     {
-        var count = broker == null ? 96 : 24;
+        null => false,
+        "compact-v1" => true,
+        _ => throw Invalid("Unknown coverage protocol.")
+    };
+
+    private static IEnumerable<JsonObject> Points(JsonObject source, string? broker = null, bool compact = false)
+    {
+        var count = compact ? 12 : broker == null ? 96 : 24;
         if (source["points"] is not JsonArray points || points.Count != count) throw Invalid($"Requires all {count} points / {count * 3} runs.");
         var keys = new HashSet<(string, int, int, int)>();
         foreach (var value in points)
@@ -198,7 +215,7 @@ public static class BrokerCalibrationV3
             if (value is not JsonObject point) throw Invalid("Point must be an object.");
             var key = (Text(point, "broker"), Integer(point, "messageBytes"), Integer(point, "qos"), Integer(point, "publishers"));
             if (!Brokers.Contains(key.Item1) || (broker != null && key.Item1 != broker) || key.Item2 is not (16 or 256) || key.Item3 is < 0 or > 2 ||
-                key.Item4 is not (1 or 16 or 64 or 128) || Integer(point, "repeats") != 3 || !keys.Add(key))
+                (compact ? key.Item4 is not (1 or 16) : key.Item4 is not (1 or 16 or 64 or 128)) || Integer(point, "repeats") != 3 || !keys.Add(key))
                 throw Invalid("Unknown or duplicate point key, or wrong repeats.");
             yield return point;
         }
