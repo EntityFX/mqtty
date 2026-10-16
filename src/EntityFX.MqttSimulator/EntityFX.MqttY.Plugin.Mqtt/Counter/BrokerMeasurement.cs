@@ -53,13 +53,13 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                     Qos = qos,
                     PacketId = packetId,
                     NetworkPacketId = networkPacketId,
-                    Generation = _generation,
+                    Generation = startTick < _startTick ? _generation - 1 : _generation,
                     StartTick = startTick,
                     LocalPublishSequence = localPublishSequence,
                     MessageBytes = messageBytes
                 };
                 _publishes[key] = tracker;
-                _accumulators[(int)qos].Attempted++;
+                if (tracker.Generation == _generation) _accumulators[(int)qos].Attempted++;
                 return tracker;
             }
         }

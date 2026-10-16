@@ -48,6 +48,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
                         if (version.ValueKind != JsonValueKind.Number || !version.TryGetInt32(out var number))
                             throw new InvalidDataException("schemaVersion must be an integer.");
                         if (number == 3) return BrokerCalibrationV3.ReadProfiles(System.Text.Encoding.UTF8.GetBytes(json));
+                        if (number == 4) return BrokerCalibrationEmpirical.ReadProfiles(System.Text.Encoding.UTF8.GetBytes(json));
                     }
                 }
                 dto = JsonSerializer.Deserialize<BrokerBenchmarkV2Dto>(json,

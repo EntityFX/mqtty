@@ -12,5 +12,6 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
         public double? TargetPublishFailureRate { get; init; }
         public LatencyQuantiles? ObservedLatencyQuantiles { get; init; }
         public double? RttBaselineMs { get; init; }
+        public EmpiricalLatencyDistribution? ProcessingLatencyDistribution { get; init; }
     }
 }

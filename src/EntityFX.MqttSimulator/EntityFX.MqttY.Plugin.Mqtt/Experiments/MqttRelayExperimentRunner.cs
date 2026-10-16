@@ -226,6 +226,19 @@ public sealed class MqttRelayExperimentRunner
         for (long tick = 0; tick < ticks; tick++)
         {
             tokens += tokensPerTick;
+            if (options.LoadMode == PublishLoadMode.ClosedLoopPerPublisher)
+            {
+                tokens = Math.Min(tokens, publishers.Count);
+                for (var scanned = 0; scanned < publishers.Count && tokens >= 1; scanned++)
+                {
+                    var publisher = publishers[publisherIndex++ % publishers.Count];
+                    if (options.PublishQos != MqttQos.AtMostOnce && publisher.HasPendingPublish) continue;
+                    publisher.Publish("telemetry/data", payload, options.PublishQos);
+                    tokens -= 1;
+                }
+                graph.RefreshWithCounters(options.Parallel, options.RefreshStrategy);
+                continue;
+            }
             var publishCount = (long)Math.Floor(tokens + 1e-12);
             tokens -= publishCount;
             for (long message = 0; message < publishCount; message++)

@@ -9,6 +9,7 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
 
         public IDictionary<int, MqttMessageSizeProfile> MessageSizes { get; init; }
             = new Dictionary<int, MqttMessageSizeProfile>();
+        public bool RequireObservedPublisherCount { get; init; }
 
         public CalibratedMqttQosSample For(int messageBytes, MqttQos qos, int clients)
         {
@@ -21,6 +22,8 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
             if (!messageProfile.Qos.TryGetValue(qos, out var qosProfile))
                 throw new KeyNotFoundException(
                     $"Broker '{BrokerType}' has no calibration for MessageBytes={messageBytes}, QoS={(int)qos}.");
+            if (RequireObservedPublisherCount && !qosProfile.Samples.Any(sample => sample.Clients == clients))
+                throw new InvalidDataException("Empirical profile requires an observed publisher-count point.");
             return qosProfile.Interpolate(clients);
         }
 

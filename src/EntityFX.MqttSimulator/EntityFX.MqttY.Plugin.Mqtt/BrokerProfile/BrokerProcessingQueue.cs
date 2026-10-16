@@ -16,7 +16,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
 
         public void Enqueue(INetworkPacket packet, int processingTicks)
         {
-            _items.Enqueue(new PendingItem(packet, Math.Max(1, processingTicks)));
+            if (processingTicks < 0) throw new ArgumentOutOfRangeException(nameof(processingTicks));
+            _items.Enqueue(new PendingItem(packet, processingTicks));
         }
 
         /// <summary>

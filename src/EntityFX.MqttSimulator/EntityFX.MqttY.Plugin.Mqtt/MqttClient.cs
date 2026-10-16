@@ -41,6 +41,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         public string ClientId { get; set; }
 
+        public bool HasPendingPublish => _sessionRepository.ReadAll().Any(session =>
+            session.GetPendingMessages().Any());
+
         public SessionState? CurrentSessionState { get; private set; }
 
         public string Server => ServerName ?? string.Empty;
@@ -258,7 +261,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             INetworkPacket packetPayload = GetContextPacket(NetworkSimulator!.GetPacketId(), ServerName ?? string.Empty,
                 NodeType.Server,
                 ServerIndex ?? -1,
-                _packetManager.PacketToBytes(publish), ProtocolType, localPublishSequence, "MQTT Publish");
+                _packetManager.PacketToBytes(publish), ProtocolType,
+                new PublishIdentity(localPublishSequence, NetworkSimulator.TotalTicks), "MQTT Publish");
             var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packetPayload!,
                 $"Publish {Name} to {packetPayload.To} with topic {topic}");
 

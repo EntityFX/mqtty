@@ -28,7 +28,7 @@ public sealed class BrokerProfileSet : IBrokerBenchmarkRepository
             var repository = new BrokerBenchmarkRepository(json);
             JsonElement? provenance = null;
             IEnumerable<string> names;
-            if (root.GetProperty("schemaVersion").GetInt32() == 3)
+            if (root.GetProperty("schemaVersion").GetInt32() is 3 or 4)
             {
                 provenance = root.GetProperty("provenance").Clone();
                 var identity = provenance.Value.GetProperty("observations").GetProperty("identity");
@@ -36,11 +36,13 @@ public sealed class BrokerProfileSet : IBrokerBenchmarkRepository
                     identity.GetProperty("deploymentMode").GetString(),
                     identity.GetProperty("mqttBenchmarkCommitSha").GetString(),
                     provenance.Value.GetProperty("mqttYCommitSha").GetString(),
-                    provenance.Value.TryGetProperty("coverageProtocol", out var coverage) ? coverage.GetString() : "full-v3");
+                    provenance.Value.TryGetProperty("coverageProtocol", out var coverage) ? coverage.GetString() : "full-v3",
+                    root.GetProperty("schemaVersion").GetInt32(), provenance.Value.GetProperty("method").GetString());
                 if (compatibility != null && compatibility != key)
                     throw new InvalidDataException("Profile source commits, deployment and CPU modes must match.");
                 compatibility = key;
-                names = root.GetProperty("points").EnumerateArray()
+                var pointsRoot = root.GetProperty("schemaVersion").GetInt32() == 4 ? root.GetProperty("calibration") : root;
+                names = pointsRoot.GetProperty("points").EnumerateArray()
                     .Select(point => point.GetProperty("broker").GetString()!).Distinct(StringComparer.Ordinal);
             }
             else

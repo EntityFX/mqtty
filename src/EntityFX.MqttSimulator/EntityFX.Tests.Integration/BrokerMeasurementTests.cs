@@ -130,6 +130,40 @@ namespace EntityFX.Tests.Integration
         [DataTestMethod]
         [DataRow(MqttQos.AtLeastOnce)]
         [DataRow(MqttQos.ExactlyOnce)]
+        public void Latency_StartsAtPublisherBeforeFirstNetworkHop(MqttQos qos)
+        {
+            var (graph, broker, publisher, subscribers) = Build(1);
+            ConnectAndSubscribe(graph, publisher, subscribers, qos);
+            graph.ResetMeasurement();
+            var started = graph.TotalTicks;
+            publisher.Publish("measure/clock", new byte[16], qos);
+            Assert.IsTrue(publisher.HasPendingPublish);
+            RefreshUntil(graph, () => !publisher.HasPendingPublish);
+            var completed = graph.TotalTicks - 1;
+            var measured = broker.GetMetrics().ByQos[qos].LatencyP99Ms;
+            Assert.AreEqual((completed - started) * Ticks.TickPeriod.TotalMilliseconds, measured!.Value, 1e-9);
+            RefreshUntil(graph, () => graph.IsQuiescent);
+        }
+
+        [TestMethod]
+        public void PublisherStartedBeforeReset_IsNotCountedWhenItArrivesAfterReset()
+        {
+            var (graph, broker, publisher, subscribers) = Build(1);
+            ConnectAndSubscribe(graph, publisher, subscribers, MqttQos.AtLeastOnce);
+            publisher.Publish("measure/warmup", new byte[16], MqttQos.AtLeastOnce);
+            graph.Refresh(false, 0);
+            graph.ResetMeasurement();
+            RefreshUntil(graph, () => graph.IsQuiescent);
+            Assert.AreEqual(0L, broker.GetMetrics().ByQos[MqttQos.AtLeastOnce].Attempted);
+            Assert.AreEqual(0L, broker.GetMetrics().ByQos[MqttQos.AtLeastOnce].Completed);
+            publisher.Publish("measure/new", new byte[16], MqttQos.AtLeastOnce);
+            RefreshUntil(graph, () => graph.IsQuiescent);
+            Assert.AreEqual(1L, broker.GetMetrics().ByQos[MqttQos.AtLeastOnce].Completed);
+        }
+
+        [DataTestMethod]
+        [DataRow(MqttQos.AtLeastOnce)]
+        [DataRow(MqttQos.ExactlyOnce)]
         public void AcknowledgedQos_CompletesAtPublisherAndRecordsLatency(MqttQos publishQos)
         {
             var (graph, broker, publisher, subscribers) = Build(1);

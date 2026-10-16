@@ -69,7 +69,7 @@ internal static class MqttRelayExperimentCommand
         try
         {
             var arguments = ParseArguments(args);
-            if (arguments.Keys.Any(key => key is not ("observations" or "output" or "mqtty-repository" or "rate-rejection-rate" or "broker" or "coverage-protocol")))
+            if (arguments.Keys.Any(key => key is not ("observations" or "output" or "mqtty-repository" or "rate-rejection-rate" or "broker" or "coverage-protocol" or "latency-histograms")))
                 throw new ArgumentException("Unknown calibration argument.");
             var inputPath = Path.GetFullPath(Required(arguments, "observations"));
             var outputPath = Path.GetFullPath(Required(arguments, "output"));
@@ -77,7 +77,11 @@ internal static class MqttRelayExperimentCommand
                 throw new ArgumentException("Observations and calibration must be separate files.");
             var rate = arguments.TryGetValue("rate-rejection-rate", out var text)
                 ? double.Parse(text, CultureInfo.InvariantCulture) : 0;
-            var bytes = BrokerCalibrationV3.Calibrate(File.ReadAllBytes(inputPath),
+            var bytes = arguments.TryGetValue("latency-histograms", out var histogramPath)
+                ? BrokerCalibrationEmpirical.Calibrate(File.ReadAllBytes(inputPath), File.ReadAllBytes(histogramPath!),
+                    ResolveCleanCommit(Required(arguments, "mqtty-repository")), rate, Required(arguments, "broker"),
+                    arguments.TryGetValue("coverage-protocol", out var empiricalCoverage) ? empiricalCoverage : null)
+                : BrokerCalibrationV3.Calibrate(File.ReadAllBytes(inputPath),
                 ResolveCleanCommit(Required(arguments, "mqtty-repository")), rate,
                 arguments.TryGetValue("broker", out var broker) ? broker : null,
                 arguments.TryGetValue("coverage-protocol", out var coverage) ? coverage : null);
@@ -91,7 +95,7 @@ internal static class MqttRelayExperimentCommand
         catch (Exception error)
         {
             Console.Error.WriteLine(error.Message);
-            Console.Error.WriteLine("Usage: EntityFX.MqttY.MqttRelay.App calibrate --observations <broker-observations.v3.json> --output <broker-calibration.v3.json> --mqtty-repository <clean-repository> [--rate-rejection-rate <0..1>] [--broker <name>] [--coverage-protocol compact-v1]");
+            Console.Error.WriteLine("Usage: EntityFX.MqttY.MqttRelay.App calibrate --observations <broker-observations.v3.json> --output <broker-calibration.json> --mqtty-repository <clean-repository> [--rate-rejection-rate <0..1>] [--broker <name>] [--coverage-protocol compact-v1] [--latency-histograms <sealed-raw-histograms.json>]");
             return 1;
         }
     }

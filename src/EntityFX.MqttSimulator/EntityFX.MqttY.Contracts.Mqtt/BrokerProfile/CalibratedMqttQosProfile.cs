@@ -13,6 +13,9 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
         {
             if (clients <= 0) throw new ArgumentOutOfRangeException(nameof(clients));
             if (Samples.Count == 0) throw new InvalidDataException("Calibration sample set is empty.");
+            if (clients < Samples[0].Clients && Samples[0].ProcessingLatencyDistribution != null ||
+                clients > Samples[^1].Clients && Samples[^1].ProcessingLatencyDistribution != null)
+                throw new InvalidDataException("Empirical latency cannot extrapolate outside observed publisher counts.");
             if (clients <= Samples[0].Clients) return Samples[0] with { Clients = clients };
             if (clients >= Samples[^1].Clients) return Samples[^1] with { Clients = clients };
 
@@ -20,7 +23,11 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
             {
                 var lower = Samples[index];
                 var upper = Samples[index + 1];
+                if (clients == lower.Clients) return lower;
+                if (clients == upper.Clients) return upper;
                 if (clients < lower.Clients || clients > upper.Clients) continue;
+                if (lower.ProcessingLatencyDistribution != null || upper.ProcessingLatencyDistribution != null)
+                    throw new InvalidDataException("Empirical latency requires an observed publisher-count point; interpolation is not identified.");
                 var ratio = (clients - lower.Clients) / (double)(upper.Clients - lower.Clients);
                 return new CalibratedMqttQosSample(
                     clients,

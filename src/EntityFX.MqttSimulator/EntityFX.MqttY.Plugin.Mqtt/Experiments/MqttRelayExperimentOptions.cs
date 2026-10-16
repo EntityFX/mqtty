@@ -4,6 +4,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Experiments;
 
 public enum ExperimentTopologyMode { BrokerFidelity, MqttRelay }
 public enum ProfileClientCountMode { Publishers, ConnectedClients }
+public enum PublishLoadMode { OpenLoopRate, ClosedLoopPerPublisher }
 
 public enum MqttBrokerAssignmentMode
 {
@@ -36,10 +37,11 @@ public sealed class MqttRelayExperimentOptions
     public int RefreshStrategy { get; set; }
     public bool EnableCounters { get; set; }
     public bool FidelityMode { get; set; } = true;
+    public PublishLoadMode LoadMode { get; set; } = PublishLoadMode.OpenLoopRate;
 
     public void Validate()
     {
-        if (!Enum.IsDefined(typeof(ExperimentTopologyMode), TopologyMode) ||
+        if (!Enum.IsDefined(typeof(PublishLoadMode), LoadMode) || !Enum.IsDefined(typeof(ExperimentTopologyMode), TopologyMode) ||
             !Enum.IsDefined(typeof(ProfileClientCountMode), ProfileClientCountMode))
             throw new InvalidDataException("Unknown topology or profile client-count mode.");
         if (Brokers <= 0 || NetworkLength <= 0 || ClientsPerBroker <= 0 || PayloadBytes <= 0)

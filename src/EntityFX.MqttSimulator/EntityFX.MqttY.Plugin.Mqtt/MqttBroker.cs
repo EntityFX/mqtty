@@ -155,9 +155,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return;
             }
 
-            var localPublishSequence = packet.Context is long sequence ? sequence : packet.Id;
+            var identity = packet.Context as PublishIdentity;
+            var localPublishSequence = identity?.Sequence ?? (packet.Context is long sequence ? sequence : packet.Id);
             var tracker = _measurement.BeginAttempt(packet.From, publishPacket.QualityOfService,
-                publishPacket.PacketId, packet.Id, NetworkSimulator!.TotalTicks,
+                publishPacket.PacketId, packet.Id, identity?.StartedTick ?? NetworkSimulator!.TotalTicks,
                 localPublishSequence, publishPacket.Payload.Length);
             if (tracker.Admitted)
             {
@@ -203,11 +204,14 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             // 3. Постановка в очередь обработки с задержкой.
             tracker.ConditionalDeliveryLossRate = sample.ConditionalDeliveryLossRate;
             _measurement.Admit(tracker);
-            var processingTicks = sample.ProcessingLatencyQuantiles == null
+            var uniform = DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
+                localPublishSequence, "processing-latency");
+            var processingTicks = sample.ProcessingLatencyDistribution != null
+                ? EmpiricalTicksFromMs(sample.ProcessingLatencyDistribution.Sample(uniform))
+                : sample.ProcessingLatencyQuantiles == null
                 ? 1
                 : TicksFromMs(DeterministicMqttSampler.InverseCdf(
-                    DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
-                        localPublishSequence, "processing-latency"),
+                    uniform,
                     sample.ProcessingLatencyQuantiles));
             _processingQueue.Enqueue(packet, processingTicks);
         }
@@ -689,6 +693,14 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             }
 
             return Math.Max(1, (int)Math.Ceiling(latencyMs / _tickPeriod.TotalMilliseconds));
+        }
+
+        private int EmpiricalTicksFromMs(double latencyMs)
+        {
+            var ticks = Math.Ceiling(latencyMs / _tickPeriod.TotalMilliseconds);
+            if (!double.IsFinite(ticks) || ticks < 0 || ticks > int.MaxValue)
+                throw new InvalidDataException("Empirical latency cannot be represented at the selected tick resolution.");
+            return (int)ticks;
         }
 
         public override void Clear()
