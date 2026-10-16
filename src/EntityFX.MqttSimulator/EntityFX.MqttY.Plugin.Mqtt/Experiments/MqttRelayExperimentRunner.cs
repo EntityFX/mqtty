@@ -69,7 +69,7 @@ public sealed class MqttRelayExperimentRunner
             var phaseStart = 0L;
             NetworkOptions? resolvedNetwork = null;
             long? protocolFloor = null;
-            if (options.TransportTiming == TransportTimingMode.CalibratedRttBudget)
+            if (options.TransportTiming != TransportTimingMode.Fixed)
             {
                 var sample = assignedProfiles.Single()!.For(options.PayloadBytes, options.PublishQos, options.ResolveProfileClientCount());
                 if (sample.RttBaselineMs is not double rtt || !double.IsFinite(rtt) || rtt <= 0 || !assignedProfiles.Single()!.RequireObservedPublisherCount)
@@ -78,23 +78,40 @@ public sealed class MqttRelayExperimentRunner
                 var legs = 2 * (int)probeQos;
                 var atOne = ProbeProtocolFloor(options, probeQos, NetworkWithTransfer(1));
                 var target = (int)probeQos * rtt / _ticks.TickPeriod.TotalMilliseconds;
+                var serviceBudget = options.TransportTiming == TransportTimingMode.EmpiricalServiceBudget;
+                // Echo RTT is only a proxy. It cannot impose a protocol floor above
+                // the smallest observed publish completion at this calibration point.
+                // Reserve one refresh tick for the causal empirical processing queue.
+                var observedMinimum = sample.ObservedLatencyDistribution?.Bins[0].Milliseconds;
+                var empiricalBound = observedMinimum.HasValue
+                    ? Math.Max(atOne, Math.Floor(observedMinimum.Value / _ticks.TickPeriod.TotalMilliseconds) - 1)
+                    : target;
+                if (serviceBudget) target = Math.Min(target, empiricalBound);
                 if (!double.IsFinite(target) || target / legs > int.MaxValue - 1)
                     throw new InvalidDataException("Calibration RTT cannot be represented at this tick resolution.");
-                var transfer = Math.Max(1, (int)Math.Round((target - atOne) / legs + 1));
+                var transfer = Math.Max(1, (int)(serviceBudget
+                    ? Math.Floor((target - atOne) / legs + 1)
+                    : Math.Round((target - atOne) / legs + 1)));
                 resolvedNetwork = NetworkWithTransfer(transfer);
                 protocolFloor = ProbeProtocolFloor(options, probeQos, resolvedNetwork);
                 var clipped = sample.ObservedLatencyDistribution?.Bins.Where(bin => bin.Milliseconds < protocolFloor * _ticks.TickPeriod.TotalMilliseconds).Sum(bin => bin.Count) ?? 0;
                 WriteJsonNew(Path.Combine(runDirectory, "transport-resolution.json"), new {
-                    method = "ideal-protocol-rtt-budget-v1", calibrationRttMs = rtt,
+                    method = serviceBudget ? "empirical-service-budget-v1" : "ideal-protocol-rtt-budget-v1", calibrationRttMs = rtt,
                     assumption = "MQTT echo RTT proxies a QoS1 ACK budget; protocol overhead measured on an unloaded ideal graph; no validation-data fitting",
                     requestedTransferTicks = _network.TransferTicks, resolvedTransferTicks = transfer,
                     protocolFloorAtTransferOneTicks = atOne, protocolFloorTicks = protocolFloor,
                     modeledNativeProtocolBudgetTicks = target, clippedEmpiricalSamples = clipped,
+                    observedMinimumPublishLatencyMs = observedMinimum,
+                    capacityPacing = serviceBudget,
                     clippingScope = "observed latencies below the model protocol floor cannot be reproduced; retained and reported, never removed from the profile" });
             }
             graph = BuildGraph(options, assignedProfiles, resolvedNetwork);
             if (protocolFloor.HasValue)
-                foreach (var broker in graph.Servers.Values.OfType<MqttBroker>()) broker.EmpiricalProtocolFloorTicks = protocolFloor;
+                foreach (var broker in graph.Servers.Values.OfType<MqttBroker>())
+                {
+                    broker.EmpiricalProtocolFloorTicks = protocolFloor;
+                    broker.EmpiricalCapacityPacing = options.TransportTiming == TransportTimingMode.EmpiricalServiceBudget;
+                }
             phases.Add(new ExperimentPhaseBoundary("construct", phaseStart, graph.TotalTicks, "completed"));
 
             phaseStart = graph.TotalTicks;
@@ -281,7 +298,7 @@ public sealed class MqttRelayExperimentRunner
         for (long tick = 0; tick < ticks; tick++)
         {
             tokens += tokensPerTick;
-            if (options.LoadMode == PublishLoadMode.ClosedLoopPerPublisher)
+            if (options.LoadMode == PublishLoadMode.ClosedLoopPerPublisher && options.PublishQos != MqttQos.AtMostOnce)
             {
                 tokens = Math.Min(tokens, publishers.Count);
                 for (var scanned = 0; scanned < publishers.Count && tokens >= 1; scanned++)

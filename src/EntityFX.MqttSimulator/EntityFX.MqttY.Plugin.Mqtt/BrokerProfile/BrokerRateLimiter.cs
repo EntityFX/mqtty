@@ -8,6 +8,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
         private double _tokensPerTick;
         private long _lastRefillTick;
         private double _tokens;
+        private double _nextReservationTick;
+        private long _lastReservationTick;
         public double BurstTokens { get; private set; }
 
         public BrokerRateLimiter(double maxRps, TimeSpan tickPeriod)
@@ -29,6 +31,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
                 BurstTokens = _tokensPerTick + 1.0;
                 _lastRefillTick = 0;
                 _tokens = 0;
+                _nextReservationTick = 0;
+                _lastReservationTick = 0;
             }
         }
 
@@ -46,6 +50,24 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
                 if (_tokens + 1e-9 < 1.0) return false;
                 _tokens = Math.Max(0, _tokens - 1.0);
                 return true;
+            }
+        }
+
+        /// <summary>FIFO capacity pacing: defer work instead of inventing a failed publish.
+        /// Fractional eligibility is retained, so sub-tick rates do not round down.</summary>
+        public int Reserve(long currentTick)
+        {
+            lock (this)
+            {
+                if (currentTick < 0 || currentTick < _lastReservationTick)
+                    throw new ArgumentOutOfRangeException(nameof(currentTick));
+                _lastReservationTick = currentTick;
+                var eligible = Math.Max(currentTick, _nextReservationTick);
+                var wait = Math.Ceiling(Math.Max(0, eligible - currentTick) - 1e-9);
+                if (!double.IsFinite(wait) || wait > int.MaxValue)
+                    throw new InvalidDataException("Capacity backlog cannot be represented in ticks.");
+                _nextReservationTick = eligible + 1 / _tokensPerTick;
+                return checked((int)Math.Max(0, wait));
             }
         }
     }

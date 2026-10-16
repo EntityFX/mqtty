@@ -183,7 +183,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             var limiterKey = (publishPacket.Payload.Length, publishPacket.QualityOfService, clients);
             var limiter = _rateLimiters.GetOrAdd(limiterKey,
                 _ => new BrokerRateLimiter(sample.CapacityRps, _tickPeriod));
-            if (!limiter.TryAcquire(NetworkSimulator!.TotalTicks))
+            var capacityWaitTicks = EmpiricalCapacityPacing ? limiter.Reserve(NetworkSimulator!.TotalTicks) : 0;
+            if (!EmpiricalCapacityPacing && !limiter.TryAcquire(NetworkSimulator!.TotalTicks))
             {
                 MqttCounters.RefuseByRateLimit(publishPacket.QualityOfService);
                 _measurement.RejectByRate(tracker);
@@ -215,7 +216,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 : TicksFromMs(DeterministicMqttSampler.InverseCdf(
                     uniform,
                     sample.ProcessingLatencyQuantiles));
-            _processingQueue.Enqueue(packet, processingTicks);
+            // The observed end-to-end CDF already includes native queueing. Capacity
+            // eligibility is an additional lower bound, not an independent delay to add twice.
+            _processingQueue.Enqueue(packet, Math.Max(processingTicks, capacityWaitTicks));
         }
 
         private void FailClientPublish(string publisher, ushort? packetId)
@@ -706,6 +709,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         }
 
         public long? EmpiricalProtocolFloorTicks { get; set; }
+        public bool EmpiricalCapacityPacing { get; set; }
 
         public override void Clear()
         {

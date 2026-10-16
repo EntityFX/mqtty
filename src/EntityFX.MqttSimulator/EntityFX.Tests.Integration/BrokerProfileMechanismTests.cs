@@ -8,6 +8,16 @@ namespace EntityFX.Tests.Integration
     public class BrokerRateLimiterTests
     {
         [TestMethod]
+        public void Reservation_DefersBurstWithoutRejectingOrAccumulatingIdleCredit()
+        {
+            var limiter = new BrokerRateLimiter(400, TimeSpan.FromMilliseconds(1));
+            CollectionAssert.AreEqual(new[] { 0, 3, 5, 8, 10 }, Enumerable.Range(0, 5).Select(_ => limiter.Reserve(100)).ToArray());
+            Assert.AreEqual(0, limiter.Reserve(10000));
+            Assert.AreEqual(3, limiter.Reserve(10000));
+            Assert.ThrowsException<ArgumentOutOfRangeException>(() => limiter.Reserve(9999));
+        }
+
+        [TestMethod]
         public void RateLimiter_RejectsInvalidRateAndTickValues()
         {
             foreach (var invalid in new[] { 0.0, -1.0, double.NaN, double.PositiveInfinity })

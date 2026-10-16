@@ -5,7 +5,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Experiments;
 public enum ExperimentTopologyMode { BrokerFidelity, MqttRelay }
 public enum ProfileClientCountMode { Publishers, ConnectedClients }
 public enum PublishLoadMode { OpenLoopRate, ClosedLoopPerPublisher }
-public enum TransportTimingMode { Fixed, CalibratedRttBudget }
+public enum TransportTimingMode { Fixed, CalibratedRttBudget, EmpiricalServiceBudget }
 
 public enum MqttBrokerAssignmentMode
 {
@@ -47,8 +47,10 @@ public sealed class MqttRelayExperimentOptions
             !Enum.IsDefined(typeof(ProfileClientCountMode), ProfileClientCountMode))
             throw new InvalidDataException("Unknown topology or profile client-count mode.");
         if (!Enum.IsDefined(typeof(TransportTimingMode), TransportTiming) ||
-            TransportTiming == TransportTimingMode.CalibratedRttBudget && (TopologyMode != ExperimentTopologyMode.BrokerFidelity || Brokers != 1))
+            TransportTiming != TransportTimingMode.Fixed && (TopologyMode != ExperimentTopologyMode.BrokerFidelity || Brokers != 1))
             throw new InvalidDataException("RTT budget calibration requires a single BrokerFidelity broker.");
+        if (TransportTiming == TransportTimingMode.EmpiricalServiceBudget && LoadMode != PublishLoadMode.ClosedLoopPerPublisher)
+            throw new InvalidDataException("Empirical service budgeting requires closed-loop publisher backpressure.");
         if (Brokers <= 0 || NetworkLength <= 0 || ClientsPerBroker <= 0 || PayloadBytes <= 0)
             throw new InvalidDataException(
                 "Brokers, NetworkLength, ClientsPerBroker and PayloadBytes must be positive.");
