@@ -67,7 +67,34 @@ public sealed class MqttRelayExperimentRunner
             var assignedProfiles = ResolveProfiles(options, assignedTypes);
 
             var phaseStart = 0L;
-            graph = BuildGraph(options, assignedProfiles);
+            NetworkOptions? resolvedNetwork = null;
+            long? protocolFloor = null;
+            if (options.TransportTiming == TransportTimingMode.CalibratedRttBudget)
+            {
+                var sample = assignedProfiles.Single()!.For(options.PayloadBytes, options.PublishQos, options.ResolveProfileClientCount());
+                if (sample.RttBaselineMs is not double rtt || !double.IsFinite(rtt) || rtt <= 0 || !assignedProfiles.Single()!.RequireObservedPublisherCount)
+                    throw new InvalidDataException("RTT budget calibration requires an empirical profile with a positive calibration RTT.");
+                var probeQos = options.PublishQos == MqttQos.AtMostOnce ? MqttQos.AtLeastOnce : options.PublishQos;
+                var legs = 2 * (int)probeQos;
+                var atOne = ProbeProtocolFloor(options, probeQos, NetworkWithTransfer(1));
+                var target = (int)probeQos * rtt / _ticks.TickPeriod.TotalMilliseconds;
+                if (!double.IsFinite(target) || target / legs > int.MaxValue - 1)
+                    throw new InvalidDataException("Calibration RTT cannot be represented at this tick resolution.");
+                var transfer = Math.Max(1, (int)Math.Round((target - atOne) / legs + 1));
+                resolvedNetwork = NetworkWithTransfer(transfer);
+                protocolFloor = ProbeProtocolFloor(options, probeQos, resolvedNetwork);
+                var clipped = sample.ObservedLatencyDistribution?.Bins.Where(bin => bin.Milliseconds < protocolFloor * _ticks.TickPeriod.TotalMilliseconds).Sum(bin => bin.Count) ?? 0;
+                WriteJsonNew(Path.Combine(runDirectory, "transport-resolution.json"), new {
+                    method = "ideal-protocol-rtt-budget-v1", calibrationRttMs = rtt,
+                    assumption = "MQTT echo RTT proxies a QoS1 ACK budget; protocol overhead measured on an unloaded ideal graph; no validation-data fitting",
+                    requestedTransferTicks = _network.TransferTicks, resolvedTransferTicks = transfer,
+                    protocolFloorAtTransferOneTicks = atOne, protocolFloorTicks = protocolFloor,
+                    modeledNativeProtocolBudgetTicks = target, clippedEmpiricalSamples = clipped,
+                    clippingScope = "observed latencies below the model protocol floor cannot be reproduced; retained and reported, never removed from the profile" });
+            }
+            graph = BuildGraph(options, assignedProfiles, resolvedNetwork);
+            if (protocolFloor.HasValue)
+                foreach (var broker in graph.Servers.Values.OfType<MqttBroker>()) broker.EmpiricalProtocolFloorTicks = protocolFloor;
             phases.Add(new ExperimentPhaseBoundary("construct", phaseStart, graph.TotalTicks, "completed"));
 
             phaseStart = graph.TotalTicks;
@@ -154,7 +181,7 @@ public sealed class MqttRelayExperimentRunner
     }
 
     private INetworkSimulator BuildGraph(
-        MqttRelayExperimentOptions options, IReadOnlyList<MqttBrokerProfile?> profiles)
+        MqttRelayExperimentOptions options, IReadOnlyList<MqttBrokerProfile?> profiles, NetworkOptions? networkOverride = null)
     {
         var generic = new GenericBuilder();
         var evaluator = generic.GetMqttTopicEvaluator();
@@ -179,7 +206,7 @@ public sealed class MqttRelayExperimentRunner
             options.ProfileClientCountMode == ProfileClientCountMode.Publishers ? options.ClientsPerBroker : null);
         graph.Construction = true;
         builder.BuildSimpleTree(options.Brokers, options.NetworkLength,
-            options.ClientsPerBroker, 1, null, true, _ticks, _network);
+            options.ClientsPerBroker, 1, null, true, _ticks, networkOverride ?? _network);
         if (options.TopologyMode == ExperimentTopologyMode.BrokerFidelity)
             builder.BuildBrokerFidelity(graph, _ticks);
         else
@@ -187,6 +214,34 @@ public sealed class MqttRelayExperimentRunner
         graph.Construction = false;
         graph.UpdateRoutes();
         return graph;
+    }
+
+    private NetworkOptions NetworkWithTransfer(int transfer) => new() {
+        TransferTicks = transfer, CapacityBytesPerSecond = _network.CapacityBytesPerSecond,
+        ThroughputWindowTicks = _network.ThroughputWindowTicks, QueueCapacity = _network.QueueCapacity, NetworkType = _network.NetworkType };
+
+    private long ProbeProtocolFloor(MqttRelayExperimentOptions options, MqttQos qos, NetworkOptions network)
+    {
+        var probeOptions = JsonSerializer.Deserialize<MqttRelayExperimentOptions>(JsonSerializer.Serialize(options, _json), _json)!;
+        probeOptions.PublishQos = probeOptions.SubscribeQos = qos;
+        var graph = BuildGraph(probeOptions, new MqttBrokerProfile?[] { null }, network);
+        try
+        {
+            var (relays, receivers, publishers) = StartAndConnect(graph);
+            if (!RefreshUntil(graph, () => graph.Clients.Values.All(client => client.IsConnected), options.DrainTimeoutTicks, options))
+                throw new InvalidDataException("Ideal protocol probe connection failed.");
+            foreach (var receiver in receivers) receiver.SubscribeAll();
+            if (!RefreshUntil(graph, () => AreSubscribed(relays, receivers), options.DrainTimeoutTicks, options))
+                throw new InvalidDataException("Ideal protocol probe subscription failed.");
+            graph.ResetMeasurement();
+            publishers[0].Publish("telemetry/data", CreatePayload(options.PayloadBytes, options.RandomSeed), qos);
+            if (!RefreshUntil(graph, () => !publishers[0].HasPendingPublish, options.DrainTimeoutTicks, options))
+                throw new InvalidDataException("Ideal protocol probe ACK failed.");
+            var latency = graph.Servers.Values.OfType<IMqttBroker>().Single().GetMetrics().ByQos[qos].LatencyP99Ms
+                ?? throw new InvalidDataException("Ideal protocol probe did not record latency.");
+            return checked((long)Math.Round(latency / _ticks.TickPeriod.TotalMilliseconds));
+        }
+        finally { graph.Clear(); }
     }
 
     private static (MqttRelay[] Relays, MqttReceiver[] Receivers, MqttClient[] Publishers)

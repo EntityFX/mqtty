@@ -48,3 +48,22 @@ it increases wall-clock cost and alone does not fix transport or profile errors.
 Use a new revision/cohort for this model. Never replace old profiles/results in
 place or describe reused, already inspected validation as a new blind control.
 Acceptance limits remain unchanged. CPU/RSS are not modeled broker properties.
+
+For single-broker BrokerFidelity, `transportTiming: calibratedRttBudget` resolves
+the transport budget from the frozen profile's calibration RTT. It measures an
+unloaded ideal graph's publisher-to-ACK duration at transfer=1, accounts for
+the two/four QoS handshake legs, selects the nearest feasible transfer ticks,
+and probes the actual resulting protocol floor. Processing delay then uses
+the observed empirical CDF minus that measured model floor. The protocol is
+actually delayed; reported latency is never substituted with a target value.
+This avoids counting model scheduling overhead on top of a full RTT budget.
+
+`transport-resolution.json` retains the requested/resolved transfer ticks,
+ideal floor, calibration RTT and count of empirical observations below the
+unavoidable protocol floor. Those observations remain in the source profile;
+their effective processing delay is zero, so they cannot be reproduced below
+that floor. MQTT echo RTT as a QoS1 ACK budget is an explicit assumption.
+Neither validation observations nor acceptance thresholds resolve timing.
+The input network object is not mutated, and repeated runs remain deterministic.
+Relay keeps explicit transport settings and the documented residual assumption;
+this option does not establish native Relay fidelity.

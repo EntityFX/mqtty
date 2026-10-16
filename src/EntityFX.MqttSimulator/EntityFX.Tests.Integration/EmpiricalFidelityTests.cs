@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.Json;
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Mqtt.BrokerProfile;
 using EntityFX.MqttY.Contracts.Options;
@@ -128,6 +129,41 @@ public class EmpiricalFidelityTests
             Assert.AreEqual(ExperimentRunStatus.Completed, closed.Summary.Status, closed.Summary.Error);
             Assert.IsTrue(closed.Summary.Simulated.Attempted < open.Summary.Simulated.Attempted / 5);
             Assert.AreEqual(closed.Summary.Simulated.Attempted, closed.Summary.Simulated.Completed);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [DataTestMethod]
+    [DataRow(MqttQos.AtLeastOnce)]
+    [DataRow(MqttQos.ExactlyOnce)]
+    public void RttBudget_UsesCalibrationAndModelProbeWithoutChangingInputsOrUsingValidation(MqttQos qos)
+    {
+        var root = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "rtt-budget-" + Guid.NewGuid().ToString("N"))).FullName;
+        try
+        {
+            var observations = CompactCalibrationTests.Observations();
+            var bytes = Calibrate(observations, Histograms(observations));
+            var profile = new BrokerBenchmarkRepository(Encoding.UTF8.GetString(bytes)).Get("Aedes");
+            var options = new MqttRelayExperimentOptions { TopologyMode = ExperimentTopologyMode.BrokerFidelity,
+                ProfileClientCountMode = ProfileClientCountMode.Publishers, Brokers = 1, NetworkLength = 1, ClientsPerBroker = 1,
+                PublishQos = qos, SubscribeQos = qos, PayloadBytes = 16, BrokerAssignmentMode = MqttBrokerAssignmentMode.Aedes,
+                MeasurementTicks = 1000, DrainTimeoutTicks = 5000, OfferedRps = 100,
+                LoadMode = PublishLoadMode.ClosedLoopPerPublisher, TransportTiming = TransportTimingMode.CalibratedRttBudget };
+            var ticks = new TicksOptions { TickPeriod = TimeSpan.FromMilliseconds(.1), OutgoingWaitTicks = 1, ReceiveWaitPeriod = TimeSpan.FromSeconds(1), CounterHistoryDepth = 100 };
+            var network = new NetworkOptions { NetworkType = "eth", TransferTicks = 500, CapacityBytesPerSecond = 100_000_000, ThroughputWindowTicks = 100, QueueCapacity = 100000 };
+            var runner = new MqttRelayExperimentRunner(ticks, network, new Repository(profile));
+            var first = runner.Run(options, root, new("y", "b", "p"));
+            var second = runner.Run(options, root, new("y", "b", "p"), new ExperimentMetricSummary(0,0,0,0,0,0,0,0,1,0,0,.001));
+            Assert.AreEqual(ExperimentRunStatus.Completed, first.Summary.Status, first.Summary.Error);
+            Assert.AreEqual(ExperimentRunStatus.Completed, second.Summary.Status, second.Summary.Error);
+            Assert.AreEqual(500, network.TransferTicks);
+            Assert.AreEqual(first.Summary.Simulated, second.Summary.Simulated);
+            var resolution = File.ReadAllText(Path.Combine(first.RunDirectory, "transport-resolution.json"));
+            Assert.AreEqual(resolution, File.ReadAllText(Path.Combine(second.RunDirectory, "transport-resolution.json")));
+            using var document = JsonDocument.Parse(resolution);
+            Assert.AreEqual(2d, document.RootElement.GetProperty("calibrationRttMs").GetDouble());
+            Assert.IsTrue(document.RootElement.GetProperty("resolvedTransferTicks").GetInt32() < 500);
+            Assert.IsTrue(document.RootElement.GetProperty("protocolFloorTicks").GetInt64() > 0);
         }
         finally { Directory.Delete(root, true); }
     }

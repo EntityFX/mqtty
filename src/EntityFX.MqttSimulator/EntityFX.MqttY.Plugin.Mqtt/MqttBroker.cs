@@ -206,7 +206,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             _measurement.Admit(tracker);
             var uniform = DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
                 localPublishSequence, "processing-latency");
-            var processingTicks = sample.ProcessingLatencyDistribution != null
+            var processingTicks = sample.ObservedLatencyDistribution != null && EmpiricalProtocolFloorTicks.HasValue
+                ? checked((int)Math.Max(0, EmpiricalTicksFromMs(sample.ObservedLatencyDistribution.Sample(uniform)) - EmpiricalProtocolFloorTicks.Value))
+                : sample.ProcessingLatencyDistribution != null
                 ? EmpiricalTicksFromMs(sample.ProcessingLatencyDistribution.Sample(uniform))
                 : sample.ProcessingLatencyQuantiles == null
                 ? 1
@@ -702,6 +704,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 throw new InvalidDataException("Empirical latency cannot be represented at the selected tick resolution.");
             return (int)ticks;
         }
+
+        public long? EmpiricalProtocolFloorTicks { get; set; }
 
         public override void Clear()
         {

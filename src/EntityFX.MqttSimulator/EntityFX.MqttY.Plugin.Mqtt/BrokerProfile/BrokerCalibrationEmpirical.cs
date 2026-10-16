@@ -124,7 +124,10 @@ public static class BrokerCalibrationEmpirical
                 .GroupBy(bin => bin.Milliseconds).Select(group => new LatencyBin(group.Key, group.Sum(bin => bin.Count)));
             var profile = profiles[name].MessageSizes[size].Qos[(MqttQos)qos];
             profiles[name].MessageSizes[size].Qos[(MqttQos)qos] = new CalibratedMqttQosProfile(profile.Samples.Select(sample =>
-                sample.Clients == clients ? sample with { ProcessingLatencyDistribution = new EmpiricalLatencyDistribution(processing) } : sample).ToArray());
+                sample.Clients == clients ? sample with {
+                    ProcessingLatencyDistribution = new EmpiricalLatencyDistribution(processing),
+                    ObservedLatencyDistribution = new EmpiricalLatencyDistribution(bins.Select(pair => new LatencyBin(pair.Key / 1000.0, pair.Value)))
+                } : sample).ToArray());
         }
         return profiles.ToDictionary(pair => pair.Key, pair => new MqttBrokerProfile {
             BrokerType = pair.Value.BrokerType, MessageSizes = pair.Value.MessageSizes, RequireObservedPublisherCount = true });

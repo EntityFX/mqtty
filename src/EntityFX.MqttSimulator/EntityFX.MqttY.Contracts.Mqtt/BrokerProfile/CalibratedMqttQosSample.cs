@@ -13,5 +13,6 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
         public LatencyQuantiles? ObservedLatencyQuantiles { get; init; }
         public double? RttBaselineMs { get; init; }
         public EmpiricalLatencyDistribution? ProcessingLatencyDistribution { get; init; }
+        public EmpiricalLatencyDistribution? ObservedLatencyDistribution { get; init; }
     }
 }
