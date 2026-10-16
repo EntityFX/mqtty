@@ -300,7 +300,10 @@ public sealed class MqttRelayExperimentRunner
             tokens += tokensPerTick;
             if (options.LoadMode == PublishLoadMode.ClosedLoopPerPublisher && options.PublishQos != MqttQos.AtMostOnce)
             {
-                tokens = Math.Min(tokens, publishers.Count);
+                // Preserve the fractional credit of the arrival tick. A cap of N
+                // discards that remainder and rounds each publisher's offered
+                // period up to a whole tick even when no ACK is outstanding.
+                tokens = Math.Min(tokens, publishers.Count + tokensPerTick);
                 for (var scanned = 0; scanned < publishers.Count && tokens >= 1; scanned++)
                 {
                     var publisher = publishers[publisherIndex++ % publishers.Count];

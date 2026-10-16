@@ -210,12 +210,11 @@ namespace EntityFX.Tests.Integration
         }
 
         [TestMethod]
-        public void DrainReady_ZeroTicks_ClampsToSingleTick()
+        public void Enqueue_RejectsNegativeProcessingTicks()
         {
             var queue = new BrokerProcessingQueue();
-            queue.Enqueue(CreatePacket(1), processingTicks: -5);
-
-            Assert.AreEqual(1, queue.DrainReady().Count);
+            Assert.ThrowsException<ArgumentOutOfRangeException>(() => queue.Enqueue(CreatePacket(1), processingTicks: -5));
+            Assert.AreEqual(0, queue.Count);
         }
     }
 

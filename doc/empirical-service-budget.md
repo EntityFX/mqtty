@@ -31,6 +31,11 @@ accumulator without the one-publisher token cap or scan limit used for pending
 QoS1/2 publications. The previous cap rounded a 30674-RPS stream down to 25000
 RPS at a 10-microsecond tick with one publisher.
 
+The QoS1/2 offered-load cap retains one arrival tick's fractional credit in
+addition to the N-publisher backlog. Capping at N alone rounded even an
+uncongested 9051-RPS stream down to 8333 RPS at a 10-microsecond tick. Pending-ACK
+backpressure still bounds each publisher to one outstanding QoS1/2 publication.
+
 The transport-resolution artifact identifies the new method, empirical lower
 bound, RTT proxy, resolved protocol floor, clipping, and capacity pacing. Profile
 hashes and acceptance thresholds do not change. Regression against calibration

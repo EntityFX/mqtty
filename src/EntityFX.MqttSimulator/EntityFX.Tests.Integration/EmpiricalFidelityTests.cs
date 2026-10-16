@@ -111,6 +111,16 @@ public class EmpiricalFidelityTests
     }
 
     [TestMethod]
+    public void ServiceBudget_RejectsRelayAndOpenLoopBeforeConstructingGraph()
+    {
+        var options = new MqttRelayExperimentOptions { TransportTiming = TransportTimingMode.EmpiricalServiceBudget };
+        Assert.ThrowsException<InvalidDataException>(options.Validate);
+        options.TopologyMode = ExperimentTopologyMode.BrokerFidelity;
+        options.Brokers = 1;
+        Assert.ThrowsException<InvalidDataException>(options.Validate);
+    }
+
+    [TestMethod]
     public void ServiceBudget_BoundsEchoProxyByObservedMinimumAndPacesInsteadOfRejecting()
     {
         var root = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "service-budget-" + Guid.NewGuid().ToString("N"))).FullName;
@@ -158,6 +168,27 @@ public class EmpiricalFidelityTests
             var result = new MqttRelayExperimentRunner(ticks, network).Run(options, root, new("y", "b", "p"));
             Assert.AreEqual(ExperimentRunStatus.Completed, result.Summary.Status, result.Summary.Error);
             Assert.AreEqual(306L, result.Summary.Simulated.Attempted);
+            Assert.AreEqual(result.Summary.Simulated.Attempted, result.Summary.Simulated.Completed);
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
+    [TestMethod]
+    public void ClosedLoopQosOne_PreservesFractionalCreditBelowAckCapacity()
+    {
+        var root = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "qos-one-budget-" + Guid.NewGuid().ToString("N"))).FullName;
+        try
+        {
+            var options = new MqttRelayExperimentOptions { TopologyMode = ExperimentTopologyMode.BrokerFidelity,
+                ProfileClientCountMode = ProfileClientCountMode.Publishers, Brokers = 1, NetworkLength = 1, ClientsPerBroker = 1,
+                PublishQos = MqttQos.AtLeastOnce, SubscribeQos = MqttQos.AtLeastOnce, PayloadBytes = 16,
+                BrokerAssignmentMode = MqttBrokerAssignmentMode.Ideal, MeasurementTicks = 10000, DrainTimeoutTicks = 1000,
+                OfferedRps = 9050.991895, LoadMode = PublishLoadMode.ClosedLoopPerPublisher };
+            var ticks = new TicksOptions { TickPeriod = TimeSpan.FromMilliseconds(.01), OutgoingWaitTicks = 1, ReceiveWaitPeriod = TimeSpan.FromSeconds(1), CounterHistoryDepth = 100 };
+            var network = new NetworkOptions { NetworkType = "eth", TransferTicks = 1, CapacityBytesPerSecond = 100_000_000, ThroughputWindowTicks = 100, QueueCapacity = 100000 };
+            var result = new MqttRelayExperimentRunner(ticks, network).Run(options, root, new("y", "b", "p"));
+            Assert.AreEqual(ExperimentRunStatus.Completed, result.Summary.Status, result.Summary.Error);
+            Assert.AreEqual(905L, result.Summary.Simulated.Attempted);
             Assert.AreEqual(result.Summary.Simulated.Attempted, result.Summary.Simulated.Completed);
         }
         finally { Directory.Delete(root, true); }
