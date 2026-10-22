@@ -7,7 +7,8 @@ public static class FederationConsoleView
     {
         string N(double? x) => x?.ToString("0.######", CultureInfo.InvariantCulture) ?? "notApplicable";
         writer.WriteLine($"Статическая федерация: {o.Mode}; площадок {o.Brokers}; QoS {o.Qos}; статус {s.Status}");
-        writer.WriteLine("Физические связи: " + string.Join(", ", FederationGraph.Edges(o).Select(e => $"{e.A}<->{e.B}")));
+        writer.WriteLine("Физические связи: " + string.Join(", ", FederationGraph.Edges(o).Select(e => $"{FederationGraph.NetworkName(o, e.A)}<->{FederationGraph.NetworkName(o, e.B)}")));
+        if (o.Topology == "star") writer.WriteLine("transit — промежуточный сетевой узел без брокера и клиентов; межплощадочный трафик проходит через его очередь.");
         if (o.Mode == FederationMode.Relay)
         {
             writer.WriteLine($"Логическая сеть Relay: каждый с каждым; направлений {o.Brokers * (o.Brokers - 1)}; импорт не экспортируется повторно.");

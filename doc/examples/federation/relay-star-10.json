@@ -1,0 +1,14 @@
+{
+  "mode": "relay",
+  "topology": "star",
+  "brokers": 10,
+  "publishers": 160,
+  "qos": 1,
+  "offeredRps": 1000,
+  "seed": 42,
+  "payloadBytes": 16,
+  "warmupSeconds": 0.01,
+  "measurementSeconds": 0.2,
+  "drainTimeoutSeconds": 1,
+  "ideal": true
+}

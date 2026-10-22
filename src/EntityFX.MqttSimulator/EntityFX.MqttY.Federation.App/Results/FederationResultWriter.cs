@@ -22,7 +22,7 @@ public static class FederationResultWriter
     public static void Seal(string output) => Json(Path.Combine(output, "sha256.json"), Directory.GetFiles(output, "*", SearchOption.AllDirectories)
         .Where(p => Path.GetFullPath(p) != Path.GetFullPath(Path.Combine(output, "sha256.json")) && Path.GetFileName(p) != ".experiment")
         .OrderBy(p => p, StringComparer.Ordinal).ToDictionary(p => Path.GetRelativePath(output, p).Replace('\\', '/'), p => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(p))).ToLowerInvariant()));
-    public static void Write(string output, FederationInput input, FederationSummary s, FederationPublication[] publications, DeliveryReceipt[] receipts, TransmissionResult[] transmissions, string? graphMl)
+    public static void Write(string output, FederationInput input, FederationSummary s, FederationPublication[] publications, DeliveryReceipt[] receipts, TransmissionResult[] transmissions, string? graphMl, TransitNetworkEvidence? networkEvidence = null)
     {
         var o = input.Options; var inputs = Path.Combine(output, "inputs"); Directory.CreateDirectory(inputs);
         File.WriteAllBytes(Path.Combine(inputs, "config.json"), input.Configuration);
@@ -30,6 +30,7 @@ public static class FederationResultWriter
         Json(Path.Combine(output, "run-config.json"), o with { BrokerProfilePath = input.ProfileBytes == null ? null : "inputs/profile.json" });
         Json(Path.Combine(output, "summary.json"), s); Json(Path.Combine(output, "publications.json"), publications); Json(Path.Combine(output, "transmissions.json"), transmissions);
         Json(Path.Combine(output, "delivery-receipts.json"), receipts);
+        if (networkEvidence != null) Json(Path.Combine(output, "network-evidence.json"), networkEvidence);
         Json(Path.Combine(output, "phases.json"), s.Phases); Json(Path.Combine(output, "histograms.json"), new { publish = s.PublishHistogramTicks, receiver = s.ReceiverHistogramTicks, s.TickMilliseconds });
         Json(Path.Combine(output, "manifest.json"), new
         {
@@ -41,6 +42,7 @@ public static class FederationResultWriter
             profileProvenance = ProfileProvenance(input.ProfileBytes),
             profileLookup = s.Sources.GroupBy(p => p.Broker).Select(g => new { broker = g.Key, publishers = g.Count(), o.PayloadBytes, o.Qos }),
             physicalEdges = FederationGraph.Edges(o),
+            networkEvidence = networkEvidence == null ? null : "network-evidence.json",
             topologyVerified = graphMl != null,
             relayImplementation = "MqttRelay full mesh, source-only export, imported messages delivered locally",
             assumptions = new[] { "Static topology; no discovery, election, beacons or failover", "Separate ingress, routing and delivered topics; no No Local", "Profile lookup uses original publishers; forwarding traffic and fanout are outside calibration conditions", "TopicPayloadBytes excludes MQTT/network headers; actual model transports complete serialized packets", "Warmup is drained before measurement; all model results are exploratory, not native federation fidelity" },

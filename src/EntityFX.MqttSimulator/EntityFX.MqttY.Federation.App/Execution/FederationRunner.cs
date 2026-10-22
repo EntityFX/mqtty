@@ -11,6 +11,7 @@ public sealed class FederationRunner
         FederationTopology? topology = null; var phases = new List<FederationPhase>(); var phase = "construct"; long phaseStart = 0;
         long scheduled = 0, rejected = 0, uniqueBefore = 0, completeBefore = 0;
         var measured = false; var measurementStarted = false; var status = "failed"; string? error = null; string? graphMl = null;
+        TransitNetworkSnapshot? transitBaseline = null;
         try
         {
             topology = FederationTopologyBuilder.Build(input, ledger, traffic);
@@ -26,6 +27,7 @@ public sealed class FederationRunner
             Begin("warmup"); Drive(o.ToTicks(o.WarmupSeconds), false); Finish();
             // Finish the warmup cohort before resetting broker counters; ledger still rejects late warmup IDs.
             Begin("warmupDrain"); Until(() => topology.IsIdle); Finish();
+            if (o.Topology == "star") transitBaseline = TransitNetworkSnapshot.Capture(topology);
             topology.Graph.ResetMeasurement();
             measurementStarted = true;
             Begin("measure"); Drive(o.ToTicks(o.MeasurementSeconds), true); measured = true;
@@ -91,7 +93,8 @@ public sealed class FederationRunner
                 topology?.Federators.Sum(f => f.SuppressedDuplicates) ?? 0, topology?.Federators.Sum(f => f.QueueDrops) ?? 0,
                 topology?.Federators.Sum(f => f.HopLimitDrops) ?? 0, topology?.Federators.Sum(f => f.CacheEntries) ?? 0,
                 P(.5), P(.95), P(.99), R(.5), R(.95), R(.99), sources, receivers, ph, rh, phases.ToArray());
-            if (output != null) FederationResultWriter.Write(output, input, summary, ledger.Publications(), ledger.Receipts(), transmissions, graphMl);
+            if (output != null) FederationResultWriter.Write(output, input, summary, ledger.Publications(), ledger.Receipts(), transmissions, graphMl,
+                o.Topology == "star" && topology != null ? TransitNetworkEvidence.Capture(o, topology, transitBaseline) : null);
             return summary;
         }
         finally { topology?.Dispose(); }

@@ -3,7 +3,7 @@ namespace EntityFX.MqttY.Federation;
 
 public static class FederationCommand
 {
-    public const string Help = "demo [--brokers 3 --topology line|ring --mode single|relay|federation --publishers 12 --qos 1 --rps 1000 --seconds 0.2 --seed 42 --output <new>] | validate --config <json> | run/matrix --config <json> --output <new>";
+    public const string Help = "demo [--brokers 3 --topology line|ring|star --mode single|relay|federation --publishers 12 --qos 1 --rps 1000 --seconds 0.2 --seed 42 --output <new>] | validate --config <json> | run/matrix --config <json> --output <new>";
     public static int Execute(string[] args) => Execute(args, Console.Out, Console.Error);
     public static int Execute(string[] args, TextWriter stdout, TextWriter stderr)
     {

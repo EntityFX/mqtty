@@ -108,6 +108,79 @@ public class FederationTests
     }
 
     [TestMethod]
+    public void TenBrokerRelay_UsesAnEmptyTransitNetwork_ForEveryPhysicalPath()
+    {
+        foreach (var qos in new[] { 0, 1, 2 })
+        {
+            var output = Path.Combine(Path.GetTempPath(), "mqtty-federation-tests-" + Guid.NewGuid());
+            try
+            {
+                var options = Small(FederationMode.Relay, qos) with
+                { Brokers = 10, Publishers = 10, Topology = "star", MeasurementSeconds = .01, WarmupSeconds = .01 };
+                var summary = new FederationRunner().Run(FederationInput.Prepare(options), output);
+                Assert.AreEqual("completed", summary.Status, summary.Error);
+                Assert.AreEqual(10L, summary.SourceCompleted);
+                Assert.AreEqual(100L, summary.UniqueDeliveries);
+                Assert.AreEqual(90L, summary.ForwardAttempts);
+                Assert.AreEqual(0L, summary.DuplicateDeliveries);
+                var evidence = JsonSerializer.Deserialize<TransitNetworkEvidence>(File.ReadAllText(Path.Combine(output, "network-evidence.json")), FederationInput.Json)!;
+                Assert.AreEqual(11, evidence.NetworkCount);
+                Assert.AreEqual(10, evidence.BrokerCount);
+                Assert.IsFalse(evidence.HasAttachedEndpoints);
+                Assert.AreEqual(90, evidence.AvailablePaths.Length);
+                foreach (var route in evidence.AvailablePaths)
+                    CollectionAssert.AreEqual(new[] { "site" + route.Source, "transit", "site" + route.Target }, route.Networks);
+                var delta = evidence.MeasurementAndDrainCounters!;
+                Assert.IsTrue(evidence.BeforeMeasurement!.Counters["TransferPackets"] > 0, "The warmup baseline must be captured, not counted as measurement.");
+                Assert.IsTrue(delta["TransferPackets"] >= 90);
+                Assert.AreEqual(delta["InboundPackets"], delta["OutboundPackets"]);
+                Assert.AreEqual(delta["TransferPackets"], delta["OutboundPackets"]);
+                Assert.AreEqual(delta["Inbound"], delta["Outbound"]);
+                Assert.AreEqual(0L, delta["Refused"]);
+                Assert.AreEqual(0L, evidence.Final.QueuedPackets);
+                var physical = File.ReadAllText(Path.Combine(output, "topology-physical.mmd"));
+                Assert.AreEqual(10, physical.Split('\n').Count(line => line.Contains("<-->")));
+                StringAssert.Contains(physical, "S10[\"transit:");
+                var logical = File.ReadAllText(Path.Combine(output, "topology-logical.mmd"));
+                Assert.AreEqual(90, logical.Split('\n').Count(line => line.Contains(" -->")));
+                XDocument.Parse(File.ReadAllText(Path.Combine(output, "topology-logical.svg")));
+                FederationDiagrams.Verify(File.ReadAllText(Path.Combine(output, "topology.graphml")), options);
+            }
+            finally
+            {
+                var absolute = Path.GetFullPath(output); var temp = Path.GetFullPath(Path.GetTempPath());
+                if (absolute.StartsWith(temp, StringComparison.OrdinalIgnoreCase) && Path.GetFileName(absolute).StartsWith("mqtty-federation-tests-", StringComparison.Ordinal)) Directory.Delete(absolute, true);
+            }
+        }
+    }
+
+    [DataTestMethod]
+    [DataRow(FederationMode.Single, 0)] [DataRow(FederationMode.Single, 1)] [DataRow(FederationMode.Single, 2)]
+    [DataRow(FederationMode.Federation, 0)] [DataRow(FederationMode.Federation, 1)] [DataRow(FederationMode.Federation, 2)]
+    public void TransitTopology_PreservesOtherModes(FederationMode mode, int qos)
+    {
+        var options = Small(mode, qos) with { Brokers = 4, Publishers = 4, Topology = "star", MeasurementSeconds = .004 };
+        var summary = new FederationRunner().Run(FederationInput.Prepare(options));
+        Assert.AreEqual("completed", summary.Status, summary.Error);
+        Assert.AreEqual(16L, summary.UniqueDeliveries);
+        Assert.AreEqual(0L, summary.DuplicateDeliveries);
+    }
+
+    [TestMethod]
+    public void TransitNetwork_AddsModelledLatency_AndCliAcceptsStar()
+    {
+        var options = Small(FederationMode.Relay) with { Brokers = 2, Publishers = 2, MeasurementSeconds = .002, Topology = "line" };
+        var direct = new FederationRunner().Run(FederationInput.Prepare(options));
+        var transit = new FederationRunner().Run(FederationInput.Prepare(options with { Topology = "star" }));
+        Assert.AreEqual("completed", direct.Status, direct.Error);
+        Assert.AreEqual("completed", transit.Status, transit.Error);
+        Assert.IsTrue(transit.ReceiverP99Ms > direct.ReceiverP99Ms, "The transit must be simulated, not just drawn.");
+        var demo = FederationDemoOptions.Parse(new[] { "--brokers", "10", "--topology", "star", "--mode", "relay" });
+        Assert.AreEqual(11, FederationGraph.NetworkCount(demo.Options));
+        Assert.ThrowsException<InvalidDataException>(() => (options with { Topology = "star", Links = new[] { new SiteLink(0, 1) } }).Validate());
+    }
+
+    [TestMethod]
     public void HopLimitAndQueueOverflow_AreVisibleLoss_NotInfiniteExecution()
     {
         var limited = new FederationRunner().Run(FederationInput.Prepare(Small() with {

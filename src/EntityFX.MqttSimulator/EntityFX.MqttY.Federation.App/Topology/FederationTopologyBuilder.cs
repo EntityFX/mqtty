@@ -18,7 +18,8 @@ public static class FederationTopologyBuilder
         {
             var generic = new GenericBuilder(); var evaluator = generic.GetMqttTopicEvaluator(); var packets = generic.GetMqttPacketManager(evaluator);
             var index = o.Brokers + 1;
-            var sites = Enumerable.Range(0, o.Brokers).Select(i => new ModelNetwork(i, $"site{i}", $"site{i}.local", "ethernet", o.Network.Build(), ticks, true)).ToArray();
+            var sites = Enumerable.Range(0, FederationGraph.NetworkCount(o)).Select(i =>
+                new ModelNetwork(i, FederationGraph.NetworkName(o, i), FederationGraph.NetworkName(o, i) + ".local", "ethernet", o.Network.Build(), ticks, true)).ToArray();
             foreach (var site in sites) graph.AddNetwork(site);
             foreach (var edge in edges) { graph.Link(sites[edge.A].Name, sites[edge.B].Name); graph.Link(sites[edge.B].Name, sites[edge.A].Name); }
             for (var b = 0; b < result.Brokers.Length; b++)
@@ -46,9 +47,10 @@ public static class FederationTopologyBuilder
                 {
                     var listener = Client($"fed{site}in", site, site);
                     result.Subscriptions.Add((listener, FederationTopics.InputFilter)); result.Subscriptions.Add((listener, FederationTopics.RoutingFilter));
-                    var outputs = FederationGraph.Neighbors(site, edges).Append(site).ToDictionary(target => target,
+                    var forwardingEdges = FederationGraph.ForwardingEdges(o);
+                    var outputs = FederationGraph.Neighbors(site, forwardingEdges).Append(site).ToDictionary(target => target,
                         target => Client($"fed{site}to{target}", site, target));
-                    var federator = new StaticFederator(site, o, ledger, new FloodingPolicy(edges), outputs);
+                    var federator = new StaticFederator(site, o, ledger, new FloodingPolicy(forwardingEdges), outputs);
                     listener.MessageReceived += (_, m) => federator.Receive(m);
                     result.Federators.Add(federator);
                 }
