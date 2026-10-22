@@ -48,7 +48,8 @@ public static class FederationDiagrams
             {
                 mmd.AppendLine($"  S{i}[\"Площадка {i}: publishers={Enumerable.Range(0, o.Publishers).Count(p => o.PublisherSite(p) == i)}; subscribers={(o.Receivers().Contains(i) ? 1 : 0)}; брокер={(o.Mode != FederationMode.Single || i == 0 ? "есть" : "нет")}\"]");
             }
-            foreach (var (a, b, label) in Edges(o, logical)) mmd.AppendLine($"  S{a} -->|\"{label}\"| S{b}");
+            foreach (var (a, b, label) in Edges(o, logical))
+                mmd.AppendLine($"  S{a} {(!logical || o.Mode == FederationMode.Single ? "<-->" : "-->")}|\"{label}\"| S{b}");
             File.WriteAllText(Path.Combine(output, $"topology-{kind}.mmd"), mmd.ToString(), new UTF8Encoding(false));
             File.WriteAllText(Path.Combine(output, $"topology-{kind}.svg"), Svg(o, logical), new UTF8Encoding(false));
         }
@@ -64,18 +65,35 @@ public static class FederationDiagrams
     private static string Svg(FederationOptions o, bool logical)
     {
         static string N(double n) => n.ToString("0.###", CultureInfo.InvariantCulture);
-        var positions = Enumerable.Range(0, o.Brokers).Select(i => (X: 450 + 300 * Math.Cos(2 * Math.PI * i / o.Brokers - Math.PI / 2), Y: 340 + 220 * Math.Sin(2 * Math.PI * i / o.Brokers - Math.PI / 2))).ToArray();
-        var svg = new StringBuilder("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 900 690\"><defs><marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"3\" orient=\"auto-start-reverse\"><path d=\"M0,0 L0,6 L9,3 z\" fill=\"#566578\"/></marker></defs><rect width=\"900\" height=\"690\" fill=\"white\"/>");
-        svg.Append($"<text x=\"450\" y=\"30\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"21\">{(logical ? "Логические соединения" : "Физическая сеть")}: {o.Mode}</text>");
+        var radiusX = Math.Max(300, o.Brokers * 35); var radiusY = Math.Max(220, o.Brokers * 30);
+        var centerX = radiusX + 150; var centerY = radiusY + 120;
+        var width = centerX * 2; var height = radiusY * 2 + 250;
+        var positions = Enumerable.Range(0, o.Brokers).Select(i => (
+            X: centerX + radiusX * Math.Cos(2 * Math.PI * i / o.Brokers - Math.PI / 2),
+            Y: centerY + radiusY * Math.Sin(2 * Math.PI * i / o.Brokers - Math.PI / 2))).ToArray();
+        var svg = new StringBuilder($"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {width} {height}\"><defs><marker id=\"arrow\" markerWidth=\"10\" markerHeight=\"10\" refX=\"9\" refY=\"3\" orient=\"auto-start-reverse\"><path d=\"M0,0 L0,6 L9,3 z\" fill=\"#566578\"/></marker></defs><rect width=\"{width}\" height=\"{height}\" fill=\"white\"/>");
+        svg.Append($"<text x=\"{centerX}\" y=\"30\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"21\">{(logical ? "Логические соединения" : "Физическая сеть")}: {o.Mode}</text>");
         var color = new[] { "#2878b5", "#d16b32", "#33864b", "#9856a2" };
         var edgeIndex = 0;
+        var directions = new Dictionary<(int, int), int>();
         foreach (var e in Edges(o, logical))
         {
-            var a = positions[e.A]; var b = positions[e.B]; var dx = b.X - a.X; var dy = b.Y - a.Y; var length = Math.Sqrt(dx * dx + dy * dy); var offset = o.Mode == FederationMode.Relay && logical ? (edgeIndex % 3 - 1) * 5 : 0;
-            var x1 = a.X + dx / length * 72 - dy / length * offset; var y1 = a.Y + dy / length * 52 + dx / length * offset;
-            var x2 = b.X - dx / length * 72 - dy / length * offset; var y2 = b.Y - dy / length * 52 + dx / length * offset;
-            svg.Append($"<line x1=\"{N(x1)}\" y1=\"{N(y1)}\" x2=\"{N(x2)}\" y2=\"{N(y2)}\" stroke=\"{color[edgeIndex % color.Length]}\" stroke-width=\"2\" marker-end=\"url(#arrow)\"{(!logical || o.Mode == FederationMode.Single ? " marker-start=\"url(#arrow)\"" : "")}/>");
-            if (o.Mode == FederationMode.Relay && logical) svg.Append($"<text x=\"{N((x1 + x2) / 2)}\" y=\"{N((y1 + y2) / 2 - 8 - offset * 2)}\" font-family=\"sans-serif\" font-size=\"11\">{e.Label}</text>");
+            var a = positions[e.A]; var b = positions[e.B]; var dx = b.X - a.X; var dy = b.Y - a.Y;
+            var length = Math.Sqrt(dx * dx + dy * dy);
+            // Clip to the actual rectangular node boundary, keeping arrowheads outside the box.
+            var clip = Math.Min(dx == 0 ? double.PositiveInfinity : 96 / Math.Abs(dx), dy == 0 ? double.PositiveInfinity : 49 / Math.Abs(dy));
+            var x1 = a.X + dx * clip; var y1 = a.Y + dy * clip;
+            var x2 = b.X - dx * clip; var y2 = b.Y - dy * clip;
+            var slot = directions.GetValueOrDefault((e.A, e.B)); directions[(e.A, e.B)] = slot + 1;
+            var bend = logical && o.Mode != FederationMode.Single ? 36 + slot * 36 : 0;
+            var cx = (x1 + x2) / 2 - dy / length * bend; var cy = (y1 + y2) / 2 + dx / length * bend;
+            var stroke = color[o.Mode == FederationMode.Relay && logical ? int.Parse(e.Label.Split(' ')[1], CultureInfo.InvariantCulture) % color.Length : edgeIndex % color.Length];
+            svg.Append($"<path d=\"M {N(x1)} {N(y1)} Q {N(cx)} {N(cy)} {N(x2)} {N(y2)}\" fill=\"none\" stroke=\"{stroke}\" stroke-width=\"2\" marker-end=\"url(#arrow)\"{(!logical || o.Mode == FederationMode.Single ? " marker-start=\"url(#arrow)\"" : "")}/>");
+            if (o.Mode == FederationMode.Relay && logical)
+            {
+                var lx = (x1 + x2 + 2 * cx) / 4; var ly = (y1 + y2 + 2 * cy) / 4;
+                svg.Append($"<rect x=\"{N(lx - 39)}\" y=\"{N(ly - 14)}\" width=\"78\" height=\"18\" fill=\"white\"/><text x=\"{N(lx)}\" y=\"{N(ly)}\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"12\" fill=\"{stroke}\">{e.Label}</text>");
+            }
             edgeIndex++;
         }
         for (var i = 0; i < o.Brokers; i++)
@@ -85,8 +103,8 @@ public static class FederationDiagrams
             var lines = new[] { $"Площадка {i}", $"P={Enumerable.Range(0, o.Publishers).Count(n => o.PublisherSite(n) == i)}; S={(o.Receivers().Contains(i) ? 1 : 0)}", o.Mode != FederationMode.Single || i == 0 ? $"Брокер B{i}" : "Клиенты → B0" };
             for (var row = 0; row < lines.Length; row++) svg.Append($"<text x=\"{N(p.X)}\" y=\"{N(p.Y - 20 + row * 23)}\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"15\">{lines[row]}</text>");
         }
-        svg.Append("<text x=\"450\" y=\"640\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"14\">P — publishers; S — subscribers. Расположение клиентов неизменно.</text>");
-        svg.Append($"<text x=\"450\" y=\"666\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"13\">{(logical ? "Стрелки — MQTT-соединения; локальная доставка показана счётчиками S." : "Связи двусторонние; логические MQTT-пути могут проходить через несколько площадок.")}</text></svg>");
+        svg.Append($"<text x=\"{centerX}\" y=\"{height - 50}\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"14\">P — publishers; S — subscribers. Расположение клиентов неизменно.</text>");
+        svg.Append($"<text x=\"{centerX}\" y=\"{height - 24}\" text-anchor=\"middle\" font-family=\"sans-serif\" font-size=\"13\">{(logical ? "Стрелки — MQTT-соединения; локальная доставка показана счётчиками S." : "Связи двусторонние; логические MQTT-пути могут проходить через несколько площадок.")}</text></svg>");
         return svg.ToString();
     }
 }
