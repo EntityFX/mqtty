@@ -147,7 +147,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
                 var relayTopic = mqttMessage.Topic;
 
-                if (relayTopics.ReplaceRelaySegment)
+                if (relayTopics.TargetTopic != null)
+                {
+                    relayTopic = relayTopics.TargetTopic;
+                }
+                else if (relayTopics.ReplaceRelaySegment)
                 {
                     var splitSegmentsExceptRelay = relayTopic.Split('/').Skip(1);
                     relayTopic = string.Join("/", splitSegmentsExceptRelay);

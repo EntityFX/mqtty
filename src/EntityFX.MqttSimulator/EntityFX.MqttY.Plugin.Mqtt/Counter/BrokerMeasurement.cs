@@ -35,6 +35,26 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
         private readonly Dictionary<string, PublishTracker> _publishes = new();
         private readonly Dictionary<long, (long Generation, MqttQos Qos)> _deliveries = new();
         private Accumulator[] _accumulators = CreateAccumulators();
+        private readonly Dictionary<string, Accumulator[]> _publishers = new(StringComparer.Ordinal);
+
+        public void TrackPublishers(IEnumerable<string> names)
+        {
+            lock (_sync)
+                foreach (var name in names) _publishers.TryAdd(name, CreateAccumulators());
+        }
+
+        public BrokerQosMetricsSnapshot PublisherSnapshot(string name, MqttQos qos, long endTick, TimeSpan tickPeriod)
+        {
+            lock (_sync)
+            {
+                var a = _publishers[name][(int)qos];
+                var seconds = Math.Max(0, endTick - _startTick) * tickPeriod.TotalSeconds;
+                double? Ms(double q) => qos == MqttQos.AtMostOnce ? null : a.Latency.NearestRank(q) * tickPeriod.TotalMilliseconds;
+                return new(a.Attempted, a.Admitted, a.Completed, 0, 0, a.RateRejected, a.PublishFailed, 0,
+                    seconds > 0 ? a.Completed / seconds : 0, Ms(.5), Ms(.95), Ms(.99))
+                { LatencyHistogramTicks = a.Latency.Snapshot() };
+            }
+        }
         private long _generation;
         private long _startTick;
 
@@ -60,6 +80,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                 };
                 _publishes[key] = tracker;
                 if (tracker.Generation == _generation) _accumulators[(int)qos].Attempted++;
+                if (tracker.Generation == _generation && _publishers.TryGetValue(publisher, out var sources)) sources[(int)qos].Attempted++;
                 return tracker;
             }
         }
@@ -74,6 +95,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                 var accumulator = _accumulators[(int)tracker.Qos];
                 accumulator.Admitted++;
                 if (tracker.Qos == MqttQos.AtMostOnce) accumulator.Completed++;
+                if (_publishers.TryGetValue(tracker.Publisher, out var sources))
+                {
+                    sources[(int)tracker.Qos].Admitted++;
+                    if (tracker.Qos == MqttQos.AtMostOnce) sources[(int)tracker.Qos].Completed++;
+                }
             }
         }
 
@@ -89,6 +115,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                 {
                     if (rate) _accumulators[(int)tracker.Qos].RateRejected++;
                     else _accumulators[(int)tracker.Qos].PublishFailed++;
+                    if (_publishers.TryGetValue(tracker.Publisher, out var sources))
+                    {
+                        if (rate) sources[(int)tracker.Qos].RateRejected++;
+                        else sources[(int)tracker.Qos].PublishFailed++;
+                    }
                 }
                 _publishes.Remove(Key(tracker.Publisher, tracker.Qos, tracker.PacketId, tracker.NetworkPacketId));
             }
@@ -146,6 +177,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                 var accumulator = _accumulators[(int)qos];
                 accumulator.Completed++;
                 accumulator.Latency.Record(elapsedTicks);
+                if (_publishers.TryGetValue(publisher, out var sources))
+                {
+                    sources[(int)qos].Completed++;
+                    sources[(int)qos].Latency.Record(elapsedTicks);
+                }
                 return elapsedTicks;
             }
         }
@@ -164,6 +200,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                 _generation++;
                 _startTick = startTick;
                 _accumulators = CreateAccumulators();
+                foreach (var name in _publishers.Keys.ToArray()) _publishers[name] = CreateAccumulators();
             }
         }
 

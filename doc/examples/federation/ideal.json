@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "mode": "federation",
+  "brokers": 3,
+  "topology": "ring",
+  "publishers": 12,
+  "ideal": true,
+  "payloadBytes": 16,
+  "qos": 1,
+  "offeredRps": 1000,
+  "seed": 42,
+  "warmupSeconds": 0.01,
+  "measurementSeconds": 0.2,
+  "drainTimeoutSeconds": 1,
+  "tickPeriod": "00:00:00.0001000"
+}

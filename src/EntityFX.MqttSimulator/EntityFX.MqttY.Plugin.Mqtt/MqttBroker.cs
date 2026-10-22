@@ -12,7 +12,7 @@ using System.Collections.Concurrent;
 
 namespace EntityFX.MqttY.Plugin.Mqtt
 {
-    internal class MqttBroker : Server, IMqttBroker, IMeasurementSource, IMqttBrokerMetricsSink
+    internal class MqttBroker : Server, IMqttBroker, IMeasurementSource, IMqttBrokerMetricsSink, IPublisherMeasurementSource
     {
         protected override bool ShouldTrackResponse(INetworkPacket packet) => false;
         private readonly IRepository<ClientSession> _sessionRepository = new InMemoryRepository<ClientSession>();
@@ -49,6 +49,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         }
 
         public void ResetMeasurement(long startTick) => _measurement.Reset(startTick);
+
+        public void TrackPublishers(IEnumerable<string> names) => _measurement.TrackPublishers(names);
+        public BrokerQosMetricsSnapshot GetPublisherMetrics(string name, MqttQos qos) =>
+            _measurement.PublisherSnapshot(name, qos, NetworkSimulator?.TotalTicks ?? 0, _tickPeriod);
 
         void IMqttBrokerMetricsSink.CompletePublisher(
             string publisher, MqttQos qos, ushort packetId, long tick)

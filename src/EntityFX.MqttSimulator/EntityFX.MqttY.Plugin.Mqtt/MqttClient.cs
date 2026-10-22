@@ -248,7 +248,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             _sessionRepository.Update(session);
         }
 
-        public bool Publish(string topic, byte[] payload, MqttQos qos, bool retain = false)
+        public virtual bool Publish(string topic, byte[] payload, MqttQos qos, bool retain = false)
         {
             ArgumentNullException.ThrowIfNull(payload);
             var localPublishSequence = Interlocked.Increment(ref _localPublishSequence);

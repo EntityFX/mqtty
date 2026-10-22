@@ -22,6 +22,7 @@
     <ProjectReference Include="..\EntityFX.MqttSimulator\EntityFX.MqttY.csproj" />
     <ProjectReference Include="..\EntityFX.MqttY.Plugin.Mqtt\EntityFX.MqttY.Plugin.Mqtt.csproj" />
     <ProjectReference Include="..\EntityFX.MqttY.Plugin.Scenarios\EntityFX.MqttY.Plugin.Scenarios.csproj" />
+    <ProjectReference Include="..\EntityFX.MqttY.Federation.App\EntityFX.MqttY.Federation.App.csproj" />
   </ItemGroup>
 
   <ItemGroup>

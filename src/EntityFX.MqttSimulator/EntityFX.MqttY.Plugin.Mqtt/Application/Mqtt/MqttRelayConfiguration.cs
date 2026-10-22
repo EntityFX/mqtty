@@ -21,6 +21,8 @@
 
         public class MqttRelayConfigurationItem
         {
+            /// <summary>Optional exact destination. Null preserves the existing prefix rules.</summary>
+            public string? TargetTopic { get; set; }
             public string Server { get; set; } = string.Empty;
             public bool ReplaceRelaySegment  { get; set; } = false;
 
