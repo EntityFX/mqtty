@@ -66,7 +66,8 @@ public static class ExperimentResultWriter
         if (graphMl != null) File.WriteAllText(Path.Combine(directory, "topology.graphml"), graphMl.Replace("encoding=\"utf-16\"", "encoding=\"utf-8\""), new UTF8Encoding(false));
         if (plantUml != null) File.WriteAllText(Path.Combine(directory, "topology.puml"), plantUml, new UTF8Encoding(false));
         var report = new StringBuilder("# Балансировка подключений MQTT\n\n");
-        report.AppendLine($"Брокер: **{options.BrokerType}**; режим: **{options.Mode}**; QoS: **{options.PublishQos}**; seed: **{options.Seed}**. Статус: **{summary.Status}**.\n");
+        var brokerLabel = options.Ideal ? "идеальная модель без реального профиля" : options.BrokerType;
+        report.AppendLine($"Брокер: **{brokerLabel}**; режим: **{options.Mode}**; QoS: **{options.PublishQos}**; seed: **{options.Seed}**. Статус: **{summary.Status}**.\n");
         report.AppendLine("| Показатель | Значение |\n| --- | ---: |");
         foreach (var (label, value) in new[]
         {

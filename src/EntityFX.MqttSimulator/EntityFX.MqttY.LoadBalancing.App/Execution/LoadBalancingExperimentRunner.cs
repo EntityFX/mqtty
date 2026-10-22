@@ -7,8 +7,16 @@ public sealed class LoadBalancingExperimentRunner
 {
     public ExperimentSummary Run(PreparedExperiment input, string output)
     {
+        ArgumentNullException.ThrowIfNull(output);
+        return RunCore(input, output);
+    }
+
+    public ExperimentSummary RunInMemory(PreparedExperiment input) => RunCore(input, null);
+
+    private ExperimentSummary RunCore(PreparedExperiment input, string? output)
+    {
         // Claim a new directory before simulation; previous evidence is never overwritten.
-        ExperimentResultWriter.CreateOutput(output);
+        if (output != null) ExperimentResultWriter.CreateOutput(output);
         var options = input.Options;
         var ledger = new DeliveryLedger(options.PayloadBytes, options.TickPeriod.TotalMilliseconds);
         LoadBalancingTopology? topology = null;
@@ -26,8 +34,11 @@ public sealed class LoadBalancingExperimentRunner
         {
             topology = LoadBalancingTopologyBuilder.Build(input);
             var graph = topology.Graph;
-            graphMl = new SimpleGraphMlGenerator().SerializeNetworkGraph(graph);
-            plantUml = new PlantUmlGraphGenerator().Generate(graph);
+            if (output != null)
+            {
+                graphMl = new SimpleGraphMlGenerator().SerializeNetworkGraph(graph);
+                plantUml = new PlantUmlGraphGenerator().Generate(graph);
+            }
             CompletePhase();
             for (var i = 0; i < topology.Receivers.Length; i++)
             {
@@ -144,7 +155,7 @@ public sealed class LoadBalancingExperimentRunner
                 PublishQuantile(.5), PublishQuantile(.95), PublishQuantile(.99),
                 ReceiverQuantile(.5), ReceiverQuantile(.95), ReceiverQuantile(.99), deliveryBefore.UniqueDelivered,
                 delivery.UniqueDelivered - deliveryBefore.UniqueDelivered, delivery, backends, histogram, phases);
-            ExperimentResultWriter.Write(output, input, summary, graphMl, plantUml);
+            if (output != null) ExperimentResultWriter.Write(output, input, summary, graphMl, plantUml);
             return summary;
 
             BrokerQosMetricsSnapshot Normalize(BrokerQosMetricsSnapshot metrics) =>
