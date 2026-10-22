@@ -48,6 +48,66 @@ public class FederationTests
     }
 
     [TestMethod]
+    public void Relay_ConnectsEveryBrokerToEveryOtherBroker_WithoutReexportingImports()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "mqtty-federation-tests-" + Guid.NewGuid());
+        try
+        {
+            foreach (var shape in new[] { "line", "ring", "custom" })
+            foreach (var qos in new[] { 0, 1, 2 })
+            {
+                var o = Small(FederationMode.Relay, qos) with
+                {
+                    Brokers = 4, Publishers = 4, MeasurementSeconds = .004, Topology = shape,
+                    Links = shape == "custom" ? new[] { new SiteLink(0,1), new SiteLink(0,2), new SiteLink(1,3), new SiteLink(2,3) } : null
+                };
+                var input = FederationInput.Prepare(o);
+                var ledger = new FederationDeliveryLedger(o);
+                using (var topology = FederationTopologyBuilder.Build(input, ledger, new TransmissionLedger(ledger)))
+                    Assert.AreEqual(4, topology.Relays.Count, "One MqttRelay application per broker.");
+                var output = Path.Combine(root, shape + qos);
+                var summary = new FederationRunner().Run(input, output);
+                Assert.AreEqual("completed", summary.Status, summary.Error);
+                Assert.AreEqual(16L, summary.UniqueDeliveries);
+                Assert.AreEqual(0L, summary.DuplicateDeliveries);
+                Assert.AreEqual(12L, summary.ForwardAttempts);
+                var publications = JsonSerializer.Deserialize<FederationPublication[]>(File.ReadAllText(Path.Combine(output, "publications.json")), FederationInput.Json)!.ToDictionary(p => p.Id);
+                var tx = JsonSerializer.Deserialize<TransmissionResult[]>(File.ReadAllText(Path.Combine(output, "transmissions.json")), FederationInput.Json)!;
+                var forwards = tx.Where(t => t.Role == "forward" && t.Measurement).ToArray();
+                foreach (var source in publications.Values)
+                {
+                    var actual = forwards.Where(t => t.PublicationId == source.Id).ToArray();
+                    Assert.AreEqual(3, actual.Length);
+                    CollectionAssert.AreEquivalent(Enumerable.Range(0, 4).Where(s => s != source.Origin).ToArray(), actual.Select(t => t.Target).ToArray());
+                    Assert.IsTrue(actual.All(t => t.Site == source.Origin && t.Accepted && t.Topic == FederationTopics.Relay(source.Origin)),
+                        "Every export must originate at the source site; importing sites must never reexport it.");
+                }
+                var mmd = File.ReadAllText(Path.Combine(output, "topology-logical.mmd"));
+                Assert.AreEqual(12, mmd.Split('\n').Count(line => line.Contains(" -->")));
+                StringAssert.Contains(mmd, "S0 -->|\"источник 0\"| S3");
+                var graph = File.ReadAllText(Path.Combine(output, "topology.graphml"));
+                Assert.ThrowsException<InvalidDataException>(() => FederationDiagrams.Verify(graph.Replace(">relay0relayfrom0to3<", ">missing<"), o));
+            }
+        }
+        finally
+        {
+            var absolute = Path.GetFullPath(root); var temp = Path.GetFullPath(Path.GetTempPath());
+            if (absolute.StartsWith(temp, StringComparison.OrdinalIgnoreCase) && Path.GetFileName(absolute).StartsWith("mqtty-federation-tests-", StringComparison.Ordinal)) Directory.Delete(absolute, true);
+        }
+    }
+
+    [DataTestMethod]
+    [DataRow(0)] [DataRow(1)] [DataRow(2)]
+    public void Relay_WithoutSubscribers_StillExportsOnceToEveryPeer(int qos)
+    {
+        var summary = new FederationRunner().Run(FederationInput.Prepare(Small(FederationMode.Relay, qos) with { ReceiverSites = Array.Empty<int>() }));
+        Assert.AreEqual("completed", summary.Status, summary.Error);
+        Assert.AreEqual(12L, summary.ForwardAttempts);
+        Assert.AreEqual(0L, summary.ExpectedDeliveries);
+        Assert.IsNull(summary.DeliveryLoss);
+    }
+
+    [TestMethod]
     public void HopLimitAndQueueOverflow_AreVisibleLoss_NotInfiniteExecution()
     {
         var limited = new FederationRunner().Run(FederationInput.Prepare(Small() with {

@@ -8,6 +8,12 @@ public static class FederationConsoleView
         string N(double? x) => x?.ToString("0.######", CultureInfo.InvariantCulture) ?? "notApplicable";
         writer.WriteLine($"Статическая федерация: {o.Mode}; площадок {o.Brokers}; QoS {o.Qos}; статус {s.Status}");
         writer.WriteLine("Физические связи: " + string.Join(", ", FederationGraph.Edges(o).Select(e => $"{e.A}<->{e.B}")));
+        if (o.Mode == FederationMode.Relay)
+        {
+            writer.WriteLine($"Логическая сеть Relay: каждый с каждым; направлений {o.Brokers * (o.Brokers - 1)}; импорт не экспортируется повторно.");
+            for (var site = 0; site < o.Brokers; site++)
+                writer.WriteLine($"  B{site} -> " + string.Join(", ", Enumerable.Range(0, o.Brokers).Where(target => target != site).Select(target => $"B{target}")));
+        }
         var max = s.Receivers.Select(r => r.UniqueDeliveries).DefaultIfEmpty(0).Max();
         foreach (var r in s.Receivers) writer.WriteLine($"subscriber@{r.Site}: [{new string('#', max == 0 ? 0 : (int)(r.UniqueDeliveries * 24 / max))}] {r.UniqueDeliveries}; дубликатов {r.Duplicates}");
         writer.WriteLine($"Publish попытки/завершения: {s.ApiAttempts}/{s.SourceCompleted}; source RPS={N(s.SourceCompletedRps)}; delivery goodput={N(s.UniqueGoodput)}; loss={N(s.DeliveryLoss)}");

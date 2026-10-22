@@ -52,33 +52,41 @@ public static class FederationTopologyBuilder
                     listener.MessageReceived += (_, m) => federator.Receive(m);
                     result.Federators.Add(federator);
                 }
-            var treePolicy = new TreeForwardingPolicy(o.Brokers, edges);
             if (o.Mode == FederationMode.Relay)
-                for (var origin = 0; origin < o.Brokers; origin++)
-                    for (var site = 0; site < o.Brokers; site++)
+                for (var site = 0; site < o.Brokers; site++)
                     {
-                        var localSite = site; var name = $"relay{origin}site{site}";
+                        var localSite = site; var name = $"relay{site}";
                         var config = new MqttRelayConfiguration();
-                        var destinations = treePolicy.Destinations(site, origin, -1).ToList();
-                        var map = new Dictionary<string, int> { [name + "listenin"] = site };
-                        config.ListenTopics["in"] = new()
+                        var map = new Dictionary<string, int>();
+                        // Export only publications originating here. Imported publications are
+                        // delivered locally and never exported again, even on a physical cycle.
+                        for (var origin = 0; origin < o.Brokers; origin++)
                         {
-                            Server = result.Brokers[site].Name,
-                            Qos = (MqttQos)o.Qos,
-                            Topics = new[] { site == origin ? FederationTopics.Input(origin) : FederationTopics.Relay(origin) }
-                        };
-                        var targets = new List<string>();
-                        if (o.Receivers().Contains(site)) destinations.Add(site);
-                        foreach (var target in destinations)
-                        {
-                            var key = "to" + target; targets.Add(key); map[name + "relay" + key] = target;
-                            config.RelayTopics[key] = new()
+                            var listen = "from" + origin;
+                            map[name + "listen" + listen] = site;
+                            config.ListenTopics[listen] = new()
                             {
-                                Server = result.Brokers[target].Name,
-                                TargetTopic = target == site ? FederationTopics.Delivered(origin) : FederationTopics.Relay(origin)
+                                Server = result.Brokers[site].Name,
+                                Qos = (MqttQos)o.Qos,
+                                Topics = new[] { site == origin ? FederationTopics.Input(origin) : FederationTopics.Relay(origin) }
                             };
+                            var targets = new List<string>();
+                            var destinations = origin == site
+                                ? Enumerable.Range(0, o.Brokers).Where(target => target != site)
+                                : Enumerable.Empty<int>();
+                            if (o.Receivers().Contains(site)) destinations = destinations.Append(site);
+                            foreach (var target in destinations)
+                            {
+                                var key = $"from{origin}to{target}";
+                                targets.Add(key); map[name + "relay" + key] = target;
+                                config.RelayTopics[key] = new()
+                                {
+                                    Server = result.Brokers[target].Name,
+                                    TargetTopic = target == site ? FederationTopics.Delivered(origin) : FederationTopics.Relay(origin)
+                                };
+                            }
+                            config.RouteMap[listen] = targets.ToArray();
                         }
-                        config.RouteMap["in"] = targets.ToArray();
                         var factory = generic.GetClientBuilder((a, clientName, c, d, e, f, g, h, i, j) => Client(clientName, localSite, map[clientName], true));
                         var relay = new MqttRelay(index++, name, "mqtt://" + name, "mqtt", "mqtt-relay", factory, evaluator, ticks, config, true);
                         sites[site].AddApplication(relay); graph.AddApplication(relay); result.Relays.Add(relay);

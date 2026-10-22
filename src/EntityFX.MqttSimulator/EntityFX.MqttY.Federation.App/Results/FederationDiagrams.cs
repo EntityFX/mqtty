@@ -20,6 +20,11 @@ public static class FederationDiagrams
         if (!actual.SetEquals(expected)) throw new InvalidDataException("Exported physical edges differ from the diagram.");
         VerifyClients("publisher", Enumerable.Range(0, o.Publishers).Select(p => ($"publisher{p:D4}", o.PublisherSite(p))).ToArray());
         VerifyClients("receiver", o.Receivers().Select(s => ($"receiver{s:D4}", s)).ToArray());
+        if (o.Mode == FederationMode.Relay)
+            for (var site = 0; site < o.Brokers; site++)
+                VerifyClients($"relay{site}relayfrom{site}to", Enumerable.Range(0, o.Brokers)
+                    .Where(target => target != site || o.Receivers().Contains(site))
+                    .Select(target => ($"relay{site}relayfrom{site}to{target}", site)).ToArray());
         var brokers = nodes.Values.Where(n => n["type"] == "Server").Select(n => n["label"]).OrderBy(s => s).ToArray();
         if (!brokers.SequenceEqual(Enumerable.Range(0, o.Mode == FederationMode.Single ? 1 : o.Brokers).Select(i => $"broker{i:D4}")))
             throw new InvalidDataException("Exported brokers differ from the diagram.");
@@ -60,7 +65,8 @@ public static class FederationDiagrams
         if (!logical) return edges.Select(e => (e.A, e.B, "сеть ↔"));
         if (o.Mode == FederationMode.Single) return Enumerable.Range(1, o.Brokers - 1).Select(s => (s, 0, "MQTT к B0 ↔"));
         if (o.Mode == FederationMode.Federation) return edges.SelectMany(e => new[] { (e.A, e.B, "federator"), (e.B, e.A, "federator") });
-        return Enumerable.Range(0, o.Brokers).SelectMany(origin => FederationGraph.Tree(origin, o.Brokers, edges).Select(e => (e.A, e.B, $"источник {origin}")));
+        return Enumerable.Range(0, o.Brokers).SelectMany(origin => Enumerable.Range(0, o.Brokers)
+            .Where(target => target != origin).Select(target => (origin, target, $"источник {origin}")));
     }
     private static string Svg(FederationOptions o, bool logical)
     {

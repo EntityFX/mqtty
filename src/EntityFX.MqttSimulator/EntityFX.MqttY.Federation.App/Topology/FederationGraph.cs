@@ -19,13 +19,4 @@ public static class FederationGraph
     }
     public static int[] Neighbors(int site, SiteLink[] edges) => edges.Where(e => e.A == site || e.B == site)
         .Select(e => e.A == site ? e.B : e.A).OrderBy(x => x).ToArray();
-    public static SiteLink[] Tree(int root, int count, SiteLink[] edges)
-    {
-        var queue = new Queue<int>(); queue.Enqueue(root);
-        var seen = new HashSet<int> { root }; var result = new List<SiteLink>();
-        while (queue.TryDequeue(out var site)) foreach (var next in Neighbors(site, edges))
-            if (seen.Add(next)) { result.Add(new(site, next)); queue.Enqueue(next); }
-        if (seen.Count != count) throw new InvalidDataException("Unreachable site.");
-        return result.ToArray();
-    }
 }
