@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EntityFX.MqttY.LoadBalancing.App\EntityFX.MqttY.LoadBalancing.App.csproj" />
     <ProjectReference Include="..\EntityFX.MqttSimulator\EntityFX.MqttY.csproj" />
     <ProjectReference Include="..\EntityFX.MqttY.Plugin.Mqtt\EntityFX.MqttY.Plugin.Mqtt.csproj" />
     <ProjectReference Include="..\EntityFX.MqttY.Plugin.Scenarios\EntityFX.MqttY.Plugin.Scenarios.csproj" />

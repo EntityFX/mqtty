@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "mode": "roundRobin",
+  "brokerType": "Aedes",
+  "backendCount": 4,
+  "ideal": true,
+  "totalPublishers": 8,
+  "payloadBytes": 16,
+  "publishQos": 1,
+  "subscribeQos": 1,
+  "offeredRps": 1000,
+  "seed": 42,
+  "warmupSeconds": 0.01,
+  "measurementSeconds": 0.05,
+  "drainTimeoutSeconds": 1,
+  "tickPeriod": "00:00:00.0001000",
+  "networkLength": 2,
+  "network": {
+    "capacityBytesPerSecond": 125000000,
+    "throughputWindowTicks": 100,
+    "queueCapacity": 100000,
+    "transferTicks": 2
+  }
+}
