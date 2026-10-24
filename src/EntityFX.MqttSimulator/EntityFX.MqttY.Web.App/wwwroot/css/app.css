@@ -24,6 +24,21 @@ body {
     cursor: grab;
 }
 
+#tpl-canvas {
+    height: 90vh;
+    min-height: 720px;
+}
+
+.node.draggable {
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.node.dragging {
+    cursor: grabbing;
+}
+
 #graph-canvas:active,
 #tpl-canvas:active,
 #dsg-canvas:active,

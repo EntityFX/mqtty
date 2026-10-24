@@ -69,7 +69,7 @@ export async function renderDesigner(app) {
         if (node && node.type === 'Server') {
             window.dispatchEvent(new CustomEvent('mqtty:broker-click', { detail: { nodeId: id } }));
         }
-    });
+    }, { draggable: true });
 
     const addNode = (type) => {
         const id = `${type.toLowerCase()}-${nextId++}`;

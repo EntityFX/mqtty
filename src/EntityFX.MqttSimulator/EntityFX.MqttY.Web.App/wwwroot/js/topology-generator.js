@@ -78,7 +78,8 @@ export async function renderTopologies(app) {
             <div class="col-md-8">
                 <div class="card p-3">
                     <div id="tpl-legend" class="mb-2"></div>
-                    <svg id="tpl-canvas" class="border rounded"></svg>
+                    <p class="small text-muted mb-2">Узлы и сети можно перемещать мышью. Меняется только расположение на схеме.</p>
+                    <svg id="tpl-canvas" class="border rounded" aria-label="Топология: перетаскивайте узлы мышью"></svg>
                     <div class="mt-2 d-flex gap-2">
                         <button id="tpl-run" class="btn btn-success" disabled>Запустить симуляцию</button>
                         <button id="tpl-edit" class="btn btn-outline-secondary" disabled>Открыть в редакторе</button>
@@ -118,7 +119,7 @@ export async function renderTopologies(app) {
             const result = await api.post('/topologies/generate', spec);
             current = { graph: result.graph, runOptions: result.runOptions, spec };
             applyCircular(current.graph);
-            renderGraph(document.getElementById('tpl-canvas'), current.graph);
+            renderGraph(document.getElementById('tpl-canvas'), current.graph, null, { draggable: true });
             document.getElementById('tpl-run').disabled = false;
             document.getElementById('tpl-edit').disabled = false;
         } catch (err) {
