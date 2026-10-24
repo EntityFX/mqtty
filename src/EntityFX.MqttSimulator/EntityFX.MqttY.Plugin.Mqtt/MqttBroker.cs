@@ -9,11 +9,14 @@ using EntityFX.MqttY.Plugin.Mqtt.BrokerProfile;
 using EntityFX.MqttY.Plugin.Mqtt.Counter;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
 using System.Collections.Concurrent;
+using EntityFX.MqttY.Contracts.Mqtt.Diagnostics;
 
 namespace EntityFX.MqttY.Plugin.Mqtt
 {
-    internal class MqttBroker : Server, IMqttBroker, IMeasurementSource, IMqttBrokerMetricsSink, IPublisherMeasurementSource
+    internal class MqttBroker : Server, IMqttBroker, IMeasurementSource, IMqttBrokerMetricsSink, IPublisherMeasurementSource, IMqttPendingDiagnostics
     {
+        public MqttPendingSnapshot GetPendingSnapshot(int detailLimit = 32, int sessionLimit = 64) =>
+            Diagnostics.MqttPendingSnapshotBuilder.Capture(_sessionRepository.ReadAll(), _processingQueue.Count, detailLimit, sessionLimit);
         protected override bool ShouldTrackResponse(INetworkPacket packet) => false;
         private readonly IRepository<ClientSession> _sessionRepository = new InMemoryRepository<ClientSession>();
 

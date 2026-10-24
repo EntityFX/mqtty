@@ -1,0 +1,2 @@
+# Vendored assets are verified by SHA-256; preserve their bytes on every checkout.
+/src/EntityFX.MqttSimulator/EntityFX.MqttY.Web.App/wwwroot/vendor/** -text

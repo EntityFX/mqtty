@@ -1,0 +1,81 @@
+body {
+    background: #f5f6f8;
+}
+
+.navbar-brand {
+    font-weight: 600;
+}
+
+.card {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Редактор графа */
+#graph-canvas,
+#tpl-canvas,
+#dsg-canvas,
+#mon-canvas {
+    width: 100%;
+    height: 70vh;
+    min-height: 420px;
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    cursor: grab;
+}
+
+#graph-canvas:active,
+#tpl-canvas:active,
+#dsg-canvas:active,
+#mon-canvas:active {
+    cursor: grabbing;
+}
+
+.node {
+    cursor: pointer;
+}
+
+.node text {
+    font-size: 11px;
+    fill: #212529;
+    pointer-events: none;
+}
+
+.link {
+    stroke: #90a4ae;
+    stroke-width: 1.5;
+    fill: none;
+    marker-end: url(#arrowhead);
+}
+
+.connection {
+    stroke: #b0bec5;
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+    fill: none;
+}
+
+/* Легенда цветов */
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 14px;
+    font-size: 13px;
+}
+
+.legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+/* Таблицы мониторинга */
+.state-badge {
+    font-size: 12px;
+}
+
+.monitor-table td {
+    vertical-align: middle;
+}

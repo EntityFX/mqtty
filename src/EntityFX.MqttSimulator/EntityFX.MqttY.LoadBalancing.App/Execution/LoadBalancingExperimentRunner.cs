@@ -1,19 +1,23 @@
 using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Utils;
 
 namespace EntityFX.MqttY.LoadBalancing;
 
 public sealed class LoadBalancingExperimentRunner
 {
-    public ExperimentSummary Run(PreparedExperiment input, string output)
+    public ExperimentSummary Run(PreparedExperiment input, string output,
+        CancellationToken cancellationToken = default, Action<INetworkSimulator, string>? onProgress = null)
     {
         ArgumentNullException.ThrowIfNull(output);
-        return RunCore(input, output);
+        return RunCore(input, output, cancellationToken, onProgress);
     }
 
-    public ExperimentSummary RunInMemory(PreparedExperiment input) => RunCore(input, null);
+    public ExperimentSummary RunInMemory(PreparedExperiment input, CancellationToken cancellationToken = default,
+        Action<INetworkSimulator, string>? onProgress = null) => RunCore(input, null, cancellationToken, onProgress);
 
-    private ExperimentSummary RunCore(PreparedExperiment input, string? output)
+    private ExperimentSummary RunCore(PreparedExperiment input, string? output, CancellationToken cancellationToken,
+        Action<INetworkSimulator, string>? onProgress)
     {
         // Claim a new directory before simulation; previous evidence is never overwritten.
         if (output != null) ExperimentResultWriter.CreateOutput(output);
@@ -32,6 +36,7 @@ public sealed class LoadBalancingExperimentRunner
         string? graphMl = null, plantUml = null;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             topology = LoadBalancingTopologyBuilder.Build(input);
             var graph = topology.Graph;
             if (output != null)
@@ -78,9 +83,11 @@ public sealed class LoadBalancingExperimentRunner
             void CompletePhase() => phases.Add(new(phase, phaseStart, graph.TotalTicks, "completed"));
             void Refresh()
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 // RefreshWithCounters resets the graph on error; retain partial evidence instead.
                 if (!graph.Refresh(false, 0) || graph.Errors != 0)
                     throw new InvalidOperationException("Simulator refresh failed; graph errors=" + graph.Errors);
+                onProgress?.Invoke(graph, phase);
             }
             void Until(Func<bool> condition)
             {

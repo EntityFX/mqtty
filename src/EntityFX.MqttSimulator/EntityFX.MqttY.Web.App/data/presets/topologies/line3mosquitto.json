@@ -1,0 +1,27 @@
+{
+  "id": "line-3-mosquitto",
+  "name": "\u041B\u0438\u043D\u0438\u044F \u0438\u0437 3 \u0431\u0440\u043E\u043A\u0435\u0440\u043E\u0432 Mosquitto",
+  "kind": "line",
+  "chainLength": 3,
+  "rays": 3,
+  "ringLength": 4,
+  "brokerPresetId": "mosquitto-default",
+  "clientsPerBroker": 2,
+  "relayApps": true,
+  "engine": "relay",
+  "networkLength": 2,
+  "qos": 1,
+  "payloadBytes": 16,
+  "offeredRps": 1000,
+  "warmupTicks": 50000,
+  "measurementTicks": 300000,
+  "drainTimeoutTicks": 100000,
+  "seed": 42,
+  "networkType": {
+    "name": "ethernet",
+    "capacityBytesPerSecond": 100000000,
+    "throughputWindowTicks": 100,
+    "queueCapacity": 100000,
+    "transferTicks": 1
+  }
+}

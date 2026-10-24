@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MqttY.Web — симулятор сетей MQTT</title>
+    <link href="vendor/bootstrap/bootstrap.min.css" rel="stylesheet" />
+    <link href="css/app.css" rel="stylesheet" />
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#/">MqttY.Web</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="nav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" href="#/topologies">Топологии</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#/designer">Редактор</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#/simulations">Мониторинг</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#/presets">Пресеты</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#/settings">Настройки</a></li>
+                </ul>
+                <span class="navbar-text">
+                    <a class="text-light" href="/swagger" target="_blank">Swagger</a>
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container-fluid py-3" id="app"></main>
+
+    <!-- Модальное окно статуса брокера -->
+    <div class="modal fade" id="brokerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="brokerModalTitle">Статус брокера</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body" id="brokerModalBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="vendor/bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="vendor/signalr/signalr.min.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

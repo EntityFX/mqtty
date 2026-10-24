@@ -29,7 +29,8 @@ public static class FederationResultWriter
         using var sha256 = SHA256.Create();
         return Convert.ToHexString(sha256.ComputeHash(stream)).ToLowerInvariant();
     }
-    public static void Write(string output, FederationInput input, FederationSummary s, FederationPublication[] publications, DeliveryReceipt[] receipts, TransmissionResult[] transmissions, string? graphMl, TransitNetworkEvidence? networkEvidence = null)
+    public static void Write(string output, FederationInput input, FederationSummary s, FederationPublication[] publications, DeliveryReceipt[] receipts, TransmissionResult[] transmissions, string? graphMl, TransitNetworkEvidence? networkEvidence = null,
+        FederationDrainDiagnostics? drainDiagnostics = null)
     {
         var o = input.Options; var inputs = Path.Combine(output, "inputs"); Directory.CreateDirectory(inputs);
         File.WriteAllBytes(Path.Combine(inputs, "config.json"), input.Configuration);
@@ -38,6 +39,7 @@ public static class FederationResultWriter
         Json(Path.Combine(output, "summary.json"), s); Json(Path.Combine(output, "publications.json"), publications); Json(Path.Combine(output, "transmissions.json"), transmissions);
         Json(Path.Combine(output, "delivery-receipts.json"), receipts);
         if (networkEvidence != null) Json(Path.Combine(output, "network-evidence.json"), networkEvidence);
+        if (drainDiagnostics != null) Json(Path.Combine(output, "drain-diagnostics.json"), drainDiagnostics);
         Json(Path.Combine(output, "phases.json"), s.Phases); Json(Path.Combine(output, "histograms.json"), new { publish = s.PublishHistogramTicks, receiver = s.ReceiverHistogramTicks, s.TickMilliseconds });
         Json(Path.Combine(output, "manifest.json"), new
         {

@@ -233,7 +233,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
             if (string.IsNullOrEmpty(clientId))
                 return true;
 
-            var regex = new Regex("^[a-zA-Z0-9]+$");
+            var regex = new Regex("^[a-zA-Z0-9_-]+$");
 
             return regex.IsMatch(clientId);
         }

@@ -6,9 +6,12 @@ using System.Collections.Concurrent;
 using EntityFX.MqttY.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using System.Net.Sockets;
+using EntityFX.MqttY.Contracts.Network.Diagnostics;
 
-public abstract class Node : NodeBase, IQuiescenceParticipant
+public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnostics
 {
+    public NodeQueueSnapshot GetQueueSnapshot() =>
+        new(_incommingMessages.Count, _outgoingMessages.Count, _responseMessages.Count);
     /// <summary>Overrides should combine base.IsQuiescent with their processing/handshake state.</summary>
     public virtual bool IsQuiescent => _outgoingMessages.IsEmpty && _incommingMessages.IsEmpty;
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание

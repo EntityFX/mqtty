@@ -7,11 +7,14 @@ using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Plugin.Mqtt.Counter;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
 using System.Collections.Immutable;
+using EntityFX.MqttY.Contracts.Mqtt.Diagnostics;
 
 namespace EntityFX.MqttY.Plugin.Mqtt
 {
-    public class MqttClient : Client, IMqttClient, IMqttClientPublishStateSink
+    public class MqttClient : Client, IMqttClient, IMqttClientPublishStateSink, IMqttPendingDiagnostics
     {
+        public MqttPendingSnapshot GetPendingSnapshot(int detailLimit = 32, int sessionLimit = 64) =>
+            Diagnostics.MqttPendingSnapshotBuilder.Capture(_sessionRepository.ReadAll(), 0, detailLimit, sessionLimit);
         protected override bool ShouldTrackResponse(INetworkPacket packet) =>
             packet.Category is not ("MQTT Publish" or "MQTT PubAck" or "MQTT PubRec" or "MQTT PubRel" or "MQTT PubComp");
         private readonly PacketIdProvider _packetIdProvider = new();

@@ -1,0 +1,13 @@
+{
+  "id": "emqx-default",
+  "name": "EMQX \u2014 \u043A\u0430\u043B\u0438\u0431\u0440\u043E\u0432\u043A\u0430 v3",
+  "brokerType": "EMQX",
+  "profilePath": "profiles/EMQX/broker-calibration.v3.json",
+  "description": "\u0414\u0432\u043E\u0439\u043D\u0438\u043A EMQX \u043F\u043E \u043D\u0430\u0442\u0443\u0440\u043D\u044B\u043C \u043D\u0430\u0431\u043B\u044E\u0434\u0435\u043D\u0438\u044F\u043C",
+  "defaults": {
+    "payloadBytes": 16,
+    "qos": 1,
+    "publishers": 64,
+    "offeredRps": 1000
+  }
+}

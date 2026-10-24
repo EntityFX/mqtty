@@ -1,11 +1,14 @@
 using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Utils;
 namespace EntityFX.MqttY.Federation;
 
 public sealed class FederationRunner
 {
-    public FederationSummary Run(FederationInput input, string? output = null)
+    public FederationSummary Run(FederationInput input, string? output = null, bool diagnostics = false,
+        CancellationToken cancellationToken = default, Action<INetworkSimulator, string>? onProgress = null)
     {
+        var drainDiagnostics = diagnostics ? new FederationDrainDiagnostics() : null;
         if (output != null) FederationResultWriter.Claim(output);
         var o = input.Options; var ledger = new FederationDeliveryLedger(o); var traffic = new TransmissionLedger(ledger);
         FederationTopology? topology = null; var phases = new List<FederationPhase>(); var phase = "construct"; long phaseStart = 0;
@@ -14,6 +17,7 @@ public sealed class FederationRunner
         TransitNetworkSnapshot? transitBaseline = null;
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             topology = FederationTopologyBuilder.Build(input, ledger, traffic);
             graphMl = new SimpleGraphMlGenerator().SerializeNetworkGraph(topology.Graph);
             Finish(); Begin("connect");
@@ -34,12 +38,22 @@ public sealed class FederationRunner
             uniqueBefore = ledger.Unique; completeBefore = Sources().Sum(s => s.Metrics.Completed); Finish();
             Begin("drain"); Until(() => topology.IsIdle); Finish(); status = "completed";
 
-            void Begin(string name) { phase = name; phaseStart = topology.Graph.TotalTicks; }
-            void Finish() => phases.Add(new(phase, phaseStart, topology.Graph.TotalTicks, "completed"));
+            void Begin(string name)
+            {
+                phase = name; phaseStart = topology.Graph.TotalTicks;
+                if (phase is "warmupDrain" or "drain") drainDiagnostics?.Capture(topology, phase, "entry");
+            }
+            void Finish()
+            {
+                if (phase is "warmupDrain" or "drain") drainDiagnostics?.Capture(topology, phase, "completed");
+                phases.Add(new(phase, phaseStart, topology.Graph.TotalTicks, "completed"));
+            }
             void Refresh()
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 topology.Pump();
                 if (!topology.Graph.Refresh(false, 0) || topology.Graph.Errors != 0) throw new InvalidOperationException("Simulator refresh failed.");
+                onProgress?.Invoke(topology.Graph, phase);
             }
             void Until(Func<bool> condition)
             {
@@ -72,6 +86,8 @@ public sealed class FederationRunner
         }
         catch (Exception ex)
         {
+            if (topology != null && phase is "warmupDrain" or "drain")
+                drainDiagnostics?.Capture(topology, phase, "failed");
             error = ex.ToString(); phases.Add(new(phase, phaseStart, topology?.Graph.TotalTicks ?? 0, "failed"));
         }
         try
@@ -94,7 +110,8 @@ public sealed class FederationRunner
                 topology?.Federators.Sum(f => f.HopLimitDrops) ?? 0, topology?.Federators.Sum(f => f.CacheEntries) ?? 0,
                 P(.5), P(.95), P(.99), R(.5), R(.95), R(.99), sources, receivers, ph, rh, phases.ToArray());
             if (output != null) FederationResultWriter.Write(output, input, summary, ledger.Publications(), ledger.Receipts(), transmissions, graphMl,
-                o.Topology == "star" && topology != null ? TransitNetworkEvidence.Capture(o, topology, transitBaseline) : null);
+                o.Topology == "star" && topology != null ? TransitNetworkEvidence.Capture(o, topology, transitBaseline) : null,
+                drainDiagnostics);
             return summary;
         }
         finally { topology?.Dispose(); }

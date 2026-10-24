@@ -15,6 +15,8 @@ public sealed class StaticFederator
     public long HopLimitDrops { get; private set; }
     public long CacheEntries => seen.Count;
     public bool IsIdle => queues.Values.All(q => q.Count == 0) && outputs.Values.All(c => !c.HasPendingPublish);
+    public FederatorTargetSnapshot[] GetQueueSnapshots() => outputs.OrderBy(p => p.Key)
+        .Select(p => new FederatorTargetSnapshot(site, p.Key, queues[p.Key].Count, p.Value.Name, p.Value.HasPendingPublish)).ToArray();
     public StaticFederator(int site, FederationOptions options, FederationDeliveryLedger ledger,
         IForwardingPolicy policy, Dictionary<int, ObservedMqttClient> outputs)
     {

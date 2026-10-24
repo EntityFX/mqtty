@@ -1,0 +1,27 @@
+{
+  "id": "star-3-aedes",
+  "name": "\u0417\u0432\u0435\u0437\u0434\u0430 \u0438\u0437 3 \u043B\u0443\u0447\u0435\u0439 Aedes",
+  "kind": "star",
+  "chainLength": 1,
+  "rays": 3,
+  "ringLength": 4,
+  "brokerPresetId": "aedes-default",
+  "clientsPerBroker": 2,
+  "relayApps": true,
+  "engine": "federation",
+  "networkLength": 2,
+  "qos": 1,
+  "payloadBytes": 16,
+  "offeredRps": 1000,
+  "warmupTicks": 50000,
+  "measurementTicks": 300000,
+  "drainTimeoutTicks": 100000,
+  "seed": 42,
+  "networkType": {
+    "name": "ethernet",
+    "capacityBytesPerSecond": 100000000,
+    "throughputWindowTicks": 100,
+    "queueCapacity": 100000,
+    "transferTicks": 1
+  }
+}
