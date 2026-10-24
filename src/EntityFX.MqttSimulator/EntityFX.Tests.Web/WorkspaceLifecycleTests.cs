@@ -35,6 +35,37 @@ public sealed class WorkspaceLifecycleTests : IClassFixture<MqttYWebFactory>
         run=await _client.PostAsJsonAsync("/api/simulations",new {topologyId=id,engine="relay"});
         Assert.Equal(HttpStatusCode.BadRequest,run.StatusCode);
     }
+    [Theory]
+    [InlineData("relay")]
+    [InlineData("federation")]
+    public async Task EditedPhysicalGraphWithTransitRunsActualEdgesAndRetainsNames(string engine)
+    {
+        var spec=new {kind="line",chainLength=3,engine,brokerPresetId="ideal-demo",clientsPerBroker=1,qos=1,
+            warmupTicks=10,measurementTicks=200,drainTimeoutTicks=10000,offeredRps=1000};
+        var generated=await _client.PostAsJsonAsync("/api/topologies/generate",spec);
+        generated.EnsureSuccessStatusCode();
+        var graph=JsonNode.Parse(await generated.Content.ReadAsStringAsync())!["graph"]!.DeepClone();
+        graph["networks"]!.AsArray().Add(JsonSerializer.SerializeToNode(new {id="transit-edited",name="Транзит",networkType="ethernet",x=100,y=100}));
+        graph["links"]!.AsArray().Add(JsonSerializer.SerializeToNode(new {from="net-0",to="transit-edited"}));
+        graph["links"]!.AsArray().Add(JsonSerializer.SerializeToNode(new {from="transit-edited",to="net-2"}));
+        var countBefore=(await _client.GetFromJsonAsync<JsonElement>("/api/simulations")).GetArrayLength();
+        var validation=await _client.PostAsJsonAsync("/api/simulations",new {engine,spec,graph,validateOnly=true});
+        Assert.True(validation.IsSuccessStatusCode,await validation.Content.ReadAsStringAsync());
+        Assert.Equal(countBefore,(await _client.GetFromJsonAsync<JsonElement>("/api/simulations")).GetArrayLength());
+        var created=await _client.PostAsJsonAsync("/api/simulations",new {engine,spec,graph,runSettings=new {executionMode="OutOfProcess"}});
+        Assert.True(created.StatusCode==HttpStatusCode.Accepted,await created.Content.ReadAsStringAsync());
+        var id=(await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetString()!;
+        var terminal=await Wait(id);Assert.True(terminal.GetProperty("state").GetString()=="Completed",terminal.ToString());
+        var summary=await _client.GetFromJsonAsync<JsonElement>($"/api/simulations/{id}/results/summary.json");
+        Assert.Equal(20,summary.GetProperty("apiAttempts").GetInt32());Assert.Equal(60,summary.GetProperty("uniqueDeliveries").GetInt32());
+        var config=await _client.GetFromJsonAsync<JsonElement>($"/api/simulations/{id}/results/run-config.json");
+        Assert.Equal("custom",config.GetProperty("topology").GetString());Assert.Equal(4,config.GetProperty("links").GetArrayLength());
+        Assert.Equal(4,config.GetProperty("physicalLayout").GetProperty("networkNames").GetArrayLength());
+        var monitor=await _client.GetFromJsonAsync<JsonElement>($"/api/simulations/{id}/monitor");
+        var ids=monitor.GetProperty("nodes").EnumerateArray().Select(n=>n.GetProperty("id").GetString()).ToArray();
+        Assert.Contains("transit-edited",ids);Assert.Contains("broker-0",ids);Assert.Contains("client-0-0",ids);
+    }
+
     [Fact]
     public async Task PausePreservesWorkerAndStopThenRestartCreatesNewOutput()
     {

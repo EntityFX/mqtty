@@ -49,19 +49,25 @@ public sealed class SimulationsController : ControllerBase
         SimulationStorageGuard.Check(_options, Path.GetFullPath(_options.DataDirectory));
         if (request.Engine is not ("relay" or "federation" or "loadBalancing")) return BadRequest(new { error = "Unknown engine." });
         if (request.RunSettings.ExecutionMode is not ("" or "InProcess" or "OutOfProcess")) return BadRequest(new { error = "Unknown execution mode." });
-        if (request.Graph != null) return BadRequest(new { error = "Edited graph execution is not supported by native adapters yet. Submit spec or a topology preset; graph editing remains available for design." });
+
         var spec = await ResolveSpecAsync(request);
         if (spec == null)
         {
             return BadRequest(new { error = "Topology not found or graph is empty." });
         }
 
-        var graph = request.Graph != null
-            ? _mapper.ToNetworkGraphOption(request.Graph)
-            : _generator.Generate(spec);
-
+        var saved=request.TopologyId==null?null:await _store.ReadAsync<SavedTopologyDto>($"topologies/{request.TopologyId}.json");
+        var supplied=request.Graph??saved?.Graph;
+        if(supplied!=null) {
+            var ids=supplied.Nodes.Select(n=>n.Id).Concat(supplied.Networks.Select(n=>n.Id)).ToArray();
+            if(ids.Any(string.IsNullOrWhiteSpace)||ids.Distinct().Count()!=ids.Length)throw new ArgumentException("Идентификаторы узлов и сетей должны быть уникальными и непустыми.");
+        }
+        var expected=_generator.Generate(spec);
+        var edited=supplied!=null && GraphStructure(supplied)!=GraphStructure(_mapper.ToGraphDto(expected));
+        var graph=edited?_mapper.ToNetworkGraphOption(supplied!):expected;
         var runOptions = _mapper.ToRunOptions(graph, request.Engine, spec);
-        await _native.PopulateAsync(runOptions, spec);
+        await _native.PopulateAsync(runOptions, spec, edited);
+        if(request.ValidateOnly)return Ok(new { valid=true, editedGraph=edited, networks=graph.Networks.Count, brokers=graph.Nodes.Values.Count(n=>n.Type==EntityFX.MqttY.Contracts.Options.NodeOptionType.Server) });
 
         var job = new SimulationJob
         {
@@ -78,7 +84,7 @@ public sealed class SimulationsController : ControllerBase
         var id = await _runner.EnqueueAsync(job);
         return Accepted(ToStatusDto(job));
         }
-        catch (Exception ex) when (ex is ArgumentException or IOException or KeyNotFoundException or InvalidOperationException)
+        catch (Exception ex) when (ex is ArgumentException or IOException or InvalidDataException or KeyNotFoundException or InvalidOperationException)
         { return BadRequest(new { error = ex.Message }); }
     }
 
@@ -239,11 +245,6 @@ public sealed class SimulationsController : ControllerBase
             var saved = await _store.ReadAsync<SavedTopologyDto>($"topologies/{request.TopologyId}.json");
             if (saved == null) return null;
             saved.Spec.Engine = request.Engine;
-            // Native runners reconstruct the graph from spec. Never silently execute
-            // a different topology after structural changes in the visual editor.
-            var expected = _mapper.ToGraphDto(_generator.Generate(saved.Spec));
-            if (GraphStructure(saved.Graph) != GraphStructure(expected))
-                throw new ArgumentException("Структура графа изменена вручную. Исполнение произвольных графов пока не поддерживается; заново создайте топологию генератором. Имена и координаты можно менять.");
             return saved.Spec;
         }
 

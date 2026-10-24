@@ -1,5 +1,7 @@
+import { openResultsDialog, closeResultsDialog } from './results-dialog.js';
 import { api } from './api.js';
 import { renderGraph, renderLegend, resetCamera } from './graph-renderer.js';
+import { applySmart, applyCircular, applyGrid } from './layout.js';
 import { openBrokerDialog, closeBrokerDialog } from './broker-dialog.js';
 import { escapeHtml as esc, readDraft, saveDraft, showMessage } from './workspace-state.js';
 
@@ -13,22 +15,25 @@ export async function renderMonitoring(app) {
         <p class="small text-muted">Пауза сохраняет модель в памяти процесса. «Остановить» завершает запуск; «Повторить» создаёт новый запуск с теми же параметрами.</p>
         <label for="mon-node" class="form-label">Статистика узла</label><select id="mon-node" class="form-select form-select-sm"><option value="">Выберите узел…</option></select>
         <h6 class="mt-3">Процесс</h6><pre id="mon-process" class="small text-wrap"></pre>
-        <details><summary>Файлы результатов</summary><div id="mon-files" class="d-grid gap-1 small"></div></details>
+        <button id="mon-results" class="btn btn-outline-primary btn-sm mt-2">▤ Результаты и графики</button><div id="mon-files" hidden></div>
         <p class="small text-muted mt-3">Здесь показаны задания очереди Web. Внешние запуски CLI и натурные измерения MqttBenchmark не попадают в неё автоматически.</p>
-      </aside><section class="workspace-main card p-3"><div class="graph-toolbar"><div id="mon-legend"></div><button id="mon-reset-camera" class="btn btn-light btn-sm">Вписать схему</button></div>
+      </aside><section class="workspace-main card p-3"><div class="graph-toolbar"><div id="mon-legend"></div><select id="mon-layout" class="form-select form-select-sm" style="width:auto" aria-label="Раскладка графа"><option value="auto">Авто: по связям</option><option value="levels">По уровням</option><option value="circle">По кругу</option><option value="grid">Сетка</option></select><button id="mon-reset-camera" class="btn btn-light btn-sm">Вписать схему</button></div>
         <div id="mon-stats" class="stats-grid"></div><svg id="mon-canvas" aria-label="Мониторинг: нажмите на узел для статистики"></svg>
-        <div id="mon-phase" class="small text-muted mt-2"></div><details class="mt-2"><summary>Все итоговые показатели</summary><pre id="mon-summary" class="small overflow-auto" style="max-height:360px"></pre></details>
+        <div id="mon-phase" class="small text-muted mt-2"></div><pre id="mon-summary" hidden></pre>
       </section></div>`;
     const el=id=>app.querySelector('#'+id);
     let id=readDraft('mqtty-selected-simulation'), disposed=false, timer, graph=null, summaryId=null;
     const positions=new Map();
-    const cleanup=()=>{disposed=true;clearTimeout(timer);closeBrokerDialog();};
+    const cleanup=()=>{disposed=true;clearTimeout(timer);closeBrokerDialog();closeResultsDialog();};
     window.addEventListener('mqtty:before-navigation',cleanup,{once:true});
     renderLegend(el('mon-legend'));
     function choose(next) { id=next;saveDraft('mqtty-selected-simulation',id);positions.clear();summaryId=null;graph=null;el('mon-stats').innerHTML='';el('mon-summary').textContent='Итоги появятся после завершения.';el('mon-files').innerHTML='';resetCamera(el('mon-canvas')); }
+    el('mon-results').onclick=()=>{if(id)openResultsDialog(id);};
     el('mon-job').onchange=e=>{choose(e.target.value);refresh();};
     el('mon-node').onchange=e=>{if(e.target.value)openBrokerDialog(id,e.target.value);};
     function draw() { if(!graph)return;renderGraph(el('mon-canvas'),graph,node=>openBrokerDialog(id,node),{draggable:true,onPositionChange:(node,m)=>positions.set(node,{x:m.x,y:m.y})}); }
+    function layout() { if(!graph)return;const mode=el('mon-layout').value;(mode==='circle'?applyCircular:mode==='grid'?applyGrid:applySmart)(graph);for(const n of [...graph.networks,...graph.nodes])positions.set(n.id,{x:n.x,y:n.y});resetCamera(el('mon-canvas'));draw(); }
+    el('mon-layout').onchange=layout;
     el('mon-reset-camera').onclick=()=>{resetCamera(el('mon-canvas'));draw();};
     function metric(label,value,unit='') { return `<div class="stat-card"><strong>${value==null?'—':typeof value==='number'?value.toLocaleString('ru-RU',{maximumFractionDigits:3}):esc(value)}${unit}</strong><span>${esc(label)}</span></div>`; }
     async function showResults(job) {
@@ -67,10 +72,11 @@ export async function renderMonitoring(app) {
         el('mon-process').textContent=`PID: ${job.processId??'—'}\nПамять: ${((job.processWorkingSetBytes||0)/1024**2).toFixed(1)} МиБ\nCPU: ${(job.processCpuSeconds||0).toFixed(2)} с\n${job.error||''}`;
         el('mon-phase').textContent=`Этап: ${job.phase||'—'} · модельных шагов: ${job.totalTicks} · ошибок исполнения: ${job.errors}`;
         if(snapshot?.nodes?.length){
+          const first=positions.size===0;
           graph={networks:[],nodes:[],links:snapshot.links||[]};
           snapshot.nodes.forEach((n,i)=>{if(!positions.has(n.id)){const angle=i*2*Math.PI/snapshot.nodes.length;positions.set(n.id,{x:450+280*Math.cos(angle),y:350+240*Math.sin(angle)});}const m={...n,...positions.get(n.id),name:n.name||n.id};if(n.type==='Network'){m.networkType=n.specification;graph.networks.push(m);}else graph.nodes.push(m);});
           const previous=el('mon-node').value;
-          el('mon-node').innerHTML='<option value="">Выберите узел…</option>'+snapshot.nodes.map(n=>`<option value="${esc(n.id)}">${esc(n.name||n.id)} (${esc(n.type)})</option>`).join('');el('mon-node').value=previous;draw();
+          el('mon-node').innerHTML='<option value="">Выберите узел…</option>'+snapshot.nodes.map(n=>`<option value="${esc(n.id)}">${esc(n.name||n.id)} (${esc(n.type)})</option>`).join('');el('mon-node').value=previous;if(first)layout();else draw();
         }
         await showResults(job);
       }catch(e){if(!disposed)showMessage(app,'Не удалось обновить мониторинг: '+e.message,true);}

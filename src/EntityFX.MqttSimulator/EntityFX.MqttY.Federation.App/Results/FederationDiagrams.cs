@@ -24,7 +24,7 @@ public static class FederationDiagrams
             if (edges.Any(e => e.Item1 == transit && !networks.ContainsKey(e.Item2) || e.Item2 == transit && !networks.ContainsKey(e.Item1)))
                 throw new InvalidDataException("The transit network must have no broker, client or application attached.");
         }
-        VerifyClients("publisher", Enumerable.Range(0, o.Publishers).Select(p => ($"publisher{p:D4}", o.PublisherSite(p))).ToArray());
+        VerifyClients("publisher", Enumerable.Range(0, o.Publishers).Select(p => (o.PhysicalLayout?.PublisherNames?[p] ?? $"publisher{p:D4}", o.PublisherSite(p))).ToArray());
         VerifyClients("receiver", o.Receivers().Select(s => ($"receiver{s:D4}", s)).ToArray());
         if (o.Mode == FederationMode.Relay)
             for (var site = 0; site < o.Brokers; site++)
@@ -32,18 +32,18 @@ public static class FederationDiagrams
                     .Where(target => target != site || o.Receivers().Contains(site))
                     .Select(target => ($"relay{site}relayfrom{site}to{target}", site)).ToArray());
         var brokers = nodes.Values.Where(n => n["type"] == "Server").Select(n => n["label"]).OrderBy(s => s).ToArray();
-        if (!brokers.SequenceEqual(Enumerable.Range(0, o.Mode == FederationMode.Single ? 1 : o.Brokers).Select(i => $"broker{i:D4}")))
+        if (!brokers.SequenceEqual(Enumerable.Range(0, o.Mode == FederationMode.Single ? 1 : o.Brokers).Select(i => o.PhysicalLayout?.BrokerNames?[i] ?? $"broker{i:D4}").OrderBy(s=>s)))
             throw new InvalidDataException("Exported brokers differ from the diagram.");
         void VerifyClients(string prefix, (string Name, int Site)[] clients)
         {
-            if (nodes.Values.Count(n => n["type"] == "Client" && n["label"].StartsWith(prefix, StringComparison.Ordinal)) != clients.Length)
+            if (nodes.Values.Count(n => n["type"] == "Client" && (prefix == "publisher" && o.PhysicalLayout?.PublisherNames != null ? o.PhysicalLayout.PublisherNames.Contains(n["label"]) : n["label"].StartsWith(prefix, StringComparison.Ordinal))) != clients.Length)
                 throw new InvalidDataException("Exported client population differs.");
             foreach (var client in clients)
             {
                 var id = nodes.Single(n => n.Value["type"] == "Client" && n.Value["label"] == client.Name).Key;
                 var attachments = edges.Where(e => e.Item1 == id && networks.ContainsKey(e.Item2) || e.Item2 == id && networks.ContainsKey(e.Item1))
                     .Select(e => networks[e.Item1 == id ? e.Item2 : e.Item1]).Distinct().ToArray();
-                if (attachments.Length != 1 || attachments[0] != "site" + client.Site) throw new InvalidDataException("Client moved from its declared physical site.");
+                if (attachments.Length != 1 || attachments[0] != FederationGraph.NetworkName(o, o.NetworkForSite(client.Site))) throw new InvalidDataException("Client moved from its declared physical site.");
             }
         }
     }
@@ -51,6 +51,7 @@ public static class FederationDiagrams
     public static void Write(string output, FederationOptions o, string graphMl)
     {
         Verify(graphMl, o);
+        if(o.PhysicalLayout!=null){FederationCustomDiagrams.Write(output,o);return;}
         foreach (var logical in new[] { false, true })
         {
             var kind = logical ? "logical" : "physical";

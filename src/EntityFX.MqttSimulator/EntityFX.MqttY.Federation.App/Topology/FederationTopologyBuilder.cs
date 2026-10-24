@@ -25,16 +25,16 @@ public static class FederationTopologyBuilder
             for (var b = 0; b < result.Brokers.Length; b++)
             {
                 var count = Enumerable.Range(0, o.Publishers).Count(p => o.BrokerForSite(o.PublisherSite(p)) == b);
-                result.Brokers[b] = new FederationBrokerBuilder(graph, packets, evaluator, input, count).Add(sites[b], ticks, b);
+                result.Brokers[b] = new FederationBrokerBuilder(graph, packets, evaluator, input, count).Add(sites[o.NetworkForSite(b)], ticks, b, o.PhysicalLayout?.BrokerNames?[b]);
             }
             ObservedMqttClient Client(string name, int site, int target, bool automatic = false)
             {
                 var client = new ObservedMqttClient(packets, index++, name, ticks, traffic, site, target);
-                sites[site].AddClient(client); graph.AddClient(client);
+                sites[o.NetworkForSite(site)].AddClient(client); graph.AddClient(client);
                 if (!automatic) result.Connections.Add((client, target));
                 return client;
             }
-            for (var p = 0; p < o.Publishers; p++) result.Publishers[p] = Client($"publisher{p:D4}", o.PublisherSite(p), o.BrokerForSite(o.PublisherSite(p)));
+            for (var p = 0; p < o.Publishers; p++) result.Publishers[p] = Client(o.PhysicalLayout?.PublisherNames?[p] ?? $"publisher{p:D4}", o.PublisherSite(p), o.BrokerForSite(o.PublisherSite(p)));
             for (var r = 0; r < o.Receivers().Length; r++)
             {
                 var site = o.Receivers()[r]; var receiverSite = site;
@@ -91,7 +91,7 @@ public static class FederationTopologyBuilder
                         }
                         var factory = generic.GetClientBuilder((a, clientName, c, d, e, f, g, h, i, j) => Client(clientName, localSite, map[clientName], true));
                         var relay = new MqttRelay(index++, name, "mqtt://" + name, "mqtt", "mqtt-relay", factory, evaluator, ticks, config, true);
-                        sites[site].AddApplication(relay); graph.AddApplication(relay); result.Relays.Add(relay);
+                        sites[o.NetworkForSite(site)].AddApplication(relay); graph.AddApplication(relay); result.Relays.Add(relay);
                     }
             graph.UpdateRoutes();
             foreach (var relay in result.Relays) relay.Start();

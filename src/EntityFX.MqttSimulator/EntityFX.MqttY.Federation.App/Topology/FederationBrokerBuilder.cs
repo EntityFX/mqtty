@@ -14,9 +14,9 @@ internal sealed class FederationBrokerBuilder : MqttNetworkBuilder
         : base(graph, packets, evaluator, new GenericBuilder().GetClientBuilder((a, b, c, d, e, f, g, h, i, j) => throw new NotSupportedException()),
             _ => input.Profile, input.Options.Seed, profileClientCount: publishers)
     { }
-    public IMqttBroker Add(ModelNetwork network, TicksOptions ticks, int site)
+    public IMqttBroker Add(ModelNetwork network, TicksOptions ticks, int site, string? nameOverride = null)
     {
-        var name = $"broker{site:D4}";
+        var name = nameOverride ?? $"broker{site:D4}";
         var broker = (IMqttBroker)CreateServer(ticks, site, name, $"{name}.{network.Name}", $"mqtt://{name}.{network.Name}");
         network.AddServer(broker); networkSimulator.AddServer(broker); broker.Start(); return broker;
     }

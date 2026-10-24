@@ -14,8 +14,10 @@ public static class NativeExperimentAdapter
         cancellationToken.ThrowIfCancellationRequested();
         var reporting = System.Diagnostics.Stopwatch.StartNew();
         string? lastPhase = null;
+        long finalSteps=0, finalErrors=0;
         void Report(EntityFX.MqttY.Contracts.Network.INetworkSimulator simulator, string phase)
         {
+            finalSteps=simulator.TotalSteps;finalErrors=simulator.Errors;
             if (phase == lastPhase && reporting.Elapsed < TimeSpan.FromSeconds(1)) return;
             lastPhase = phase;
             reporting.Restart();
@@ -40,7 +42,7 @@ public static class NativeExperimentAdapter
             var summary = new FederationRunner().Run(input, output, cancellationToken: cancellationToken, onProgress: Report);
             cancellationToken.ThrowIfCancellationRequested();
             return new ExperimentResult { Success = summary.Status == "completed", ExitCode = summary.Status == "completed" ? 0 : 1,
-                Error = summary.Error, OutputDirectory = output, TotalTicks = summary.Phases.LastOrDefault()?.EndTick ?? 0 };
+                Error = summary.Error, OutputDirectory = output, TotalTicks = summary.Phases.LastOrDefault()?.EndTick ?? 0, TotalSteps=finalSteps, Errors=finalErrors };
         }
         if (options.Engine == "loadBalancing")
         {
@@ -55,7 +57,7 @@ public static class NativeExperimentAdapter
             var summary = new LoadBalancingExperimentRunner().Run(input, output!, cancellationToken, Report);
             cancellationToken.ThrowIfCancellationRequested();
             return new ExperimentResult { Success = summary.Status == "completed", ExitCode = summary.Status == "completed" ? 0 : 1,
-                Error = summary.Error, OutputDirectory = output, TotalTicks = summary.FinalTick, Errors = summary.GraphErrors };
+                Error = summary.Error, OutputDirectory = output, TotalTicks = summary.FinalTick, TotalSteps=finalSteps, Errors = summary.GraphErrors };
         }
         throw new InvalidDataException("Unknown engine.");
     }

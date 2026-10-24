@@ -3,6 +3,8 @@ namespace EntityFX.MqttY.Web.App.Models;
 /// <summary>Запрос на создание и запуск симуляции.</summary>
 public sealed class SimulationCreateDto
 {
+    public bool ValidateOnly { get; set; }
+
     public string? TopologyId { get; set; }
 
     public GraphDto? Graph { get; set; }

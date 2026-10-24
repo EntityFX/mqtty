@@ -8,6 +8,8 @@ public sealed record FederationOptions
     public int Brokers { get; init; } = 3;
     public string Topology { get; init; } = "ring";
     public SiteLink[]? Links { get; init; }
+    public FederationPhysicalLayout? PhysicalLayout { get; init; }
+    public int[]? PublisherSites { get; init; }
     public int Publishers { get; init; } = 12;
     public int[]? ReceiverSites { get; init; }
     public int PayloadBytes { get; init; } = 16;
@@ -26,7 +28,8 @@ public sealed record FederationOptions
     public string? BrokerProfilePath { get; init; }
     public FederationNetworkOptions Network { get; init; } = new();
     public int[] Receivers() => ReceiverSites ?? Enumerable.Range(0, Brokers).ToArray();
-    public int PublisherSite(int publisher) => publisher % Brokers;
+    public int PublisherSite(int publisher) => PublisherSites?[publisher] ?? publisher % Brokers;
+    public int NetworkForSite(int site) => PhysicalLayout?.BrokerNetworks[site] ?? site;
     public int BrokerForSite(int site) => Mode == FederationMode.Single ? 0 : site;
     public long ToTicks(double seconds)
     {
@@ -62,6 +65,17 @@ public sealed record FederationOptions
             throw new InvalidDataException("Use ideal with no profile, or an explicit supported broker profile.");
         if (Network == null) throw new InvalidDataException("Network is required.");
         Network.Build().Validate();
+        if (PublisherSites != null && (PublisherSites.Length != Publishers || PublisherSites.Any(site => site < 0 || site >= Brokers)))
+            throw new InvalidDataException("Invalid publisher placement.");
+        if (PhysicalLayout is { } layout && (Topology != "custom" || layout.NetworkNames.Length is < 1 or > 64 ||
+            layout.NetworkNames.Any(string.IsNullOrWhiteSpace) || layout.NetworkNames.Distinct().Count() != layout.NetworkNames.Length ||
+            layout.BrokerNetworks.Length != Brokers || layout.BrokerNetworks.Distinct().Count() != Brokers ||
+            layout.BrokerNetworks.Any(n => n < 0 || n >= layout.NetworkNames.Length)))
+            throw new InvalidDataException("Invalid physical graph layout.");
+        if (PhysicalLayout is { } identities &&
+            (identities.BrokerNames != null && (identities.BrokerNames.Length != Brokers || identities.BrokerNames.Any(string.IsNullOrWhiteSpace) || identities.BrokerNames.Distinct().Count() != Brokers) ||
+             identities.PublisherNames != null && (identities.PublisherNames.Length != Publishers || identities.PublisherNames.Any(string.IsNullOrWhiteSpace) || identities.PublisherNames.Distinct().Count() != Publishers)))
+            throw new InvalidDataException("Invalid physical graph node identities.");
         FederationGraph.Edges(this);
     }
 }

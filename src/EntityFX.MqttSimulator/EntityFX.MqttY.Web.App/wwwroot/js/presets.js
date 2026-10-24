@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { navigate } from './router.js';
-import { escapeHtml as esc, saveDraft, showMessage } from './workspace-state.js';
+import { escapeHtml as esc, saveDraft, readDraft, showMessage } from './workspace-state.js';
 
 export async function renderPresets(app) {
     app.innerHTML=`<h4>Пресеты и сохранённые топологии</h4><p class="text-muted">Пресет задаёт параметры новых запусков. Изменения не переписывают уже выполненные опыты и их снимки профилей.</p><div data-feedback role="status" hidden></div>
@@ -44,5 +44,8 @@ export async function renderPresets(app) {
       if(item)el('pr-delete').onclick=async()=>{if(!confirm('Удалить выбранный пресет?'))return;try{await api.del(endpoint()+'/'+encodeURIComponent(item.id));el('pr-editor').textContent='Запись удалена.';await refresh();}catch(e){showMessage(app,e.message,true);}};
     }
     app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=async()=>{tab=b.dataset.tab;app.querySelectorAll('[data-tab]').forEach(t=>t.classList.toggle('active',t===b));el('pr-editor').textContent='Выберите запись для редактирования.';try{await refresh();}catch(e){showMessage(app,e.message,true);}});
+    const requested=readDraft('mqtty-preset-selection');
+    if(requested){sessionStorage.removeItem('mqtty-preset-selection');tab=requested.tab;app.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));}
     await refresh();
+    if(requested?.id){const item=list.find(p=>p.id===requested.id);if(item)edit(item);}
 }
