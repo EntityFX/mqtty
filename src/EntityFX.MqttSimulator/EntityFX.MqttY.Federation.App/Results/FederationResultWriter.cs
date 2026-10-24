@@ -16,12 +16,19 @@ public static class FederationResultWriter
     public static void Json(string path, object value)
     {
         var temp = path + ".tmp";
-        File.WriteAllText(temp, JsonSerializer.Serialize(value, FederationInput.Json), new UTF8Encoding(false));
+        using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
+            JsonSerializer.Serialize(stream, value, FederationInput.Json);
         File.Move(temp, path, true);
     }
     public static void Seal(string output) => Json(Path.Combine(output, "sha256.json"), Directory.GetFiles(output, "*", SearchOption.AllDirectories)
         .Where(p => Path.GetFullPath(p) != Path.GetFullPath(Path.Combine(output, "sha256.json")) && Path.GetFileName(p) != ".experiment")
-        .OrderBy(p => p, StringComparer.Ordinal).ToDictionary(p => Path.GetRelativePath(output, p).Replace('\\', '/'), p => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(p))).ToLowerInvariant()));
+        .OrderBy(p => p, StringComparer.Ordinal).ToDictionary(p => Path.GetRelativePath(output, p).Replace('\\', '/'), FileSha256));
+    private static string FileSha256(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var sha256 = SHA256.Create();
+        return Convert.ToHexString(sha256.ComputeHash(stream)).ToLowerInvariant();
+    }
     public static void Write(string output, FederationInput input, FederationSummary s, FederationPublication[] publications, DeliveryReceipt[] receipts, TransmissionResult[] transmissions, string? graphMl, TransitNetworkEvidence? networkEvidence = null)
     {
         var o = input.Options; var inputs = Path.Combine(output, "inputs"); Directory.CreateDirectory(inputs);
