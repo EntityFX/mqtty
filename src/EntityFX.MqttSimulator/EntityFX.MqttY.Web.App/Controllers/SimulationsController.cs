@@ -1,5 +1,6 @@
 using EntityFX.MqttY.Web.App.Models;
 using EntityFX.MqttY.Web.App.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EntityFX.MqttY.Web.App.Controllers;
@@ -17,6 +18,7 @@ public sealed class SimulationsController : ControllerBase
     private readonly IMonitoringService _monitoring;
     private readonly DataDirectoryOptions _options;
     private readonly NativeConfigurationService _native;
+    private readonly JsonFileStore _store;
 
     public SimulationsController(
         IPresetCatalogService catalog,
@@ -25,7 +27,7 @@ public sealed class SimulationsController : ControllerBase
         ISimulationJobRunner runner,
         IJobRegistry registry,
         IMonitoringService monitoring,
-        DataDirectoryOptions options, NativeConfigurationService native)
+        DataDirectoryOptions options, NativeConfigurationService native, JsonFileStore store)
     {
         _catalog = catalog;
         _generator = generator;
@@ -35,6 +37,7 @@ public sealed class SimulationsController : ControllerBase
         _monitoring = monitoring;
         _options = options;
         _native = native;
+        _store = store;
     }
 
     /// <summary>Создаёт и запускает симуляцию.</summary>
@@ -93,14 +96,16 @@ public sealed class SimulationsController : ControllerBase
     [HttpPost("{id}/pause")]
     public async Task<IActionResult> Pause(string id)
     {
-        await _runner.PauseAsync(id);
+        try { await _runner.PauseAsync(id); }
+        catch (InvalidOperationException error) { return Conflict(new { error = error.Message }); }
         return Ok(ToStatusDto(_registry.Get(id)));
     }
 
     [HttpPost("{id}/resume")]
     public async Task<IActionResult> Resume(string id)
     {
-        await _runner.ResumeAsync(id);
+        try { await _runner.ResumeAsync(id); }
+        catch (InvalidOperationException error) { return Conflict(new { error = error.Message }); }
         return Ok(ToStatusDto(_registry.Get(id)));
     }
 
@@ -109,6 +114,21 @@ public sealed class SimulationsController : ControllerBase
     {
         await _runner.StopAsync(id);
         return Ok(ToStatusDto(_registry.Get(id)));
+    }
+
+    [HttpPost("{id}/restart")]
+    public async Task<IActionResult> Restart(string id)
+    {
+        var original = _registry.Get(id);
+        if (original == null) return NotFound();
+        if (original.State is "Running" or "Paused" or "Queued" or "Cancelling")
+            return Conflict(new { error = "Сначала завершите или остановите текущий запуск." });
+        var copy = new SimulationJob { TopologyId = original.TopologyId, Engine = original.Engine,
+            RunOptions = original.RunOptions, TimeLimit = original.TimeLimit,
+            Parallel = original.Parallel, ExecutionMode = original.ExecutionMode };
+        try { await _runner.EnqueueAsync(copy); }
+        catch (InvalidOperationException error) { return Conflict(new { error = error.Message }); }
+        return Accepted(ToStatusDto(copy));
     }
 
     [HttpDelete("{id}")]
@@ -166,6 +186,40 @@ public sealed class SimulationsController : ControllerBase
         return System.IO.File.Exists(path) ? PhysicalFile(path, "application/octet-stream", file) : NotFound();
     }
 
+    /// <summary>Экспорт манифеста симуляции (manifest.json) для сохранения вне приложения.</summary>
+    [HttpGet("{id}/manifest")]
+    public IActionResult ExportManifest(string id)
+    {
+        var job = _registry.Get(id);
+        if (job?.OutputDir == null || !Directory.Exists(job.OutputDir)) return NotFound();
+        var manifestPath = Path.Combine(job.OutputDir, "experiment-manifest.json");
+        if (!System.IO.File.Exists(manifestPath)) manifestPath = Path.Combine(job.OutputDir, "manifest.json");
+        if (!System.IO.File.Exists(manifestPath)) return NotFound(new { error = "Manifest not found." });
+        return PhysicalFile(manifestPath, "application/json", $"manifest-{id}.json");
+    }
+
+    /// <summary>Импорт топологии из загруженного JSON-файла (манифеста или графа).</summary>
+    [HttpPost("import")]
+    public async Task<IActionResult> ImportTopology(IFormFile file)
+    {
+        if (file == null || file.Length == 0) return BadRequest(new { error = "File is required." });
+        using var reader = new StreamReader(file.OpenReadStream());
+        var content = await reader.ReadToEndAsync();
+        try
+        {
+            var imported = System.Text.Json.JsonSerializer.Deserialize<SavedTopologyDto>(content, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (imported == null) return BadRequest(new { error = "Invalid topology JSON." });
+            if (string.IsNullOrWhiteSpace(imported.Id)) imported.Id = Guid.NewGuid().ToString("N");
+            imported.Name = string.IsNullOrWhiteSpace(imported.Name) ? $"Импортировано {DateTimeOffset.UtcNow:yyyy-MM-dd HH:mm}" : imported.Name;
+            await _store.WriteAsync($"topologies/{imported.Id}.json", imported);
+            return Ok(imported);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = $"Не удалось импортировать топологию: {ex.Message}" });
+        }
+    }
+
     private async Task<TopologySpecDto?> ResolveSpecAsync(SimulationCreateDto request)
     {
         if (request.Spec != null) { request.Spec.Engine = request.Engine; return request.Spec; }
@@ -182,7 +236,15 @@ public sealed class SimulationsController : ControllerBase
         var preset = await _catalog.GetTopologyPresetAsync(request.TopologyId);
         if (preset == null)
         {
-            return null;
+            var saved = await _store.ReadAsync<SavedTopologyDto>($"topologies/{request.TopologyId}.json");
+            if (saved == null) return null;
+            saved.Spec.Engine = request.Engine;
+            // Native runners reconstruct the graph from spec. Never silently execute
+            // a different topology after structural changes in the visual editor.
+            var expected = _mapper.ToGraphDto(_generator.Generate(saved.Spec));
+            if (GraphStructure(saved.Graph) != GraphStructure(expected))
+                throw new ArgumentException("Структура графа изменена вручную. Исполнение произвольных графов пока не поддерживается; заново создайте топологию генератором. Имена и координаты можно менять.");
+            return saved.Spec;
         }
 
         return new TopologySpecDto
@@ -205,6 +267,18 @@ public sealed class SimulationsController : ControllerBase
             Seed = preset.Seed,
             NetworkType = preset.NetworkType
         };
+    }
+
+    private static string GraphStructure(GraphDto graph)
+    {
+        var normalized = new {
+            graph.RandomSeed, graph.Ticks,
+            Networks = graph.Networks.OrderBy(n => n.Id).Select(n => new { n.Id, n.NetworkType }),
+            Nodes = graph.Nodes.OrderBy(n => n.Id).Select(n => new { n.Id, n.Type, n.Specification, n.Network, n.Broker, n.ConnectsToServer, n.Configuration, n.Additional }),
+            Links = graph.Links.OrderBy(l => l.From).ThenBy(l => l.To).Select(l => new { l.From, l.To, l.Weight }),
+            graph.NetworkTypes
+        };
+        return System.Text.Json.JsonSerializer.Serialize(normalized, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
     }
 
     private static SimulationStatusDto ToStatusDto(SimulationJob? job)

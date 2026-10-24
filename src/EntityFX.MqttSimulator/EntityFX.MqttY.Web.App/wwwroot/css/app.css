@@ -94,3 +94,48 @@ body {
 .monitor-table td {
     vertical-align: middle;
 }
+
+/* Соединение узлов (временно при создании) */
+.connection.temp {
+    stroke: #ff9800;
+    stroke-width: 2;
+    stroke-dasharray: 6 4;
+}
+
+/* Узлы в режиме соединения */
+.node.connecting {
+    stroke: #ff9800;
+    stroke-width: 2;
+}
+
+/* Кнопки действий в мониторинге */
+.monitor-table .btn {
+    font-size: 11px;
+    padding: 2px 6px;
+    margin: 1px;
+}
+
+/* Статус импорта/экспорта */
+.text-success { color: #198754; }
+.text-danger { color: #dc3545; }
+
+/* Общая рабочая область: компактная панель, просторная схема. */
+.workspace { display:grid; grid-template-columns:270px minmax(0,1fr); gap:16px; align-items:start; }
+.workspace-heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.workspace-sidebar { max-height:calc(100vh - 120px); overflow:auto; position:sticky; top:12px; font-size:13px; }
+.workspace-sidebar .form-label { margin-bottom:3px; }
+.workspace-sidebar .form-control,.workspace-sidebar .form-select { font-size:13px; padding:4px 8px; }
+.workspace-sidebar details { border-top:1px solid #e1e5eb; padding:10px 0; }
+.workspace-sidebar summary { cursor:pointer; font-weight:600; margin-bottom:8px; }
+.workspace-main { min-width:0; }
+.control-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.control-grid label { min-width:0; }
+.control-grid .wide { grid-column:1/-1; }
+.graph-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px; margin-bottom:12px; }
+#dsg-canvas,#mon-canvas,#tpl-canvas { height:76vh; min-height:580px; touch-action:none; }
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:8px; margin:12px 0; }
+.stat-card { padding:10px; background:#f4f7fb; border-radius:6px; }
+.stat-card strong { display:block; font-size:20px; }
+.stat-card span { font-size:12px; color:#536475; }
+.node:focus { outline:none; filter:drop-shadow(0 0 4px #1467c0); }
+@media(max-width:850px) { .workspace { grid-template-columns:1fr; } .workspace-sidebar{position:static;max-height:none;} #dsg-canvas,#mon-canvas,#tpl-canvas{min-height:420px;height:65vh;} }

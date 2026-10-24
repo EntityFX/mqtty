@@ -54,6 +54,15 @@ public sealed class OutOfProcessJobExecutor : IJobExecutor
             }
             await process.WaitForExitAsync(ct);
             await copying;
+            // A short experiment may finish between polls. Retain its last node
+            // snapshot too, so completed jobs still have a usable graph/dialog.
+            var finalProgress = Directory.GetFiles(Path.GetDirectoryName(request)!, Path.GetFileName(request) + ".progress.*.json")
+                .OrderByDescending(path => path, StringComparer.Ordinal).FirstOrDefault();
+            if (finalProgress != null)
+            {
+                var snapshot = JsonSerializer.Deserialize<EngineProgress>(await File.ReadAllTextAsync(finalProgress, ct), SimulationWorker.Json);
+                if (snapshot != null) job.Progress?.Report(snapshot);
+            }
             if (!File.Exists(request + ".result.json"))
                 return new ExperimentResult { ExitCode = process.ExitCode, Error = "Worker exited without a result receipt.", OutputDirectory = job.OutputDir };
             return JsonSerializer.Deserialize<ExperimentResult>(await File.ReadAllTextAsync(request + ".result.json", ct), SimulationWorker.Json)

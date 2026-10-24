@@ -26,7 +26,7 @@ public sealed class SimulationsApiTests : IClassFixture<MqttYWebFactory>
         };
 
         var response = await client.PostAsJsonAsync("/api/simulations", body);
-        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.True(response.StatusCode == HttpStatusCode.Accepted, await response.Content.ReadAsStringAsync());
 
         var status = await response.Content.ReadFromJsonAsync<SimulationStatusDto>();
         Assert.NotNull(status);

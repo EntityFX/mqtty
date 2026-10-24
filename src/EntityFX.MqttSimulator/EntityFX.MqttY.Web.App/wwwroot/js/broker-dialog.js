@@ -1,5 +1,6 @@
 import { api } from './api.js';
-import { subscribe, unsubscribe } from './realtime.js';
+import { subscribe } from './realtime.js';
+import { escapeHtml as esc } from './workspace-state.js';
 
 let activeSimulationId = null;
 let releaseNodeMonitoring = null;
@@ -8,8 +9,8 @@ let activeNodeId = null;
 export function openBrokerDialog(simulationId, nodeId) {
     activeSimulationId = simulationId;
     activeNodeId = nodeId;
-    const modal = new bootstrap.Modal(document.getElementById('brokerModal'));
-    document.getElementById('brokerModalTitle').textContent = `Статус брокера: ${nodeId}`;
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('brokerModal'));
+    document.getElementById('brokerModalTitle').textContent = `Статистика узла: ${nodeId}`;
     document.getElementById('brokerModalBody').innerHTML = '<div class="text-muted">Загрузка…</div>';
     modal.show();
 
@@ -27,25 +28,25 @@ export function openBrokerDialog(simulationId, nodeId) {
 
 function refresh() {
     if (!activeSimulationId || !activeNodeId) return;
-    api.get(`/simulations/${activeSimulationId}/nodes/${activeNodeId}`)
+    api.get(`/simulations/${activeSimulationId}/nodes/${encodeURIComponent(activeNodeId)}`)
         .then(render)
-        .catch(() => { /* хаб уже обновил */ });
+        .catch(error => { document.getElementById('brokerModalBody').textContent='Статистика недоступна: '+error.message; });
 }
 
 function render(node) {
     const body = document.getElementById('brokerModalBody');
     if (!body) return;
     const counters = Object.entries(node.counters || {})
-        .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
+        .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`)
         .join('');
 
     body.innerHTML = `
         <table class="table table-sm">
-            <tr><th>Имя</th><td>${node.name}</td></tr>
-            <tr><th>Тип</th><td>${node.type} (${node.specification})</td></tr>
-            <tr><th>Сеть</th><td>${node.network || '—'}</td></tr>
+            <tr><th>Имя</th><td>${esc(node.name)}</td></tr>
+            <tr><th>Тип</th><td>${esc(node.type)} (${esc(node.specification)})</td></tr>
+            <tr><th>Сеть</th><td>${esc(node.network || '—')}</td></tr>
             <tr><th>Подключён</th><td>${node.connected ? 'да' : 'нет'}</td></tr>
-            <tr><th>Очередь</th><td>${node.queueLength}</td></tr>
+            <tr><th>Очередь</th><td>${node.queueLength ?? '—'}</td></tr>
         </table>
         <h6>Счётчики</h6>
         <table class="table table-sm table-striped">

@@ -37,7 +37,7 @@ public sealed class SimulationJobRunner : BackgroundService, ISimulationJobRunne
         {
             if (job.State is "Completed" or "Failed" or "Cancelled" or "TimedOut" or "Interrupted") return Task.CompletedTask;
             job.Cts?.Cancel();
-            if (job.State != "Running") { job.State = "Cancelled"; job.FinishedAt = DateTimeOffset.UtcNow; }
+            if (job.Cts == null) { job.State = "Cancelled"; job.FinishedAt = DateTimeOffset.UtcNow; }
             else job.State = "Cancelling";
             Save(job);
         }
@@ -49,7 +49,19 @@ public sealed class SimulationJobRunner : BackgroundService, ISimulationJobRunne
         if (job == null) return Task.CompletedTask;
         lock (job.SyncRoot)
         {
-            if (job.State == "Running") throw new InvalidOperationException("Running scientific experiments cannot be paused; stop or leave them running.");
+            if (job.State is "Completed" or "Failed" or "Cancelled" or "TimedOut" or "Interrupted" or "Paused") return Task.CompletedTask;
+            if (job.State == "Running")
+            {
+                if (job.ExecutionMode != "OutOfProcess")
+                    throw new InvalidOperationException("Пауза выполняющейся модели доступна в отдельном процессе. Используйте OutOfProcess.");
+                WorkerProcessControl.SetPaused(job, true);
+                job.WorkerPaused = true;
+                job.BudgetClock.Stop();
+                job.Cts!.CancelAfter(Timeout.InfiniteTimeSpan);
+                job.State = "Paused";
+                Save(job);
+                return Task.CompletedTask;
+            }
             if (job.State == "Queued") { job.State = "Paused"; Save(job); }
         }
         return Task.CompletedTask;
@@ -62,6 +74,16 @@ public sealed class SimulationJobRunner : BackgroundService, ISimulationJobRunne
         {
             if (job.State == "Paused")
             {
+                if (job.WorkerPaused)
+                {
+                    WorkerProcessControl.SetPaused(job, false);
+                    job.WorkerPaused = false;
+                    job.BudgetClock.Start();
+                    if (job.TimeLimit is { } limit)
+                        job.Cts!.CancelAfter(limit > job.BudgetClock.Elapsed ? limit-job.BudgetClock.Elapsed : TimeSpan.FromMilliseconds(1));
+                    job.State = "Running"; Save(job);
+                    return Task.CompletedTask;
+                }
                 // An entry may still be queued. A generation stamp prevents duplicate execution.
                 job.State = "Queued"; Save(job);
                 if (!_queue.Writer.TryWrite(job)) throw new InvalidOperationException("Simulation queue is full.");
@@ -98,6 +120,7 @@ public sealed class SimulationJobRunner : BackgroundService, ISimulationJobRunne
             if (job.State != "Queued") return;
             job.State = "Running"; job.StartedAt = DateTimeOffset.UtcNow; job.Cts = cts; Save(job);
         }
+        job.BudgetClock.Restart();
         if (job.TimeLimit.HasValue) cts.CancelAfter(job.TimeLimit.Value);
         job.Progress = new SynchronousProgress(p =>
         {
@@ -124,7 +147,7 @@ public sealed class SimulationJobRunner : BackgroundService, ISimulationJobRunne
         finally
         {
             lock (job.SyncRoot)
-            { job.Cts = null; job.FinishedAt = DateTimeOffset.UtcNow; Save(job); }
+            { job.Cts = null; job.WorkerPaused = false; job.BudgetClock.Stop(); job.FinishedAt = DateTimeOffset.UtcNow; Save(job); }
         }
     }
     private void Save(SimulationJob job) { _registry.Add(job); _monitoring.SetState(job.Id, job.State); }

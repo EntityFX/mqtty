@@ -14,13 +14,15 @@ export function start() {
     render();
 }
 
-function render() {
+async function render() {
     const path = (location.hash || '#/').replace(/^#/, '');
     const app = document.getElementById('app');
     const handler = routes.get(path) || routes.get('/');
-    app.innerHTML = '';
+    window.dispatchEvent(new Event('mqtty:before-navigation'));
+    const page = document.createElement('div');
+    app.replaceChildren(page);
     if (handler) {
-        handler(app);
+        try { await handler(page); } catch(error) { page.textContent='Ошибка открытия экрана: '+error.message; }
     } else {
         app.innerHTML = '<div class="alert alert-warning">Страница не найдена</div>';
     }

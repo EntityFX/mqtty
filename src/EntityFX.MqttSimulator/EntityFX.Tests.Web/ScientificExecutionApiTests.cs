@@ -27,6 +27,8 @@ public sealed class ScientificExecutionApiTests : IClassFixture<MqttYWebFactory>
         var id = job.GetProperty("id").GetString()!;
         var terminal = await UntilTerminal(client, id);
         Assert.True(terminal.GetProperty("state").GetString() == "Completed", terminal.ToString());
+        var monitor = await client.GetFromJsonAsync<JsonElement>($"/api/simulations/{id}/monitor");
+        Assert.True(monitor.GetProperty("nodes").GetArrayLength() > 0);
         var summary = await client.GetFromJsonAsync<JsonElement>($"/api/simulations/{id}/results/summary.json");
         Assert.Equal("completed", summary.GetProperty("status").GetString());
         Assert.Equal(20, summary.GetProperty("apiAttempts").GetInt64());

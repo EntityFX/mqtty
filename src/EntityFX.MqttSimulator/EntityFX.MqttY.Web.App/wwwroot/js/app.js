@@ -12,8 +12,7 @@ register('/', async (app) => {
             <h3>MqttY.Web</h3>
             <p class="text-muted">Симулятор распределённых топологий сетей с MQTT-брокерами.</p>
             <div class="d-flex justify-content-center gap-2">
-                <a class="btn btn-primary" href="#/topologies">Генератор топологий</a>
-                <a class="btn btn-outline-secondary" href="#/designer">Редактор</a>
+                <a class="btn btn-primary" href="#/designer">Создать или открыть топологию</a>
                 <a class="btn btn-outline-secondary" href="#/simulations">Мониторинг</a>
             </div>
         </div>`;

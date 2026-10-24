@@ -19,4 +19,10 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Runtime data belongs to the host, never to a deployable release. -->
+    <Content Remove="data/**" />
+    <None Remove="data/**" />
+  </ItemGroup>
+
 </Project>

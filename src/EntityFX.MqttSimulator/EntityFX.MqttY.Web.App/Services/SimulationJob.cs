@@ -50,4 +50,8 @@ public sealed class SimulationJob
     public string? Phase { get; set; }
     [System.Text.Json.Serialization.JsonIgnore]
     public object SyncRoot { get; } = new();
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool WorkerPaused { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public System.Diagnostics.Stopwatch BudgetClock { get; } = new();
 }

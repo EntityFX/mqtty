@@ -1,19 +1,22 @@
 using EntityFX.MqttY.Web.App.Models;
 using EntityFX.MqttY.Web.App.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace EntityFX.MqttY.Web.App.Controllers;
 
-/// <summary>Настройки приложения: лимит времени, параллельность, режим исполнения.</summary>
+/// <summary>Настройки приложения: лимит времени, параллельность, режим исполнения, профили брокеров.</summary>
 [ApiController]
 [Route("api/settings")]
 public sealed class SettingsController : ControllerBase
 {
     private readonly DataDirectoryOptions _options;
+    private readonly JsonFileStore _store;
 
-    public SettingsController(DataDirectoryOptions options)
+    public SettingsController(DataDirectoryOptions options, JsonFileStore store)
     {
         _options = options;
+        _store = store;
     }
 
     [HttpGet]
@@ -30,6 +33,48 @@ public sealed class SettingsController : ControllerBase
         _options.DefaultExecutionMode = settings.ExecutionMode;
         _options.MaxParallelJobs = Math.Max(1, settings.MaxParallelJobs);
         return Ok(ToDto());
+    }
+
+    /// <summary>Чтение содержимого профиля брокера по относительному пути профиля.</summary>
+    [HttpGet("broker-profile")]
+    public IActionResult GetBrokerProfile([FromQuery] string profilePath)
+    {
+        if (string.IsNullOrWhiteSpace(profilePath)) return BadRequest(new { error = "profilePath is required." });
+        try
+        {
+            var fullPath = _store.Resolve(profilePath);
+            if (!System.IO.File.Exists(fullPath)) return NotFound(new { error = "Profile file not found." });
+            var content = System.IO.File.ReadAllText(fullPath);
+            return Ok(new { profilePath, content });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>Сохранение содержимого профиля брокера.</summary>
+    [HttpPut("broker-profile")]
+    public IActionResult UpdateBrokerProfile([FromBody] BrokerProfileUpdateDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.ProfilePath)) return BadRequest(new { error = "profilePath is required." });
+        if (dto.Content == null) return BadRequest(new { error = "content is required." });
+        try
+        {
+            // Валидируем, что content — валидный JSON
+            JsonDocument.Parse(dto.Content);
+            var fullPath = _store.Resolve(dto.ProfilePath);
+            System.IO.File.WriteAllText(fullPath, dto.Content);
+            return Ok(new { profilePath = dto.ProfilePath });
+        }
+        catch (JsonException ex)
+        {
+            return BadRequest(new { error = $"Invalid JSON: {ex.Message}" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     private AppSettingsDto ToDto() => new()

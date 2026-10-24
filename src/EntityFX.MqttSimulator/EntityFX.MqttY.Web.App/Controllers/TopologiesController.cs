@@ -25,6 +25,36 @@ public sealed class TopologiesController : ControllerBase
         _store = store;
     }
 
+    /// <summary>Клонирует существующую топологию с новым именем.</summary>
+    [HttpPost("{id}/clone")]
+    public async Task<IActionResult> CloneTopology(string id, [FromBody] CloneTopologyRequest? request = null)
+    {
+        var saved = await _store.ReadAsync<SavedTopologyDto>($"{TopologiesDir}/{id}.json");
+        if (saved == null) return NotFound();
+
+        var clone = new SavedTopologyDto
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = string.IsNullOrWhiteSpace(request?.Name) ? $"Копия {saved.Name}" : request.Name,
+            Graph = saved.Graph,
+            Spec = saved.Spec
+        };
+
+        await _store.WriteAsync($"{TopologiesDir}/{clone.Id}.json", clone);
+        return Ok(clone);
+    }
+
+    /// <summary>Очищает все сохранённые топологии (в ноль).</summary>
+    [HttpDelete]
+    public IActionResult ClearAllTopologies()
+    {
+        foreach (var file in _store.ListFiles(TopologiesDir, "*.json"))
+        {
+            _store.Delete($"{TopologiesDir}/{file}.json");
+        }
+        return NoContent();
+    }
+
     /// <summary>Генерирует топологию по параметрам: граф для редактора + execution-конфиг.</summary>
     [HttpPost("generate")]
     public IActionResult Generate([FromBody] TopologySpecDto spec)
