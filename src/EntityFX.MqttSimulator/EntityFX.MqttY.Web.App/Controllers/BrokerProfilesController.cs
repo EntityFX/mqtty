@@ -25,7 +25,7 @@ public sealed class BrokerProfilesController : ControllerBase
     }
 
     [HttpPut]
-    [RequestSizeLimit(5_000_000)]
+    [RequestSizeLimit(20_000_000)]
     public async Task<IActionResult> SaveCopy(string id, [FromBody] JsonElement profile)
     {
         var preset = await _catalog.GetBrokerPresetAsync(id);

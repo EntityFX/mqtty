@@ -9,6 +9,7 @@ export function highlightedJson(value) {
 }
 
 export function showJson(value,title='JSON') {
+    if(JSON.stringify(value).length>5_000_000)throw new Error('Для подсветки выберите JSON до 5 МБ. Большой профиль редактируется по разделам или скачивается.');
     document.getElementById('json-preview')?.remove();
     const dialog=document.createElement('dialog');dialog.id='json-preview';dialog.className='json-dialog';
     dialog.innerHTML=`<div class="d-flex justify-content-between gap-2"><h5>${esc(title)}</h5><button class="btn btn-outline-secondary btn-sm">Закрыть</button></div><pre class="json-code"><code>${highlightedJson(value)}</code></pre>`;
@@ -32,10 +33,15 @@ export function jsonParameterForm(container,initial) {
     const value=structuredClone(initial), controls=[];
     function render(parent,current,path) {
         if(current!==null&&typeof current==='object'){
-            for(const [key,child] of Object.entries(current)){
+            const entries=Object.entries(current);let offset=0;
+            function nextPage(){
+            const end=Array.isArray(current)?Math.min(entries.length,offset+100):entries.length;
+            for(;offset<end;offset++){
+                const [key,child]=entries[offset];
                 if(child!==null&&typeof child==='object'){
                     const details=document.createElement('details');details.className='mb-2';
-                    const heading=document.createElement('summary');heading.textContent=key+(Array.isArray(child)?` (${child.length})`:'');details.append(heading);parent.append(details);render(details,child,[...path,key]);
+                    const heading=document.createElement('summary');heading.textContent=key+(Array.isArray(child)?` (${child.length})`:'');details.append(heading);parent.append(details);
+                    let rendered=false;details.addEventListener('toggle',()=>{if(details.open&&!rendered){rendered=true;render(details,child,[...path,key]);}});
                 }else{
                     const label=document.createElement('label');label.className='form-label d-block small';label.textContent=key;
                     const input=document.createElement('input');input.className='form-control form-control-sm';
@@ -44,6 +50,9 @@ export function jsonParameterForm(container,initial) {
                     input.disabled=child===null;if(child===null)input.placeholder='null (не задано)';label.append(input);parent.append(label);controls.push({path:[...path,key],input,type:typeof child,original:child});
                 }
             }
+            if(offset<entries.length){const more=document.createElement('button');more.type='button';more.className='btn btn-outline-secondary btn-sm mb-2';more.textContent=`Показать ещё (осталось ${entries.length-offset})`;more.onclick=()=>{more.remove();nextPage();};parent.append(more);}
+            }
+            nextPage();
         }
     }
     container.replaceChildren();render(container,value,[]);
