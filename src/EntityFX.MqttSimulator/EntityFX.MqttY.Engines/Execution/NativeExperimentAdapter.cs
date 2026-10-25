@@ -29,6 +29,8 @@ public static class NativeExperimentAdapter
             throw new InvalidDataException("Scientific execution requires nativeConfiguration; graph-only preview is not a federation or balancing experiment.");
         if (output == null && !validateOnly) throw new InvalidDataException("An output directory is required.");
         var native = options.NativeConfiguration.Value;
+        if (options.Engine == "twinValidation")
+            return TwinValidation.TwinValidationAdapter.Run(options, output, validateOnly, cancellationToken, progress);
         if (options.Engine is "relay" or "federation")
         {
             var configuration = JsonSerializer.Deserialize<FederationOptions>(native.GetRawText(), FederationInput.Json)

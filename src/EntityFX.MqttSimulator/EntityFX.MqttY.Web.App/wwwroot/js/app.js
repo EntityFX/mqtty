@@ -6,6 +6,7 @@ import { renderPresets } from './presets.js';
 import { renderSettings } from './settings.js';
 import { closeBrokerDialog } from './broker-dialog.js';
 import { renderJsonViewer } from './json-viewer.js';
+import { renderTwinValidation } from './twin-validation.js';
 
 register('/', async (app) => {
     app.innerHTML = `
@@ -25,6 +26,7 @@ register('/simulations', renderMonitoring);
 register('/presets', renderPresets);
 register('/settings', renderSettings);
 register('/json', renderJsonViewer);
+register('/twin-validation', renderTwinValidation);
 
 document.getElementById('brokerModal').addEventListener('hidden.bs.modal', closeBrokerDialog);
 

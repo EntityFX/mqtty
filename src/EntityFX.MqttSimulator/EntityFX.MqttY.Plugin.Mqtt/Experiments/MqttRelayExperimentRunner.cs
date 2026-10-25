@@ -42,7 +42,7 @@ public sealed class MqttRelayExperimentRunner
 
     public MqttRelayExperimentResult Run(
         MqttRelayExperimentOptions options, string outputRoot, ExperimentProvenance provenance,
-        ExperimentMetricSummary? independentReference = null)
+        ExperimentMetricSummary? independentReference = null, Action<INetworkSimulator, string>? onProgress = null)
     {
         var runId = $"{DateTimeOffset.UtcNow:yyyyMMddTHHmmssfffZ}-{Guid.NewGuid():N}";
         var runDirectory = Path.Combine(Path.GetFullPath(outputRoot), runId);
@@ -114,6 +114,7 @@ public sealed class MqttRelayExperimentRunner
                     broker.EmpiricalCapacityPacing = options.TransportTiming == TransportTimingMode.EmpiricalServiceBudget;
                 }
             phases.Add(new ExperimentPhaseBoundary("construct", phaseStart, graph.TotalTicks, "completed"));
+            onProgress?.Invoke(graph, "construct");
 
             phaseStart = graph.TotalTicks;
             var (relays, receivers, publishers) = StartAndConnect(graph);
@@ -128,6 +129,7 @@ public sealed class MqttRelayExperimentRunner
                 throw new ExperimentPhaseException(ExperimentRunStatus.ConnectionFailed,
                     "Connection barrier timed out.");
             phases.Add(new ExperimentPhaseBoundary("connect", phaseStart, graph.TotalTicks, "completed"));
+            onProgress?.Invoke(graph, "connect");
 
             phaseStart = graph.TotalTicks;
             foreach (var relay in relays) relay.SubscribeAll();
@@ -137,11 +139,13 @@ public sealed class MqttRelayExperimentRunner
                 throw new ExperimentPhaseException(ExperimentRunStatus.SubscriptionFailed,
                     "Subscription barrier timed out.");
             phases.Add(new ExperimentPhaseBoundary("subscribe", phaseStart, graph.TotalTicks, "completed"));
+            onProgress?.Invoke(graph, "subscribe");
 
             var payload = CreatePayload(options.PayloadBytes, options.RandomSeed);
             phaseStart = graph.TotalTicks;
             DriveOfferedLoad(graph, publishers, options.WarmupTicks, payload, options, traceOwner.Trace, false);
             phases.Add(new ExperimentPhaseBoundary("warmup", phaseStart, graph.TotalTicks, "completed"));
+            onProgress?.Invoke(graph, "warmup");
 
             graph.ResetMeasurement();
             receiverBaselines = receivers.ToDictionary(receiver => receiver.Name, receiver => receiver.Received);
@@ -153,6 +157,7 @@ public sealed class MqttRelayExperimentRunner
             measurementEnd = graph.TotalTicks;
             phases.Add(new ExperimentPhaseBoundary("measure",
                 measurementStart, measurementEnd, "completed"));
+            onProgress?.Invoke(graph, "measure");
 
             phaseStart = graph.TotalTicks;
             if (options.ObserveFullDrainWindow)
@@ -168,6 +173,7 @@ public sealed class MqttRelayExperimentRunner
                 throw new ExperimentPhaseException(ExperimentRunStatus.DrainTimedOut,
                     $"Drain did not reach quiescence within {options.DrainTimeoutTicks} ticks.");
             phases.Add(new ExperimentPhaseBoundary("drain", phaseStart, graph.TotalTicks, "completed"));
+            onProgress?.Invoke(graph, "drain");
 
             snapshots = NormalizeSnapshots(graph, measurementStart, measurementEnd);
             simulated = AggregateSnapshots(snapshots);
