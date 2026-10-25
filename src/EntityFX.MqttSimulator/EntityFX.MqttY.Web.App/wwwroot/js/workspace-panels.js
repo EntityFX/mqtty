@@ -6,7 +6,9 @@ export function configureWorkspace(app) {
     const commandbar=document.createElement('div');commandbar.className='workspace-commandbar card';
     const name=app.querySelector('#dsg-name');name.classList.add('workspace-name');name.setAttribute('aria-label','Название топологии');
     sidebar.querySelector('label[for="dsg-name"]')?.remove();
-    commandbar.append(name,app.querySelector('#dsg-save'),app.querySelector('#dsg-start-sim'));
+    const chooser=document.createElement('label');chooser.className='workspace-saved-picker';chooser.textContent='Сохранённая топология';
+    const load=app.querySelector('#dsg-load');load.setAttribute('aria-label','Выбрать сохранённую топологию');chooser.append(load);
+    commandbar.append(chooser,name,app.querySelector('#dsg-save'),app.querySelector('#dsg-start-sim'));
     const otherActions=sidebar.querySelector('.d-flex');if(otherActions)files.append(otherActions);
     app.querySelector('.workspace').before(commandbar);
     const tabs=document.createElement('div');tabs.className='workspace-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Задачи редактора');sidebar.prepend(tabs);

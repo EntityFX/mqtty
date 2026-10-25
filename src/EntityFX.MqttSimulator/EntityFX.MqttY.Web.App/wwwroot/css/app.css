@@ -152,3 +152,6 @@ body {
 .workspace-sidebar .workspace-pane details { font-size:12px; }
 .workspace-sidebar [hidden] { display:none!important; }
 .workspace-sidebar { max-height:calc(100vh - 190px); }
+
+.workspace-saved-picker { min-width:210px; max-width:330px; font-size:12px; color:#536475; }
+.workspace-saved-picker select { margin-top:3px; }
