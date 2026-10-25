@@ -59,6 +59,7 @@ public sealed class MqttRelayExperimentRunner
         var simulated = EmptyMetrics();
         ExperimentMetricSummary? reference = null;
         var receiverBaselines = new Dictionary<string, long>();
+        using var traceOwner = new TraceOwner();
 
         try
         {
@@ -116,6 +117,12 @@ public sealed class MqttRelayExperimentRunner
 
             phaseStart = graph.TotalTicks;
             var (relays, receivers, publishers) = StartAndConnect(graph);
+            if (options.RecordPublicationCohort)
+            {
+                traceOwner.Trace = new Tracing.PublicationCohortTrace(runDirectory, graph,
+                    _ticks.TickPeriod.TotalSeconds, options.PayloadBytes, options.PublishQos);
+                traceOwner.Trace.Attach(publishers, receivers);
+            }
             if (!RefreshUntil(graph, () => graph.Clients.Values.All(client => client.IsConnected),
                     options.DrainTimeoutTicks, options))
                 throw new ExperimentPhaseException(ExperimentRunStatus.ConnectionFailed,
@@ -133,15 +140,16 @@ public sealed class MqttRelayExperimentRunner
 
             var payload = CreatePayload(options.PayloadBytes, options.RandomSeed);
             phaseStart = graph.TotalTicks;
-            DriveOfferedLoad(graph, publishers, options.WarmupTicks, payload, options);
+            DriveOfferedLoad(graph, publishers, options.WarmupTicks, payload, options, traceOwner.Trace, false);
             phases.Add(new ExperimentPhaseBoundary("warmup", phaseStart, graph.TotalTicks, "completed"));
 
             graph.ResetMeasurement();
             receiverBaselines = receivers.ToDictionary(receiver => receiver.Name, receiver => receiver.Received);
             measurementStart = graph.TotalTicks;
+            traceOwner.Trace?.RecordConnections("measurementStart");
             phases.Add(new ExperimentPhaseBoundary("resetMeasurement",
                 measurementStart, measurementStart, "completed"));
-            DriveOfferedLoad(graph, publishers, options.MeasurementTicks, payload, options);
+            DriveOfferedLoad(graph, publishers, options.MeasurementTicks, payload, options, traceOwner.Trace, true);
             measurementEnd = graph.TotalTicks;
             phases.Add(new ExperimentPhaseBoundary("measure",
                 measurementStart, measurementEnd, "completed"));
@@ -179,6 +187,8 @@ public sealed class MqttRelayExperimentRunner
         var criteria = Evaluate(options, options.TopologyMode == ExperimentTopologyMode.BrokerFidelity ? reference : null, simulated);
         var summary = new MqttRelayExperimentSummary(status, measurementStart, measurementEnd,
             simulated, reference, criteria, error);
+        traceOwner.Trace?.SavePhases(measurementStart, measurementEnd, status);
+        traceOwner.Dispose();
         Export(runDirectory, runId, options, provenance, assignedTypes, phases,
             graph, snapshots, summary, receiverBaselines);
         graph?.Clear();
@@ -290,7 +300,8 @@ public sealed class MqttRelayExperimentRunner
 
     private void DriveOfferedLoad(
         INetworkSimulator graph, IReadOnlyList<MqttClient> publishers,
-        long ticks, byte[] payload, MqttRelayExperimentOptions options)
+        long ticks, byte[] payload, MqttRelayExperimentOptions options,
+        Tracing.PublicationCohortTrace? trace = null, bool measurement = false)
     {
         double tokens = 0;
         var tokensPerTick = options.OfferedRps * _ticks.TickPeriod.TotalSeconds;
@@ -306,9 +317,10 @@ public sealed class MqttRelayExperimentRunner
                 tokens = Math.Min(tokens, publishers.Count + tokensPerTick);
                 for (var scanned = 0; scanned < publishers.Count && tokens >= 1; scanned++)
                 {
-                    var publisher = publishers[publisherIndex++ % publishers.Count];
+                    var index = publisherIndex++ % publishers.Count;
+                    var publisher = publishers[index];
                     if (options.PublishQos != MqttQos.AtMostOnce && publisher.HasPendingPublish) continue;
-                    publisher.Publish("telemetry/data", payload, options.PublishQos);
+                    publisher.Publish("telemetry/data", trace?.CreateAndRecord(index, measurement) ?? payload, options.PublishQos);
                     tokens -= 1;
                 }
                 graph.RefreshWithCounters(options.Parallel, options.RefreshStrategy);
@@ -318,8 +330,9 @@ public sealed class MqttRelayExperimentRunner
             tokens -= publishCount;
             for (long message = 0; message < publishCount; message++)
             {
-                var publisher = publishers[publisherIndex++ % publishers.Count];
-                publisher.Publish("telemetry/data", payload, options.PublishQos);
+                var index = publisherIndex++ % publishers.Count;
+                var publisher = publishers[index];
+                publisher.Publish("telemetry/data", trace?.CreateAndRecord(index, measurement) ?? payload, options.PublishQos);
             }
             graph.RefreshWithCounters(options.Parallel, options.RefreshStrategy);
         }

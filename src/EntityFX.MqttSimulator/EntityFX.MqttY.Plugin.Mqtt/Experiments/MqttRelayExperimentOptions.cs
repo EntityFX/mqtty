@@ -38,11 +38,14 @@ public sealed class MqttRelayExperimentOptions
     public int RefreshStrategy { get; set; }
     public bool EnableCounters { get; set; }
     public bool FidelityMode { get; set; } = true;
+    public bool RecordPublicationCohort { get; set; }
     public PublishLoadMode LoadMode { get; set; } = PublishLoadMode.OpenLoopRate;
     public TransportTimingMode TransportTiming { get; set; } = TransportTimingMode.Fixed;
 
     public void Validate()
     {
+        if (RecordPublicationCohort && (TopologyMode != ExperimentTopologyMode.BrokerFidelity || Brokers != 1 || PayloadBytes < 16 || Parallel))
+            throw new InvalidDataException("Publication cohort tracing requires a sequential single BrokerFidelity broker and payload >=16 bytes.");
         if (!Enum.IsDefined(typeof(PublishLoadMode), LoadMode) || !Enum.IsDefined(typeof(ExperimentTopologyMode), TopologyMode) ||
             !Enum.IsDefined(typeof(ProfileClientCountMode), ProfileClientCountMode))
             throw new InvalidDataException("Unknown topology or profile client-count mode.");

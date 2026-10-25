@@ -18,6 +18,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
 
 
         public long Received => _receiverCounter.Received;
+        public event EventHandler<MqttMessage>? MessageReceived;
 
         public MqttReceiver(IClientBuilder clientBuilder, int index, string name, string address, string protocolType, string specification,
             TicksOptions ticksOptions,
@@ -114,6 +115,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt
                 $"Mqtt Application {Name} receives message by topic {e.Topic} from broker {e.Broker}",
                 Specification, "MQTT Receiver Application");
             _receiverCounter.Receive();
+            MessageReceived?.Invoke(this, e);
         }
 
         private string GetNodeName(string group, string key) => $"{group}{key}";

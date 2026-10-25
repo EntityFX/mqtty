@@ -25,6 +25,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         private long _localPublishSequence;
 
         public event EventHandler<MqttMessage>? MessageReceived;
+        public event EventHandler<Diagnostics.MqttPublishOutcome>? PublicationOutcome;
+        private Dictionary<ushort, (byte[] Payload, long Tick)>? observedPublications;
 
         private readonly MqttCounters _mqttCounters;
 
@@ -260,6 +262,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             {
                 Payload = payload
             };
+            var startedTick = NetworkSimulator!.TotalTicks;
+            if (PublicationOutcome != null && packetId.HasValue)
+                (observedPublications ??= new())[packetId.Value] = (payload, startedTick);
 
             INetworkPacket packetPayload = GetContextPacket(NetworkSimulator!.GetPacketId(), ServerName ?? string.Empty,
                 NodeType.Server,
@@ -289,7 +294,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             if (!sendResult)
             {
                 _mqttCounters.Refuse(publish.Type);
+                if (packetId.HasValue) ObservePublicationOutcome(packetId.Value, false, "outgoingSendRefused");
             }
+            if (qos == MqttQos.AtMostOnce)
+                PublicationOutcome?.Invoke(this, new(payload, startedTick, NetworkSimulator.TotalTicks, sendResult,
+                    sendResult ? null : "outgoingSendRefused"));
 
             return sendResult;
         }
@@ -498,6 +507,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             _sessionRepository.Update(session);
             CompletePublisher(packet.From, MqttQos.ExactlyOnce,
                 publishCompletePacket.PacketId, NetworkSimulator!.TotalTicks);
+            ObservePublicationOutcome(publishCompletePacket.PacketId, true);
         }
 
         private ClientSession GetSession()
@@ -531,6 +541,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             CompletePublisher(payload.From, MqttQos.AtLeastOnce,
                 publishAckPacket.PacketId, NetworkSimulator!.TotalTicks);
+            ObservePublicationOutcome(publishAckPacket.PacketId, true);
 
             NetworkSimulator!.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref payload);
         }
@@ -699,8 +710,18 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 sink.CompleteDelivery(outgoingPublishPacketId);
         }
 
-        void IMqttClientPublishStateSink.FailPublish(ushort packetId) =>
+        void IMqttClientPublishStateSink.FailPublish(ushort packetId)
+        {
             RemovePendingMessage(Name, packetId);
+            ObservePublicationOutcome(packetId, false, "brokerPublishFailed");
+        }
+
+        private void ObservePublicationOutcome(ushort packetId, bool completed, string? reason = null)
+        {
+            if (observedPublications?.Remove(packetId, out var observed) == true)
+                PublicationOutcome?.Invoke(this, new(observed.Payload, observed.Tick,
+                    NetworkSimulator!.TotalTicks, completed, reason));
+        }
 
         private void UpsertSubscription(ClientSession session, string topicFilter, MqttQos qos)
         {
