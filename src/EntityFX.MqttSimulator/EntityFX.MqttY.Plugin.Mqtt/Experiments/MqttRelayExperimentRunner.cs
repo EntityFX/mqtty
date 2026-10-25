@@ -124,7 +124,7 @@ public sealed class MqttRelayExperimentRunner
                 traceOwner.Trace.Attach(publishers, receivers);
             }
             if (!RefreshUntil(graph, () => graph.Clients.Values.All(client => client.IsConnected),
-                    options.DrainTimeoutTicks, options))
+                    options.DrainTimeoutTicks, options, traceOwner.Trace))
                 throw new ExperimentPhaseException(ExperimentRunStatus.ConnectionFailed,
                     "Connection barrier timed out.");
             phases.Add(new ExperimentPhaseBoundary("connect", phaseStart, graph.TotalTicks, "completed"));
@@ -133,7 +133,7 @@ public sealed class MqttRelayExperimentRunner
             foreach (var relay in relays) relay.SubscribeAll();
             foreach (var receiver in receivers) receiver.SubscribeAll();
             if (!RefreshUntil(graph, () => AreSubscribed(relays, receivers),
-                    options.DrainTimeoutTicks, options))
+                    options.DrainTimeoutTicks, options, traceOwner.Trace))
                 throw new ExperimentPhaseException(ExperimentRunStatus.SubscriptionFailed,
                     "Subscription barrier timed out.");
             phases.Add(new ExperimentPhaseBoundary("subscribe", phaseStart, graph.TotalTicks, "completed"));
@@ -155,8 +155,16 @@ public sealed class MqttRelayExperimentRunner
                 measurementStart, measurementEnd, "completed"));
 
             phaseStart = graph.TotalTicks;
-            if (!RefreshUntil(graph, () => graph.IsQuiescent,
-                    options.DrainTimeoutTicks, options))
+            if (options.ObserveFullDrainWindow)
+            {
+                for (long tick = 0; tick < options.DrainTimeoutTicks; tick++)
+                {
+                    graph.RefreshWithCounters(options.Parallel, options.RefreshStrategy);
+                    traceOwner.Trace?.RecordConnectionChanges();
+                }
+            }
+            else if (!RefreshUntil(graph, () => graph.IsQuiescent,
+                    options.DrainTimeoutTicks, options, traceOwner.Trace))
                 throw new ExperimentPhaseException(ExperimentRunStatus.DrainTimedOut,
                     $"Drain did not reach quiescence within {options.DrainTimeoutTicks} ticks.");
             phases.Add(new ExperimentPhaseBoundary("drain", phaseStart, graph.TotalTicks, "completed"));
@@ -324,6 +332,7 @@ public sealed class MqttRelayExperimentRunner
                     tokens -= 1;
                 }
                 graph.RefreshWithCounters(options.Parallel, options.RefreshStrategy);
+                trace?.RecordConnectionChanges();
                 continue;
             }
             var publishCount = (long)Math.Floor(tokens + 1e-12);
@@ -335,15 +344,17 @@ public sealed class MqttRelayExperimentRunner
                 publisher.Publish("telemetry/data", trace?.CreateAndRecord(index, measurement) ?? payload, options.PublishQos);
             }
             graph.RefreshWithCounters(options.Parallel, options.RefreshStrategy);
+            trace?.RecordConnectionChanges();
         }
     }
 
     private static bool RefreshUntil(
         INetworkSimulator graph, Func<bool> condition, long timeoutTicks,
-        MqttRelayExperimentOptions options)
+        MqttRelayExperimentOptions options, Tracing.PublicationCohortTrace? trace = null)
     {
         for (long tick = 0; tick <= timeoutTicks; tick++)
         {
+            trace?.RecordConnectionChanges();
             if (condition()) return true;
             if (tick < timeoutTicks)
                 graph.RefreshWithCounters(options.Parallel, options.RefreshStrategy);

@@ -15,11 +15,17 @@ internal sealed class PublicationCohortTrace : IDisposable
     private readonly StreamWriter publishes;
     private readonly StreamWriter deliveries;
     private readonly StreamWriter connections;
+    private readonly StreamWriter subscriptions;
     private readonly string directory;
     private readonly Dictionary<(int Publisher, bool Measurement), long> sequences = new();
     private readonly List<MqttClient> clients = new();
     private readonly List<MqttReceiver> receivers = new();
+    private MqttClient[] observedClients = Array.Empty<MqttClient>();
     private readonly MqttQos qos;
+    private readonly Dictionary<string, bool> connectionStates = new();
+    private readonly Dictionary<string, bool> subscriptionStates = new();
+    private readonly HashSet<string> subscriberNames = new();
+    private readonly Dictionary<string, string[]> subscriberTopics = new();
 
     public PublicationCohortTrace(string directory, INetworkSimulator graph, double secondsPerTick, int bytes, MqttQos qos)
     {
@@ -31,6 +37,7 @@ internal sealed class PublicationCohortTrace : IDisposable
         publishes = Open("publishes.ndjson");
         deliveries = Open("deliveries.ndjson");
         connections = Open("connections.ndjson");
+        subscriptions = Open("subscriptions.ndjson");
     }
 
     private StreamWriter Open(string name) => new(new FileStream(Path.Combine(directory, name), FileMode.CreateNew));
@@ -46,8 +53,11 @@ internal sealed class PublicationCohortTrace : IDisposable
         foreach (var receiver in subscribers)
         {
             receivers.Add(receiver);
+            subscriberNames.Add(receiver.Name + receiver.Options!.Server);
+            subscriberTopics[receiver.Name + receiver.Options!.Server] = receiver.Options.Topics;
             receiver.MessageReceived += OnDelivery;
         }
+        observedClients = graph.Clients.Values.OfType<MqttClient>().ToArray();
         RecordConnections("connectStarted");
     }
 
@@ -79,9 +89,40 @@ internal sealed class PublicationCohortTrace : IDisposable
 
     public void RecordConnections(string phase)
     {
-        foreach (var client in graph.Clients.Values)
-            Write(connections, new { client = client.Name, connected = client.IsConnected, phase,
-                elapsedSeconds = graph.TotalTicks * secondsPerTick });
+        foreach (var client in observedClients)
+            WriteConnection(client, phase);
+    }
+
+    public void RecordConnectionChanges()
+    {
+        foreach (var client in observedClients)
+        {
+            if (!connectionStates.TryGetValue(client.Name, out var previous) || previous != client.IsConnected)
+                WriteConnection(client, "stateChange");
+            if (!subscriberNames.Contains(client.Name)) continue;
+            foreach (var topic in subscriberTopics[client.Name])
+            {
+                var key = client.Name + "\0" + topic;
+                var subscribed = client.IsSubscribed(topic);
+                if (subscriptionStates.TryGetValue(key, out var previousSubscription) && previousSubscription == subscribed) continue;
+                subscriptionStates[key] = subscribed;
+                var granted = subscribed ? (int?)client.Subscribtions.Values.SelectMany(value => value)
+                    .Single(value => value.TopicFilter == topic).MaximumQualityOfService : null;
+                Write(subscriptions, new { client = client.Name, clientId = client.ClientId, role = "subscriber",
+                    topic, state = subscribed ? "subscribed" : "unsubscribed",
+                    requestedQos = (int)qos, grantedQos = granted, elapsedSeconds = graph.TotalTicks * secondsPerTick });
+            }
+        }
+    }
+
+    private void WriteConnection(MqttClient client, string phase)
+    {
+        connectionStates[client.Name] = client.IsConnected;
+        var role = clients.Contains(client) ? "publisher" :
+            subscriberNames.Contains(client.Name) ? "subscriber" : "other";
+        Write(connections, new { client = client.Name, clientId = client.ClientId, role,
+            connected = client.IsConnected, state = client.IsConnected ? "connected" : "disconnected", phase,
+            elapsedSeconds = graph.TotalTicks * secondsPerTick });
     }
 
     public void SavePhases(long start, long end, ExperimentRunStatus status)
@@ -91,6 +132,7 @@ internal sealed class PublicationCohortTrace : IDisposable
         JsonSerializer.Serialize(output, new { timeOrigin = "sharedMonotonic", qos = (int)qos,
             measurementStartSeconds = start * secondsPerTick, measurementEndSeconds = end * secondsPerTick,
             drainEndSeconds = graph.TotalTicks * secondsPerTick, completed = status == ExperimentRunStatus.Completed,
+            connectionObservation = "everyModelTick",
             policy = "closedLoopPerPublisher; publication IDs; actual publisher ACK/failure" });
     }
 
@@ -98,6 +140,6 @@ internal sealed class PublicationCohortTrace : IDisposable
     {
         foreach (var client in clients) client.PublicationOutcome -= OnOutcome;
         foreach (var receiver in receivers) receiver.MessageReceived -= OnDelivery;
-        publishes.Dispose(); deliveries.Dispose(); connections.Dispose();
+        publishes.Dispose(); deliveries.Dispose(); connections.Dispose(); subscriptions.Dispose();
     }
 }

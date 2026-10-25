@@ -39,6 +39,7 @@ public sealed class MqttRelayExperimentOptions
     public bool EnableCounters { get; set; }
     public bool FidelityMode { get; set; } = true;
     public bool RecordPublicationCohort { get; set; }
+    public bool ObserveFullDrainWindow { get; set; }
     public PublishLoadMode LoadMode { get; set; } = PublishLoadMode.OpenLoopRate;
     public TransportTimingMode TransportTiming { get; set; } = TransportTimingMode.Fixed;
 
