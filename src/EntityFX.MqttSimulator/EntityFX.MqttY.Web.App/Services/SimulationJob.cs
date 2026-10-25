@@ -9,6 +9,7 @@ public sealed class SimulationJob
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
 
     public string? TopologyId { get; set; }
+    public string? Name { get; set; }
 
     public string Engine { get; set; } = "relay";
 

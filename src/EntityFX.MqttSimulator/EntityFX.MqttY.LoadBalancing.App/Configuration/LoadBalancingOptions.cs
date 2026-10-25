@@ -37,7 +37,7 @@ public sealed record LoadBalancingOptions
     {
         if (SchemaVersion != 1 || !Enum.IsDefined(typeof(BalancingMode), Mode))
             throw new InvalidDataException("Unsupported schemaVersion or mode.");
-        if (!ExperimentInput.BrokerTypes.Contains(BrokerType)) throw new InvalidDataException("Unknown brokerType.");
+        if (string.IsNullOrWhiteSpace(BrokerType) || BrokerType.Length > 128) throw new InvalidDataException("Broker type is required (up to 128 characters).");
         if (TotalPublishers is < 1 or > 4096 || BackendCount < 1 || BackendCount > 64 || BackendCount > TotalPublishers ||
             Mode == BalancingMode.Single && BackendCount != 1)
             throw new InvalidDataException("Each backend needs publishers; single requires exactly one backend.");

@@ -72,6 +72,7 @@ public sealed class SimulationsController : ControllerBase
         var job = new SimulationJob
         {
             TopologyId = request.TopologyId,
+            Name = saved?.Name,
             Engine = request.Engine,
             RunOptions = runOptions,
             TimeLimit = request.RunSettings.TimeLimit ?? _options.DefaultTimeLimit,
@@ -91,6 +92,24 @@ public sealed class SimulationsController : ControllerBase
     [HttpGet]
     public IActionResult GetSimulations() =>
         Ok(_registry.GetAll().Select(ToStatusDto));
+
+    [HttpGet("search")]
+    public IActionResult Search([FromQuery] string? q, [FromQuery] string? state,
+        [FromQuery] string? engine, [FromQuery] DateTimeOffset? from,
+        [FromQuery] DateTimeOffset? to, [FromQuery] int page = 1, [FromQuery] int pageSize = 25)
+    {
+        page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
+        var jobs = _registry.GetAll().Where(j =>
+            (string.IsNullOrWhiteSpace(q) || (j.Id + " " + j.Name + " " + j.TopologyId).Contains(q.Trim(), StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrEmpty(state) || j.State == state) &&
+            (string.IsNullOrEmpty(engine) || j.Engine == engine) &&
+            (!from.HasValue || j.StartedAt >= from) && (!to.HasValue || j.StartedAt <= to))
+            .OrderByDescending(j => j.StartedAt).ThenBy(j => j.Id).ToArray();
+        var pages = Math.Max(1, (jobs.Length + pageSize - 1) / pageSize);
+        page = Math.Min(page, pages);
+        return Ok(new { total = jobs.Length, page, pageSize, pages,
+            items = jobs.Skip((page - 1) * pageSize).Take(pageSize).Select(ToStatusDto) });
+    }
 
     [HttpGet("{id}")]
     public IActionResult GetSimulation(string id)
@@ -129,7 +148,7 @@ public sealed class SimulationsController : ControllerBase
         if (original == null) return NotFound();
         if (original.State is "Running" or "Paused" or "Queued" or "Cancelling")
             return Conflict(new { error = "Сначала завершите или остановите текущий запуск." });
-        var copy = new SimulationJob { TopologyId = original.TopologyId, Engine = original.Engine,
+        var copy = new SimulationJob { TopologyId = original.TopologyId, Name = original.Name, Engine = original.Engine,
             RunOptions = original.RunOptions, TimeLimit = original.TimeLimit,
             Parallel = original.Parallel, ExecutionMode = original.ExecutionMode };
         try { await _runner.EnqueueAsync(copy); }
@@ -293,6 +312,8 @@ public sealed class SimulationsController : ControllerBase
         {
             Id = job.Id,
             TopologyId = job.TopologyId,
+            Name = job.Name,
+            TickMilliseconds = job.RunOptions.Graph.Ticks.TickPeriod.TotalMilliseconds,
             Engine = job.Engine,
             State = job.State,
             TotalTicks = job.TotalTicks,

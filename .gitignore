@@ -743,3 +743,6 @@ src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/results/2025_05_10__16_48/net3.loc
 src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/results/2025_05_10__16_48/net3.local/mqrl3relayrs2/PUBLISH_AvgRps.csv
 src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/results/2025_05_10__16_48/net3.local/mqrl3relayrs2/PUBLISH_Rps.csv
 src/EntityFX.MqttSimulator/EntityFX.MqttY.Cli/results/2025_05_10__16_48/net3.local/mqrl3relayrs2/Queue.csv
+# Local Web state is host data, not source code (tracked seed presets remain tracked).
+/src/EntityFX.MqttSimulator/EntityFX.MqttY.Web.App/data/
+/src/EntityFX.MqttSimulator/EntityFX.MqttY.Web.App/Microsoft.PowerShell*.cmd

@@ -1,6 +1,7 @@
 import { api } from './api.js';
 import { navigate } from './router.js';
 import { escapeHtml as esc, saveDraft, readDraft, showMessage } from './workspace-state.js';
+import { editBrokerProfile } from './broker-profile-editor.js';
 
 export async function renderPresets(app) {
     app.innerHTML=`<h4>Пресеты и сохранённые топологии</h4><p class="text-muted">Пресет задаёт параметры новых запусков. Изменения не переписывают уже выполненные опыты и их снимки профилей.</p><div data-feedback role="status" hidden></div>
@@ -25,10 +26,15 @@ export async function renderPresets(app) {
       const broker=tab==='brokers';
       el('pr-editor').innerHTML=`<h5>${item?'Редактировать':'Создать'} ${broker?'пресет брокера':'шаблон топологии'}</h5><form id="pr-form">
         ${field('pr-name','Название',selected.name||'Новый пресет')}
-        ${broker?select('pr-type','Реализация брокера',selected.brokerType||'Mosquitto',['Mosquitto','Aedes','ActiveMQ','EMQX'].map(t=>[t,t]))+field('pr-profile','Путь к профилю в каталоге данных (пусто — идеальная модель)',selected.profilePath||'')+field('pr-description','Описание',selected.description||''):
+        ${broker?field('pr-type','Тип брокера (можно указать свой)',selected.brokerType||'Mosquitto')+field('pr-profile','Путь к профилю в каталоге данных (пусто — идеальная модель)',selected.profilePath||'')+field('pr-description','Описание',selected.description||''):
           select('pr-kind','Форма',selected.kind||'line',[['line','Линия'],['ring','Кольцо'],['star','Звезда']])+select('pr-engine','Способ объединения',selected.engine||'relay',[['relay','MqttRelay'],['federation','Федерация'],['loadBalancing','Балансировщик']])+field('pr-count','Брокеров',selected.brokers??(selected.kind==='ring'?selected.ringLength:selected.kind==='star'?selected.rays+1:selected.chainLength)??3,'number')+field('pr-broker','ID пресета брокера',selected.brokerPresetId||'ideal-demo')+field('pr-clients','Отправителей на брокер',selected.clientsPerBroker??2,'number')+field('pr-rps','Сообщений в секунду, всего',selected.offeredRps??1000,'number')+select('pr-qos','QoS',String(selected.qos??1),[['0','0'],['1','1'],['2','2']])}
         <details class="my-2"><summary>Все параметры JSON</summary><p class="small text-muted">Здесь можно изменить дополнительные параметры. Поля формы выше имеют приоритет.</p><textarea id="pr-json" class="form-control font-monospace" rows="8">${esc(JSON.stringify(selected,null,2))}</textarea></details>
         <div class="d-flex gap-2 mt-3"><button class="btn btn-primary btn-sm" type="submit">💾 Сохранить изменения</button><button id="pr-copy" class="btn btn-outline-success btn-sm" type="button">⧉ Сохранить копию</button>${item?'<button id="pr-delete" class="btn btn-outline-danger btn-sm" type="button">✕ Удалить</button>':''}</div></form>`;
+      if(broker && item?.profilePath) {
+        const button=document.createElement('button');button.id='pr-profile-edit';button.type='button';button.className='btn btn-outline-primary btn-sm mt-3';button.textContent='Параметры профиля: открыть форму';
+        button.onclick=async()=>{try{await editBrokerProfile(item.id,async saved=>{await refresh();edit(saved);showMessage(app,'Сохранена новая версия профиля. Снимки прежних опытов не изменены.');});}catch(error){showMessage(app,error.message,true);}};
+        el('pr-editor').append(button);
+      }
       async function save(copy) {
         try {
           let value=JSON.parse(el('pr-json').value);value.name=el('pr-name').value.trim();if(!value.name)throw new Error('Укажите название.');

@@ -5,6 +5,7 @@ import { renderMonitoring } from './monitoring.js';
 import { renderPresets } from './presets.js';
 import { renderSettings } from './settings.js';
 import { closeBrokerDialog } from './broker-dialog.js';
+import { renderJsonViewer } from './json-viewer.js';
 
 register('/', async (app) => {
     app.innerHTML = `
@@ -23,6 +24,7 @@ register('/designer', renderDesigner);
 register('/simulations', renderMonitoring);
 register('/presets', renderPresets);
 register('/settings', renderSettings);
+register('/json', renderJsonViewer);
 
 document.getElementById('brokerModal').addEventListener('hidden.bs.modal', closeBrokerDialog);
 

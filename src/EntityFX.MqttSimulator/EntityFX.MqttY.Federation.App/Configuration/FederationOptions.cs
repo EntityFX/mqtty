@@ -61,7 +61,7 @@ public sealed record FederationOptions
             throw new InvalidDataException("Bounded experiment/cache/queue/hop budget exceeded.");
         if (Receivers().Distinct().Count() != Receivers().Length || Receivers().Any(site => site < 0 || site >= Brokers))
             throw new InvalidDataException("Invalid receiver sites.");
-        if (Ideal != (BrokerProfilePath == null) || BrokerType is not ("Mosquitto" or "Aedes" or "ActiveMQ" or "EMQX"))
+        if (Ideal != (BrokerProfilePath == null) || string.IsNullOrWhiteSpace(BrokerType) || BrokerType.Length > 128)
             throw new InvalidDataException("Use ideal with no profile, or an explicit supported broker profile.");
         if (Network == null) throw new InvalidDataException("Network is required.");
         Network.Build().Validate();

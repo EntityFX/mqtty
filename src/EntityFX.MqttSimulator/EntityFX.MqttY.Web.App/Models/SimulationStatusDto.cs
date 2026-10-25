@@ -6,6 +6,8 @@ public sealed class SimulationStatusDto
     public string Id { get; set; } = string.Empty;
 
     public string? TopologyId { get; set; }
+    public string? Name { get; set; }
+    public double TickMilliseconds { get; set; }
 
     public string Engine { get; set; } = string.Empty;
 

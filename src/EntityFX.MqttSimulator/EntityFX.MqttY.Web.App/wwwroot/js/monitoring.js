@@ -10,7 +10,9 @@ const terminal=s=>['Completed','Failed','Cancelled','TimedOut','Interrupted'].in
 export async function renderMonitoring(app) {
     app.innerHTML=`<div class="workspace-heading"><h4>Мониторинг симуляций</h4><span class="small text-muted">Обновление каждые 2 секунды</span></div><div data-feedback role="status" hidden></div>
       <div class="workspace"><aside class="workspace-sidebar card p-3">
+        <form id="mon-search-form" class="mb-2"><label for="mon-search" class="form-label">Найти запуск</label><input id="mon-search" class="form-control form-control-sm" placeholder="Название, ID или топология"><select id="mon-state" class="form-select form-select-sm mt-1" aria-label="Статус запуска"><option value="">Все статусы</option>${Object.entries(states).map(([key,value])=>`<option value="${key}">${value}</option>`).join('')}</select><button class="btn btn-primary btn-sm mt-1" type="submit">Найти</button></form>
         <label for="mon-job" class="form-label">Запуск</label><select id="mon-job" class="form-select form-select-sm mb-2"></select>
+        <div class="d-flex align-items-center gap-2 mb-2"><button id="mon-prev" class="btn btn-outline-secondary btn-sm" aria-label="Предыдущая страница">←</button><span id="mon-page" class="small"></span><button id="mon-next" class="btn btn-outline-secondary btn-sm" aria-label="Следующая страница">→</button></div>
         <div id="mon-status" class="mb-2"></div><div id="mon-actions" class="d-flex flex-wrap gap-1 mb-2"></div>
         <p class="small text-muted">Пауза сохраняет модель в памяти процесса. «Остановить» завершает запуск; «Повторить» создаёт новый запуск с теми же параметрами.</p>
         <label for="mon-node" class="form-label">Статистика узла</label><select id="mon-node" class="form-select form-select-sm"><option value="">Выберите узел…</option></select>
@@ -23,6 +25,7 @@ export async function renderMonitoring(app) {
       </section></div>`;
     const el=id=>app.querySelector('#'+id);
     let id=readDraft('mqtty-selected-simulation'), disposed=false, timer, graph=null, summaryId=null;
+    let listPage=1, listPages=1, refreshSequence=0;
     const positions=new Map();
     const cleanup=()=>{disposed=true;clearTimeout(timer);closeBrokerDialog();closeResultsDialog();};
     window.addEventListener('mqtty:before-navigation',cleanup,{once:true});
@@ -31,6 +34,10 @@ export async function renderMonitoring(app) {
     el('mon-results').onclick=()=>{if(id)openResultsDialog(id);};
     el('mon-job').onchange=e=>{choose(e.target.value);refresh();};
     el('mon-node').onchange=e=>{if(e.target.value)openBrokerDialog(id,e.target.value);};
+    el('mon-search-form').onsubmit=e=>{e.preventDefault();listPage=1;choose(null);refresh();};
+    el('mon-state').onchange=()=>el('mon-search-form').requestSubmit();
+    el('mon-prev').onclick=()=>{if(listPage>1){listPage--;choose(null);refresh();}};
+    el('mon-next').onclick=()=>{if(listPage<listPages){listPage++;choose(null);refresh();}};
     function draw() { if(!graph)return;renderGraph(el('mon-canvas'),graph,node=>openBrokerDialog(id,node),{draggable:true,onPositionChange:(node,m)=>positions.set(node,{x:m.x,y:m.y})}); }
     function layout() { if(!graph)return;const mode=el('mon-layout').value;(mode==='circle'?applyCircular:mode==='grid'?applyGrid:applySmart)(graph);for(const n of [...graph.networks,...graph.nodes])positions.set(n.id,{x:n.x,y:n.y});resetCamera(el('mon-canvas'));draw(); }
     el('mon-layout').onchange=layout;
@@ -52,15 +59,20 @@ export async function renderMonitoring(app) {
       el('mon-summary').textContent=JSON.stringify(summary,null,2);
     }
     async function refresh() {
+      const sequence=++refreshSequence;
       try {
-        const list=await api.get('/simulations');if(disposed)return;
+        const query=new URLSearchParams({q:el('mon-search').value.trim(),state:el('mon-state').value,page:String(listPage),pageSize:'25'});
+        const result=await api.get('/simulations/search?'+query);if(disposed||sequence!==refreshSequence)return;
+        const list=result.items;listPage=result.page;listPages=result.pages;
+        el('mon-page').textContent=`${listPage}/${listPages} · всего ${result.total}`;
+        el('mon-prev').disabled=listPage<=1;el('mon-next').disabled=listPage>=listPages;
         if(!list.some(j=>j.id===id))choose(list[0]?.id||null);
-        el('mon-job').innerHTML=list.map(j=>`<option value="${esc(j.id)}">${esc(j.engine)} · ${esc(states[j.state]||j.state)} · ${esc(j.id.slice(0,8))}</option>`).join('')||'<option>Запусков пока нет</option>';
+        el('mon-job').innerHTML=list.map(j=>`<option value="${esc(j.id)}">${esc(j.startedAt?new Date(j.startedAt).toLocaleString('ru-RU'):'Ещё не начат')} · ${esc(states[j.state]||j.state)} · ${esc(j.name||j.engine)} · ${esc(j.id.slice(0,8))}</option>`).join('')||'<option>Запусков не найдено</option>';
         el('mon-job').value=id||'';
         if(!id){el('mon-status').textContent='Создайте топологию и запустите симуляцию.';return;}
         const selected=id;
         const [job,snapshot]=await Promise.all([api.get(`/simulations/${id}`),api.get(`/simulations/${id}/monitor`).catch(()=>null)]);
-        if(disposed||selected!==id)return;
+        if(disposed||selected!==id||sequence!==refreshSequence)return;
         el('mon-status').textContent=states[job.state]||job.state;
         const actions=[];
         if(job.state==='Running'&&job.processId)actions.push(['pause','⏸ Пауза','outline-warning']);
@@ -70,7 +82,7 @@ export async function renderMonitoring(app) {
         el('mon-actions').innerHTML=actions.map(([a,t,c])=>`<button data-action="${a}" class="btn btn-${c} btn-sm">${t}</button>`).join('');
         el('mon-actions').querySelectorAll('[data-action]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const result=await api.post(`/simulations/${id}/${b.dataset.action}`);if(b.dataset.action==='restart')choose(result.id);await refresh();}catch(e){showMessage(app,e.message,true);}finally{b.disabled=false;}});
         el('mon-process').textContent=`PID: ${job.processId??'—'}\nПамять: ${((job.processWorkingSetBytes||0)/1024**2).toFixed(1)} МиБ\nCPU: ${(job.processCpuSeconds||0).toFixed(2)} с\n${job.error||''}`;
-        el('mon-phase').textContent=`Этап: ${job.phase||'—'} · модельных шагов: ${job.totalTicks} · ошибок исполнения: ${job.errors}`;
+        el('mon-phase').textContent=`Этап: ${job.phase||'—'} · тиков: ${job.totalTicks} · шагов: ${job.step} · тик: ${job.tickMilliseconds} мс · модельное время: ${(job.totalTicks*job.tickMilliseconds/1000).toFixed(4)} с · ошибок: ${job.errors}`;
         if(snapshot?.nodes?.length){
           const first=positions.size===0;
           graph={networks:[],nodes:[],links:snapshot.links||[]};
