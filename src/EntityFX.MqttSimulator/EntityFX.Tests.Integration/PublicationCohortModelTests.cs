@@ -9,11 +9,12 @@ namespace EntityFX.Tests.Integration;
 public class PublicationCohortModelTests
 {
     [DataTestMethod]
-    [DataRow(1, false)]
-    [DataRow(2, false)]
-    [DataRow(1, true)]
-    [DataRow(2, true)]
-    public void ModelTrace_RecordsActualOutcomes_AndSeparatesWarmupWithoutChangingMetrics(int qos, bool fixedHorizon)
+    [DataRow(1, false, 1)]
+    [DataRow(2, false, 2)]
+    [DataRow(1, true, 1)]
+    [DataRow(2, true, 2)]
+    [DataRow(2, true, 1)]
+    public void ModelTrace_RecordsActualOutcomes_AndSeparatesWarmupWithoutChangingMetrics(int qos, bool fixedHorizon, int subscribeQos)
     {
         var root = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "cohort-model-" + Guid.NewGuid().ToString("N"))).FullName;
         var ticks = new TicksOptions { TickPeriod = TimeSpan.FromMilliseconds(.1), OutgoingWaitTicks = 1,
@@ -22,7 +23,7 @@ public class PublicationCohortModelTests
             CapacityBytesPerSecond = 100_000_000, QueueCapacity = 100_000, ThroughputWindowTicks = 100 };
         var options = new MqttRelayExperimentOptions { TopologyMode = ExperimentTopologyMode.BrokerFidelity,
             ProfileClientCountMode = ProfileClientCountMode.Publishers, Brokers = 1, NetworkLength = 1,
-            ClientsPerBroker = 2, PayloadBytes = 16, PublishQos = (MqttQos)qos, SubscribeQos = (MqttQos)qos,
+            ClientsPerBroker = 2, PayloadBytes = 16, PublishQos = (MqttQos)qos, SubscribeQos = (MqttQos)subscribeQos,
             WarmupTicks = 50, MeasurementTicks = 500, DrainTimeoutTicks = 2000, OfferedRps = 20000,
             LoadMode = PublishLoadMode.ClosedLoopPerPublisher, RandomSeed = 42, ObserveFullDrainWindow = fixedHorizon };
         var runner = new MqttRelayExperimentRunner(ticks, network);
@@ -54,7 +55,8 @@ public class PublicationCohortModelTests
         var subscriptionRows = File.ReadAllLines(Path.Combine(observed.RunDirectory, "subscriptions.ndjson"))
             .Select(line => JsonDocument.Parse(line).RootElement.Clone()).ToArray();
         Assert.IsTrue(subscriptionRows.Any(row => row.GetProperty("state").GetString() == "subscribed"
-            && row.GetProperty("grantedQos").GetInt32() == qos
+            && row.GetProperty("grantedQos").GetInt32() == subscribeQos
+            && row.GetProperty("requestedQos").GetInt32() == subscribeQos
             && !string.IsNullOrWhiteSpace(row.GetProperty("topic").GetString())
             && row.GetProperty("elapsedSeconds").GetDouble() <= phaseEvidence.RootElement.GetProperty("measurementStartSeconds").GetDouble()));
         if (fixedHorizon)

@@ -26,6 +26,7 @@ internal sealed class PublicationCohortTrace : IDisposable
     private readonly Dictionary<string, bool> subscriptionStates = new();
     private readonly HashSet<string> subscriberNames = new();
     private readonly Dictionary<string, string[]> subscriberTopics = new();
+    private readonly Dictionary<string, MqttQos> subscriberQos = new();
 
     public PublicationCohortTrace(string directory, INetworkSimulator graph, double secondsPerTick, int bytes, MqttQos qos)
     {
@@ -55,6 +56,7 @@ internal sealed class PublicationCohortTrace : IDisposable
             receivers.Add(receiver);
             subscriberNames.Add(receiver.Name + receiver.Options!.Server);
             subscriberTopics[receiver.Name + receiver.Options!.Server] = receiver.Options.Topics;
+            subscriberQos[receiver.Name + receiver.Options!.Server] = receiver.Options.Qos;
             receiver.MessageReceived += OnDelivery;
         }
         observedClients = graph.Clients.Values.OfType<MqttClient>().ToArray();
@@ -110,7 +112,7 @@ internal sealed class PublicationCohortTrace : IDisposable
                     .Single(value => value.TopicFilter == topic).MaximumQualityOfService : null;
                 Write(subscriptions, new { client = client.Name, clientId = client.ClientId, role = "subscriber",
                     topic, state = subscribed ? "subscribed" : "unsubscribed",
-                    requestedQos = (int)qos, grantedQos = granted, elapsedSeconds = graph.TotalTicks * secondsPerTick });
+                    requestedQos = (int)subscriberQos[client.Name], grantedQos = granted, elapsedSeconds = graph.TotalTicks * secondsPerTick });
             }
         }
     }
