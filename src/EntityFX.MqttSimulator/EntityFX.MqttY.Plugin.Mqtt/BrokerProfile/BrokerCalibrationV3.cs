@@ -18,16 +18,17 @@ public static class BrokerCalibrationV3
         string? coverageProtocol = null)
     {
         var compact = Compact(coverageProtocol);
-        if (compact && broker == null) throw Invalid("compact-v1 requires an explicit single broker.");
+        var singlePoint = coverageProtocol == MqttBrokerProfile.SinglePointCoverage;
+        if ((compact || singlePoint) && broker == null) throw Invalid("Limited coverage requires an explicit single broker.");
         Hash(mqttYCommitSha, 40);
         Rate(rateRejectionRate);
         var source = Parse(observationsBytes);
         Fields(source, "schemaVersion", "runCount", "provenance", "points");
-        Header(source, compact ? 36 : broker == null ? 288 : 72);
+        Header(source, singlePoint ? 3 : compact ? 36 : broker == null ? 288 : 72);
         if (broker != null && !Brokers.Contains(broker)) throw Invalid("Unknown calibration broker.");
         ValidateObservationProvenance(Object(source, "provenance"));
         var outputPoints = new JsonArray();
-        foreach (var point in Points(source, broker, compact))
+        foreach (var point in Points(source, broker, compact, singlePoint))
         {
             Fields(point, "broker", "messageBytes", "qos", "publishers", "repeats", "attemptedRps", "completedRps",
                 "publishFailureRate", "deliveryLossRate", "observedLatencyQuantiles", "observedLatencyStatistics", "rttBaselineMs");
@@ -68,7 +69,7 @@ public static class BrokerCalibrationV3
         }
         var output = new JsonObject
         {
-            ["schemaVersion"] = 3, ["artifactType"] = compact ? "broker-calibration-compact-v1" : "broker-calibration", ["runCount"] = Integer(source, "runCount"),
+            ["schemaVersion"] = 3, ["artifactType"] = singlePoint ? "broker-calibration-single-point-v1" : compact ? "broker-calibration-compact-v1" : "broker-calibration", ["runCount"] = Integer(source, "runCount"),
             ["profileClientCountMode"] = "publishers",
             ["provenance"] = new JsonObject
             {
@@ -79,7 +80,7 @@ public static class BrokerCalibrationV3
             },
             ["points"] = outputPoints
         };
-        if (compact) output["provenance"]!["coverageProtocol"] = "compact-v1";
+        if (compact || singlePoint) output["provenance"]!["coverageProtocol"] = coverageProtocol;
         return JsonSerializer.SerializeToUtf8Bytes(output, Json);
     }
 
@@ -88,16 +89,18 @@ public static class BrokerCalibrationV3
         var source = Parse(bytes);
         Fields(source, "schemaVersion", "artifactType", "runCount", "profileClientCountMode", "provenance", "points");
         var compact = Text(source, "artifactType") == "broker-calibration-compact-v1";
-        var scope = compact || Integer(source, "runCount") == 72
+        var singlePoint = Text(source, "artifactType") == "broker-calibration-single-point-v1";
+        var scope = singlePoint || compact || Integer(source, "runCount") == 72
             ? Text(ObjectInPoints(source), "broker") : null;
-        Header(source, compact ? 36 : scope == null ? 288 : 72);
-        if ((!compact && Text(source, "artifactType") != "broker-calibration") || Text(source, "profileClientCountMode") != "publishers")
+        Header(source, singlePoint ? 3 : compact ? 36 : scope == null ? 288 : 72);
+        if ((!singlePoint && !compact && Text(source, "artifactType") != "broker-calibration") || Text(source, "profileClientCountMode") != "publishers")
             throw Invalid("Expected broker-calibration artifact indexed by publishers.");
         var provenance = Object(source, "provenance");
-        if (compact)
+        if (compact || singlePoint)
         {
             Fields(provenance, "observationsSha256", "mqttYCommitSha", "method", "observations", "coverageProtocol");
-            if (!Compact(Text(provenance, "coverageProtocol"))) throw Invalid("Compact coverage must be explicit.");
+            if (Text(provenance, "coverageProtocol") != (singlePoint ? MqttBrokerProfile.SinglePointCoverage : "compact-v1"))
+                throw Invalid("Limited coverage must match the artifact type.");
         }
         else Fields(provenance, "observationsSha256", "mqttYCommitSha", "method", "observations");
         Hash(Text(provenance, "observationsSha256"), 64);
@@ -105,7 +108,7 @@ public static class BrokerCalibrationV3
         if (Text(provenance, "method") != "conditional-failure-rtt-v1") throw Invalid("Unknown calibration method.");
         ValidateObservationProvenance(Object(provenance, "observations"));
         var profiles = new Dictionary<string, MqttBrokerProfile>(StringComparer.Ordinal);
-        var points = Points(source, scope, compact).ToArray();
+        var points = Points(source, scope, compact, singlePoint).ToArray();
         foreach (var point in points)
         {
             Fields(point, "broker", "messageBytes", "qos", "publishers", "repeats", "attemptedRps", "targetCompletedRps",
@@ -133,6 +136,8 @@ public static class BrokerCalibrationV3
             var profile = new MqttBrokerProfile
             {
                 BrokerType = broker.Key,
+                CoverageProtocol = singlePoint ? MqttBrokerProfile.SinglePointCoverage : null,
+                RequireObservedPublisherCount = singlePoint,
                 MessageSizes = broker.GroupBy(p => Integer(p, "messageBytes")).ToDictionary(g => g.Key, g =>
                     new MqttMessageSizeProfile(g.Key, g.GroupBy(p => (MqttQos)Integer(p, "qos")).ToDictionary(q => q.Key, q =>
                         new CalibratedMqttQosProfile(q.OrderBy(p => Integer(p, "publishers")).Select(p =>
@@ -202,12 +207,13 @@ public static class BrokerCalibrationV3
     {
         null => false,
         "compact-v1" => true,
+        MqttBrokerProfile.SinglePointCoverage => false,
         _ => throw Invalid("Unknown coverage protocol.")
     };
 
-    private static IEnumerable<JsonObject> Points(JsonObject source, string? broker = null, bool compact = false)
+    private static IEnumerable<JsonObject> Points(JsonObject source, string? broker = null, bool compact = false, bool singlePoint = false)
     {
-        var count = compact ? 12 : broker == null ? 96 : 24;
+        var count = singlePoint ? 1 : compact ? 12 : broker == null ? 96 : 24;
         if (source["points"] is not JsonArray points || points.Count != count) throw Invalid($"Requires all {count} points / {count * 3} runs.");
         var keys = new HashSet<(string, int, int, int)>();
         foreach (var value in points)
@@ -217,6 +223,8 @@ public static class BrokerCalibrationV3
             if (!Brokers.Contains(key.Item1) || (broker != null && key.Item1 != broker) || key.Item2 is not (16 or 256) || key.Item3 is < 0 or > 2 ||
                 (compact ? key.Item4 is not (1 or 16) : key.Item4 is not (1 or 16 or 64 or 128)) || Integer(point, "repeats") != 3 || !keys.Add(key))
                 throw Invalid("Unknown or duplicate point key, or wrong repeats.");
+            if (singlePoint && (key.Item2 != 16 || key.Item3 != 1 || key.Item4 != 16))
+                throw Invalid("single-point-v1 requires exactly 16 bytes, QoS 1 and 16 publishers.");
             yield return point;
         }
     }

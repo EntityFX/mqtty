@@ -8,7 +8,7 @@ namespace EntityFX.Tests.Web;
 /// <summary>Синтетические данные только для проверки исполнения, не натурные измерения.</summary>
 internal static class TwinValidationFixture
 {
-    public static byte[] Profile()
+    public static byte[] Profile(bool singlePoint = false)
     {
         JsonObject Stats(double mean) => new() { ["count"] = 3, ["mean"] = mean,
             ["standardDeviation"] = 0, ["ci95HalfWidth"] = 0, ["ci95Lower"] = mean,
@@ -28,7 +28,11 @@ internal static class TwinValidationFixture
                 ["observedLatencyQuantiles"] = qos == 0 ? null : quantiles,
                 ["observedLatencyStatistics"] = qos == 0 ? null : latency, ["rttBaselineMs"] = 2 });
         }
-        var observations = new JsonObject { ["schemaVersion"] = 3, ["runCount"] = 36,
+        if (singlePoint)
+            points = new JsonArray(points.Where(p => p!["messageBytes"]!.GetValue<int>() == 16 &&
+                p["qos"]!.GetValue<int>() == 1 && p["publishers"]!.GetValue<int>() == 16)
+                .Select(p => JsonNode.Parse(p!.ToJsonString())).ToArray());
+        var observations = new JsonObject { ["schemaVersion"] = 3, ["runCount"] = singlePoint ? 3 : 36,
             ["provenance"] = new JsonObject { ["identity"] = new JsonObject { ["campaignId"] = "synthetic-web-test",
                 ["configSha256"] = new string('a',64), ["standSha256"] = new string('b',64),
                 ["deploymentMode"] = "singleHostSequential", ["cpuMode"] = "singleCorePinned",
@@ -49,7 +53,7 @@ internal static class TwinValidationFixture
         var histogram=new JsonObject { ["schemaVersion"]=1,["artifactType"]="broker-publish-latency-histograms",
             ["observationsSha256"]=Hash(observationBytes),["campaignId"]="synthetic-web-test",["points"]=histPoints };
         return BrokerCalibrationEmpirical.Calibrate(observationBytes,Encoding.UTF8.GetBytes(histogram.ToJsonString()),
-            new string('e',40),0,"Mosquitto","compact-v1");
+            new string('e',40),0,"Mosquitto",singlePoint ? "single-point-v1" : "compact-v1");
     }
     public static string Hash(byte[] value) => Convert.ToHexString(SHA256.HashData(value)).ToLowerInvariant();
 }

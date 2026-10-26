@@ -130,7 +130,8 @@ public static class BrokerCalibrationEmpirical
                 } : sample).ToArray());
         }
         return profiles.ToDictionary(pair => pair.Key, pair => new MqttBrokerProfile {
-            BrokerType = pair.Value.BrokerType, MessageSizes = pair.Value.MessageSizes, RequireObservedPublisherCount = true });
+            BrokerType = pair.Value.BrokerType, MessageSizes = pair.Value.MessageSizes, RequireObservedPublisherCount = true,
+            CoverageProtocol = pair.Value.CoverageProtocol });
     }
 
     private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();

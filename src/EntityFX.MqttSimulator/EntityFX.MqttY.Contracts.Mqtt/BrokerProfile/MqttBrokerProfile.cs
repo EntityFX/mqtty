@@ -5,6 +5,9 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
     /// </summary>
     public sealed class MqttBrokerProfile
     {
+        public const string SinglePointCoverage = "single-point-v1";
+        /// <summary>Null retains the legacy complete-QoS contract.</summary>
+        public string? CoverageProtocol { get; init; }
         public string BrokerType { get; init; } = string.Empty;
 
         public IDictionary<int, MqttMessageSizeProfile> MessageSizes { get; init; }
@@ -29,10 +32,15 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
 
         public void Validate()
         {
+            if (CoverageProtocol != null && CoverageProtocol != SinglePointCoverage)
+                throw new InvalidDataException("Unknown profile coverage protocol.");
+            var singlePoint = CoverageProtocol == SinglePointCoverage;
             if (string.IsNullOrWhiteSpace(BrokerType))
                 throw new InvalidDataException("Broker name is required.");
             if (MessageSizes == null || MessageSizes.Count == 0)
                 throw new InvalidDataException($"Broker '{BrokerType}' has no message-size calibrations.");
+            if (singlePoint && (!RequireObservedPublisherCount || MessageSizes.Count != 1 || !MessageSizes.ContainsKey(16)))
+                throw new InvalidDataException("Single-point coverage requires exact 16-byte calibration without interpolation.");
 
             foreach (var (messageBytes, messageProfile) in MessageSizes)
             {
@@ -41,12 +49,16 @@ namespace EntityFX.MqttY.Contracts.Mqtt.BrokerProfile
                 if (messageProfile.Qos == null)
                     throw new InvalidDataException(
                         $"Broker '{BrokerType}', MessageBytes={messageBytes} has no QoS calibrations.");
-                foreach (var qos in Enum.GetValues<MqttQos>())
+                if (singlePoint && (messageProfile.Qos.Count != 1 || !messageProfile.Qos.ContainsKey(MqttQos.AtLeastOnce)))
+                    throw new InvalidDataException("Single-point coverage requires only QoS 1.");
+                foreach (var qos in singlePoint ? new[] { MqttQos.AtLeastOnce } : Enum.GetValues<MqttQos>())
                 {
                     if (!messageProfile.Qos.TryGetValue(qos, out var profile))
                         throw new InvalidDataException(
                             $"Broker '{BrokerType}', MessageBytes={messageBytes} is missing QoS={(int)qos}.");
                     ValidateSamples(messageBytes, qos, profile.Samples);
+                    if (singlePoint && (profile.Samples.Count != 1 || profile.Samples[0].Clients != 16))
+                        throw new InvalidDataException("Single-point coverage requires only 16 publishers.");
                 }
                 if (messageProfile.Qos.Keys.Any(qos => !Enum.IsDefined(typeof(MqttQos), qos)))
                     throw new InvalidDataException($"Broker '{BrokerType}' contains an unknown QoS.");

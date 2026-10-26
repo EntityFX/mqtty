@@ -95,7 +95,7 @@ internal static class MqttRelayExperimentCommand
         catch (Exception error)
         {
             Console.Error.WriteLine(error.Message);
-            Console.Error.WriteLine("Usage: EntityFX.MqttY.MqttRelay.App calibrate --observations <broker-observations.v3.json> --output <broker-calibration.json> --mqtty-repository <clean-repository> [--rate-rejection-rate <0..1>] [--broker <name>] [--coverage-protocol compact-v1] [--latency-histograms <sealed-raw-histograms.json>]");
+            Console.Error.WriteLine("Usage: EntityFX.MqttY.MqttRelay.App calibrate --observations <broker-observations.v3.json> --output <broker-calibration.json> --mqtty-repository <clean-repository> [--rate-rejection-rate <0..1>] [--broker <name>] [--coverage-protocol compact-v1|single-point-v1] [--latency-histograms <sealed-raw-histograms.json>]");
             return 1;
         }
     }
@@ -179,8 +179,8 @@ internal sealed class MqttRelayExperimentRunConfiguration
     public void Validate()
     {
         if (ReferenceCoverageProtocol != null &&
-            (ReferenceCoverageProtocol != "compact-v1" || string.IsNullOrWhiteSpace(ReferenceObservationsPath)))
-            throw new InvalidDataException("Reference coverage requires compact-v1 and an observations path.");
+            (ReferenceCoverageProtocol is not ("compact-v1" or "single-point-v1") || string.IsNullOrWhiteSpace(ReferenceObservationsPath)))
+            throw new InvalidDataException("Reference coverage requires compact-v1 or single-point-v1 and an observations path.");
         Experiment.Validate();
         Ticks.Validate();
         Network.Validate();
