@@ -20,6 +20,8 @@ public sealed class TwinValidationOptions
     public string ProfilePath { get; set; } = "";
     public string ProfileSha256 { get; set; } = "";
     public string RuntimeIdentity { get; set; } = "";
+    public string? NativeControlReferencePath { get; set; }
+    public string? NativeControlReferenceSha256 { get; set; }
 
     public long Ticks(double seconds)
     {

@@ -44,11 +44,23 @@ public sealed class TwinValidationsController : ControllerBase
                 Seed=request.Seed,WarmupSeconds=request.WarmupSeconds,MeasurementSeconds=request.MeasurementSeconds,
                 DrainSeconds=request.DrainSeconds,TickSeconds=request.TickSeconds,ProfilePath=snapshot,ProfileSha256=sha,
                 RuntimeIdentity="sha256:"+Convert.ToHexString(SHA256.HashData(await System.IO.File.ReadAllBytesAsync(typeof(TwinValidationAdapter).Assembly.Location))).ToLowerInvariant() };
+            if(!string.IsNullOrWhiteSpace(request.NativeControlReferenceId))
+            {
+                var referenceBytes=NativeControlReferencesController.Load(store,request.NativeControlReferenceId);
+                var reference=NativeControlReference.Parse(referenceBytes);reference.ValidateFor(config,bytes);
+                var referenceSha=NativeControlReference.Sha(referenceBytes);
+                var referencePath=store.Resolve($"native-control-snapshots/{referenceSha}.json");
+                Directory.CreateDirectory(Path.GetDirectoryName(referencePath)!);
+                try {await using var stream=new FileStream(referencePath,FileMode.CreateNew,FileAccess.Write,FileShare.None);await stream.WriteAsync(referenceBytes);}
+                catch(IOException) when(System.IO.File.Exists(referencePath)) { }
+                config.NativeControlReferencePath=referencePath;config.NativeControlReferenceSha256=referenceSha;
+            }
             var options=new SimulationRunOptions { Engine="twinValidation",ExpectedProfileSha256=sha,
                 NativeConfiguration=JsonSerializer.SerializeToElement(config) };
             NativeExperimentAdapter.Run(options,null,validateOnly:true);
             options.Graph.Ticks=config.TickOptions();
-            if(request.ValidateOnly)return Ok(new { valid=true,profileSha256=sha,referenceScope="calibration only",
+            if(request.ValidateOnly)return Ok(new { valid=true,profileSha256=sha,nativeControlReferenceSha256=config.NativeControlReferenceSha256,
+                referenceScope=config.NativeControlReferencePath==null?"calibration only":NativeControlReference.Scope,
                 warmupTicks=config.Ticks(config.WarmupSeconds),measurementTicks=config.Ticks(config.MeasurementSeconds),
                 drainTicks=config.Ticks(config.DrainSeconds) });
             var job=new SimulationJob { Name=request.Name,Engine="twinValidation",RunOptions=options,

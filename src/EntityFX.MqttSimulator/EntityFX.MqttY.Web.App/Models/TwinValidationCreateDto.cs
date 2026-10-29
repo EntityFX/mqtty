@@ -4,6 +4,7 @@ public sealed class TwinValidationCreateDto
 {
     public string Name { get; set; } = "Одиночная проверка статьи 1";
     public string BrokerPresetId { get; set; } = "mosquittodefault";
+    public string? NativeControlReferenceId { get; set; }
     public int Publishers { get; set; } = 16;
     public int Qos { get; set; } = 1;
     public int Seed { get; set; } = 42;
