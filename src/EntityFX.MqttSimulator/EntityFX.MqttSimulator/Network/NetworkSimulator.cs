@@ -79,6 +79,7 @@ public class NetworkSimulator : INetworkSimulator
         Monitoring = monitoring;
         this._ticksOptions = ticksOptions;
         this.EnableCounters = enableCounters;
+        this.EnableMonitoring = false;
         PathFinder.NetworkGraph = this;
 
         _counters = new NetworkSimulatorCounters("NetworkSimulator", "NN", ticksOptions, enableCounters);
@@ -105,6 +106,7 @@ public class NetworkSimulator : INetworkSimulator
 
     public bool WaitMode { get; private set; }
     public bool EnableCounters { get; private set; }
+    public bool EnableMonitoring { get; set; }
 
     public int CountNodes => _countNodes;
 
@@ -246,8 +248,12 @@ public class NetworkSimulator : INetworkSimulator
         _stopwatch.Start();
         try
         {
-            var scope = Monitoring.BeginScope(TotalTicks, "Refresh sourceNetwork graph");
-            Monitoring.Push(0, TotalTicks, NetworkLoggerType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
+            NetworkLoggerScope? scope = null;
+            if (EnableMonitoring)
+            {
+                scope = Monitoring.BeginScope(TotalTicks, "Refresh sourceNetwork graph");
+                Monitoring.Push(0, TotalTicks, NetworkLoggerType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
+            }
 
             if (parallel)
             {
@@ -261,7 +267,10 @@ public class NetworkSimulator : INetworkSimulator
             _counters.SetRealTime(_stopwatch.Elapsed);
             _counters.SetVirtualTime(VirtualTime);
 
-            Monitoring.EndScope(TotalTicks, scope);
+            if (EnableMonitoring)
+            {
+                Monitoring.EndScope(TotalTicks, scope);
+            }
 
             return true;
         }
@@ -283,33 +292,46 @@ public class NetworkSimulator : INetworkSimulator
         {
             Parallel.ForEach(_networks, network =>
             {
-                Monitoring.Push(0, TotalTicks,
-                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                    "Network", "Refresh", scope);
+                if (EnableMonitoring)
+                {
+                    Monitoring.Push(0, TotalTicks,
+                        network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                        "Network", "Refresh", scope);
+                }
                 network.Value.Refresh();
             });
 
             Parallel.ForEach(_nodes, node =>
             {
-                Monitoring.Push(0, TotalTicks,
-                    node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
-                    scope);
-                node.Value.Refresh();
-            });
-        } else
-        {
-            Parallel.ForEach(_networks, network =>
-            {
-                Monitoring.Push(0, TotalTicks,
-                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                    "Network", "Refresh", scope);
-                network.Value.Refresh();
-                var nodes = network.Value.Nodes;
-                foreach (var node in nodes)
+                if (EnableMonitoring)
                 {
                     Monitoring.Push(0, TotalTicks,
                         node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
                         scope);
+                }
+                node.Value.Refresh();
+            });
+        }
+        else
+        {
+            Parallel.ForEach(_networks, network =>
+            {
+                if (EnableMonitoring)
+                {
+                    Monitoring.Push(0, TotalTicks,
+                        network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                        "Network", "Refresh", scope);
+                }
+                network.Value.Refresh();
+                var nodes = network.Value.Nodes;
+                foreach (var node in nodes)
+                {
+                    if (EnableMonitoring)
+                    {
+                        Monitoring.Push(0, TotalTicks,
+                            node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                            scope);
+                    }
                     node.Value.Refresh();
                 }
             });
@@ -335,17 +357,23 @@ public class NetworkSimulator : INetworkSimulator
         {
             foreach (var network in _orderedNetworks)
             {
-                Monitoring.Push(0, TotalTicks,
-                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                    "Network", "Refresh", scope);
+                if (EnableMonitoring)
+                {
+                    Monitoring.Push(0, TotalTicks,
+                        network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                        "Network", "Refresh", scope);
+                }
                 network.Value.Refresh();
             }
 
             foreach (var node in _orderedNodes)
             {
-                Monitoring.Push(0, TotalTicks,
-                    node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
-                    scope);
+                if (EnableMonitoring)
+                {
+                    Monitoring.Push(0, TotalTicks,
+                        node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                        scope);
+                }
                 node.Value.Refresh();
             }
         }
@@ -353,17 +381,23 @@ public class NetworkSimulator : INetworkSimulator
         {
             foreach (var network in _orderedNetworks)
             {
-                Monitoring.Push(0, TotalTicks,
-                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                    "Network", "Refresh", scope);
+                if (EnableMonitoring)
+                {
+                    Monitoring.Push(0, TotalTicks,
+                        network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                        "Network", "Refresh", scope);
+                }
                 network.Value.Refresh();
 
                 var nodes = network.Value.Nodes;
                 foreach (var node in nodes)
                 {
-                    Monitoring.Push(0, TotalTicks,
-                        node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
-                        scope);
+                    if (EnableMonitoring)
+                    {
+                        Monitoring.Push(0, TotalTicks,
+                            node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                            scope);
+                    }
                     node.Value.Refresh();
                 }
             }

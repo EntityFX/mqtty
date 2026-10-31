@@ -23,6 +23,7 @@ public class NetworkLogger : INetworkLogger
     private readonly bool _scopesEnabled;
     private readonly TimeSpan _simulationTickTime;
     private readonly MonitoringIgnoreOption _ignore;
+    private bool _monitoringEnabled = true;
 
     public IEnumerable<NetworkLoggerItem> Items => _storage;
 
@@ -30,9 +31,13 @@ public class NetworkLogger : INetworkLogger
 
     private int _scopesEnded = 0;
 
-    private object _stdLock = new object();
-
     private long _scopeId = 0;
+
+    public bool MonitoringEnabled
+    {
+        get => _monitoringEnabled;
+        set => _monitoringEnabled = value;
+    }
 
     public NetworkLogger(bool scopesEnabled, TimeSpan simulationTickTime, MonitoringIgnoreOption ignore)
     {
@@ -51,6 +56,11 @@ public class NetworkLogger : INetworkLogger
     private void Push(long id, long tick, string from, NodeType fromType, string to, NodeType toType, byte[]? packet,
         NetworkLoggerType type, string message, string protocol, string? category, NetworkLoggerScope? scope = null, int? ttl = null, int? queueLength = null)
     {
+        if (!_monitoringEnabled)
+        {
+            return;
+        }
+
         if (ValidateIgnore(protocol, category))
         {
             return;
@@ -69,15 +79,7 @@ public class NetworkLogger : INetworkLogger
 
         if (category != null)
         {
-            lock (_stdLock)
-            {
-                if (!_countersByCategory.ContainsKey(category))
-                {
-                    _countersByCategory[category] = 0;
-                }
-                _countersByCategory[category]++;
-            }
-
+            _countersByCategory.AddOrUpdate(category, 1, (_, existing) => existing + 1);
         }
 
         scope?.Items.Add(item);

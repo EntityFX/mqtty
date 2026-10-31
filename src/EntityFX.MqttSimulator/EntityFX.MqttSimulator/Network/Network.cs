@@ -75,10 +75,25 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
     public IReadOnlyDictionary<string, IApplication> Applications => _applications.ToImmutableDictionary();
 
-    public IReadOnlyDictionary<string, INode> Nodes => _clients.Values.OfType<INode>().ToArray()
-        .Concat(_servers.Values.OfType<INode>().ToArray())
-        .Concat(_applications.Values.OfType<INode>().ToArray())
-        .ToDictionary(n => n.Name, n => n).ToImmutableDictionary();
+    private IReadOnlyDictionary<string, INode>? _nodesCache;
+    private int _nodesCacheVersion = -1;
+    private int _nodesVersion = 0;
+
+    public IReadOnlyDictionary<string, INode> Nodes
+    {
+        get
+        {
+            if (_nodesCache == null || _nodesCacheVersion != _nodesVersion)
+            {
+                _nodesCache = _clients.Values.OfType<INode>().ToArray()
+                    .Concat(_servers.Values.OfType<INode>().ToArray())
+                    .Concat(_applications.Values.OfType<INode>().ToArray())
+                    .ToDictionary(n => n.Name, n => n).ToImmutableDictionary();
+                _nodesCacheVersion = _nodesVersion;
+            }
+            return _nodesCache;
+        }
+    }
 
 
     public override NodeType NodeType => NodeType.Network;
@@ -112,6 +127,8 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
         ((Client)client).Network = this;
 
+        _nodesVersion++;
+
         return true;
     }
 
@@ -128,7 +145,9 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
             clientNode.Disconnect();
         }
 
-        return _clients.Remove(clientNode.Name);
+        var removed = _clients.Remove(clientNode.Name);
+        if (removed) _nodesVersion++;
+        return removed;
     }
 
 
@@ -206,6 +225,8 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
         ((Server)server).Network = this;
 
+        _nodesVersion++;
+
         return true;
     }
 
@@ -217,6 +238,8 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         }
 
         _servers.Remove(id);
+
+        _nodesVersion++;
 
         return true;
     }
@@ -490,6 +513,8 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
         ((ApplicationBase)application).Network = this;
 
+        _nodesVersion++;
+
         return true;
     }
 
@@ -501,6 +526,8 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         }
 
         _applications.Remove(application);
+
+        _nodesVersion++;
 
         return true;
     }

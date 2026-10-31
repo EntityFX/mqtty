@@ -52,7 +52,7 @@ public sealed class FederationRunner
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 topology.Pump();
-                if (!topology.Graph.Refresh(false, 0) || topology.Graph.Errors != 0) throw new InvalidOperationException("Simulator refresh failed.");
+                if (!topology.Graph.Refresh(true, 1) || topology.Graph.Errors != 0) throw new InvalidOperationException("Simulator refresh failed.");
                 onProgress?.Invoke(topology.Graph, phase);
             }
             void Until(Func<bool> condition)

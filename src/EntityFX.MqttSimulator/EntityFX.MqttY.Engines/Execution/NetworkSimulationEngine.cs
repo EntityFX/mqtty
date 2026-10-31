@@ -39,7 +39,11 @@ public sealed class NetworkSimulationEngine
             ignore: new MonitoringIgnoreOption());
 
         var pathFinder = serviceProvider.GetRequiredService<IPathFinder>();
-        var simulator = new NetworkSimulator(pathFinder, logger, ticks, options.Graph.EnableCounters);
+        var simulator = new NetworkSimulator(pathFinder, logger, ticks, options.Graph.EnableCounters)
+        {
+            EnableMonitoring = false
+        };
+        logger.MonitoringEnabled = false;
 
         try
         {

@@ -85,7 +85,7 @@ public sealed class LoadBalancingExperimentRunner
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 // RefreshWithCounters resets the graph on error; retain partial evidence instead.
-                if (!graph.Refresh(false, 0) || graph.Errors != 0)
+                if (!graph.Refresh(true, 1) || graph.Errors != 0)
                     throw new InvalidOperationException("Simulator refresh failed; graph errors=" + graph.Errors);
                 onProgress?.Invoke(graph, phase);
             }
