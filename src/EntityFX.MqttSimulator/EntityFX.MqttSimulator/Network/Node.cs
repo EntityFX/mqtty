@@ -23,6 +23,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     protected virtual bool ShouldTrackResponse(INetworkPacket packet) => true;
     private readonly ConcurrentQueue<NodeMonitoringPacket> _outgoingMessages = new();
     private readonly ConcurrentQueue<NodeMonitoringPacket> _incommingMessages = new();
+    private static readonly ConcurrentBag<NodeMonitoringPacket> _packetPool = new();
     protected readonly TicksOptions TicksOptions;
 
     protected NodeCounters counters;
@@ -125,11 +126,11 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     private void SendToNetwork(NodeMonitoringPacket outgoing)
     {
         var packet = outgoing.RequestPacket;
-        NetworkSimulator!.Monitoring.Push(packet.Id, NetworkSimulator.TotalTicks, this, Network!, packet.Payload, NetworkLoggerType.Push,
-            $"Push message: {packet.From} -> {Network!.Name}", packet.Protocol, "Node");
         outgoing.Release();
 
         Network?.Send(packet);
+
+        _packetPool.Add(outgoing);
     }
 
     private void CompleteReceive(NodeMonitoringPacket incomming)
@@ -137,14 +138,13 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         var packet = incomming.RequestPacket;
         incomming.Release();
         CompleteReceiveImplementation(packet);
+        _packetPool.Add(incomming);
     }
 
     protected override bool SendImplementation(INetworkPacket packet)
     {
-        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send,
-            $"Send message: {packet.From} -> {packet.To}", packet.Protocol, "Node");
         PreSend(packet);
-        counters.SendCounter.Increment();
+        if (NetworkSimulator!.EnableCounters) counters.SendCounter.Increment();
         return true;
     }
 
@@ -157,8 +157,6 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
 
     protected virtual bool CompleteReceiveImplementation(INetworkPacket packet)
     {
-        NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Receive,
-            $"receive message: {packet.To} <~ {packet.From}", packet.Protocol, "Node");
         if (packet.RequestId == null)
         {
             return false;
@@ -181,14 +179,24 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
 
     private void PreSend(INetworkPacket packet)
     {
-        var outgoing = new NodeMonitoringPacket(NetworkSimulator!.TotalTicks, packet, true, NetworkSimulator!.WaitMode)
+        var sim = NetworkSimulator!;
+        var tick = sim.TotalTicks;
+        NodeMonitoringPacket outgoing;
+        if (!_packetPool.TryTake(out outgoing!))
         {
-            WaitTicks = TicksOptions.OutgoingWaitTicks,
-            Id = NetworkSimulator.GetPacketId(),
-            SendTick = NetworkSimulator!.TotalTicks
-        };
+            outgoing = new NodeMonitoringPacket(tick, packet, true, sim.WaitMode)
+            {
+                WaitTicks = TicksOptions.OutgoingWaitTicks,
+                Id = sim.GetPacketId(),
+                SendTick = tick
+            };
+        }
+        else
+        {
+            outgoing.Reset(tick, packet, true, sim.WaitMode, TicksOptions.OutgoingWaitTicks, sim.GetPacketId(), tick);
+        }
         if (ShouldTrackResponse(packet))
-        _responseMessages[packet.Id] = new ResponseMonitoringPacket(NetworkSimulator.WaitMode, Volatile.Read(ref _responseRefreshCount))
+        _responseMessages[packet.Id] = new ResponseMonitoringPacket(sim.WaitMode, Volatile.Read(ref _responseRefreshCount))
         {
             RequestPacket = packet,
             RequestTick = outgoing.SendTick,
@@ -200,12 +208,23 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
 
     private void PreReceive(INetworkPacket packet)
     {
-        _incommingMessages.Enqueue(new NodeMonitoringPacket(NetworkSimulator!.TotalTicks, packet, true, NetworkSimulator!.WaitMode)
+        var sim = NetworkSimulator!;
+        var tick = sim.TotalTicks;
+        NodeMonitoringPacket incoming;
+        if (!_packetPool.TryTake(out incoming!))
         {
-            WaitTicks = TicksOptions.OutgoingWaitTicks,
-            Id = NetworkSimulator.GetPacketId(),
-            SendTick = NetworkSimulator!.TotalTicks
-        });
+            incoming = new NodeMonitoringPacket(tick, packet, true, sim.WaitMode)
+            {
+                WaitTicks = TicksOptions.OutgoingWaitTicks,
+                Id = sim.GetPacketId(),
+                SendTick = tick
+            };
+        }
+        else
+        {
+            incoming.Reset(tick, packet, true, sim.WaitMode, TicksOptions.OutgoingWaitTicks, sim.GetPacketId(), tick);
+        }
+        _incommingMessages.Enqueue(incoming);
     }
 
     protected ResponsePacket? WaitResponse(long packetId)

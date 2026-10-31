@@ -16,13 +16,13 @@ internal class NodeMonitoringPacket
 
     public INetworkPacket RequestPacket { get; set; }
 
-    public long Tick { get; }
+    public long Tick { get; set; }
 
-    internal bool PassTillNextTick { get; private set; }
+    internal bool PassTillNextTick { get; set; }
 
-    public long WaitTicks { get => _outgoingWaitTicks; init => _outgoingWaitTicks = value; }
+    public long WaitTicks { get => _outgoingWaitTicks; set => _outgoingWaitTicks = value; }
     
-    public long SendTick { get; init; }
+    public long SendTick { get; set; }
 
     public bool Released { get; private set; }
     
@@ -30,11 +30,24 @@ internal class NodeMonitoringPacket
 
     public ManualResetEventSlim ResetEventSlim { get; private set; } = new ManualResetEventSlim(false);
 
-    public bool WaitMode { get; }
+    public bool WaitMode { get; set; }
 
     internal void ReduceWaitTicks()
     {
         Interlocked.Decrement(ref _outgoingWaitTicks);
+    }
+
+    public void Reset(long tick, INetworkPacket requestPacket, bool passTillNextTick, bool waitMode, long waitTicks, long id, long sendTick)
+    {
+        Tick = tick;
+        RequestPacket = requestPacket;
+        PassTillNextTick = passTillNextTick;
+        WaitMode = waitMode;
+        WaitTicks = waitTicks;
+        Id = id;
+        SendTick = sendTick;
+        Released = false;
+        _outgoingWaitTicks = waitTicks;
     }
 
     public bool WaitIsReleased(TimeSpan timeSpan)
