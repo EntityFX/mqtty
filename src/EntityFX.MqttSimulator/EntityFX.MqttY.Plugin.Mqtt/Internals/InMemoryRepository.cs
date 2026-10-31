@@ -7,7 +7,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals
     {
         readonly ConcurrentDictionary<string, T> _elements = new ConcurrentDictionary<string, T>();
 
-        public IEnumerable<T> ReadAll() => _elements.Select(e => e.Value);
+        public IEnumerable<T> ReadAll() => _elements.Values;
 
         public T? Read(string id)
         {
