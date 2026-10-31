@@ -442,7 +442,6 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         //_monitoringPacketsQueue.RemoveAll(p => p.Released);
 
         _networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
-        NetworkSimulator!.Step();
         Counters.Refresh(NetworkSimulator!.TotalTicks, NetworkSimulator!.TotalSteps);
     }
 
