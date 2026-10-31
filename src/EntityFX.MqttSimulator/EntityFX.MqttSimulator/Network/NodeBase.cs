@@ -41,7 +41,6 @@ public abstract class NodeBase : ISender
     //Создаём ManualResetEventSlim 
     public bool Send(INetworkPacket packet)
     {
-        NetworkSimulator!.Step();
         var result = SendImplementation(packet);
 
         return result;
@@ -52,7 +51,6 @@ public abstract class NodeBase : ISender
     //Добавляем и Снимаем ManualResetEventSlim 
     public bool Receive(INetworkPacket packet)
     {
-        NetworkSimulator!.Step();
         var result = ReceiveImplementation(packet);
 
         return result;
