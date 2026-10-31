@@ -163,8 +163,11 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
         var result = network.Link(this);
 
-        NetworkSimulator!.Monitoring.Push(0, NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Link,
-            $"Link network {this.Name} <-> {network.Name}", "Network", "Link", Scope);
+        if (NetworkSimulator!.EnableMonitoring)
+        {
+            NetworkSimulator.Monitoring.Push(0, NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Link,
+                $"Link network {this.Name} <-> {network.Name}", "Network", "Link", Scope);
+        }
 
         return true;
     }
@@ -184,8 +187,11 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
             _linkedNetworks[network.Name] = network;
         }
 
-        NetworkSimulator!.Monitoring.Push(0, NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Unlink,
-            $"Unlink network {this.Name} from {network.Name}", "Network", "Unlink");
+        if (NetworkSimulator!.EnableMonitoring)
+        {
+            NetworkSimulator.Monitoring.Push(0, NetworkSimulator.TotalTicks, this, network, null, NetworkLoggerType.Unlink,
+                $"Unlink network {this.Name} from {network.Name}", "Network", "Unlink");
+        }
 
         return result;
     }
@@ -343,10 +349,13 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         }
 
 
-        NetworkSimulator!.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Push,
-            $"Push packet from network to node: {network.Name} ~> {networkPacket.DestionationNode.Name}",
-            "Network", packet.Category, null, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
-        NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
+        if (NetworkSimulator!.EnableMonitoring)
+        {
+            NetworkSimulator.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Push,
+                $"Push packet from network to node: {network.Name} ~> {networkPacket.DestionationNode.Name}",
+                "Network", packet.Category, null, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
+            NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
+        }
 
         _networkCounters.CountOutbound(packet);
         return networkPacket.DestionationNode!.Receive(packet);
@@ -373,8 +382,11 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         if (packet.Ttl <= 1)
         {
             packet.DecrementTtl();
-            NetworkSimulator!.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Unreachable,
-                $"NetworkMonitoringPacket unreachable: {packet.From} => {packet.To}", "Network", packet.Category, null);
+            if (NetworkSimulator!.EnableMonitoring)
+            {
+                NetworkSimulator.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Unreachable,
+                    $"NetworkMonitoringPacket unreachable: {packet.From} => {packet.To}", "Network", packet.Category, null);
+            }
             //destination uneachable
             return false;
         }
@@ -389,9 +401,12 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         }
         networkPacket.Path.Dequeue();
 
-        NetworkSimulator!.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Transfer,
-            $"Push netwok packet:  {this.Name} => {next.Name}",
-            "Network", packet.Category, null, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
+        if (NetworkSimulator!.EnableMonitoring)
+        {
+            NetworkSimulator.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, this, next, packet.Payload, NetworkLoggerType.Transfer,
+                $"Push netwok packet:  {this.Name} => {next.Name}",
+                "Network", packet.Category, null, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
+        }
 
 
         _networkCounters.CountTransfers();
@@ -421,11 +436,14 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
                     continue;
                 }
 
-                NetworkSimulator!.Monitoring.Push(pendingPacket.Packet.Id, NetworkSimulator.TotalTicks,
-                    this, to,
-                    pendingPacket.Packet.Payload, NetworkLoggerType.Pass,
-                    $"Pass incomming: {pendingPacket.Packet.From} -> {to!.Name}",
-                    pendingPacket.Packet.Protocol, "Node");
+                if (NetworkSimulator!.EnableMonitoring)
+                {
+                    NetworkSimulator.Monitoring.Push(pendingPacket.Packet.Id, NetworkSimulator.TotalTicks,
+                        this, to,
+                        pendingPacket.Packet.Payload, NetworkLoggerType.Pass,
+                        $"Pass incomming: {pendingPacket.Packet.From} -> {to!.Name}",
+                        pendingPacket.Packet.Protocol, "Node");
+                }
                 continue;
             }
 
