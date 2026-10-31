@@ -9,6 +9,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
     internal sealed class BrokerProcessingQueue
     {
         private readonly Queue<PendingItem> _items = new();
+    private readonly List<INetworkPacket> _readyBuffer = new(16);
 
         public int Count => _items.Count;
 
@@ -26,7 +27,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
         /// </summary>
         public List<INetworkPacket> DrainReady()
         {
-            var ready = new List<INetworkPacket>();
+            _readyBuffer.Clear();
             var count = _items.Count;
 
             for (var i = 0; i < count; i++)
@@ -36,7 +37,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
 
                 if (item.RemainingTicks <= 0)
                 {
-                    ready.Add(item.Packet);
+                    _readyBuffer.Add(item.Packet);
                 }
                 else
                 {
@@ -44,7 +45,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
                 }
             }
 
-            return ready;
+            return _readyBuffer;
         }
 
         public void Clear()
@@ -52,7 +53,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.BrokerProfile
             _items.Clear();
         }
 
-        private sealed class PendingItem
+        private struct PendingItem
         {
             public PendingItem(INetworkPacket packet, int remainingTicks)
             {

@@ -19,6 +19,7 @@ namespace EntityFX.MqttY.Contracts.Network
         bool WaitMode { get; }
 
         bool EnableCounters { get; }
+    bool EnableMonitoring { get; set; }
 
         public int CountNodes { get; }
 
