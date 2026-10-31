@@ -78,17 +78,13 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
 
     public override void Refresh()
     {
-        //var outgoing = _outgoingMessages.ToArray();
+        var sim = NetworkSimulator!;
+        var totalTicks = sim.TotalTicks;
         var outgoingCount = _outgoingMessages.Count;
-        var incomingCount = _incommingMessages.Count;
         for (var i = 0; i < outgoingCount && _outgoingMessages.TryDequeue(out var outgoingMonitoringPacket); i++)
         {
-            if (outgoingMonitoringPacket.PassTillNextTick && outgoingMonitoringPacket.Tick == NetworkSimulator!.TotalTicks)
+            if (outgoingMonitoringPacket.PassTillNextTick && outgoingMonitoringPacket.Tick == totalTicks)
             {
-                NetworkSimulator!.Monitoring.Push(outgoingMonitoringPacket.Id, NetworkSimulator.TotalTicks, this, Network!,
-                    outgoingMonitoringPacket.RequestPacket.Payload, NetworkLoggerType.Pass,
-                    $"Pass outgoing: {outgoingMonitoringPacket.RequestPacket.From} -> {Network!.Name}",
-                    outgoingMonitoringPacket.RequestPacket.Protocol, "Node");
                 _outgoingMessages.Enqueue(outgoingMonitoringPacket);
                 continue;
             }
@@ -99,17 +95,12 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
             }
             else _outgoingMessages.Enqueue(outgoingMonitoringPacket);
         }
-        //_outgoingMessages.RemoveAll(o => o.Released);
 
-        //var incomming = _incommingMessages.ToArray();
+        var incomingCount = _incommingMessages.Count;
         for (var i = 0; i < incomingCount && _incommingMessages.TryDequeue(out var incommingMonitoringPacket); i++)
         {
-            if (incommingMonitoringPacket.PassTillNextTick && incommingMonitoringPacket.Tick == NetworkSimulator!.TotalTicks)
+            if (incommingMonitoringPacket.PassTillNextTick && incommingMonitoringPacket.Tick == totalTicks)
             {
-                NetworkSimulator!.Monitoring.Push(incommingMonitoringPacket.Id, NetworkSimulator.TotalTicks, this, Network!,
-                    incommingMonitoringPacket.RequestPacket.Payload, NetworkLoggerType.Pass,
-                    $"Pass incomming: {incommingMonitoringPacket.RequestPacket.From} -> {Network!.Name}",
-                    incommingMonitoringPacket.RequestPacket.Protocol, "Node");
                 _incommingMessages.Enqueue(incommingMonitoringPacket);
                 continue;
             }
@@ -120,16 +111,15 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
             }
             else _incommingMessages.Enqueue(incommingMonitoringPacket);
         }
-        //_incommingMessages.RemoveAll(o => o.Released);
 
-
-        // Preserve the old timeout's number of Node.Refresh calls, including
-        // repeated refreshes within one graph tick, without visiting every waiter.
         Interlocked.Increment(ref _responseRefreshCount);
-        base.Refresh();
-        counters.SetOutgoingQueueLength(_outgoingMessages.Count);
-        counters.SetIncommingQueueLength(_incommingMessages.Count);
-        counters.SetReceiveQueueLength(_responseMessages.Count);
+        if (sim.EnableCounters)
+        {
+            base.Refresh();
+            counters.SetOutgoingQueueLength(_outgoingMessages.Count);
+            counters.SetIncommingQueueLength(_incommingMessages.Count);
+            counters.SetReceiveQueueLength(_responseMessages.Count);
+        }
     }
 
     private void SendToNetwork(NodeMonitoringPacket outgoing)
