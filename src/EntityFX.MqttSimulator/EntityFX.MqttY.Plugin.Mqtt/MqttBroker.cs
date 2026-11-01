@@ -418,13 +418,20 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         {
             var ack = new PublishAckPacket(publishPacket.PacketId ?? 0);
             var ackPayload = _packetManager.PacketToBytes(ack) ?? Array.Empty<byte>();
-            var reversePacket = NetworkSimulator!.GetReversePacket(packet, ackPayload.ToArray(), "MQTT PubAck");
-            var scope = NetworkSimulator.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref reversePacket,
-                $"Publish Ack {packet.From} to {packet.To} with topic {publishPacket.Topic}");
-            NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send, 
-                $"Send MQTT publish ack {packet.From} to {packet.To} with {publishPacket.Topic} (QoS={publishPacket.QualityOfService})", ProtocolType, "MQTT PubAck");
-            Send(reversePacket);
-            NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref reversePacket);
+            var reversePacket = NetworkSimulator!.GetReversePacket(packet, ackPayload, "MQTT PubAck");
+            if (NetworkSimulator.EnableMonitoring)
+            {
+                var scope = NetworkSimulator.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref reversePacket,
+                    $"Publish Ack {packet.From} to {packet.To} with topic {publishPacket.Topic}");
+                NetworkSimulator.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send,
+                    $"Send MQTT publish ack {packet.From} to {packet.To} with {publishPacket.Topic} (QoS={publishPacket.QualityOfService})", ProtocolType, "MQTT PubAck");
+                Send(reversePacket);
+                NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref reversePacket);
+            }
+            else
+            {
+                Send(reversePacket);
+            }
             MqttCounters.PacketTypeCounters[ack.Type].Increment();
         }
 
@@ -635,8 +642,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                     _packetManager.PacketToBytes(subscribeAck), ProtocolType, "MQTT SubAck", packet.Id);
 
 
-            NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send,
-                $"Send MQTT subscribe ack {packet.From} to {packet.To}", ProtocolType, "MQTT SubAck");
+            if (NetworkSimulator!.EnableMonitoring)
+            {
+                NetworkSimulator!.Monitoring.Push(NetworkSimulator.TotalTicks, packet, NetworkLoggerType.Send,
+                    $"Send MQTT subscribe ack {packet.From} to {packet.To}", ProtocolType, "MQTT SubAck");
+            }
             Send(packetPayload);
             MqttCounters.PacketTypeCounters[subscribeAck.Type].Increment();
             return true;

@@ -271,8 +271,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 ServerIndex ?? -1,
                 _packetManager.PacketToBytes(publish), ProtocolType,
                 new PublishIdentity(localPublishSequence, NetworkSimulator.TotalTicks), "MQTT Publish");
-            var scope = NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packetPayload!,
-                $"Publish {Name} to {packetPayload.To} with topic {topic}");
+            if (NetworkSimulator!.EnableMonitoring)
+            {
+                NetworkSimulator!.Monitoring.WithBeginScope(NetworkSimulator.TotalTicks, ref packetPayload!,
+                    $"Publish {Name} to {packetPayload.To} with topic {topic}");
+            }
 
             if (!IsConnected)
             {

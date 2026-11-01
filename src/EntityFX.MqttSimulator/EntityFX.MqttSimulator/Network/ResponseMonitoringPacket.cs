@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Network;
+﻿using System.Diagnostics;
+using EntityFX.MqttY.Contracts.Network;
 
 namespace EntityFX.MqttY.Network;
 
@@ -33,9 +34,27 @@ internal class ResponseMonitoringPacket
 
     public bool WaitIsSet(TimeSpan timeSpan)
     {
-        var isSet = ResetEventSlim?.Wait(TimeSpan.FromMinutes(1));
+        if (ResetEventSlim == null)
+        {
+            return false;
+        }
 
-        return isSet ?? false;
+        // Bounded spin avoids an immediate kernel transition for short simulation
+        // responses; once spins are exhausted we fall back to the blocking Wait
+        // with the caller-supplied timeout, preserving the original semantics
+        // without monopolizing a CPU core.
+        var spinner = new SpinWait();
+        while (!ResetEventSlim.IsSet)
+        {
+            if (spinner.NextSpinWillYield)
+            {
+                return ResetEventSlim.Wait(timeSpan);
+            }
+
+            spinner.SpinOnce();
+        }
+
+        return true;
     }
 
     public void Receive()

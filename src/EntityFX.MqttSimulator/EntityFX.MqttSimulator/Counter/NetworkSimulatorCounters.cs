@@ -61,14 +61,17 @@ namespace EntityFX.MqttY.Counter
             base.Refresh(totalTicks, steps);
         }
 
-        public override IEnumerable<ICounter> Counters { 
-            get => _counters.Concat(_netwotkCounters).ToArray();
-            set => base.Counters = value; 
+        private ICounter[]? _countersCache;
+
+        public override IEnumerable<ICounter> Counters {
+            get => _countersCache ??= _counters.Concat(_netwotkCounters).ToArray();
+            set => base.Counters = value;
         }
 
         public void WithNetworks(IEnumerable<INetwork> networks)
         {
             _netwotkCounters = networks.Select(n => n.Counters);
+            _countersCache = null;
         }
 
         public void AddCounterValue<TValue>(string name, string shortName, TValue value)
@@ -78,6 +81,7 @@ namespace EntityFX.MqttY.Counter
             valueCounter.Set(value);
 
             _counters.Add(valueCounter);
+            _countersCache = null;
         }
 
         internal void SetRealTime(TimeSpan realTime)

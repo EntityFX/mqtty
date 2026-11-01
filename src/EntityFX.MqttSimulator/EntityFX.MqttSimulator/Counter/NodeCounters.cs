@@ -5,6 +5,7 @@ namespace EntityFX.MqttY.Counter
     public class NodeCounters : CounterGroup
     {
         private List<ICounter> _counters = new List<ICounter>();
+        private ICounter[]? _countersCache;
         private readonly ValueCounter<long> _outgoingQueue;
         private readonly ValueCounter<long> _incommingQueue;
         private readonly ValueCounter<long> _receiveQueue;
@@ -13,9 +14,9 @@ namespace EntityFX.MqttY.Counter
         public GenericCounter ReceiveCounter { get; }
         public GenericCounter ErrorCounter { get; }
 
-        public override IEnumerable<ICounter> Counters { 
-            get => _counters.ToArray();
-            set => _counters = value.ToList(); 
+        public override IEnumerable<ICounter> Counters {
+            get => _countersCache ??= _counters.ToArray();
+            set => _counters = value.ToList();
         }
 
         public NodeCounters(string name, string shortName, 
@@ -41,6 +42,7 @@ namespace EntityFX.MqttY.Counter
         public void AddCounter(ICounter incrementable)
         {
             _counters.Add(incrementable);
+            _countersCache = null;
         }
 
         public void Error()

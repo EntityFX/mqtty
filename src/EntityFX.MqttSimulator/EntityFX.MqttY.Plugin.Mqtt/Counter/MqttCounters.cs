@@ -31,16 +31,32 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
 
         public ValueCounter<double> LatencyP99 { get; }
 
+        private ICounter[]? _countersCache;
+
         public override IEnumerable<ICounter> Counters
         {
-            get => PacketTypeCounters.Values.ToArray<GenericCounter>()
-                .Concat(RefusedPacketTypeCounters.Values).Cast<ICounter>().ToArray()
-                .Concat(RpsPacketTypeCounters.Values).ToArray()
-                .Concat(PublishByQos.Values).ToArray()
-                .Concat(PublishRpsByQos.Values).ToArray()
-                .Concat(RefusedByRateLimit.Values).ToArray()
-                .Concat(RefusedByFailRate.Values).ToArray()
-                .Append(LatencyMs).Append(LatencyP99).ToArray();
+            get
+            {
+                if (_countersCache != null)
+                {
+                    return _countersCache;
+                }
+
+                var counters = new List<ICounter>(
+                    PacketTypeCounters.Count + RefusedPacketTypeCounters.Count + RpsPacketTypeCounters.Count
+                    + PublishByQos.Count + PublishRpsByQos.Count + RefusedByRateLimit.Count + RefusedByFailRate.Count + 2);
+                counters.AddRange(PacketTypeCounters.Values);
+                counters.AddRange(RefusedPacketTypeCounters.Values);
+                counters.AddRange(RpsPacketTypeCounters.Values);
+                counters.AddRange(PublishByQos.Values);
+                counters.AddRange(PublishRpsByQos.Values);
+                counters.AddRange(RefusedByRateLimit.Values);
+                counters.AddRange(RefusedByFailRate.Values);
+                counters.Add(LatencyMs);
+                counters.Add(LatencyP99);
+                _countersCache = counters.ToArray();
+                return _countersCache;
+            }
             set => base.Counters = value;
         }
 
