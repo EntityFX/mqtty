@@ -1,20 +1,21 @@
-﻿// See https://aka.ms/new-console-template for more information
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.PathFinder;
+using System.Collections.Concurrent;
 
 public class DijkstraIndexPathFinder : IPathFinder
 {
     public INetworkSimulator? NetworkGraph { get; set; }
 
-    private Path<int>[] _paths = new Path<int>[0];
+    private volatile Path<int>[] _paths = new Path<int>[0];
 
-    public Dictionary<string, IEnumerable<INetwork>> _pathCache = new Dictionary<string, IEnumerable<INetwork>>();
+    private readonly ConcurrentDictionary<string, IEnumerable<INetwork>> _pathCache = new();
 
     public void Build()
     {
-        _pathCache.Clear();
         if (NetworkGraph?.Networks?.Any() != true)
         {
+            _paths = new Path<int>[0];
+            _pathCache.Clear();
             return;
         }
 
@@ -27,6 +28,7 @@ public class DijkstraIndexPathFinder : IPathFinder
             }
         }
         _paths = pathsList.ToArray();
+        _pathCache.Clear();
     }
 
 
@@ -48,15 +50,11 @@ public class DijkstraIndexPathFinder : IPathFinder
             source.Index, destination.Index, _paths);
 
 
-        //TODO: optimize
-
-
-        var networks = path.Select(p => 
+        var networks = path.Select(p =>
             NetworkGraph.Networks.Values.FirstOrDefault(n => n.Index == p.Destination))
             .Where(n => n != null).Select(n => n!);
 
-
-        var result = networks ?? Enumerable.Empty<INetwork>();
+        var result = (networks ?? Enumerable.Empty<INetwork>()).ToArray();
         _pathCache[netPair] = result;
 
         return result;

@@ -55,7 +55,7 @@ public class DijkstraWeightedIndexPathFinder : IPathFinder
 
         var networks = path.Skip(1).Select(p => p.item);
 
-        var result = networks ?? Enumerable.Empty<INetwork>();
+        var result = (networks ?? Enumerable.Empty<INetwork>()).ToArray();
 
         _pathCache.AddOrUpdate(netPair, (k) => result, (k, v) => v);
 

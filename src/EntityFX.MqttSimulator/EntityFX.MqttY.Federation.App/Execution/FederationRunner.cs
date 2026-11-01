@@ -6,7 +6,8 @@ namespace EntityFX.MqttY.Federation;
 public sealed class FederationRunner
 {
     public FederationSummary Run(FederationInput input, string? output = null, bool diagnostics = false,
-        CancellationToken cancellationToken = default, Action<INetworkSimulator, string>? onProgress = null)
+        CancellationToken cancellationToken = default, Action<INetworkSimulator, string>? onProgress = null,
+        bool parallel = true, int refreshStrategy = 1)
     {
         var drainDiagnostics = diagnostics ? new FederationDrainDiagnostics() : null;
         if (output != null) FederationResultWriter.Claim(output);
@@ -52,7 +53,7 @@ public sealed class FederationRunner
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 topology.Pump();
-                if (!topology.Graph.Refresh(true, 1) || topology.Graph.Errors != 0)
+                if (!topology.Graph.Refresh(parallel, refreshStrategy) || topology.Graph.Errors != 0)
                     throw new InvalidOperationException("Simulator refresh failed.", topology.Graph.SimulationException);
                 onProgress?.Invoke(topology.Graph, phase);
             }

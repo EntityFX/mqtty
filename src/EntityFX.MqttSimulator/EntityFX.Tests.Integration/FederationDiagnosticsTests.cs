@@ -29,8 +29,8 @@ public class FederationDiagnosticsTests
         {
             var input = FederationInput.Prepare(new FederationOptions
             { Brokers = 4, Publishers = 4, Topology = "star", Qos = qos, WarmupSeconds = .001, MeasurementSeconds = .004 });
-            var a = new FederationRunner().Run(input, plain);
-            var b = new FederationRunner().Run(input, diagnostic, diagnostics: true);
+            var a = new FederationRunner().Run(input, plain, parallel: false, refreshStrategy: 0);
+            var b = new FederationRunner().Run(input, diagnostic, diagnostics: true, parallel: false, refreshStrategy: 0);
             Assert.AreEqual("completed", a.Status, a.Error); Assert.AreEqual("completed", b.Status, b.Error);
             // Every previous artifact except the seal must remain byte identical, including manifest/config/GraphML.
             foreach (var file in Directory.GetFiles(plain, "*", SearchOption.AllDirectories))

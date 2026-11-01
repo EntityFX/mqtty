@@ -1,20 +1,24 @@
 ﻿using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Network;
 using EntityFX.MqttY.PathFinder;
-using System.Xml.Linq;
+using System.Collections.Concurrent;
 public class DijkstraPathFinder : IPathFinder
 {
     public INetworkSimulator? NetworkGraph { get; set; }
 
-    private Path<string>[] _paths = new Path<string>[0];
+    private volatile Path<string>[] _paths = new Path<string>[0];
 
-    public Dictionary<string, IEnumerable<INetwork>> _pathCache = new Dictionary<string, IEnumerable<INetwork>>();
+    // Path lookup runs from Network.Send during parallel refresh (strategy 1),
+    // so the cache must be thread-safe; concurrent duplicate computations of the
+    // same pair are harmless because Dijkstra is deterministic.
+    private readonly ConcurrentDictionary<string, IEnumerable<INetwork>> _pathCache = new();
 
     public void Build()
     {
-        _pathCache.Clear();
         if (NetworkGraph?.Networks?.Any() != true)
         {
+            _paths = new Path<string>[0];
+            _pathCache.Clear();
             return;
         }
 
@@ -27,6 +31,7 @@ public class DijkstraPathFinder : IPathFinder
             }
         }
         _paths = pathsList.ToArray();
+        _pathCache.Clear();
     }
 
 
@@ -49,12 +54,11 @@ public class DijkstraPathFinder : IPathFinder
         var networks = path.Select(p =>
         {
             NetworkGraph.Networks.TryGetValue(p.Destination, out var net);
-            return net; 
+            return net;
         })
             .Where(n => n != null).Select(n => n!);
 
-
-        var result = networks ?? Enumerable.Empty<INetwork>();
+        var result = (networks ?? Enumerable.Empty<INetwork>()).ToArray();
         _pathCache[netPair] = result;
 
         return result;

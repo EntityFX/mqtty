@@ -1,0 +1,9 @@
+﻿
+Scenario             AvgSeconds StdSeconds Times                          
+--------             ---------- ---------- -----                          
+LoadBalancing              1,96        0,1 1,8771788, 1,8953736, 2,1000183
+Federation                 1,24       0,03 1,2870741, 1,2166468, 1,2119119
+MqttRelay (original)       9,77       0,19 9,7022497, 10,027756, 9,5878578
+
+
+

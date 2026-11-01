@@ -1,4 +1,0 @@
-Id;GroupId;IsParallel;EnabledCounters;Brokers;Nets;Clients;Repeats;VirtualTime;RealTime;RealTime (ms);TotalTicks;TotalSteps;Errors;Memory (Mb)
-0;0;False;False;4;1;15;131;00:00:00.6890000;00:00:02.3463698;2346.3698;6890;739942;0;46.55078125
-1;0;True;False;4;1;15;131;00:00:00.6890000;00:00:01.9228558;1922.8558;6890;739942;0;53.59375
-2;0;True;True;4;1;15;131;00:00:00.6890000;00:00:10.4394945;10439.4945;6890;739942;0;56.453125

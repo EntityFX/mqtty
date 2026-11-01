@@ -47,7 +47,10 @@ public class NetworkSimulator : INetworkSimulator
 
     private CancellationTokenSource? _cancelTokenSource;
 
-    internal Exception? SimulationException;
+    internal Exception? _lastSimulationException;
+
+    /// <summary>Last exception captured by the simulator (null when healthy); used for diagnostics of refresh failures.</summary>
+    public Exception? SimulationException => _lastSimulationException;
 
     public event EventHandler<Exception>? OnError;
 
@@ -277,7 +280,7 @@ public class NetworkSimulator : INetworkSimulator
         catch (Exception ex)
         {
             _errors++;
-            SimulationException = ex;
+            _lastSimulationException = ex;
             return false;
         }
     }
@@ -439,7 +442,7 @@ public class NetworkSimulator : INetworkSimulator
         }
         catch (Exception ex)
         {
-            SimulationException = ex;
+            _lastSimulationException = ex;
             return false;
         }
     }
@@ -742,7 +745,7 @@ public class NetworkSimulator : INetworkSimulator
         }
         catch (Exception ex)
         {
-            SimulationException = ex;
+            _lastSimulationException = ex;
         }
     }
 
