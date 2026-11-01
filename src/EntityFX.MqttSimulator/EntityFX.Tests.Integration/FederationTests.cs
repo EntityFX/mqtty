@@ -290,7 +290,7 @@ public class FederationTests
         var output = Path.Combine(Path.GetTempPath(), "mqtty-federation-tests-" + Guid.NewGuid());
         try
         {
-            var result = new FederationRunner().Run(FederationInput.Prepare(Small() with { DrainTimeoutSeconds = .0001 }), output);
+            var result = new FederationRunner().Run(FederationInput.Prepare(Small() with { DrainTimeoutSeconds = .0001 }), output, parallel: false, refreshStrategy: 0);
             Assert.AreEqual("failed", result.Status);
             Assert.IsTrue(File.Exists(Path.Combine(output, "sha256.json")));
             StringAssert.Contains(File.ReadAllText(Path.Combine(output, "report.md")), "connect timed out");
@@ -311,9 +311,9 @@ public class FederationTests
         {
             var first=Path.Combine(root,"first");var second=Path.Combine(root,"second");
             var input=FederationInput.Prepare(Small(FederationMode.Relay) with { WarmupSeconds=.002 });
-            var a=new FederationRunner().Run(input,first);
+            var a=new FederationRunner().Run(input,first, parallel: false, refreshStrategy: 0);
             Assert.AreEqual("completed",a.Status,a.Error);
-            var b=new FederationRunner().Run(FederationInput.Load(Path.Combine(first,"run-config.json")),second);
+            var b=new FederationRunner().Run(FederationInput.Load(Path.Combine(first,"run-config.json")),second, parallel: false, refreshStrategy: 0);
             Assert.AreEqual("completed",b.Status,b.Error);
             CollectionAssert.AreEqual(File.ReadAllBytes(Path.Combine(first,"summary.json")),File.ReadAllBytes(Path.Combine(second,"summary.json")));
             foreach(var entry in JsonSerializer.Deserialize<Dictionary<string,string>>(File.ReadAllText(Path.Combine(first,"sha256.json")))!)
@@ -339,7 +339,7 @@ public class FederationTests
     public void DrainTimeout_RetainsPartialEvidenceAndReason()
     {
         var o=Small() with { DrainTimeoutSeconds=.0001 };
-        var s=new FederationRunner().Run(FederationInput.Prepare(o));
+        var s=new FederationRunner().Run(FederationInput.Prepare(o), parallel: false, refreshStrategy: 0);
         Assert.AreEqual("failed",s.Status);StringAssert.Contains(s.Error!,"connect timed out");
         Assert.IsTrue(s.Phases.Any(p=>p.Status=="failed"));Assert.IsNull(s.SourceCompletedRps);
     }
