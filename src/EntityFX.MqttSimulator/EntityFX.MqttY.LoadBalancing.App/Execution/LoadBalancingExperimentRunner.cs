@@ -7,17 +7,26 @@ namespace EntityFX.MqttY.LoadBalancing;
 public sealed class LoadBalancingExperimentRunner
 {
     public ExperimentSummary Run(PreparedExperiment input, string output,
+        CancellationToken cancellationToken = default, Action<INetworkSimulator, string>? onProgress = null) =>
+        Run(input, output, true, 1, cancellationToken, onProgress);
+
+    public ExperimentSummary Run(PreparedExperiment input, string output, bool parallel, int refreshStrategy,
         CancellationToken cancellationToken = default, Action<INetworkSimulator, string>? onProgress = null)
     {
         ArgumentNullException.ThrowIfNull(output);
-        return RunCore(input, output, cancellationToken, onProgress);
+        return RunCore(input, output, cancellationToken, onProgress, parallel, refreshStrategy);
     }
 
     public ExperimentSummary RunInMemory(PreparedExperiment input, CancellationToken cancellationToken = default,
-        Action<INetworkSimulator, string>? onProgress = null) => RunCore(input, null, cancellationToken, onProgress);
+        Action<INetworkSimulator, string>? onProgress = null) =>
+        RunCore(input, null, cancellationToken, onProgress, true, 1);
+
+    public ExperimentSummary RunInMemory(PreparedExperiment input, bool parallel, int refreshStrategy,
+        CancellationToken cancellationToken = default, Action<INetworkSimulator, string>? onProgress = null) =>
+        RunCore(input, null, cancellationToken, onProgress, parallel, refreshStrategy);
 
     private ExperimentSummary RunCore(PreparedExperiment input, string? output, CancellationToken cancellationToken,
-        Action<INetworkSimulator, string>? onProgress)
+        Action<INetworkSimulator, string>? onProgress, bool parallel, int refreshStrategy)
     {
         // Claim a new directory before simulation; previous evidence is never overwritten.
         if (output != null) ExperimentResultWriter.CreateOutput(output);
@@ -85,8 +94,8 @@ public sealed class LoadBalancingExperimentRunner
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 // RefreshWithCounters resets the graph on error; retain partial evidence instead.
-                if (!graph.Refresh(true, 1) || graph.Errors != 0)
-                    throw new InvalidOperationException("Simulator refresh failed; graph errors=" + graph.Errors);
+                if (!graph.Refresh(parallel, refreshStrategy) || graph.Errors != 0)
+                    throw new InvalidOperationException("Simulator refresh failed; graph errors=" + graph.Errors, graph.SimulationException);
                 onProgress?.Invoke(graph, phase);
             }
             void Until(Func<bool> condition)

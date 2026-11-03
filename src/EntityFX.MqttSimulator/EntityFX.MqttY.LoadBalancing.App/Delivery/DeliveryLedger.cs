@@ -5,6 +5,7 @@ namespace EntityFX.MqttY.LoadBalancing;
 
 public sealed class DeliveryLedger
 {
+    private readonly object _sync = new();
     private readonly int payloadBytes;
     private readonly double tickMilliseconds;
     private readonly Dictionary<long, DeliveryPublication> publications = new();
@@ -31,68 +32,76 @@ public sealed class DeliveryLedger
 
     public byte[] Create(int publisher, int backend, bool measurement, long tick)
     {
-        if (publisher < 0) throw new ArgumentOutOfRangeException(nameof(publisher));
-        if (backend < 0) throw new ArgumentOutOfRangeException(nameof(backend));
-        if (tick < 0) throw new ArgumentOutOfRangeException(nameof(tick));
-
-        var id = checked(++nextId);
-        var payload = new byte[payloadBytes];
-        BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(0, 8), id);
-        BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(8, 8), tick);
-        publications.Add(id, new DeliveryPublication(publisher, backend, measurement, tick));
-        var state = State(backend);
-        if (measurement)
+        lock (_sync)
         {
-            measurementCreated++;
-            state.MeasurementCreated++;
+            if (publisher < 0) throw new ArgumentOutOfRangeException(nameof(publisher));
+            if (backend < 0) throw new ArgumentOutOfRangeException(nameof(backend));
+            if (tick < 0) throw new ArgumentOutOfRangeException(nameof(tick));
+
+            var id = checked(++nextId);
+            var payload = new byte[payloadBytes];
+            BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(0, 8), id);
+            BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(8, 8), tick);
+            publications.Add(id, new DeliveryPublication(publisher, backend, measurement, tick));
+            var state = State(backend);
+            if (measurement)
+            {
+                measurementCreated++;
+                state.MeasurementCreated++;
+            }
+            return payload;
         }
-        return payload;
     }
 
     public void Receive(int backend, byte[] payload, long tick)
     {
-        if (backend < 0) throw new ArgumentOutOfRangeException(nameof(backend));
-        ArgumentNullException.ThrowIfNull(payload);
-        if (tick < 0) throw new ArgumentOutOfRangeException(nameof(tick));
+        lock (_sync)
+        {
+            if (backend < 0) throw new ArgumentOutOfRangeException(nameof(backend));
+            ArgumentNullException.ThrowIfNull(payload);
+            if (tick < 0) throw new ArgumentOutOfRangeException(nameof(tick));
 
-        if (payload.Length != payloadBytes ||
-            !publications.TryGetValue(BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(0, 8)), out var publication) ||
-            BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(8, 8)) != publication.Tick)
-        {
-            unknownDeliveries++;
-            return;
-        }
-        if (tick < publication.Tick)
-            throw new InvalidDataException("A message cannot arrive before its creation tick.");
-        if (!publication.Measurement)
-        {
-            warmupDeliveries++;
-            return;
-        }
+            if (payload.Length != payloadBytes ||
+                !publications.TryGetValue(BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(0, 8)), out var publication) ||
+                BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(8, 8)) != publication.Tick)
+            {
+                unknownDeliveries++;
+                return;
+            }
+            if (tick < publication.Tick)
+                throw new InvalidDataException("A message cannot arrive before its creation tick.");
+            if (!publication.Measurement)
+            {
+                warmupDeliveries++;
+                return;
+            }
 
-        var state = State(backend);
-        if (backend != publication.Backend)
-        {
-            unexpectedDeliveries++;
-            state.UnexpectedDeliveries++;
-            return;
-        }
-        var id = BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(0, 8));
-        if (!delivered.Add(id))
-        {
-            duplicateDeliveries++;
-            state.DuplicateDeliveries++;
-            return;
-        }
+            var state = State(backend);
+            if (backend != publication.Backend)
+            {
+                unexpectedDeliveries++;
+                state.UnexpectedDeliveries++;
+                return;
+            }
+            var id = BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(0, 8));
+            if (!delivered.Add(id))
+            {
+                duplicateDeliveries++;
+                state.DuplicateDeliveries++;
+                return;
+            }
 
-        uniqueDelivered++;
-        state.UniqueDelivered++;
-        var elapsedTicks = tick - publication.Tick;
-        Increment(latencyHistogramTicks, elapsedTicks);
-        Increment(state.LatencyHistogramTicks, elapsedTicks);
+            uniqueDelivered++;
+            state.UniqueDelivered++;
+            var elapsedTicks = tick - publication.Tick;
+            Increment(latencyHistogramTicks, elapsedTicks);
+            Increment(state.LatencyHistogramTicks, elapsedTicks);
+        }
     }
 
-    public DeliveryLedgerSnapshot Snapshot() => new(
+    public DeliveryLedgerSnapshot Snapshot()
+    {
+        lock (_sync) return new(
         measurementCreated, uniqueDelivered, duplicateDeliveries, unexpectedDeliveries,
         warmupDeliveries, unknownDeliveries,
         Array.AsReadOnly(backends.Select(pair => new BackendDeliverySnapshot(
@@ -100,6 +109,7 @@ public sealed class DeliveryLedger
             pair.Value.DuplicateDeliveries, pair.Value.UnexpectedDeliveries,
             Freeze(pair.Value.LatencyHistogramTicks))).ToArray()),
         Freeze(latencyHistogramTicks), tickMilliseconds);
+    }
 
     private DeliveryBackendState State(int backend)
     {
