@@ -109,4 +109,29 @@ public class ParallelModelSafetyTests
         Assert.AreEqual(4000L, snapshot.LatencyHistogramTicks.Values.Sum());
         Assert.AreEqual(4000L, snapshot.Backends.Sum(b => b.UniqueDelivered));
     }
+
+    [TestMethod]
+    public void EvidenceExport_IsIndependentOfCallbackOrderAndRetainsDuplicates()
+    {
+        (DeliveryReceipt[], TransmissionResult[]) Export(bool reverse)
+        {
+            var ledger = new FederationDeliveryLedger(new FederationOptions { Brokers = 4, Publishers = 4, PayloadBytes = 16 });
+            var traffic = new TransmissionLedger(ledger);
+            var publications = Enumerable.Range(0, 32).Select(i => ledger.Create(i % 4, i, true)).ToArray();
+            var order = Enumerable.Range(0, 32).Append(0);
+            foreach (var i in reverse ? order.Reverse() : order)
+            {
+                var p = publications[i];
+                ledger.Receive(i % 4, FederationTopics.Delivered(p.Origin), p.Payload, 100);
+                traffic.Observe(100, "publisher" + i % 4, i % 4, 0, "test", p.Payload, true);
+            }
+            return (ledger.Receipts(), traffic.Snapshot());
+        }
+        var forward = Export(false);
+        var backward = Export(true);
+        Assert.AreEqual(33, forward.Item1.Length);
+        Assert.AreEqual(33, forward.Item2.Length);
+        CollectionAssert.AreEqual(forward.Item1, backward.Item1);
+        CollectionAssert.AreEqual(forward.Item2, backward.Item2);
+    }
 }

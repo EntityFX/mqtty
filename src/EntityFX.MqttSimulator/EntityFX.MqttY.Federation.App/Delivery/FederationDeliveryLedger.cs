@@ -73,5 +73,10 @@ public sealed class FederationDeliveryLedger
             new SortedDictionary<long, long>(histograms[kv.Key]))).ToArray();
     }
     public FederationPublication[] Publications() { lock (_sync) return publications.Values.ToArray(); }
-    public DeliveryReceipt[] Receipts() { lock (_sync) return receipts.ToArray(); }
+    public DeliveryReceipt[] Receipts()
+    {
+        lock (_sync) return receipts.OrderBy(r => r.Tick).ThenBy(r => r.Receiver)
+            .ThenBy(r => r.PublicationId).ThenBy(r => r.Topic, StringComparer.Ordinal)
+            .ThenBy(r => r.PayloadSha256, StringComparer.Ordinal).ToArray();
+    }
 }

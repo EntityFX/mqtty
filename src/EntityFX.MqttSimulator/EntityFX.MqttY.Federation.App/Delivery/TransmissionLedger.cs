@@ -17,5 +17,13 @@ public sealed class TransmissionLedger
             Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant(),
             checked(Encoding.UTF8.GetByteCount(topic) + payload.Length), accepted));
     }
-    public TransmissionResult[] Snapshot() => records.ToArray();
+    // Same-tick callbacks can finish in any thread order. Export a total order,
+    // retaining every record, including duplicate attempts and rejected sends.
+    public TransmissionResult[] Snapshot() => records.ToArray()
+        .OrderBy(r => r.Tick).ThenBy(r => r.Client, StringComparer.Ordinal)
+        .ThenBy(r => r.Site).ThenBy(r => r.Target).ThenBy(r => r.PublicationId)
+        .ThenBy(r => r.Measurement).ThenBy(r => r.Role, StringComparer.Ordinal)
+        .ThenBy(r => r.Topic, StringComparer.Ordinal).ThenBy(r => r.PayloadBytes)
+        .ThenBy(r => r.PayloadSha256, StringComparer.Ordinal)
+        .ThenBy(r => r.TopicPayloadBytes).ThenBy(r => r.Accepted).ToArray();
 }
