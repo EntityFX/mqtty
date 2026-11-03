@@ -1,11 +1,24 @@
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Utils;
+using System.Diagnostics;
 
 namespace EntityFX.MqttY.LoadBalancing;
 
 public sealed class LoadBalancingExperimentRunner
 {
+    public (ExperimentSummary Summary, LoadBalancingExecutionTiming Timing) RunMeasured(
+        PreparedExperiment input, string output, bool parallel, int refreshStrategy,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        var timing = new LoadBalancingExecutionTiming();
+        var started = Stopwatch.GetTimestamp();
+        var summary = RunCore(input, output, cancellationToken, null, parallel, refreshStrategy, timing);
+        timing.RunnerWallSeconds = (double)(Stopwatch.GetTimestamp() - started) / Stopwatch.Frequency;
+        return (summary, timing);
+    }
+
     public ExperimentSummary Run(PreparedExperiment input, string output,
         CancellationToken cancellationToken = default, Action<INetworkSimulator, string>? onProgress = null) =>
         Run(input, output, true, 1, cancellationToken, onProgress);
@@ -26,7 +39,8 @@ public sealed class LoadBalancingExperimentRunner
         RunCore(input, null, cancellationToken, onProgress, parallel, refreshStrategy);
 
     private ExperimentSummary RunCore(PreparedExperiment input, string? output, CancellationToken cancellationToken,
-        Action<INetworkSimulator, string>? onProgress, bool parallel, int refreshStrategy)
+        Action<INetworkSimulator, string>? onProgress, bool parallel, int refreshStrategy,
+        LoadBalancingExecutionTiming? timing = null)
     {
         // Claim a new directory before simulation; previous evidence is never overwritten.
         if (output != null) ExperimentResultWriter.CreateOutput(output);
@@ -40,6 +54,7 @@ public sealed class LoadBalancingExperimentRunner
         int pendingBefore = 0;
         long phaseStart = 0;
         var phase = "construct";
+        var phaseWallStart = timing == null ? 0 : Stopwatch.GetTimestamp();
         var beforeDrain = new Dictionary<int, BrokerQosMetricsSnapshot>();
         var deliveryBefore = ledger.Snapshot();
         string? graphMl = null, plantUml = null;
@@ -88,13 +103,24 @@ public sealed class LoadBalancingExperimentRunner
             CompletePhase();
             status = "completed";
 
-            void BeginPhase(string name) { phase = name; phaseStart = graph.TotalTicks; }
-            void CompletePhase() => phases.Add(new(phase, phaseStart, graph.TotalTicks, "completed"));
+            void BeginPhase(string name)
+            {
+                phase = name; phaseStart = graph.TotalTicks;
+                if (timing != null) phaseWallStart = Stopwatch.GetTimestamp();
+            }
+            void CompletePhase()
+            {
+                phases.Add(new(phase, phaseStart, graph.TotalTicks, "completed"));
+                if (timing != null) timing.CompletePhase(phase, Stopwatch.GetTimestamp() - phaseWallStart);
+            }
             void Refresh()
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 // RefreshWithCounters resets the graph on error; retain partial evidence instead.
-                if (!graph.Refresh(parallel, refreshStrategy) || graph.Errors != 0)
+                var refreshStart = timing == null ? 0 : Stopwatch.GetTimestamp();
+                var refreshed = graph.Refresh(parallel, refreshStrategy);
+                if (timing != null) timing.Refresh(phase, Stopwatch.GetTimestamp() - refreshStart);
+                if (!refreshed || graph.Errors != 0)
                     throw new InvalidOperationException("Simulator refresh failed; graph errors=" + graph.Errors, graph.SimulationException);
                 onProgress?.Invoke(graph, phase);
             }
@@ -171,7 +197,12 @@ public sealed class LoadBalancingExperimentRunner
                 PublishQuantile(.5), PublishQuantile(.95), PublishQuantile(.99),
                 ReceiverQuantile(.5), ReceiverQuantile(.95), ReceiverQuantile(.99), deliveryBefore.UniqueDelivered,
                 delivery.UniqueDelivered - deliveryBefore.UniqueDelivered, delivery, backends, histogram, phases);
-            if (output != null) ExperimentResultWriter.Write(output, input, summary, graphMl, plantUml);
+            if (output != null)
+            {
+                var exportStart = timing == null ? 0 : Stopwatch.GetTimestamp();
+                ExperimentResultWriter.Write(output, input, summary, graphMl, plantUml);
+                if (timing != null) timing.ExportWallSeconds = (double)(Stopwatch.GetTimestamp() - exportStart) / Stopwatch.Frequency;
+            }
             return summary;
 
             BrokerQosMetricsSnapshot Normalize(BrokerQosMetricsSnapshot metrics) =>
