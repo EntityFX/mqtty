@@ -23,9 +23,11 @@ namespace EntityFX.MqttY.Counter
 
         object ICounter.PreviousValue => PreviousValue;
 
-        public long LastTicks { get; private set; }
+        // Tick stamps come from the shared simulator clock; per-instance writes
+        // on every refresh tick dominated counter CPU (see optimization report).
+        public long LastTicks => CounterClock.Ticks;
 
-        public long LastSteps { get; private set; }
+        public long LastSteps => CounterClock.Steps;
 
         public bool Enabled { get; set; }
 
@@ -121,12 +123,8 @@ namespace EntityFX.MqttY.Counter
 
         public void Refresh(long totalTicks, long totalSteps)
         {
-            if (!Enabled)
-            {
-                return;
-            }
-            LastTicks = totalTicks;
-            LastSteps = totalSteps;
+            // Tick stamps are published globally via CounterClock; nothing to
+            // update per instance.
         }
 
         public double Average()

@@ -311,6 +311,10 @@ public class NetworkSimulator : INetworkSimulator
 
         EnsureTopologySnapshot();
 
+        // Publish the shared tick clock once per tick so counters do not need a
+        // per-instance stamp walk (CounterClock).
+        CounterClock.Publish(TotalTicks, _step);
+
         _counters.Refresh(TotalTicks, _step);
 
         var networks = _orderedNetworks;
@@ -356,48 +360,75 @@ public class NetworkSimulator : INetworkSimulator
         }
         else if (strategy == 0)
         {
-            var options = MaxDegreeOfParallelism > 0
-                ? new ParallelOptions { MaxDegreeOfParallelism = MaxDegreeOfParallelism }
-                : null;
-            if (options != null)
-            {
-                Parallel.ForEach(networks, options, RefreshNetwork);
-                Parallel.ForEach(nodes, options, RefreshNode);
-            }
-            else
-            {
-                Parallel.ForEach(networks, RefreshNetwork);
-                Parallel.ForEach(nodes, RefreshNode);
-            }
+            // Range-partitioned worker pool: contiguous stripes per worker give
+            // better cache locality and avoid Parallel's TaskReplicator /
+            // loop-state overhead, which is a top CPU consumer at this tick rate.
+            RunRanges(networks.Length, i => RefreshNetwork(networks[i]));
+            RunRanges(nodes.Length, i => RefreshNode(nodes[i]));
         }
         else
         {
             // Shard per network: the network and all of its nodes are refreshed
             // on the same worker, so they never contend for the network queue.
-            var options = MaxDegreeOfParallelism > 0
-                ? new ParallelOptions { MaxDegreeOfParallelism = MaxDegreeOfParallelism }
-                : null;
-            void RefreshShard(KeyValuePair<string, INetwork> network)
+            RunRanges(networks.Length, i =>
             {
-                RefreshNetwork(network);
-                var shardNodes = network.Value.Nodes;
+                RefreshNetwork(networks[i]);
+                var shardNodes = networks[i].Value.Nodes;
                 foreach (var node in shardNodes)
                 {
                     RefreshNode(new KeyValuePair<(string Address, NodeType NodeType), ILeafNode>(
                         (node.Key, node.Value.NodeType), (ILeafNode)node.Value));
                 }
-            }
-            if (options != null)
-            {
-                Parallel.ForEach(networks, options, RefreshShard);
-            }
-            else
-            {
-                Parallel.ForEach(networks, RefreshShard);
-            }
+            });
         }
 
         Tick();
+    }
+
+    /// <summary>
+    /// Executes <paramref name="body"/> over [0, itemCount) using a fixed pool of
+    /// range-partitioned tasks (contiguous stripes) with a final barrier.
+    /// </summary>
+    private void RunRanges(int itemCount, Action<int> body)
+    {
+        if (itemCount == 0)
+        {
+            return;
+        }
+
+        var workerCount = MaxDegreeOfParallelism > 0
+            ? Math.Min(MaxDegreeOfParallelism, itemCount)
+            : Math.Min(Environment.ProcessorCount, itemCount);
+
+        if (workerCount <= 1)
+        {
+            for (var i = 0; i < itemCount; i++)
+            {
+                body(i);
+            }
+            return;
+        }
+
+        var chunk = (itemCount + workerCount - 1) / workerCount;
+        var tasks = new Task[workerCount];
+        for (var w = 0; w < workerCount; w++)
+        {
+            var from = w * chunk;
+            var to = Math.Min(itemCount, from + chunk);
+            if (from >= to)
+            {
+                tasks[w] = Task.CompletedTask;
+                continue;
+            }
+            tasks[w] = Task.Run(() =>
+            {
+                for (var i = from; i < to; i++)
+                {
+                    body(i);
+                }
+            });
+        }
+        Task.WaitAll(tasks);
     }
 
     private void RefreshImplementation(NetworkLoggerScope? scope, int strategy)
@@ -405,6 +436,8 @@ public class NetworkSimulator : INetworkSimulator
         var bytes = Array.Empty<byte>();
 
         EnsureTopologySnapshot();
+
+        CounterClock.Publish(TotalTicks, _step);
 
         _counters.Refresh(TotalTicks, _step);
 

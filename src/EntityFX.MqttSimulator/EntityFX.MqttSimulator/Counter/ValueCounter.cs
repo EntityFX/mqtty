@@ -25,8 +25,10 @@ namespace EntityFX.MqttY.Counter
 
         object ICounter.PreviousValue => PreviousValue;
 
-        public long LastTicks { get; private set; }
-        public long LastSteps { get; private set; }
+        // Shared simulator clock; per-instance stamping was a hot path (see
+        // optimization report, iteration 2).
+        public long LastTicks => CounterClock.Ticks;
+        public long LastSteps => CounterClock.Steps;
 
         public bool Enabled { get; set; }
 
@@ -74,13 +76,7 @@ namespace EntityFX.MqttY.Counter
 
         public void Refresh(long totalTicks, long totalSteps)
         {
-            if (!Enabled)
-            {
-                return;
-            }
-
-            LastTicks = totalTicks;
-            LastSteps = totalSteps;
+            // Tick stamps come from the shared CounterClock; nothing to update.
         }
 
         public void Set(TValue value)

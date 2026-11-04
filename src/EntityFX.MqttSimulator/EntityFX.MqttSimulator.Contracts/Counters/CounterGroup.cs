@@ -58,10 +58,10 @@
                 return;
             }
 
-            foreach (var counter in Counters)
-            {
-                counter.Refresh(totalTicks, totalSteps);
-            }
+            // Individual counters take their tick stamps from the shared
+            // simulator clock (CounterClock), so walking the whole counter tree
+            // on every tick is no longer needed. Overriders may still do their
+            // own bookkeeping (e.g. MqttCounters RPS recalculation).
             LastTicks = totalTicks;
             LastSteps = totalSteps;
         }
