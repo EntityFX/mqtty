@@ -32,7 +32,9 @@ public class NetworkSimulator : INetworkSimulator
     private readonly ConcurrentDictionary<string, IApplication> _apps = new();
 
     private long _tick = 0;
-    private long _step = 0;
+    // Per-worker step deltas summed on read: removes the interlocked cache-line
+    // contention of a single shared counter on every Send/Receive (R4).
+    private readonly ThreadLocal<long> _stepDeltas = new(trackAllValues: true);
     private long _errors = 0;
     private long _packetId = 0;
     private int _countNodes = 0;
@@ -105,7 +107,18 @@ public class NetworkSimulator : INetworkSimulator
 
     public bool Construction { get; set; }
 
-    public long TotalSteps => _step;
+    public long TotalSteps
+    {
+        get
+        {
+            long sum = 0;
+            foreach (var delta in _stepDeltas.Values)
+            {
+                sum += delta;
+            }
+            return sum;
+        }
+    }
 
     public bool WaitMode { get; private set; }
     public bool EnableCounters { get; private set; }
@@ -313,9 +326,9 @@ public class NetworkSimulator : INetworkSimulator
 
         // Publish the shared tick clock once per tick so counters do not need a
         // per-instance stamp walk (CounterClock).
-        CounterClock.Publish(TotalTicks, _step);
+        CounterClock.Publish(TotalTicks, TotalSteps);
 
-        _counters.Refresh(TotalTicks, _step);
+        _counters.Refresh(TotalTicks, TotalSteps);
 
         var networks = _orderedNetworks;
         var nodes = _orderedNodes;
@@ -437,9 +450,9 @@ public class NetworkSimulator : INetworkSimulator
 
         EnsureTopologySnapshot();
 
-        CounterClock.Publish(TotalTicks, _step);
+        CounterClock.Publish(TotalTicks, TotalSteps);
 
-        _counters.Refresh(TotalTicks, _step);
+        _counters.Refresh(TotalTicks, TotalSteps);
 
         if (strategy == 0)
         {
@@ -596,10 +609,7 @@ public class NetworkSimulator : INetworkSimulator
         Interlocked.Increment(ref _tick);
     }
 
-    public void Step()
-    {
-        Interlocked.Increment(ref _step);
-    }
+    public void Step() => _stepDeltas.Value++;
 
     public void ResetMeasurement()
     {

@@ -324,6 +324,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             // without per-publish allocations.
             var subscriptions = GetSubscriptionSnapshot();
 
+            // QoS0 fanout delivers byte-identical packets to every subscriber of
+            // one publish; serialize once and hand out the same read-only array (R3).
+            byte[]? sharedQoS0Payload = null;
+
             foreach (var subscription in subscriptions)
             {
                 if (!_topicEvaluator.Matches(publishPacket.Topic, subscription.TopicFilter))
@@ -331,7 +335,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                     continue;
                 }
 
-                ProcessToClientPublish(packet, subscription, publishPacket, tracker);
+                ProcessToClientPublish(packet, subscription, publishPacket, tracker, ref sharedQoS0Payload);
             }
 
             MqttCounters.IncrementPublish(publishPacket.QualityOfService);
@@ -340,7 +344,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         private bool ProcessToClientPublish(
             INetworkPacket packet, ClientSubscription subscription, PublishPacket? publishPacket,
-            BrokerMeasurement.PublishTracker? tracker)
+            BrokerMeasurement.PublishTracker? tracker, ref byte[]? sharedQoS0Payload)
         {
             if (publishPacket == null)
             {
@@ -351,15 +355,38 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 ? subscription.MaximumQualityOfService
                 : publishPacket.QualityOfService;
 
-            ushort? packetId = supportedQos == MqttQos.AtMostOnce ? null : (ushort?)_packetIdProvider.GetPacketId();
-            var retain = publishPacket.Retain;
-            var subscriptionPublish = new PublishPacket(publishPacket.Topic, supportedQos, retain, duplicated: false, packetId: packetId)
+            // QoS0 fanout delivers byte-identical packets to every subscriber of
+            // one publish: serialize once per publish and distribute the same
+            // read-only byte[] (R3). QoS1/2 keep per-subscriber packet ids.
+            PublishPacket? subscriptionPublish = null;
+            byte[] payloadBytes;
+            if (supportedQos == MqttQos.AtMostOnce && sharedQoS0Payload != null)
             {
-                Payload = publishPacket.Payload
-            };
+                payloadBytes = sharedQoS0Payload;
+                subscriptionPublish = new PublishPacket(publishPacket.Topic, supportedQos, publishPacket.Retain, duplicated: false, packetId: null)
+                {
+                    Payload = publishPacket.Payload
+                };
+            }
+            else
+            {
+                ushort? packetId = supportedQos == MqttQos.AtMostOnce ? null : (ushort?)_packetIdProvider.GetPacketId();
+                var retain = publishPacket.Retain;
+                subscriptionPublish = new PublishPacket(publishPacket.Topic, supportedQos, retain, duplicated: false, packetId: packetId)
+                {
+                    Payload = publishPacket.Payload
+                };
+                payloadBytes = _packetManager.PacketToBytes(subscriptionPublish) ?? Array.Empty<byte>();
+
+                if (supportedQos == MqttQos.AtMostOnce)
+                {
+                    sharedQoS0Payload = payloadBytes;
+                }
+            }
+
             var packetPayload = GetPacket(
                 NetworkSimulator!.GetPacketId(), subscription.ClientId, NodeType.Client, packet.FromIndex,
-                    _packetManager.PacketToBytes(subscriptionPublish), ProtocolType, "MQTT Publish");
+                    payloadBytes, ProtocolType, "MQTT Publish");
             _measurement.ExpectDelivery(tracker, packetPayload.Id);
 
             if (tracker != null && DeterministicMqttSampler.Uniform(

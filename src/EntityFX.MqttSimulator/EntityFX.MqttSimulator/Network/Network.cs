@@ -23,6 +23,13 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
     /// TODO: Add max size limit
     /// </summary>
     private ConcurrentQueue<NetworkMonitoringPacket> _monitoringPacketsQueue = new();
+
+    // Deferred (not-yet-due) network packets, split from the ready queue so each
+    // tick only touches packets once and never re-enqueues the whole backlog
+    // (O(ready) per tick instead of O(whole queue)) (R1).
+    private List<NetworkMonitoringPacket> _deferredPackets = new();
+    private List<NetworkMonitoringPacket> _deferredPacketsNext = new();
+
     private readonly NetworkOptions _networkTypeOption;
     private readonly object _admissionLock = new();
     private readonly Queue<(long Tick, int Bytes)> _admissions = new();
@@ -111,7 +118,8 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
     public override NodeType NodeType => NodeType.Network;
 
-    public long QueueSize => _monitoringPacketsQueue.Count;
+    public long QueueSize =>
+        _monitoringPacketsQueue.Count + _deferredPackets.Count + _deferredPacketsNext.Count;
 
     public Network(
         int index, string name, string address, string networkType,
@@ -445,47 +453,73 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
     //TODO: add tick reaction
     public override void Refresh()
     {
+        // Ready packets (snapshot) are processed first, then packets deferred on
+        // previous ticks. Not-yet-due packets move to a plain list instead of
+        // being re-enqueued into the concurrent queue every tick; each packet is
+        // decremented at most once per tick and the processing order matches the
+        // previous single-queue pass.
+        var deferredNext = _deferredPacketsNext;
+        var totalTicks = NetworkSimulator!.TotalTicks;
 
         var pendingCount = _monitoringPacketsQueue.Count;
         for (var i = 0; i < pendingCount && _monitoringPacketsQueue.TryDequeue(out var pendingPacket); i++)
         {
-            if (pendingPacket.PassTillNextTick && pendingPacket.Tick == NetworkSimulator!.TotalTicks)
+            if (!ProcessNetworkPacket(pendingPacket, totalTicks, deferredNext))
             {
-                _monitoringPacketsQueue.Enqueue(pendingPacket);
-                var to = pendingPacket.Path.FirstOrDefault();
-                if (to == null)
-                {
-                    continue;
-                }
-
-                if (NetworkSimulator!.EnableMonitoring)
-                {
-                    NetworkSimulator.Monitoring.Push(pendingPacket.Packet.Id, NetworkSimulator.TotalTicks,
-                        this, to,
-                        pendingPacket.Packet.Payload, NetworkLoggerType.Pass,
-                        $"Pass incomming: {pendingPacket.Packet.From} -> {to!.Name}",
-                        pendingPacket.Packet.Protocol, "Node");
-                }
-                continue;
+                deferredNext.Add(pendingPacket);
             }
-
-            pendingPacket.ReduceTransferTicks();
-            if (pendingPacket.TransferWaitTicks <= 0 && !pendingPacket.Released)
-            {
-                ProcessTransferPacket(pendingPacket, out var deferred);
-                pendingPacket.Released = !deferred;
-                if (deferred) _monitoringPacketsQueue.Enqueue(pendingPacket);
-            }
-            else _monitoringPacketsQueue.Enqueue(pendingPacket);
         }
 
-        //_monitoringPacketsQueue.RemoveAll(p => p.Released);
+        var deferred = _deferredPackets;
+        for (var i = 0; i < deferred.Count; i++)
+        {
+            var pendingPacket = deferred[i];
+            if (!ProcessNetworkPacket(pendingPacket, totalTicks, deferredNext))
+            {
+                deferredNext.Add(pendingPacket);
+            }
+        }
+        deferred.Clear();
 
-        _networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
+        _deferredPackets = deferredNext;
+        _deferredPacketsNext = deferred;
+
+        _networkCounters.SetQueueLength(_monitoringPacketsQueue.Count + _deferredPackets.Count + _deferredPacketsNext.Count);
         if (NetworkSimulator!.EnableCounters)
         {
             Counters.Refresh(NetworkSimulator!.TotalTicks, NetworkSimulator!.TotalSteps);
         }
+    }
+
+    /// <returns>true when the packet is fully processed; false when it must stay deferred.</returns>
+    private bool ProcessNetworkPacket(
+        NetworkMonitoringPacket pendingPacket, long totalTicks, List<NetworkMonitoringPacket> deferredNext)
+    {
+        if (pendingPacket.PassTillNextTick && pendingPacket.Tick == totalTicks)
+        {
+            var to = pendingPacket.Path.FirstOrDefault();
+            if (to == null || !NetworkSimulator!.EnableMonitoring)
+            {
+                return false;
+            }
+
+            NetworkSimulator.Monitoring.Push(pendingPacket.Packet.Id, NetworkSimulator.TotalTicks,
+                this, to,
+                pendingPacket.Packet.Payload, NetworkLoggerType.Pass,
+                $"Pass incomming: {pendingPacket.Packet.From} -> {to!.Name}",
+                pendingPacket.Packet.Protocol, "Node");
+            return false;
+        }
+
+        pendingPacket.ReduceTransferTicks();
+        if (pendingPacket.TransferWaitTicks <= 0 && !pendingPacket.Released)
+        {
+            ProcessTransferPacket(pendingPacket, out var deferred);
+            pendingPacket.Released = !deferred;
+            return !deferred;
+        }
+
+        return false;
     }
 
 
@@ -584,6 +618,8 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         lock (_admissionLock)
         {
             _monitoringPacketsQueue.Clear();
+            _deferredPackets.Clear();
+            _deferredPacketsNext.Clear();
             _admissions.Clear();
             _windowBytes = 0;
         }

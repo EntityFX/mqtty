@@ -13,7 +13,9 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     public NodeQueueSnapshot GetQueueSnapshot() =>
         new(_incommingMessages.Count, _outgoingMessages.Count, _responseMessages.Count);
     /// <summary>Overrides should combine base.IsQuiescent with their processing/handshake state.</summary>
-    public virtual bool IsQuiescent => _outgoingMessages.IsEmpty && _incommingMessages.IsEmpty;
+    public virtual bool IsQuiescent =>
+        _outgoingMessages.IsEmpty && _outgoingDeferred.Count == 0 && _outgoingDeferredNext.Count == 0 &&
+        _incommingMessages.IsEmpty && _incommingDeferred.Count == 0 && _incommingDeferredNext.Count == 0;
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
     private readonly ConcurrentDictionary<long, ResponseMonitoringPacket> _responseMessages = new();
@@ -23,6 +25,15 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     protected virtual bool ShouldTrackResponse(INetworkPacket packet) => true;
     private readonly ConcurrentQueue<NodeMonitoringPacket> _outgoingMessages = new();
     private readonly ConcurrentQueue<NodeMonitoringPacket> _incommingMessages = new();
+
+    // Deferred (not-yet-due) packets, split from the ready queues so each tick
+    // only touches packets once and never re-enqueues the whole backlog
+    // (O(ready) per tick instead of O(whole queue)).
+    private List<NodeMonitoringPacket> _outgoingDeferred = new();
+    private List<NodeMonitoringPacket> _outgoingDeferredNext = new();
+    private List<NodeMonitoringPacket> _incommingDeferred = new();
+    private List<NodeMonitoringPacket> _incommingDeferredNext = new();
+
     private static readonly ConcurrentBag<NodeMonitoringPacket> _packetPool = new();
     protected readonly TicksOptions TicksOptions;
 
@@ -73,6 +84,10 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         }
         _outgoingMessages.Clear();
         _incommingMessages.Clear();
+        _outgoingDeferred.Clear();
+        _outgoingDeferredNext.Clear();
+        _incommingDeferred.Clear();
+        _incommingDeferredNext.Clear();
         _responseMessages.Clear();
         _responseRefreshCount = 0;
     }
@@ -81,46 +96,76 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     {
         var sim = NetworkSimulator!;
         var totalTicks = sim.TotalTicks;
-        var outgoingCount = _outgoingMessages.Count;
-        for (var i = 0; i < outgoingCount && _outgoingMessages.TryDequeue(out var outgoingMonitoringPacket); i++)
-        {
-            if (outgoingMonitoringPacket.PassTillNextTick && outgoingMonitoringPacket.Tick == totalTicks)
-            {
-                _outgoingMessages.Enqueue(outgoingMonitoringPacket);
-                continue;
-            }
-            outgoingMonitoringPacket.ReduceWaitTicks();
-            if (outgoingMonitoringPacket.WaitTicks <= 0 && !outgoingMonitoringPacket.Released)
-            {
-                SendToNetwork(outgoingMonitoringPacket);
-            }
-            else _outgoingMessages.Enqueue(outgoingMonitoringPacket);
-        }
 
-        var incomingCount = _incommingMessages.Count;
-        for (var i = 0; i < incomingCount && _incommingMessages.TryDequeue(out var incommingMonitoringPacket); i++)
-        {
-            if (incommingMonitoringPacket.PassTillNextTick && incommingMonitoringPacket.Tick == totalTicks)
-            {
-                _incommingMessages.Enqueue(incommingMonitoringPacket);
-                continue;
-            }
-            incommingMonitoringPacket.ReduceWaitTicks();
-            if (incommingMonitoringPacket.WaitTicks <= 0 && !incommingMonitoringPacket.Released)
-            {
-                CompleteReceive(incommingMonitoringPacket);
-            }
-            else _incommingMessages.Enqueue(incommingMonitoringPacket);
-        }
+        ProcessReady(_outgoingMessages, _outgoingDeferred, _outgoingDeferredNext, totalTicks, SendToNetwork);
+        ProcessReady(_incommingMessages, _incommingDeferred, _incommingDeferredNext, totalTicks, CompleteReceive);
+
+        // Rotate the deferred lists so packets deferred this tick are processed
+        // on the next tick (matches Network.Refresh swap).
+        (_outgoingDeferred, _outgoingDeferredNext) = (_outgoingDeferredNext, _outgoingDeferred);
+        (_incommingDeferred, _incommingDeferredNext) = (_incommingDeferredNext, _incommingDeferred);
 
         Interlocked.Increment(ref _responseRefreshCount);
         if (sim.EnableCounters)
         {
             base.Refresh();
-            counters.SetOutgoingQueueLength(_outgoingMessages.Count);
-            counters.SetIncommingQueueLength(_incommingMessages.Count);
+            counters.SetOutgoingQueueLength(_outgoingMessages.Count + _outgoingDeferred.Count + _outgoingDeferredNext.Count);
+            counters.SetIncommingQueueLength(_incommingMessages.Count + _incommingDeferred.Count + _incommingDeferredNext.Count);
             counters.SetReceiveQueueLength(_responseMessages.Count);
         }
+    }
+
+    /// <summary>
+    /// Processes the ready snapshot of <paramref name="queue"/> followed by the
+    /// deferred list from previous ticks. A packet is decremented at most once
+    /// per tick; not-yet-due packets move to the next-tick deferred list without
+    /// re-enqueue churn. Processing order matches the previous single-queue pass
+    /// (ready items first, then previously deferred ones).
+    /// </summary>
+    private static void ProcessReady(
+        ConcurrentQueue<NodeMonitoringPacket> queue,
+        List<NodeMonitoringPacket> deferred,
+        List<NodeMonitoringPacket> deferredNext,
+        long totalTicks,
+        Action<NodeMonitoringPacket> process)
+    {
+        var readyCount = queue.Count;
+        for (var i = 0; i < readyCount && queue.TryDequeue(out var packet); i++)
+        {
+            if (!ProcessPacket(packet, totalTicks, process))
+            {
+                deferredNext.Add(packet);
+            }
+        }
+
+        for (var i = 0; i < deferred.Count; i++)
+        {
+            var packet = deferred[i];
+            if (!ProcessPacket(packet, totalTicks, process))
+            {
+                deferredNext.Add(packet);
+            }
+        }
+
+        deferred.Clear();
+    }
+
+    private static bool ProcessPacket(
+        NodeMonitoringPacket packet, long totalTicks, Action<NodeMonitoringPacket> process)
+    {
+        if (packet.PassTillNextTick && packet.Tick == totalTicks)
+        {
+            return false; // keep deferred until the next tick
+        }
+
+        packet.ReduceWaitTicks();
+        if (packet.WaitTicks <= 0 && !packet.Released)
+        {
+            process(packet);
+            return true;
+        }
+
+        return false;
     }
 
     private void SendToNetwork(NodeMonitoringPacket outgoing)
