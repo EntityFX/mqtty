@@ -2,34 +2,25 @@
 {
     internal class PacketIdProvider
     {
-        readonly object _lockObject;
-        volatile ushort _lastValue;
+        // int (not ushort) so it can be used with Interlocked CAS; valid ids are 1..ushort.MaxValue.
+        private int _lastValue;
 
         public PacketIdProvider()
         {
-            _lockObject = new object();
             _lastValue = 0;
         }
 
         public ushort GetPacketId()
         {
-            var id = default(ushort);
-
-            lock (_lockObject)
+            while (true)
             {
-                if (_lastValue == ushort.MaxValue)
+                var last = Volatile.Read(ref _lastValue);
+                var next = last >= ushort.MaxValue ? 1 : last + 1;
+                if (Interlocked.CompareExchange(ref _lastValue, next, last) == last)
                 {
-                    id = 1;
+                    return (ushort)next;
                 }
-                else
-                {
-                    id = (ushort)(_lastValue + 1);
-                }
-
-                _lastValue = id;
             }
-
-            return id;
         }
     }
 }

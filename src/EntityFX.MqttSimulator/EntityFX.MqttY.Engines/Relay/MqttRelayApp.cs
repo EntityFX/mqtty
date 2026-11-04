@@ -13,13 +13,13 @@ using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Plugin.Mqtt.Factories;
 using System.Security.Cryptography;
 
-record InParams(int Brokers, int Nets, int Clients, int Repeats, bool IsParallel, bool EnabledCounters, int RefreshStrategy);
-record OutParams(TimeSpan VirtualTime, TimeSpan RealTime, long TotalTicks, long TotalSteps, long Errors, double MemoryWorkingSet);
-record ResultItem(int Id, int GroupId, InParams In, OutParams Out, bool rowLine);
+public record InParams(int Brokers, int Nets, int Clients, int Repeats, bool IsParallel, bool EnabledCounters, int RefreshStrategy);
+public record OutParams(TimeSpan VirtualTime, TimeSpan RealTime, long TotalTicks, long TotalSteps, long Errors, double MemoryWorkingSet);
+public record ResultItem(int Id, int GroupId, InParams In, OutParams Out, bool rowLine);
 
-record FlatItem(int Id, int GroupId, bool IsParallel,
-    bool EnabledCounters, int Brokers, int Nets, int Clients, int Repeats, 
-    TimeSpan VirtualTime, TimeSpan RealTime, double RealTimeMs, 
+public record FlatItem(int Id, int GroupId, bool IsParallel,
+    bool EnabledCounters, int Brokers, int Nets, int Clients, int Repeats,
+    TimeSpan VirtualTime, TimeSpan RealTime, double RealTimeMs,
     long TotalTicks, long TotalSteps, long Errors, double MemoryWorkingSet);
 
 public class MqttRelayApp

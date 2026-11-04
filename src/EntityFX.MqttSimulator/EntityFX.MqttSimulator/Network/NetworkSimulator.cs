@@ -285,59 +285,116 @@ public class NetworkSimulator : INetworkSimulator
         }
     }
 
+    /// <summary>
+    /// Below this combined networks+nodes count the parallel scheduler overhead
+    /// exceeds the per-tick work, so the refresh falls back to plain loops.
+    /// </summary>
+    public int ParallelThreshold { get; set; } = 32;
+
+    /// <summary>Upper bound of worker threads used by the parallel refresh (0 = default).</summary>
+    public int MaxDegreeOfParallelism { get; set; } = 0;
+
+    private void EnsureTopologySnapshot()
+    {
+        var version = Volatile.Read(ref _topologyVersion);
+        if (_orderedTopologyVersion != version)
+        {
+            _orderedNetworks = _networks.OrderBy(item => item.Key, StringComparer.Ordinal).ToArray();
+            _orderedNodes = _nodes.OrderBy(item => item.Key.Address, StringComparer.Ordinal).ThenBy(item => item.Key.NodeType).ToArray();
+            _orderedTopologyVersion = version;
+        }
+    }
+
     private void ParallelRefreshImplementation(NetworkLoggerScope? scope, int strategy)
     {
         var bytes = Array.Empty<byte>();
 
+        EnsureTopologySnapshot();
+
         _counters.Refresh(TotalTicks, _step);
 
-        if (strategy == 0)
-        {
-            Parallel.ForEach(_networks, network =>
-            {
-                if (EnableMonitoring)
-                {
-                    Monitoring.Push(0, TotalTicks,
-                        network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                        "Network", "Refresh", scope);
-                }
-                network.Value.Refresh();
-            });
+        var networks = _orderedNetworks;
+        var nodes = _orderedNodes;
 
-            Parallel.ForEach(_nodes, node =>
+        void RefreshNetwork(KeyValuePair<string, INetwork> network)
+        {
+            if (EnableMonitoring)
             {
-                if (EnableMonitoring)
-                {
-                    Monitoring.Push(0, TotalTicks,
-                        node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
-                        scope);
-                }
-                node.Value.Refresh();
-            });
+                Monitoring.Push(0, TotalTicks,
+                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                    "Network", "Refresh", scope);
+            }
+            network.Value.Refresh();
+        }
+
+        void RefreshNode(KeyValuePair<(string Address, NodeType NodeType), ILeafNode> node)
+        {
+            if (EnableMonitoring)
+            {
+                Monitoring.Push(0, TotalTicks,
+                    node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                    scope);
+            }
+            node.Value.Refresh();
+        }
+
+        // The scheduler setup/teardown costs more than the refresh itself for
+        // small topologies, so tiny simulations always run sequentially.
+        var runParallel = networks.Length + nodes.Length >= ParallelThreshold;
+
+        if (!runParallel)
+        {
+            foreach (var network in networks)
+            {
+                RefreshNetwork(network);
+            }
+
+            foreach (var node in nodes)
+            {
+                RefreshNode(node);
+            }
+        }
+        else if (strategy == 0)
+        {
+            var options = MaxDegreeOfParallelism > 0
+                ? new ParallelOptions { MaxDegreeOfParallelism = MaxDegreeOfParallelism }
+                : null;
+            if (options != null)
+            {
+                Parallel.ForEach(networks, options, RefreshNetwork);
+                Parallel.ForEach(nodes, options, RefreshNode);
+            }
+            else
+            {
+                Parallel.ForEach(networks, RefreshNetwork);
+                Parallel.ForEach(nodes, RefreshNode);
+            }
         }
         else
         {
-            Parallel.ForEach(_networks, network =>
+            // Shard per network: the network and all of its nodes are refreshed
+            // on the same worker, so they never contend for the network queue.
+            var options = MaxDegreeOfParallelism > 0
+                ? new ParallelOptions { MaxDegreeOfParallelism = MaxDegreeOfParallelism }
+                : null;
+            void RefreshShard(KeyValuePair<string, INetwork> network)
             {
-                if (EnableMonitoring)
+                RefreshNetwork(network);
+                var shardNodes = network.Value.Nodes;
+                foreach (var node in shardNodes)
                 {
-                    Monitoring.Push(0, TotalTicks,
-                        network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                        "Network", "Refresh", scope);
+                    RefreshNode(new KeyValuePair<(string Address, NodeType NodeType), ILeafNode>(
+                        (node.Key, node.Value.NodeType), (ILeafNode)node.Value));
                 }
-                network.Value.Refresh();
-                var nodes = network.Value.Nodes;
-                foreach (var node in nodes)
-                {
-                    if (EnableMonitoring)
-                    {
-                        Monitoring.Push(0, TotalTicks,
-                            node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
-                            scope);
-                    }
-                    node.Value.Refresh();
-                }
-            });
+            }
+            if (options != null)
+            {
+                Parallel.ForEach(networks, options, RefreshShard);
+            }
+            else
+            {
+                Parallel.ForEach(networks, RefreshShard);
+            }
         }
 
         Tick();
@@ -346,13 +403,8 @@ public class NetworkSimulator : INetworkSimulator
     private void RefreshImplementation(NetworkLoggerScope? scope, int strategy)
     {
         var bytes = Array.Empty<byte>();
-        var version = Volatile.Read(ref _topologyVersion);
-        if (_orderedTopologyVersion != version)
-        {
-            _orderedNetworks = _networks.OrderBy(item=>item.Key,StringComparer.Ordinal).ToArray();
-            _orderedNodes = _nodes.OrderBy(item=>item.Key.Address,StringComparer.Ordinal).ThenBy(item=>item.Key.NodeType).ToArray();
-            _orderedTopologyVersion = version;
-        }
+
+        EnsureTopologySnapshot();
 
         _counters.Refresh(TotalTicks, _step);
 

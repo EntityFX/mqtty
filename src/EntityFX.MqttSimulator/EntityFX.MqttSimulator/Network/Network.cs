@@ -39,31 +39,44 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
     private CancellationTokenSource? _cancelTokenSource;
     public string NetworkType { get; }
 
+    private CounterGroup? _countersSnapshot;
+    private int _countersSnapshotVersion = -1;
+
     public override CounterGroup Counters
     {
         get
         {
-            _counters.Counters = new ICounter[]
-                {
-                    _networkCounters,
-                    new CounterGroup(Name, "SS", "Servers", "SG")
+            // Snapshot is rebuilt only when the node set changes; this getter is
+            // touched on every refresh tick, so allocations here dominate CPU.
+            var version = _nodesVersion;
+            if (_countersSnapshot == null || _countersSnapshotVersion != version)
+            {
+                _counters.Counters = new ICounter[]
                     {
-                        Counters = _servers.Values.ToArray().Select(s =>s.Counters).ToArray()
-                    },
-                    new CounterGroup(Name, "CS", "Clients", "CG")
-                    {
-                        Counters = _clients.Values.ToArray().Select(s =>s.Counters).ToArray()
-                    },
-                    new CounterGroup(Name, "AS", "Applications", "AG")
-                    {
-                        Counters = _applications.Values.ToArray().Select(s =>s.Counters).ToArray()
-                    },
-                };
-            return _counters;
+                        _networkCounters,
+                        new CounterGroup(Name, "SS", "Servers", "SG")
+                        {
+                            Counters = _servers.Values.ToArray().Select(s =>s.Counters).ToArray()
+                        },
+                        new CounterGroup(Name, "CS", "Clients", "CG")
+                        {
+                            Counters = _clients.Values.ToArray().Select(s =>s.Counters).ToArray()
+                        },
+                        new CounterGroup(Name, "AS", "Applications", "AG")
+                        {
+                            Counters = _applications.Values.ToArray().Select(s =>s.Counters).ToArray()
+                        },
+                    };
+                _countersSnapshot = _counters;
+                _countersSnapshotVersion = version;
+            }
+            return _countersSnapshot;
         }
         set
         {
             _counters = value;
+            _countersSnapshot = null;
+            _countersSnapshotVersion = -1;
         }
     }
 
@@ -272,6 +285,15 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
     private bool TryEnqueue(NetworkMonitoringPacket networkPacket, bool isTransfer = false)
     {
         var packet = networkPacket.Packet;
+
+        // Lock-free fast-fail for the common overload case; avoids taking the
+        // admission lock when the queue is already saturated.
+        if (_monitoringPacketsQueue.Count >= _networkTypeOption.QueueCapacity)
+        {
+            _networkCounters.Refuse();
+            return false;
+        }
+
         lock (_admissionLock)
         {
             var tick = NetworkSimulator!.TotalTicks;
@@ -460,7 +482,10 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         //_monitoringPacketsQueue.RemoveAll(p => p.Released);
 
         _networkCounters.SetQueueLength(_monitoringPacketsQueue.Count);
-        Counters.Refresh(NetworkSimulator!.TotalTicks, NetworkSimulator!.TotalSteps);
+        if (NetworkSimulator!.EnableCounters)
+        {
+            Counters.Refresh(NetworkSimulator!.TotalTicks, NetworkSimulator!.TotalSteps);
+        }
     }
 
 

@@ -6,11 +6,32 @@
 
 ## Итоговая таблица «до / после»
 
-| Сценарий | Baseline (до всех этапов) | После этапов 2–5 | Финал (A2+E) | Ускорение vs baseline |
-|----------|---------------------------|------------------|--------------|----------------------|
-| LoadBalancing (3 брокера, 12 publishers, QoS1) | 9.28 с | 4.36 с | **1.96 ± 0.10 с** | **4.73×** ✅ (цель 3–5×) |
-| Federation (ring, 1000 RPS, QoS1) | 6.25 с | 2.65 с | **1.24 ± 0.03 с** | **5.04×** ✅ (цель 3–5×) |
-| MqttRelay (original, 131 repeats) | 24.81 с | 16.90 с | **9.77 ± 0.19 с** | **2.54×** ⚠️ ниже цели |
+| Сценарий | Baseline (до всех этапов) | Финал (A2+E) | Итерация 2 (Engine + параллелизм) | Ускорение vs baseline |
+|----------|---------------------------|--------------|-----------------------------------|----------------------|
+| LoadBalancing (3 брокера, 12 publishers, QoS1) | 9.28 с | 1.96 ± 0.10 с | **1.07 ± 0.01 с** | **8.7×** ✅ |
+| Federation (ring, 1000 RPS, QoS1) | 6.25 с | 1.24 ± 0.03 с | **0.98 ± 0.03 с** | **6.4×** ✅ |
+| MqttRelay (original, 131 repeats) | 24.81 с | 9.77 ± 0.19 с | **7.62 ± 0.33 с** | **3.26×** ✅ (потолок 2.54× снят) |
+
+## Итерация 2 — консолидация Engine + параллелизм (2026-11-04)
+
+План: [plans/parallel-optimization-and-engine-consolidation.md](../../plans/parallel-optimization-and-engine-consolidation.md).
+
+### Реализованные изменения
+
+| Этап | Изменение |
+|------|-----------|
+| 0 | Архитектуры Relay/Federation/LoadBalancing перенесены в `EntityFX.MqttY.Engines` (namespace сохранены; зависимости инвертированы: Apps → Engines; в Apps остались Program.cs + Cli) |
+| 1 | Кэш снапшота `Network.Counters` (инвалидация по `_nodesVersion`); гейтинг `Counters.Refresh` по `EnableCounters` в `Network.Refresh`, `NodeBase.Refresh`, `ApplicationBase.Refresh` |
+| 2 | Параллельный Refresh использует кэшированные ordered-массивы вместо `ConcurrentDictionary`; порог `ParallelThreshold` (32) — малые топологии всегда серийные; `MaxDegreeOfParallelism`; стратегия 1 — шард «сеть + её узлы на одном потоке» |
+| 3 | Lock-free fast-fail проверки capacity в `Network.TryEnqueue` до захвата admission-лока |
+| 4 | Кэш предсортированного снапшота подписок брокера (инвалидация при subscribe/disconnect/clean-session) вместо полного скана на каждую публикацию; `PacketIdProvider` — lock-free CAS |
+| 5 | `measure-scenarios.ps1`: фикс получения ExitCode; path-finder'ы подтверждены потокобезопасными |
+
+### Валидация
+
+- Интеграционные тесты: 388/388; Web-тесты: 51/51.
+- Детерминизм: порядок fanout сохранён (снапшот отсортирован, фильтрация стабильна).
+- Замеры: results/final-measurement-stage14.txt, 3 прогона.
 
 ## Реализованные изменения (данная итерация)
 

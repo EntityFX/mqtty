@@ -10,8 +10,6 @@
     <ProjectReference Include="..\EntityFX.MqttSimulator\EntityFX.MqttY.csproj" />
     <ProjectReference Include="..\EntityFX.MqttSimulator.Contracts\EntityFX.MqttY.Contracts.csproj" />
     <ProjectReference Include="..\EntityFX.MqttY.Plugin.Mqtt\EntityFX.MqttY.Plugin.Mqtt.csproj" />
-    <ProjectReference Include="..\EntityFX.MqttY.Federation.App\EntityFX.MqttY.Federation.App.csproj" />
-    <ProjectReference Include="..\EntityFX.MqttY.LoadBalancing.App\EntityFX.MqttY.LoadBalancing.App.csproj" />
   </ItemGroup>
 
   <ItemGroup>

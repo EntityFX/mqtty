@@ -90,7 +90,10 @@ public abstract class NodeBase : ISender
     {
         if (NetworkSimulator == null) return;
 
-        Counters.Refresh(NetworkSimulator.TotalTicks, NetworkSimulator.TotalSteps);
+        if (NetworkSimulator.EnableCounters)
+        {
+            Counters.Refresh(NetworkSimulator.TotalTicks, NetworkSimulator.TotalSteps);
+        }
     }
 
     public abstract void Reset();

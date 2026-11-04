@@ -6,7 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\EntityFX.MqttSimulator\EntityFX.MqttY.csproj" />
-    <ProjectReference Include="..\EntityFX.MqttY.Plugin.Mqtt\EntityFX.MqttY.Plugin.Mqtt.csproj" />
+    <ProjectReference Include="..\EntityFX.MqttY.Engines\EntityFX.MqttY.Engines.csproj" />
   </ItemGroup>
 </Project>

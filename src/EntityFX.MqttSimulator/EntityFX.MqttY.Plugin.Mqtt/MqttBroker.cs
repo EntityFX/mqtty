@@ -33,6 +33,33 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         private readonly int? _profileClientCount;
         private readonly BrokerMeasurement _measurement = new();
 
+        // Cached, pre-sorted subscription snapshot. Rebuilding it on every
+        // publish (ReadAll + SelectMany + Where + OrderBy + ToArray) dominates
+        // broker fanout CPU. The snapshot is invalidated when sessions or
+        // subscriptions change; order is preserved for deterministic fanout.
+        private ClientSubscription[]? _subscriptionSnapshot;
+        private int _subscriptionEpoch;
+        private int _subscriptionSnapshotEpoch = -1;
+
+        private void InvalidateSubscriptionSnapshot() => Interlocked.Increment(ref _subscriptionEpoch);
+
+        private ClientSubscription[] GetSubscriptionSnapshot()
+        {
+            var epoch = Volatile.Read(ref _subscriptionEpoch);
+            var snapshot = _subscriptionSnapshot;
+            if (snapshot == null || _subscriptionSnapshotEpoch != epoch)
+            {
+                snapshot = _sessionRepository.ReadAll()
+                    .SelectMany(s => s.GetSubscriptions())
+                    .OrderBy(x => x.ClientId, StringComparer.Ordinal)
+                    .ThenBy(x => x.TopicFilter, StringComparer.Ordinal)
+                    .ToArray();
+                _subscriptionSnapshot = snapshot;
+                _subscriptionSnapshotEpoch = epoch;
+            }
+            return snapshot;
+        }
+
         public override NodeType NodeType => NodeType.Server;
 
         public override bool IsQuiescent => base.IsQuiescent && _processingQueue.IsEmpty &&
@@ -85,6 +112,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 if (session?.Clean == true)
                 {
                     _sessionRepository.Delete(clientName);
+                    InvalidateSubscriptionSnapshot();
                 }
 
                 UpdateProfileFromClients();
@@ -291,16 +319,18 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         {
             var tracker = _measurement.Find(packet.From, publishPacket.QualityOfService,
                 publishPacket.PacketId, packet.Id);
-            var subscriptions = _sessionRepository
-                .ReadAll()
-                .SelectMany(s => s.GetSubscriptions())
-                .Where(x => _topicEvaluator.Matches(publishPacket.Topic, x.TopicFilter))
-                .OrderBy(x => x.ClientId, StringComparer.Ordinal)
-                .ThenBy(x => x.TopicFilter, StringComparer.Ordinal)
-                .ToArray();
+            // Snapshot is pre-sorted by (ClientId, TopicFilter); filtering it in
+            // place keeps the deterministic fanout order without re-sorting and
+            // without per-publish allocations.
+            var subscriptions = GetSubscriptionSnapshot();
 
             foreach (var subscription in subscriptions)
             {
+                if (!_topicEvaluator.Matches(publishPacket.Topic, subscription.TopicFilter))
+                {
+                    continue;
+                }
+
                 ProcessToClientPublish(packet, subscription, publishPacket, tracker);
             }
 
@@ -617,6 +647,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                         };
 
                         session.AddSubscription(clientSubscription);
+                        InvalidateSubscriptionSnapshot();
                     }
 
                     var supportedQos = subscription.MaximumQualityOfService > _maximumQualityOfService
@@ -664,6 +695,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             if (connectPacket.CleanSession && session != null)
             {
                 _sessionRepository.Delete(packet.From);
+                InvalidateSubscriptionSnapshot();
                 session = null;
             }
 
