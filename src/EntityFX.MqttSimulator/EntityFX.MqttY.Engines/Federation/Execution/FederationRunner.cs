@@ -1,6 +1,8 @@
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Utils;
+using System.Threading;
+using System.Threading.Tasks;
 namespace EntityFX.MqttY.Federation;
 
 public sealed class FederationRunner
@@ -29,13 +31,13 @@ public sealed class FederationRunner
             foreach (var relay in topology.Relays) relay.SubscribeAll();
             Until(() => topology.Subscriptions.All(s => s.Client.IsSubscribed(s.Filter)) && topology.Relays.All(r =>
                 r.Options!.ListenTopics.All(e => r.HasListenSubscription(e.Key, e.Value.Server, e.Value.Topics[0])))); Finish();
-            Begin("warmup"); Drive(o.ToTicks(o.WarmupSeconds), false); Finish();
+            Begin("warmup"); Drive(o.ToTicks(o.WarmupSeconds), false, parallel); Finish();
             // Finish the warmup cohort before resetting broker counters; ledger still rejects late warmup IDs.
             Begin("warmupDrain"); Until(() => topology.IsIdle); Finish();
             if (o.Topology == "star") transitBaseline = TransitNetworkSnapshot.Capture(topology);
             topology.Graph.ResetMeasurement();
             measurementStarted = true;
-            Begin("measure"); Drive(o.ToTicks(o.MeasurementSeconds), true); measured = true;
+            Begin("measure"); Drive(o.ToTicks(o.MeasurementSeconds), true, parallel); measured = true;
             uniqueBefore = ledger.Unique; completeBefore = Sources().Sum(s => s.Metrics.Completed); Finish();
             Begin("drain"); Until(() => topology.IsIdle); Finish(); status = "completed";
 
@@ -62,7 +64,7 @@ public sealed class FederationRunner
                 for (long i = 0, n = o.ToTicks(o.DrainTimeoutSeconds); !condition() && i < n; i++) Refresh();
                 if (!condition()) throw new TimeoutException(phase + " timed out; partial evidence retained.");
             }
-            void Drive(long count, bool measurement)
+            void Drive(long count, bool measurement, bool par)
             {
                 var perTick = o.OfferedRps * o.TickPeriod.TotalSeconds;
                 var credit = new long[o.Publishers]; var cap = checked((long)Math.Ceiling(perTick / o.Publishers) + 1);
@@ -71,15 +73,32 @@ public sealed class FederationRunner
                 {
                     var due = (long)Math.Floor((t + 1) * perTick + 1e-9); var slots = due - planned; planned = due;
                     if (measurement) scheduled += slots;
-                    for (var p = 0; p < o.Publishers; p++)
+                    if (par)
                     {
-                        credit[p] = Math.Min(cap, credit[p] + slots / o.Publishers + ((p - next + o.Publishers) % o.Publishers < slots % o.Publishers ? 1 : 0));
-                        while (credit[p] > 0 && !topology.Publishers[p].HasPendingPublish)
+                        Parallel.For(0, o.Publishers, p =>
                         {
-                            var publication = ledger.Create(p, topology.Graph.TotalTicks, measurement);
-                            var topic = o.Mode == FederationMode.Single ? FederationTopics.Delivered(publication.Origin) : FederationTopics.Input(publication.Origin);
-                            if (!topology.Publishers[p].Publish(topic, publication.Payload, (MqttQos)o.Qos) && measurement) rejected++;
-                            credit[p]--;
+                            credit[p] = Math.Min(cap, credit[p] + slots / o.Publishers + ((p - next + o.Publishers) % o.Publishers < slots % o.Publishers ? 1 : 0));
+                            while (credit[p] > 0 && !topology.Publishers[p].HasPendingPublish)
+                            {
+                                var publication = ledger.Create(p, topology.Graph.TotalTicks, measurement);
+                                var topic = o.Mode == FederationMode.Single ? FederationTopics.Delivered(publication.Origin) : FederationTopics.Input(publication.Origin);
+                                if (!topology.Publishers[p].Publish(topic, publication.Payload, (MqttQos)o.Qos) && measurement) Interlocked.Increment(ref rejected);
+                                credit[p]--;
+                            }
+                        });
+                    }
+                    else
+                    {
+                        for (var p = 0; p < o.Publishers; p++)
+                        {
+                            credit[p] = Math.Min(cap, credit[p] + slots / o.Publishers + ((p - next + o.Publishers) % o.Publishers < slots % o.Publishers ? 1 : 0));
+                            while (credit[p] > 0 && !topology.Publishers[p].HasPendingPublish)
+                            {
+                                var publication = ledger.Create(p, topology.Graph.TotalTicks, measurement);
+                                var topic = o.Mode == FederationMode.Single ? FederationTopics.Delivered(publication.Origin) : FederationTopics.Input(publication.Origin);
+                                if (!topology.Publishers[p].Publish(topic, publication.Payload, (MqttQos)o.Qos) && measurement) rejected++;
+                                credit[p]--;
+                            }
                         }
                     }
                     next = (int)((next + slots % o.Publishers) % o.Publishers); Refresh();

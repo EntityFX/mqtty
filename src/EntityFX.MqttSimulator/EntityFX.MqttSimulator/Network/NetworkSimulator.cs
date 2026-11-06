@@ -314,7 +314,7 @@ public class NetworkSimulator : INetworkSimulator
     /// Below this combined networks+nodes count the parallel scheduler overhead
     /// exceeds the per-tick work, so the refresh falls back to plain loops.
     /// </summary>
-    public int ParallelThreshold { get; set; } = 32;
+    public int ParallelThreshold { get; set; } = 4;
 
     /// <summary>Upper bound of worker threads used by the parallel refresh (0 = default).</summary>
     public int MaxDegreeOfParallelism { get; set; } = 0;
@@ -395,9 +395,11 @@ public class NetworkSimulator : INetworkSimulator
             // schedule is both faster and deterministic.
             var pool = EnsureTickWorkerPool();
             var statsStart = RefreshStatsEnabled ? Stopwatch.GetTimestamp() : 0;
+            var chunkSize = Math.Max(1, Math.Min(networks.Length, nodes.Length) / (pool.WorkerCount * 4));
             pool.Run(
                 i => RefreshNetwork(networks[i]), networks.Length,
-                i => RefreshNode(nodes[i]), nodes.Length);
+                i => RefreshNode(nodes[i]), nodes.Length,
+                chunkSize);
             if (RefreshStatsEnabled)
             {
                 _refreshStatsTicks++;

@@ -44,6 +44,7 @@ internal sealed class TickWorkerPool : IDisposable
     private int _count2;
     private int _index1;
     private int _index2;
+    private int _chunkSize;
     private Exception? _error;
 
     public TickWorkerPool(int workerCount)
@@ -86,14 +87,25 @@ internal sealed class TickWorkerPool : IDisposable
     /// </summary>
     public void Run(Action<int>? phase1, int count1, Action<int>? phase2, int count2)
     {
+        Run(phase1, count1, phase2, count2, chunkSize: 1);
+    }
+
+    /// <summary>
+    /// Runs both refresh phases with chunked work claiming. Each worker grabs
+    /// <paramref name="chunkSize"/> items per Interlocked operation, reducing
+    /// atomic contention when per-item work is tiny.
+    /// </summary>
+    public void Run(Action<int>? phase1, int count1, Action<int>? phase2, int count2,
+        int chunkSize)
+    {
         if (_threads.Length == 0)
         {
             var start = Stopwatch.GetTimestamp();
             _index1 = 0;
             _index2 = 0;
-            RunPhase(phase1, count1, ref _index1);
+            RunPhaseChunked(phase1, count1, ref _index1, chunkSize);
             var networkEnd = Stopwatch.GetTimestamp();
-            RunPhase(phase2, count2, ref _index2);
+            RunPhaseChunked(phase2, count2, ref _index2, chunkSize);
             var end = Stopwatch.GetTimestamp();
             LastNetworkPhaseTicks = networkEnd - start;
             LastNodePhaseTicks = end - networkEnd;
@@ -110,6 +122,7 @@ internal sealed class TickWorkerPool : IDisposable
             _index1 = 0;
             _index2 = 0;
             _error = null;
+            _chunkSize = chunkSize;
             _generation++;
             Monitor.PulseAll(_gate);
         }
@@ -207,7 +220,7 @@ internal sealed class TickWorkerPool : IDisposable
 
         try
         {
-            RunPhase(phase1, count1, ref _index1);
+            RunPhaseChunked(phase1, count1, ref _index1, _chunkSize);
         }
         catch (Exception exception)
         {
@@ -230,7 +243,7 @@ internal sealed class TickWorkerPool : IDisposable
         {
             try
             {
-                RunPhase(phase2, count2, ref _index2);
+                RunPhaseChunked(phase2, count2, ref _index2, _chunkSize);
             }
             catch (Exception exception)
             {
@@ -271,6 +284,34 @@ internal sealed class TickWorkerPool : IDisposable
             }
 
             body(item);
+        }
+    }
+
+    /// <summary>
+    /// Claims work in chunks of <paramref name="chunkSize"/> to reduce
+    /// <see cref="Interlocked.Increment"/> contention on tiny per-item bodies.
+    /// </summary>
+    private static void RunPhaseChunked(Action<int>? body, int count, ref int index, int chunkSize)
+    {
+        if (body == null || count <= 0 || chunkSize <= 1)
+        {
+            RunPhase(body, count, ref index);
+            return;
+        }
+
+        while (true)
+        {
+            var start = Interlocked.Add(ref index, chunkSize) - chunkSize;
+            if (start >= count)
+            {
+                return;
+            }
+
+            var end = Math.Min(start + chunkSize, count);
+            for (var i = start; i < end; i++)
+            {
+                body(i);
+            }
         }
     }
 

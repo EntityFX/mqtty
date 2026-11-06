@@ -2,6 +2,8 @@ using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Utils;
 using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace EntityFX.MqttY.LoadBalancing;
 
@@ -87,12 +89,12 @@ public sealed class LoadBalancingExperimentRunner
             Until(() => topology.Receivers.All(c => c.IsSubscribed(LoadBalancingTopologyBuilder.Topic)));
             CompletePhase();
             BeginPhase("warmup");
-            Drive(options.ToTicks(options.WarmupSeconds), false);
+            Drive(options.ToTicks(options.WarmupSeconds), false, parallel);
             CompletePhase();
             graph.ResetMeasurement();
             start = graph.TotalTicks;
             BeginPhase("measure");
-            Drive(options.ToTicks(options.MeasurementSeconds), true);
+            Drive(options.ToTicks(options.MeasurementSeconds), true, parallel);
             end = graph.TotalTicks;
             deliveryBefore = ledger.Snapshot();
             pendingBefore = topology.Publishers.Count(c => c.HasPendingPublish);
@@ -131,7 +133,7 @@ public sealed class LoadBalancingExperimentRunner
                 for (long tick = 0; !condition() && tick < limit; tick++) Refresh();
                 if (!condition()) throw new TimeoutException($"{phase} timed out after {limit} ticks.");
             }
-            void Drive(long ticks, bool measurement)
+            void Drive(long ticks, bool measurement, bool par)
             {
                 var perTick = options.OfferedRps * options.TickPeriod.TotalSeconds;
                 var credit = new long[topology.Publishers.Length];
@@ -147,17 +149,35 @@ public sealed class LoadBalancingExperimentRunner
                     scheduledSoFar = due;
                     var each = slots / topology.Publishers.Length;
                     var extra = (int)(slots % topology.Publishers.Length);
-                    for (var publisher = 0; publisher < topology.Publishers.Length; publisher++)
+
+                    if (par)
                     {
-                        var offset = (publisher - nextScheduledPublisher + topology.Publishers.Length) % topology.Publishers.Length;
-                        credit[publisher] = Math.Min(creditCap, credit[publisher] + each + (offset < extra ? 1 : 0));
-                        // A busy publisher never transfers its assigned load to a free publisher.
-                        while (credit[publisher] > 0 && !topology.Publishers[publisher].HasPendingPublish)
+                        Parallel.For(0, topology.Publishers.Length, publisher =>
                         {
-                            var payload = ledger.Create(publisher, input.Assignments[publisher], measurement, graph.TotalTicks);
-                            var accepted = topology.Publishers[publisher].Publish(LoadBalancingTopologyBuilder.Topic, payload, (MqttQos)options.PublishQos);
-                            if (measurement) { attempts++; if (!accepted) rejected++; }
-                            credit[publisher]--;
+                            var offset = (publisher - nextScheduledPublisher + topology.Publishers.Length) % topology.Publishers.Length;
+                            credit[publisher] = Math.Min(creditCap, credit[publisher] + each + (offset < extra ? 1 : 0));
+                            while (credit[publisher] > 0 && !topology.Publishers[publisher].HasPendingPublish)
+                            {
+                                var payload = ledger.Create(publisher, input.Assignments[publisher], measurement, graph.TotalTicks);
+                                var accepted = topology.Publishers[publisher].Publish(LoadBalancingTopologyBuilder.Topic, payload, (MqttQos)options.PublishQos);
+                                if (measurement) { Interlocked.Increment(ref attempts); if (!accepted) Interlocked.Increment(ref rejected); }
+                                credit[publisher]--;
+                            }
+                        });
+                    }
+                    else
+                    {
+                        for (var publisher = 0; publisher < topology.Publishers.Length; publisher++)
+                        {
+                            var offset = (publisher - nextScheduledPublisher + topology.Publishers.Length) % topology.Publishers.Length;
+                            credit[publisher] = Math.Min(creditCap, credit[publisher] + each + (offset < extra ? 1 : 0));
+                            while (credit[publisher] > 0 && !topology.Publishers[publisher].HasPendingPublish)
+                            {
+                                var payload = ledger.Create(publisher, input.Assignments[publisher], measurement, graph.TotalTicks);
+                                var accepted = topology.Publishers[publisher].Publish(LoadBalancingTopologyBuilder.Topic, payload, (MqttQos)options.PublishQos);
+                                if (measurement) { attempts++; if (!accepted) rejected++; }
+                                credit[publisher]--;
+                            }
                         }
                     }
                     nextScheduledPublisher = (nextScheduledPublisher + extra) % topology.Publishers.Length;
