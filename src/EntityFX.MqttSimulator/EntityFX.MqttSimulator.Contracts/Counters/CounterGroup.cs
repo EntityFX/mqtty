@@ -26,9 +26,11 @@
         public object PreviousValue => string.Empty;
         public IEnumerable<KeyValuePair<long, object>> HistoryValues => Enumerable.Empty<KeyValuePair<long, object>>();
 
-        public long LastTicks { get; private set; }
+        // Tick stamps come from the shared simulator clock, so refreshing a
+        // group never writes to the group instance itself.
+        public long LastTicks => CounterClock.Ticks;
 
-        public long LastSteps { get; private set; }
+        public long LastSteps => CounterClock.Steps;
 
         public KeyValuePair<long, object> TickPreviousValue => new KeyValuePair<long, object>(0, 0);
 
@@ -53,17 +55,10 @@
 
         public virtual void Refresh(long totalTicks, long totalSteps)
         {
-            if (!Enabled)
-            {
-                return;
-            }
-
             // Individual counters take their tick stamps from the shared
-            // simulator clock (CounterClock), so walking the whole counter tree
-            // on every tick is no longer needed. Overriders may still do their
+            // simulator clock (CounterClock), so neither this group nor the
+            // counter tree needs per-tick writes. Overriders may still do their
             // own bookkeeping (e.g. MqttCounters RPS recalculation).
-            LastTicks = totalTicks;
-            LastSteps = totalSteps;
         }
 
         public override string ToString()

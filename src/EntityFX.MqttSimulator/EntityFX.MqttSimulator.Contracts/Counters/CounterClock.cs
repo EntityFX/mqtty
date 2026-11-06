@@ -1,6 +1,4 @@
-using System.Threading;
-
-namespace EntityFX.MqttY.Counter
+namespace EntityFX.MqttY.Contracts.Counters
 {
     /// <summary>
     /// Global simulation clock shared by all counters. Instead of writing
@@ -8,7 +6,7 @@ namespace EntityFX.MqttY.Counter
     /// tree walk per node per tick), the simulator publishes the current tick
     /// once and counters read it on demand.
     /// </summary>
-    internal static class CounterClock
+    public static class CounterClock
     {
         private static long _ticks;
         private static long _steps;

@@ -53,6 +53,135 @@ MqttY — это симулятор сетей MQTT-брокеров, испол
 - p99-латентность публикации и получения (мс)
 - Ошибки графа и ошибки доставки
 
+### 2.4 Топологии экспериментов
+
+#### LoadBalancing — топология балансировки нагрузки (RoundRobin)
+
+```mermaid
+graph TB
+    subgraph Clients["Публикующие клиенты (64)"]
+        C1[Client 1]
+        C2[Client 2]
+        C3[Client 3]
+        C4[Client 4]
+        C5[...]
+        C64[Client 64]
+    end
+
+    subgraph LB["Load Balancer (RoundRobin)"]
+        LB1[LB]
+    end
+
+    subgraph Brokers["Брокеры (16 узлов)"]
+        B1[Broker 1]
+        B2[Broker 2]
+        B3[Broker 3]
+        B4[Broker 4]
+        B5[...]
+        B16[Broker 16]
+    end
+
+    subgraph Networks["Сегменты сети (4 на узел, 64 всего)"]
+        N1[Net 1-1]
+        N2[Net 1-2]
+        N3[...]
+        N4[Net 1-4]
+    end
+
+    C1 --> LB1
+    C2 --> LB1
+    C3 --> LB1
+    C4 --> LB1
+    C5 --> LB1
+    C64 --> LB1
+    LB1 --> B1
+    LB1 --> B2
+    LB1 --> B3
+    LB1 --> B4
+    LB1 --> B5
+    LB1 --> B16
+    B1 --> N1
+    B1 --> N2
+    B1 --> N3
+    B1 --> N4
+```
+
+#### Relay — топология реле-сети
+
+```mermaid
+graph TB
+    subgraph Clients["MQTT клиенты"]
+        C1[Client]
+        C2[Client]
+        C3[...]
+    end
+
+    subgraph Relays["Реле-серверы (узлы)"]
+        R1[Relay 1]
+        R2[Relay 2]
+        R3[Relay 3]
+        R4[...]
+        R16[Relay 16]
+    end
+
+    subgraph Receivers["Получатели"]
+        Rec1[Receiver 1]
+        Rec2[Receiver 2]
+        Rec3[...]
+    end
+
+    C1 --> R1
+    C2 --> R2
+    C3 --> R3
+    R1 --> R2
+    R2 --> R3
+    R3 --> R4
+    R1 --> Rec1
+    R2 --> Rec2
+    R3 --> Rec3
+```
+
+#### Federation — топология федерации (звезда)
+
+```mermaid
+graph TB
+    subgraph Publishers["Издатели (64)"]
+        P1[Publisher 1]
+        P2[Publisher 2]
+        P3[...]
+        P64[Publisher 64]
+    end
+
+    subgraph CentralBroker["Центральный брокер (узел 0)"]
+        CB[Broker 0]
+    end
+
+    subgraph EdgeBrokers["Граничные брокеры (узлы 1-15)"]
+        EB1[Broker 1]
+        EB2[Broker 2]
+        EB3[Broker 3]
+        EB4[...]
+        EB15[Broker 15]
+    end
+
+    subgraph Suppression["Подавление дублей / кэш"]
+        SC[Suppression Cache]
+    end
+
+    P1 --> CB
+    P2 --> CB
+    P3 --> CB
+    P64 --> CB
+    CB --> EB1
+    CB --> EB2
+    CB --> EB3
+    CB --> EB4
+    CB --> EB15
+    EB1 --> SC
+    EB2 --> SC
+    EB3 --> SC
+```
+
 ---
 
 ## 3. Результаты

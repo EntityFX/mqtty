@@ -24,6 +24,11 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
     /// </summary>
     private ConcurrentQueue<NetworkMonitoringPacket> _monitoringPacketsQueue = new();
 
+    // Number of items currently in _monitoringPacketsQueue. ConcurrentQueue.Count
+    // walks the segment list and takes locks, which turned every send into a
+    // serialised operation on the dense client LAN; this counter is O(1).
+    private int _queueLength;
+
     // Deferred (not-yet-due) network packets, split from the ready queue so each
     // tick only touches packets once and never re-enqueues the whole backlog
     // (O(ready) per tick instead of O(whole queue)) (R1).
@@ -32,12 +37,11 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
     private readonly NetworkOptions _networkTypeOption;
     private readonly object _admissionLock = new();
-    private readonly Queue<(long Tick, int Bytes)> _admissions = new();
+    private readonly ConcurrentQueue<(long Tick, int Bytes)> _admissions = new();
+    private readonly double _throughputBudgetBytes;
     private long _windowBytes;
 
     //private Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
-
-    private readonly TicksOptions _ticksOptions;
 
     private readonly NetworkCounters _networkCounters;
     private CounterGroup _counters;
@@ -119,7 +123,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
     public override NodeType NodeType => NodeType.Network;
 
     public long QueueSize =>
-        _monitoringPacketsQueue.Count + _deferredPackets.Count + _deferredPacketsNext.Count;
+        Volatile.Read(ref _queueLength) + _deferredPackets.Count + _deferredPacketsNext.Count;
 
     public Network(
         int index, string name, string address, string networkType,
@@ -129,10 +133,11 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         networkTypeOption.Validate();
         ticksOptions.Validate();
         this._networkTypeOption = networkTypeOption;
-        this._ticksOptions = ticksOptions;
         _networkCounters = new NetworkCounters(Name, "NC", ticksOptions, enableCounters,
             throughputWindowTicks: networkTypeOption.ThroughputWindowTicks);
         _counters = new CounterGroup(Name, "NN", "Network", "NG", enableCounters);
+        _throughputBudgetBytes = networkTypeOption.CapacityBytesPerSecond *
+            ticksOptions.TickPeriod.TotalSeconds * networkTypeOption.ThroughputWindowTicks;
         NetworkType = networkType;
     }
 
@@ -294,36 +299,49 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
     {
         var packet = networkPacket.Packet;
 
-        // Lock-free fast-fail for the common overload case; avoids taking the
-        // admission lock when the queue is already saturated.
-        if (_monitoringPacketsQueue.Count >= _networkTypeOption.QueueCapacity)
+        // Lock-free fast-fail for the common overload case; avoids touching the
+        // shared admission window when the queue is already saturated.
+        if (Volatile.Read(ref _queueLength) >= _networkTypeOption.QueueCapacity)
         {
             _networkCounters.Refuse();
             return false;
         }
 
-        lock (_admissionLock)
+        // The throughput window is claimed with a single interlocked add. The
+        // window entries are pruned once per tick in Refresh, so concurrent
+        // sends from many nodes on the same network no longer serialise on a
+        // monitor lock (the shared client LAN was the node-phase bottleneck).
+        var bytes = packet.PacketBytes;
+        var windowBytes = Interlocked.Add(ref _windowBytes, bytes);
+        if (Volatile.Read(ref _queueLength) >= _networkTypeOption.QueueCapacity ||
+            windowBytes > _throughputBudgetBytes)
         {
-            var tick = NetworkSimulator!.TotalTicks;
-            while (_admissions.TryPeek(out var admission) &&
-                   tick - admission.Tick >= _networkTypeOption.ThroughputWindowTicks)
-                _windowBytes -= _admissions.Dequeue().Bytes;
+            Interlocked.Add(ref _windowBytes, -bytes);
+            _networkCounters.Refuse();
+            return false;
+        }
 
-            var budget = _networkTypeOption.CapacityBytesPerSecond *
-                _ticksOptions.TickPeriod.TotalSeconds * _networkTypeOption.ThroughputWindowTicks;
-            if (_monitoringPacketsQueue.Count >= _networkTypeOption.QueueCapacity ||
-                _windowBytes + packet.PacketBytes > budget)
+        if (isTransfer) packet.DecrementTtl();
+        _monitoringPacketsQueue.Enqueue(networkPacket);
+        Interlocked.Increment(ref _queueLength);
+        _admissions.Enqueue((NetworkSimulator!.TotalTicks, bytes));
+        _networkCounters.CountInbound(packet);
+        return true;
+    }
+
+    /// <summary>
+    /// Drops expired throughput-window entries. Runs from <see cref="Refresh"/>,
+    /// which is single-threaded for a given network.
+    /// </summary>
+    private void PruneAdmissions(long tick)
+    {
+        while (_admissions.TryPeek(out var admission) &&
+               tick - admission.Tick >= _networkTypeOption.ThroughputWindowTicks)
+        {
+            if (_admissions.TryDequeue(out var expired))
             {
-                _networkCounters.Refuse();
-                return false;
+                Interlocked.Add(ref _windowBytes, -expired.Bytes);
             }
-
-            if (isTransfer) packet.DecrementTtl();
-            _monitoringPacketsQueue.Enqueue(networkPacket);
-            _admissions.Enqueue((tick, packet.PacketBytes));
-            _windowBytes += packet.PacketBytes;
-            _networkCounters.CountInbound(packet);
-            return true;
         }
     }
 
@@ -461,9 +479,14 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         var deferredNext = _deferredPacketsNext;
         var totalTicks = NetworkSimulator!.TotalTicks;
 
-        var pendingCount = _monitoringPacketsQueue.Count;
+        // Expire the throughput window before the node phase can enqueue new
+        // packets. Sends only claim budget; the prune stays single-threaded.
+        PruneAdmissions(totalTicks);
+
+        var pendingCount = Volatile.Read(ref _queueLength);
         for (var i = 0; i < pendingCount && _monitoringPacketsQueue.TryDequeue(out var pendingPacket); i++)
         {
+            Interlocked.Decrement(ref _queueLength);
             if (!ProcessNetworkPacket(pendingPacket, totalTicks, deferredNext))
             {
                 deferredNext.Add(pendingPacket);
@@ -484,9 +507,9 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         _deferredPackets = deferredNext;
         _deferredPacketsNext = deferred;
 
-        _networkCounters.SetQueueLength(_monitoringPacketsQueue.Count + _deferredPackets.Count + _deferredPacketsNext.Count);
         if (NetworkSimulator!.EnableCounters)
         {
+            _networkCounters.SetQueueLength(Volatile.Read(ref _queueLength) + _deferredPackets.Count + _deferredPacketsNext.Count);
             Counters.Refresh(NetworkSimulator!.TotalTicks, NetworkSimulator!.TotalSteps);
         }
     }
@@ -618,6 +641,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         lock (_admissionLock)
         {
             _monitoringPacketsQueue.Clear();
+            Interlocked.Exchange(ref _queueLength, 0);
             _deferredPackets.Clear();
             _deferredPacketsNext.Clear();
             _admissions.Clear();

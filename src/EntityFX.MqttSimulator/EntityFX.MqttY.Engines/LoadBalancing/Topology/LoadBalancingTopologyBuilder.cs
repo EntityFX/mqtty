@@ -11,7 +11,7 @@ public static class LoadBalancingTopologyBuilder
 {
     public const string Topic = "balancing/data";
 
-    public static LoadBalancingTopology Build(PreparedExperiment input)
+    public static LoadBalancingTopology Build(PreparedExperiment input, bool isolateNetworks = false)
     {
         var options = input.Options;
         var ticks = options.Ticks();
@@ -28,11 +28,13 @@ public static class LoadBalancingTopologyBuilder
                 if (!graph.AddNetwork(area)) throw new InvalidOperationException("Duplicate network.");
                 return area;
             }
-            var lan = Area("clients");
+            var sharedLan = isolateNetworks ? null : Area("clients");
+            var clientLans = new ModelNetwork[options.BackendCount];
             var brokers = new IMqttBroker[options.BackendCount];
             for (var backend = 0; backend < brokers.Length; backend++)
             {
-                var previous = lan;
+                var previous = sharedLan ?? Area($"clients{backend}");
+                clientLans[backend] = previous;
                 for (var hop = 1; hop <= options.NetworkLength; hop++)
                 {
                     var next = Area($"backend{backend}-hop{hop}");
@@ -45,16 +47,20 @@ public static class LoadBalancingTopologyBuilder
                 brokers[backend] = builder.Add(previous, ticks, backend);
                 brokers[backend].Start();
             }
-            MqttClient Client(string name)
+            MqttClient Client(string name, ModelNetwork network)
             {
-                var client = new MqttClient(packets, index++, name, $"mqtt://{name}.clients.local",
+                var client = new MqttClient(packets, index++, name, $"mqtt://{name}.{network.Name}.local",
                     "mqtt", "mqtt-client", name, ticks, true);
-                lan.AddClient(client);
+                network.AddClient(client);
                 graph.AddClient(client);
                 return client;
             }
-            var publishers = Enumerable.Range(0, options.TotalPublishers).Select(i => Client($"publisher{i:D4}")).ToArray();
-            var receivers = Enumerable.Range(0, brokers.Length).Select(i => Client($"receiver{i:D4}")).ToArray();
+            var publishers = Enumerable.Range(0, options.TotalPublishers)
+                .Select(i => Client($"publisher{i:D4}", clientLans[input.Assignments[i]]))
+                .ToArray();
+            var receivers = Enumerable.Range(0, brokers.Length)
+                .Select(i => Client($"receiver{i:D4}", clientLans[i]))
+                .ToArray();
             graph.UpdateRoutes();
             return new(graph, publishers, receivers, brokers);
         }

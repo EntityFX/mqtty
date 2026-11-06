@@ -61,7 +61,8 @@ public sealed class LoadBalancingExperimentRunner
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            topology = LoadBalancingTopologyBuilder.Build(input);
+            topology = LoadBalancingTopologyBuilder.Build(input,
+                Environment.GetEnvironmentVariable("MQTTY_ISOLATE_NETWORKS") == "1");
             var graph = topology.Graph;
             if (output != null)
             {

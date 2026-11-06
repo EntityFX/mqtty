@@ -44,6 +44,17 @@ public class NetworkSimulator : INetworkSimulator
     private KeyValuePair<(string Address, NodeType NodeType), ILeafNode>[] _orderedNodes = Array.Empty<KeyValuePair<(string Address, NodeType NodeType), ILeafNode>>();
     private readonly object _measurementResetLock = new();
 
+    // Persistent refresh workers (created lazily on the first parallel tick).
+    private TickWorkerPool? _tickWorkerPool;
+    private int _tickWorkerPoolSize;
+
+    private static readonly bool RefreshStatsEnabled =
+        Environment.GetEnvironmentVariable("MQTTY_REFRESH_STATS") == "1";
+    private long _refreshStatsTicks;
+    private long _refreshStatsWall;
+    private long _refreshStatsNetworkPhaseWall;
+    private long _refreshStatsNodePhaseWall;
+
     public SimulationRunMode RunMode { get; set; } = SimulationRunMode.RealTime;
     public double SpeedMultiplier { get; set; } = 1.0;
 
@@ -83,7 +94,8 @@ public class NetworkSimulator : INetworkSimulator
         PathFinder = pathFinder;
         Monitoring = monitoring;
         this._ticksOptions = ticksOptions;
-        this.EnableCounters = enableCounters;
+        this.EnableCounters = enableCounters &&
+            Environment.GetEnvironmentVariable("MQTTY_DISABLE_COUNTERS") != "1";
         this.EnableMonitoring = false;
         PathFinder.NetworkGraph = this;
 
@@ -352,6 +364,7 @@ public class NetworkSimulator : INetworkSimulator
                     node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
                     scope);
             }
+
             node.Value.Refresh();
         }
 
@@ -371,77 +384,53 @@ public class NetworkSimulator : INetworkSimulator
                 RefreshNode(node);
             }
         }
-        else if (strategy == 0)
-        {
-            // Range-partitioned worker pool: contiguous stripes per worker give
-            // better cache locality and avoid Parallel's TaskReplicator /
-            // loop-state overhead, which is a top CPU consumer at this tick rate.
-            RunRanges(networks.Length, i => RefreshNetwork(networks[i]));
-            RunRanges(nodes.Length, i => RefreshNode(nodes[i]));
-        }
         else
         {
-            // Shard per network: the network and all of its nodes are refreshed
-            // on the same worker, so they never contend for the network queue.
-            RunRanges(networks.Length, i =>
+            // Bulk-synchronous two-phase refresh on persistent worker threads:
+            // every network is refreshed, then every node. The flat node list is
+            // scheduled dynamically, so networks that own most of the nodes (the
+            // shared client LAN in particular) no longer pin the tick to one
+            // worker. Strategy 1 used to shard "network + its nodes", which made
+            // that dense shard the serial bottleneck; the balanced two-phase
+            // schedule is both faster and deterministic.
+            var pool = EnsureTickWorkerPool();
+            var statsStart = RefreshStatsEnabled ? Stopwatch.GetTimestamp() : 0;
+            pool.Run(
+                i => RefreshNetwork(networks[i]), networks.Length,
+                i => RefreshNode(nodes[i]), nodes.Length);
+            if (RefreshStatsEnabled)
             {
-                RefreshNetwork(networks[i]);
-                var shardNodes = networks[i].Value.Nodes;
-                foreach (var node in shardNodes)
-                {
-                    RefreshNode(new KeyValuePair<(string Address, NodeType NodeType), ILeafNode>(
-                        (node.Key, node.Value.NodeType), (ILeafNode)node.Value));
-                }
-            });
+                _refreshStatsTicks++;
+                _refreshStatsWall += Stopwatch.GetTimestamp() - statsStart;
+                _refreshStatsNetworkPhaseWall += pool.LastNetworkPhaseTicks;
+                _refreshStatsNodePhaseWall += pool.LastNodePhaseTicks;
+            }
         }
 
         Tick();
     }
 
     /// <summary>
-    /// Executes <paramref name="body"/> over [0, itemCount) using a fixed pool of
-    /// range-partitioned tasks (contiguous stripes) with a final barrier.
+    /// Returns the persistent refresh pool, creating it on first use. The pool
+    /// lives for the whole simulation so a tick no longer pays task creation,
+    /// thread-pool wake-up and <see cref="Task.WaitAll"/> costs.
     /// </summary>
-    private void RunRanges(int itemCount, Action<int> body)
+    private TickWorkerPool EnsureTickWorkerPool()
     {
-        if (itemCount == 0)
+        var desired = MaxDegreeOfParallelism > 0
+            ? MaxDegreeOfParallelism
+            : Environment.ProcessorCount;
+        desired = Math.Max(1, desired);
+
+        if (_tickWorkerPool != null && _tickWorkerPoolSize == desired)
         {
-            return;
+            return _tickWorkerPool;
         }
 
-        var workerCount = MaxDegreeOfParallelism > 0
-            ? Math.Min(MaxDegreeOfParallelism, itemCount)
-            : Math.Min(Environment.ProcessorCount, itemCount);
-
-        if (workerCount <= 1)
-        {
-            for (var i = 0; i < itemCount; i++)
-            {
-                body(i);
-            }
-            return;
-        }
-
-        var chunk = (itemCount + workerCount - 1) / workerCount;
-        var tasks = new Task[workerCount];
-        for (var w = 0; w < workerCount; w++)
-        {
-            var from = w * chunk;
-            var to = Math.Min(itemCount, from + chunk);
-            if (from >= to)
-            {
-                tasks[w] = Task.CompletedTask;
-                continue;
-            }
-            tasks[w] = Task.Run(() =>
-            {
-                for (var i = from; i < to; i++)
-                {
-                    body(i);
-                }
-            });
-        }
-        Task.WaitAll(tasks);
+        _tickWorkerPool?.Dispose();
+        _tickWorkerPool = new TickWorkerPool(desired);
+        _tickWorkerPoolSize = desired;
+        return _tickWorkerPool;
     }
 
     private void RefreshImplementation(NetworkLoggerScope? scope, int strategy)
@@ -842,11 +831,57 @@ public class NetworkSimulator : INetworkSimulator
         {
             _lastSimulationException = ex;
         }
+        finally
+        {
+            if (RefreshStatsEnabled && _refreshStatsTicks > 0)
+            {
+                var frequency = (double)Stopwatch.Frequency;
+                Console.Error.WriteLine(
+                    $"refresh-stats ticks={_refreshStatsTicks} workers={_tickWorkerPoolSize} " +
+                    $"wall_ms={_refreshStatsWall * 1000 / frequency:F1} " +
+                    $"network_ms={_refreshStatsNetworkPhaseWall * 1000 / frequency:F1} " +
+                    $"node_ms={_refreshStatsNodePhaseWall * 1000 / frequency:F1} " +
+                    $"us_per_tick={_refreshStatsWall / frequency * 1e6 / _refreshStatsTicks:F1}");
+
+                if (_tickWorkerPool != null &&
+                    Environment.GetEnvironmentVariable("MQTTY_WORKER_STATS") == "1")
+                {
+                    var p1 = _tickWorkerPool.Phase1Busy;
+                    var p2 = _tickWorkerPool.Phase2Busy;
+                    var p1Sum = p1.Sum();
+                    var p1Max = p1.Length > 0 ? p1.Max() : 0;
+                    var p2Sum = p2.Sum();
+                    var p2Max = p2.Length > 0 ? p2.Max() : 0;
+                    var wall = _refreshStatsWall;
+                    Console.Error.WriteLine(
+                        $"worker-stats phase1 sum_ms={p1Sum * 1000 / frequency:F1} max_ms={p1Max * 1000 / frequency:F1} " +
+                        $"phase2 sum_ms={p2Sum * 1000 / frequency:F1} max_ms={p2Max * 1000 / frequency:F1} " +
+                        $"wall_ms={wall * 1000 / frequency:F1} " +
+                        $"p2_parallelism={(p2Max > 0 ? (double)p2Sum / p2Max : 0):F2}");
+                }
+            }
+
+            DisposeTickWorkerPool();
+        }
     }
+
+    private void DisposeTickWorkerPool()
+    {
+        _tickWorkerPool?.Dispose();
+        _tickWorkerPool = null;
+        _tickWorkerPoolSize = 0;
+    }
+
+    private static readonly bool NonAtomicPacketId =
+        Environment.GetEnvironmentVariable("MQTTY_NONATOMIC_ID") == "1";
 
     public long GetPacketId()
     {
-        Interlocked.Increment(ref _packetId);
-        return _packetId;
+        if (NonAtomicPacketId)
+        {
+            return ++_packetId;
+        }
+
+        return Interlocked.Increment(ref _packetId);
     }
 }

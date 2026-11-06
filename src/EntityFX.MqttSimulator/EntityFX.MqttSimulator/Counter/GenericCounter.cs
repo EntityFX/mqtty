@@ -16,7 +16,7 @@ namespace EntityFX.MqttY.Counter
 
         object ICounter.Value => Value;
 
-        public long PreviousValue => _privateValue;
+        public long PreviousValue => _value;
 
         IEnumerable<KeyValuePair<long, object>> ICounter.HistoryValues => 
             _valueHistory.Select(vh => new KeyValuePair<long, object>(vh.Key, vh.Value));
@@ -36,9 +36,9 @@ namespace EntityFX.MqttY.Counter
         public IEnumerable<KeyValuePair<long, long>> HistoryValues => 
             _valueHistory;
 
-        public KeyValuePair<long, long>? TickPreviousValue => _tickPreviousValue;
+        public KeyValuePair<long, long>? TickPreviousValue => null;
 
-        KeyValuePair<long, object>? ICounter.TickPreviousValue => _tickPreviousValue != null ? new KeyValuePair<long, object>(_tickPreviousValue.Value.Key, _tickPreviousValue.Value.Value) : null;
+        KeyValuePair<long, object>? ICounter.TickPreviousValue => null;
 
         public KeyValuePair<long, long>? TickFirstValue => _tickFirstValue;
 
@@ -49,9 +49,6 @@ namespace EntityFX.MqttY.Counter
         private readonly FixedSizedQueue<KeyValuePair<long, long>> _valueHistory;
 
         private long _value = 0;
-        private long _privateValue = 0;
-        private KeyValuePair<long, long>? _tickPreviousValue;
-
         private KeyValuePair<long, long>? _tickFirstValue;
         
 
@@ -75,35 +72,40 @@ namespace EntityFX.MqttY.Counter
             {
                 return;
             }
-            _privateValue = Value;
-            Interlocked.Increment(ref _value);
-            _tickPreviousValue = new KeyValuePair<long, long>(LastTicks, _privateValue);
+
+            // Hot path: a single atomic update. Writing the previous/tick fields
+            // on every increment made counters shared by many workers (the client
+            // LAN inbound/outbound counters in particular) bounce cache lines.
+            var value = Interlocked.Increment(ref _value);
 
             if (_tickFirstValue == null)
             {
-                _tickFirstValue = new KeyValuePair<long, long>(LastTicks, _privateValue);
+                _tickFirstValue = new KeyValuePair<long, long>(LastTicks, value - 1);
             }
 
             if (HistoryEnabled)
             {
-                _valueHistory.Enqueue(_tickPreviousValue.Value);
+                _valueHistory.Enqueue(new KeyValuePair<long, long>(LastTicks, value - 1));
             }
         }
 
         public void Add(long value)
         {
-            _privateValue = Value;
-            Interlocked.Add(ref _value, value);
+            if (!Enabled || value == 0)
+            {
+                return;
+            }
+
+            var next = Interlocked.Add(ref _value, value);
 
             if (_tickFirstValue == null)
             {
-                _tickFirstValue = new KeyValuePair<long, long>(LastTicks, _privateValue);
+                _tickFirstValue = new KeyValuePair<long, long>(LastTicks, next - value);
             }
-
 
             if (HistoryEnabled)
             {
-                _valueHistory.Enqueue(new KeyValuePair<long, long>(LastTicks, _privateValue));
+                _valueHistory.Enqueue(new KeyValuePair<long, long>(LastTicks, next - value));
             }
         }
 
@@ -137,9 +139,7 @@ namespace EntityFX.MqttY.Counter
         public void Clear()
         {
             _value = 0;
-            _privateValue = 0;
             _tickFirstValue = null;
-            _tickPreviousValue = null;
             _valueHistory.Clear();
         }
     }

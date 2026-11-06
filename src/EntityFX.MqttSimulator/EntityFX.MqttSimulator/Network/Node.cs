@@ -19,12 +19,13 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
     private readonly ConcurrentDictionary<long, ResponseMonitoringPacket> _responseMessages = new();
-    private long _responseRefreshCount;
     // MQTT publish handshakes have their own state machine; only legacy blocking
     // request APIs need the generic transport response table.
     protected virtual bool ShouldTrackResponse(INetworkPacket packet) => true;
     private readonly ConcurrentQueue<NodeMonitoringPacket> _outgoingMessages = new();
     private readonly ConcurrentQueue<NodeMonitoringPacket> _incommingMessages = new();
+    private int _outgoingQueueLength;
+    private int _incommingQueueLength;
 
     // Deferred (not-yet-due) packets, split from the ready queues so each tick
     // only touches packets once and never re-enqueues the whole backlog
@@ -35,6 +36,8 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     private List<NodeMonitoringPacket> _incommingDeferredNext = new();
 
     private static readonly ConcurrentBag<NodeMonitoringPacket> _packetPool = new();
+    private static readonly bool PacketPoolDisabled =
+        Environment.GetEnvironmentVariable("MQTTY_NO_PACKET_POOL") == "1";
     protected readonly TicksOptions TicksOptions;
 
     protected NodeCounters counters;
@@ -84,12 +87,13 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         }
         _outgoingMessages.Clear();
         _incommingMessages.Clear();
+        _outgoingQueueLength = 0;
+        _incommingQueueLength = 0;
         _outgoingDeferred.Clear();
         _outgoingDeferredNext.Clear();
         _incommingDeferred.Clear();
         _incommingDeferredNext.Clear();
         _responseMessages.Clear();
-        _responseRefreshCount = 0;
     }
 
     public override void Refresh()
@@ -97,20 +101,21 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         var sim = NetworkSimulator!;
         var totalTicks = sim.TotalTicks;
 
-        ProcessReady(_outgoingMessages, _outgoingDeferred, _outgoingDeferredNext, totalTicks, SendToNetwork);
-        ProcessReady(_incommingMessages, _incommingDeferred, _incommingDeferredNext, totalTicks, CompleteReceive);
+        ProcessReady(_outgoingMessages, _outgoingDeferred, _outgoingDeferredNext, totalTicks, SendToNetwork,
+            ref _outgoingQueueLength);
+        ProcessReady(_incommingMessages, _incommingDeferred, _incommingDeferredNext, totalTicks, CompleteReceive,
+            ref _incommingQueueLength);
 
         // Rotate the deferred lists so packets deferred this tick are processed
         // on the next tick (matches Network.Refresh swap).
         (_outgoingDeferred, _outgoingDeferredNext) = (_outgoingDeferredNext, _outgoingDeferred);
         (_incommingDeferred, _incommingDeferredNext) = (_incommingDeferredNext, _incommingDeferred);
 
-        Interlocked.Increment(ref _responseRefreshCount);
         if (sim.EnableCounters)
         {
             base.Refresh();
-            counters.SetOutgoingQueueLength(_outgoingMessages.Count + _outgoingDeferred.Count + _outgoingDeferredNext.Count);
-            counters.SetIncommingQueueLength(_incommingMessages.Count + _incommingDeferred.Count + _incommingDeferredNext.Count);
+            counters.SetOutgoingQueueLength(Volatile.Read(ref _outgoingQueueLength) + _outgoingDeferred.Count + _outgoingDeferredNext.Count);
+            counters.SetIncommingQueueLength(Volatile.Read(ref _incommingQueueLength) + _incommingDeferred.Count + _incommingDeferredNext.Count);
             counters.SetReceiveQueueLength(_responseMessages.Count);
         }
     }
@@ -127,11 +132,13 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         List<NodeMonitoringPacket> deferred,
         List<NodeMonitoringPacket> deferredNext,
         long totalTicks,
-        Action<NodeMonitoringPacket> process)
+        Action<NodeMonitoringPacket> process,
+        ref int queueLength)
     {
-        var readyCount = queue.Count;
+        var readyCount = Volatile.Read(ref queueLength);
         for (var i = 0; i < readyCount && queue.TryDequeue(out var packet); i++)
         {
+            Interlocked.Decrement(ref queueLength);
             if (!ProcessPacket(packet, totalTicks, process))
             {
                 deferredNext.Add(packet);
@@ -183,7 +190,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         var packet = incomming.RequestPacket;
         incomming.Release();
         CompleteReceiveImplementation(packet);
-        _packetPool.Add(incomming);
+        if (!PacketPoolDisabled) _packetPool.Add(incomming);
     }
 
     protected override bool SendImplementation(INetworkPacket packet)
@@ -227,7 +234,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         var sim = NetworkSimulator!;
         var tick = sim.TotalTicks;
         NodeMonitoringPacket outgoing;
-        if (!_packetPool.TryTake(out outgoing!))
+        if (PacketPoolDisabled || !_packetPool.TryTake(out outgoing!))
         {
             outgoing = new NodeMonitoringPacket(tick, packet, true, sim.WaitMode)
             {
@@ -241,7 +248,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
             outgoing.Reset(tick, packet, true, sim.WaitMode, TicksOptions.OutgoingWaitTicks, sim.GetPacketId(), tick);
         }
         if (ShouldTrackResponse(packet))
-        _responseMessages[packet.Id] = new ResponseMonitoringPacket(sim.WaitMode, Volatile.Read(ref _responseRefreshCount))
+        _responseMessages[packet.Id] = new ResponseMonitoringPacket(sim.WaitMode, tick)
         {
             RequestPacket = packet,
             RequestTick = outgoing.SendTick,
@@ -249,6 +256,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
             Id = packet.Id
         };
         _outgoingMessages.Enqueue(outgoing);
+        Interlocked.Increment(ref _outgoingQueueLength);
     }
 
     private void PreReceive(INetworkPacket packet)
@@ -256,7 +264,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         var sim = NetworkSimulator!;
         var tick = sim.TotalTicks;
         NodeMonitoringPacket incoming;
-        if (!_packetPool.TryTake(out incoming!))
+        if (PacketPoolDisabled || !_packetPool.TryTake(out incoming!))
         {
             incoming = new NodeMonitoringPacket(tick, packet, true, sim.WaitMode)
             {
@@ -270,6 +278,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
             incoming.Reset(tick, packet, true, sim.WaitMode, TicksOptions.OutgoingWaitTicks, sim.GetPacketId(), tick);
         }
         _incommingMessages.Enqueue(incoming);
+        Interlocked.Increment(ref _incommingQueueLength);
     }
 
     protected ResponsePacket? WaitResponse(long packetId)
@@ -289,7 +298,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
 
         _responseMessages.TryRemove(packetId, out _);
 
-        if (monitorPacket.HasExpired(Volatile.Read(ref _responseRefreshCount)))
+        if (monitorPacket.HasExpired(NetworkSimulator!.TotalTicks))
         {
             return null;
         }
@@ -336,7 +345,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
             return null;
         }
 
-        if (monitorPacket.HasExpired(Volatile.Read(ref _responseRefreshCount)))
+        if (monitorPacket.HasExpired(NetworkSimulator!.TotalTicks))
         {
             return null;
         }

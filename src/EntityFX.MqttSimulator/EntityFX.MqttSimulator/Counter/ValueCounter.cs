@@ -91,6 +91,15 @@ namespace EntityFX.MqttY.Counter
                 _tickFirstValue = new KeyValuePair<long, TValue>(LastTicks, value);
             }
 
+            // Queue length and similar gauges are set every tick but rarely
+            // change; skipping the writes avoids false sharing when workers
+            // refresh different nodes that share a counter. History-enabled
+            // counters still record every sample to preserve sampling semantics.
+            if (!HistoryEnabled && EqualityComparer<TValue>.Default.Equals(_value, value))
+            {
+                return;
+            }
+
             _previousValue = value;
             _value = value;
 
