@@ -15,6 +15,7 @@ public sealed class StaticFederator
     private readonly Dictionary<int, ObservedMqttClient> outputs;
     private readonly KeyValuePair<int, ObservedMqttClient>[] targets;
     private readonly Dictionary<int, Queue<QueuedPublication>> queues;
+    private readonly Queue<QueuedPublication>[] targetQueues;
     private readonly HashSet<(int Origin, long Sequence)> seen = new();
     public long SuppressedDuplicates { get; private set; }
     public long QueueDrops { get; private set; }
@@ -40,6 +41,7 @@ public sealed class StaticFederator
         this.site = site; this.options = options; this.ledger = ledger; this.policy = policy; this.outputs = outputs;
         queues = outputs.Keys.ToDictionary(n => n, _ => new Queue<QueuedPublication>());
         targets = outputs.OrderBy(p => p.Key).Select(p => new KeyValuePair<int, ObservedMqttClient>(p.Key, p.Value)).ToArray();
+        targetQueues = targets.Select(p => queues[p.Key]).ToArray();
     }
 
     public void Receive(MqttMessage message)
@@ -77,13 +79,31 @@ public sealed class StaticFederator
 
     public void Pump()
     {
-        foreach (var pair in targets)
+        var published = 0;
+        for (var i = 0; i < targets.Length; i++)
         {
-            if (!pair.Value.HasPendingPublish && queues[pair.Key].TryDequeue(out var p))
+            var queue = targetQueues[i];
+            if (queue.Count == 0)
             {
-                pair.Value.Publish(p.Topic, p.Payload, (MqttQos)options.Qos);
-                Interlocked.Decrement(ref _activeCount);
+                continue;
             }
+
+            var target = targets[i];
+            if (target.Value.HasPendingPublish || !queue.TryDequeue(out var p))
+            {
+                continue;
+            }
+
+            target.Value.Publish(p.Topic, p.Payload, (MqttQos)options.Qos);
+            published++;
+        }
+
+        // One atomic update per federator per tick instead of one per message.
+        // IsIdle is only polled after Pump returns, so a slightly delayed
+        // decrement cannot hide queued work from the drain loop.
+        if (published != 0)
+        {
+            Interlocked.Add(ref _activeCount, -published);
         }
     }
 }

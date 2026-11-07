@@ -35,6 +35,16 @@ internal sealed class TickWorkerPool : IDisposable
     private static readonly bool BusyStatsEnabled =
         Environment.GetEnvironmentVariable("MQTTY_WORKER_STATS") == "1";
 
+    // How many SpinWait(32) rounds the barrier spins before falling back to
+    // Thread.Yield(). Spinning avoids a syscall when the tail is short, but
+    // burns a core that the slowest worker may still need. Measurements on a
+    // 4C/8T host: 64 rounds beat the old fixed 4096 by ~5% wall speedup
+    // (1.62x vs 1.54x); 0 (always yield) and 512+ were worse.
+    private static readonly int BarrierSpinIterations =
+        int.TryParse(Environment.GetEnvironmentVariable("MQTTY_BARRIER_SPIN"), out var barrierSpin) && barrierSpin >= 0
+            ? barrierSpin
+            : 64;
+
     private readonly int _workerCount;
     private readonly Thread[] _threads;
     private readonly int[] _workerGenerations;
@@ -425,9 +435,10 @@ internal sealed class TickWorkerPool : IDisposable
             }
 
             var spin = 0;
+            var spinLimit = BarrierSpinIterations;
             while (Volatile.Read(ref _generation) == generation)
             {
-                if (spin++ < 4096)
+                if (spin++ < spinLimit)
                 {
                     Thread.SpinWait(32);
                 }
