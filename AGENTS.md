@@ -87,7 +87,7 @@ mqtty/
 - Профиль parallel-only: **~50% времени — ожидание/спин** (`WaitForNextGeneration` 31%, `SpinBarrier` 19%); полезная node-работа ~29%; инфляция работы ×1.51 (10.12 с против 6.72 с sequential refresh); загрузка 3.33/4 ядра. Узкие места работы: `ToArray`/LINQ, pending-list snapshots, `ConcurrentDictionary`, `BrokerMeasurement`.
 - Аллокации ~1.6–5 ГБ на прогон; per-tick `Parallel.For` в `Drive` убран (serial publish), `nodeChunk=1`.
 - Проверены и не дали эффекта: shared LAN ingress, `MQTTY_NONATOMIC_ID`, packet pool, изоляция сетей, статическое распределение. Pointer-chasing 1→4 потока масштабируется на 96% — память не предел.
-- Проверены и отклонены по замерам: pipeline network+outgoing (1.44× vs 1.55×), cost-aware LPT (1.38× vs 1.61×), parallel `Pump` (1.52× vs 1.98×), active-only на large LB (1.97× vs 2.19×), fast-idle (без эффекта). Симуляция CPU-bound и уже занимает все ядра — перекрывать нечего.
+- Проверены и отклонены по замерам: pipeline network+outgoing (1.44× vs 1.55×), cost-aware LPT (1.38× vs 1.61×), parallel `Pump` (1.52× vs 1.98×), active-only на large LB (1.97× vs 2.19×), fast-idle (без эффекта), per-network dependency scheduler (small 1.51× vs 1.59×, large 1.94× vs 2.25×). Симуляция CPU-bound; очередь задач и спин дороже снятого барьера.
 - 8 логических потоков на этом 4C/8T хосте хуже 4 физических: LB small 0.86× vs 1.65×, large 2.11× vs 2.29×. Для целевых 4–8× нужен хост с 8 физическими ядрами.
 - Federation недетерминирован по receiver-латентности и `queueDrops` при перегрузке; core-метрики (counts, unique, goodput, publish p50–p99) совпадают.
 - `StaticFederator.Pump` сортирует цели через `OrderBy` на каждый тик; `topology.Pump()` последовательный.
