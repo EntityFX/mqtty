@@ -195,5 +195,6 @@ dotnet test src/EntityFX.MqttSimulator/EntityFX.Tests.Integration/EntityFX.Tests
 
 - `README.md` — быстрый старт.
 - `doc/optimization/parallelization-plan.md` — **актуальный план** оптимизации и критерии приёмки.
+- `doc/optimization/scaling-forecast.md` — математическая модель и прогноз масштабирования (per-tick decomposition, прогноз для 8/16 ядер).
 - `doc/benchmark-article.md` — статья; её цифры могут отставать от текущего кода.
 - Внешняя документация: `github.com/EntityFX/mqtty-meta`.
