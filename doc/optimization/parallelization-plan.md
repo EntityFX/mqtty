@@ -125,6 +125,45 @@ Federation при перегрузке (`queueDrops > 0`) теряет дете�
 **объём CPU-работы на тик**. Дальнейший рост возможен только через уменьшение
 работы (event-driven/более грубая дискретизация) или больше физических ядер.
 
+### 2.6 Почему не масштабируется: профиль
+
+Замеры parallel-only (`--mode par`) и sequential (`--mode seq`), LB, measure 10 с,
+4 воркера, счётчики off:
+
+| Режим | wall | CPU | CPU/wall | refresh |
+|---|---:|---:|---:|---:|
+| sequential | 8.01 с | 7.85 с | 0.98 core | 6.72 с |
+| parallel 4 | 5.33 с | 17.80 с | 3.33 core | 4.02 с |
+
+Фазовый бюджет parallel:
+- `phase1 + phase2` = 2.93 + 7.18 = **10.12 с** работы → 2.53 с при идеальных 4 воркерах;
+  последовательный refresh — 6.72 с, то есть **инфляция работы ×1.51**;
+- `barrier` = 3.93 с aggregate → 0.98 с на воркера;
+- `p2_parallelism` = 3.94/4; средняя загрузка 3.33 из 4 ядер (83%).
+
+CPU-трассировка parallel-only (top exclusive):
+- `TickWorkerPool.WaitForNextGeneration` — **31.2%**;
+- `SpinBarrier.SignalAndWait` — **19.1%**;
+- `Node.Refresh` inclusive — 28.9%;
+- `EnumerableHelpers.ToArray` — 6.4%;
+- `StorageExtensions.GetPendingMessages` — 3.4%;
+- `ConcurrentDictionary.TryAddInternal` — 2.3%;
+- `BrokerMeasurement.*` — ~4%.
+
+То есть **~50% времени — ожидание/спин**, а не полезная работа. После удаления SHA
+из ideal-пути и per-session locks абсолютный CPU упал на 7–9%, но ratio не вырос:
+быстрее стали обе стороны.
+
+Проверки, исключающие железо:
+- pointer-chasing 1→4 потока: per-thread 96%;
+- OpenSSL 4 потока: per-thread 92%;
+- 8 логических потоков на 4C/8T хуже 4.
+
+Итоговая модель:
+- zero barrier → refresh ≈ 2.8× (упирается в инфляцию работы);
+- zero work inflation → refresh ≈ 2.5× (упирается в барьер/сериализацию);
+- для 4× нужно **и то, и другое**; на 4C/8T потолок ~2.5–3×.
+
 ---
 
 ## 3. Целевая архитектура

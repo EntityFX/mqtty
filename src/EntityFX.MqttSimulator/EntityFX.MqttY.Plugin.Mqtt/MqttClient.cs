@@ -46,8 +46,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         public string ClientId { get; set; }
 
-        public bool HasPendingPublish => _sessionRepository.ReadAll().Any(session =>
-            session.GetPendingMessages().Any());
+        public bool HasPendingPublish => _sessionRepository.ReadAll().Any(session => session.HasPendingMessages());
 
         public SessionState? CurrentSessionState { get; private set; }
 
@@ -55,8 +54,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         public override bool IsQuiescent => base.IsQuiescent &&
             _sessionRepository.ReadAll().All(session =>
-                !session.GetPendingMessages().Any() &&
-                !session.GetPendingAcknowledgements().Any(ack => ack.Type != MqttPacketType.PublishComplete));
+                !session.HasPendingMessages() &&
+                !session.HasPendingAcknowledgements(excludePublishComplete: true));
 
         public IReadOnlyDictionary<string, MqttSubscribtion[]> Subscribtions => 
             _sessionRepository.ReadAll().ToDictionary(s => s.Id, s => s.Subscriptions.Select(cs => new MqttSubscribtion(cs.TopicFilter, cs.MaximumQualityOfService)).ToArray()).ToImmutableDictionary();

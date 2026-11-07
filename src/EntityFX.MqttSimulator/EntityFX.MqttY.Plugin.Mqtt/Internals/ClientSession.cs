@@ -23,5 +23,9 @@
         public List<PendingMessage> PendingMessages { get; set; }
 
         public List<PendingAcknowledgement> PendingAcknowledgements { get; set; }
+
+        internal object SubscriptionsSync { get; } = new();
+        internal object PendingMessagesSync { get; } = new();
+        internal object PendingAcknowledgementsSync { get; } = new();
     }
 }

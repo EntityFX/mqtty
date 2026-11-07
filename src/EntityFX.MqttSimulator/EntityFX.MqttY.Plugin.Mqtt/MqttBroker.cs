@@ -64,8 +64,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         public override bool IsQuiescent => base.IsQuiescent && _processingQueue.IsEmpty &&
             _sessionRepository.ReadAll().All(session =>
-                !session.GetPendingMessages().Any() &&
-                !session.GetPendingAcknowledgements().Any(ack => ack.Type != MqttPacketType.PublishComplete));
+                !session.HasPendingMessages() &&
+                !session.HasPendingAcknowledgements(excludePublishComplete: true));
 
         private readonly PacketIdProvider _packetIdProvider = new();
 
@@ -228,7 +228,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             }
 
             // 2. Вероятностный отказ.
-            if (DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
+            if (sample.PublishFailureRate > 0 &&
+                DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
                     localPublishSequence, "publish-failure") < sample.PublishFailureRate)
             {
                 MqttCounters.RefuseByFailRate(publishPacket.QualityOfService);
@@ -240,17 +241,30 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             // 3. Постановка в очередь обработки с задержкой.
             tracker.ConditionalDeliveryLossRate = sample.ConditionalDeliveryLossRate;
             _measurement.Admit(tracker);
-            var uniform = DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
-                localPublishSequence, "processing-latency");
-            var processingTicks = sample.ObservedLatencyDistribution != null && EmpiricalProtocolFloorTicks.HasValue
-                ? checked((int)Math.Max(0, EmpiricalTicksFromMs(sample.ObservedLatencyDistribution.Sample(uniform)) - EmpiricalProtocolFloorTicks.Value))
-                : sample.ProcessingLatencyDistribution != null
-                ? EmpiricalTicksFromMs(sample.ProcessingLatencyDistribution.Sample(uniform))
-                : sample.ProcessingLatencyQuantiles == null
-                ? 1
-                : TicksFromMs(DeterministicMqttSampler.InverseCdf(
-                    uniform,
-                    sample.ProcessingLatencyQuantiles));
+            int processingTicks;
+            if (sample.ObservedLatencyDistribution != null && EmpiricalProtocolFloorTicks.HasValue)
+            {
+                var uniform = DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
+                    localPublishSequence, "processing-latency");
+                processingTicks = checked((int)Math.Max(0,
+                    EmpiricalTicksFromMs(sample.ObservedLatencyDistribution.Sample(uniform)) - EmpiricalProtocolFloorTicks.Value));
+            }
+            else if (sample.ProcessingLatencyDistribution != null)
+            {
+                var uniform = DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
+                    localPublishSequence, "processing-latency");
+                processingTicks = EmpiricalTicksFromMs(sample.ProcessingLatencyDistribution.Sample(uniform));
+            }
+            else if (sample.ProcessingLatencyQuantiles != null)
+            {
+                var uniform = DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
+                    localPublishSequence, "processing-latency");
+                processingTicks = TicksFromMs(DeterministicMqttSampler.InverseCdf(uniform, sample.ProcessingLatencyQuantiles));
+            }
+            else
+            {
+                processingTicks = 1;
+            }
             // The observed end-to-end CDF already includes native queueing. Capacity
             // eligibility is an additional lower bound, not an independent delay to add twice.
             _processingQueue.Enqueue(packet, Math.Max(processingTicks, capacityWaitTicks));
@@ -389,7 +403,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                     payloadBytes, ProtocolType, "MQTT Publish");
             _measurement.ExpectDelivery(tracker, packetPayload.Id);
 
-            if (tracker != null && DeterministicMqttSampler.Uniform(
+            if (tracker != null && tracker.ConditionalDeliveryLossRate > 0 && DeterministicMqttSampler.Uniform(
                     _randomSeed, Name, tracker.Publisher, tracker.LocalPublishSequence,
                     $"delivery-loss:{subscription.ClientId}") < tracker.ConditionalDeliveryLossRate)
             {

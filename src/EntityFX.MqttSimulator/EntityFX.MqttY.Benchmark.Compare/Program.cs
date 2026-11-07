@@ -121,15 +121,30 @@ string? ExportDir(string engine, bool parallel, int repetition) =>
 EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSample> run)
 {
     Console.WriteLine($"--- {name} ---");
+    var modes = options.Mode switch
+    {
+        "seq" => new[] { "seq" },
+        "par" => new[] { "par" },
+        _ => new[] { "seq", "par" }
+    };
+
     for (var warm = 0; warm < options.WarmupRuns; warm++)
     {
-        _ = run(false, 0);
-        _ = run(true, 0);
+        foreach (var mode in modes)
+        {
+            _ = run(mode == "par", 0);
+        }
     }
 
-    var samples = new List<RunSample>(options.Repeat * 2);
+    var samples = new List<RunSample>(options.Repeat * modes.Length);
     for (var rep = 0; rep < options.Repeat; rep++)
     {
+        if (modes.Length == 1)
+        {
+            samples.Add(run(modes[0] == "par", rep));
+            continue;
+        }
+
         // Alternate the order: the second run is warmer, so always running seq
         // first systematically biases the speedup in favour of par.
         if (rep % 2 == 0)
@@ -146,28 +161,28 @@ EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSam
 
     var seq = samples.Where(s => s.Mode == "seq").ToArray();
     var par = samples.Where(s => s.Mode == "par").ToArray();
-    var seqWall = median(seq.Select(s => s.Wall));
-    var parWall = median(par.Select(s => s.Wall));
-    var seqRefresh = median(seq.Select(s => s.Refresh));
-    var parRefresh = median(par.Select(s => s.Refresh));
-    var seqExport = median(seq.Select(s => s.Export));
-    var parExport = median(par.Select(s => s.Export));
-    var seqCpu = median(seq.Select(s => s.CpuSeconds));
-    var parCpu = median(par.Select(s => s.CpuSeconds));
-    var wallSpeedup = seqWall / parWall;
-    var refreshSpeedup = parRefresh > 0 ? seqRefresh / parRefresh : 0;
-    var metricReference = seq[0].Metrics.Core;
+    var seqWall = seq.Length > 0 ? median(seq.Select(s => s.Wall)) : 0;
+    var parWall = par.Length > 0 ? median(par.Select(s => s.Wall)) : 0;
+    var seqRefresh = seq.Length > 0 ? median(seq.Select(s => s.Refresh)) : 0;
+    var parRefresh = par.Length > 0 ? median(par.Select(s => s.Refresh)) : 0;
+    var seqExport = seq.Length > 0 ? median(seq.Select(s => s.Export)) : 0;
+    var parExport = par.Length > 0 ? median(par.Select(s => s.Export)) : 0;
+    var seqCpu = seq.Length > 0 ? median(seq.Select(s => s.CpuSeconds)) : 0;
+    var parCpu = par.Length > 0 ? median(par.Select(s => s.CpuSeconds)) : 0;
+    var wallSpeedup = seqWall > 0 && parWall > 0 ? seqWall / parWall : 0;
+    var refreshSpeedup = seqRefresh > 0 && parRefresh > 0 ? seqRefresh / parRefresh : 0;
+    var metricReference = samples[0].Metrics.Core;
     var metricsMatch = samples.All(s => s.Metrics.Core == metricReference);
-    var diagnosticsMatch = samples.All(s => s.Metrics.Diagnostics == seq[0].Metrics.Diagnostics);
-    var status = par[0].Status;
+    var diagnosticsMatch = samples.All(s => s.Metrics.Diagnostics == samples[0].Metrics.Diagnostics);
+    var status = par.Length > 0 ? par[0].Status : seq[0].Status;
     var errors = par.Sum(s => s.Errors) + seq.Sum(s => s.Errors);
 
-    Console.WriteLine($"  seq wall  median={seqWall:F4}s  min={seq.Min(s => s.Wall):F4}  max={seq.Max(s => s.Wall):F4}  cv={cv(seq.Select(s => s.Wall)):F1}%");
-    Console.WriteLine($"  par wall  median={parWall:F4}s  min={par.Min(s => s.Wall):F4}  max={par.Max(s => s.Wall):F4}  cv={cv(par.Select(s => s.Wall)):F1}%");
+    Console.WriteLine($"  seq wall  median={(seq.Length > 0 ? seqWall.ToString("F4") : "n/a"),8}s  min={(seq.Length > 0 ? seq.Min(s => s.Wall).ToString("F4") : "n/a"),8}  max={(seq.Length > 0 ? seq.Max(s => s.Wall).ToString("F4") : "n/a"),8}  cv={(seq.Length > 0 ? cv(seq.Select(s => s.Wall)) : 0):F1}%");
+    Console.WriteLine($"  par wall  median={(par.Length > 0 ? parWall.ToString("F4") : "n/a"),8}s  min={(par.Length > 0 ? par.Min(s => s.Wall).ToString("F4") : "n/a"),8}  max={(par.Length > 0 ? par.Max(s => s.Wall).ToString("F4") : "n/a"),8}  cv={(par.Length > 0 ? cv(par.Select(s => s.Wall)) : 0):F1}%");
     Console.WriteLine($"  refresh   seq={seqRefresh:F4}s  par={parRefresh:F4}s  speedup={(refreshSpeedup > 0 ? refreshSpeedup.ToString("F2") + "x" : "n/a")}");
     Console.WriteLine($"  export    seq={seqExport:F4}s  par={parExport:F4}s");
     Console.WriteLine($"  cpu       seq={seqCpu:F3}s  par={parCpu:F3}s  ({(seqCpu > 0 ? parCpu / seqCpu : 0):F2}x)");
-    Console.WriteLine($"  speedup   {wallSpeedup:F2}x   status={status}   errors={errors}   core={(metricsMatch ? "match" : "MISMATCH")}   diagnostics={(diagnosticsMatch ? "match" : "differ")}");
+    Console.WriteLine($"  speedup   {(wallSpeedup > 0 ? wallSpeedup.ToString("F2") + "x" : "n/a")}   status={status}   errors={errors}   core={(metricsMatch ? "match" : "MISMATCH")}   diagnostics={(diagnosticsMatch ? "match" : "differ")}");
     Console.WriteLine();
 
     return new EngineReport(name, seqWall, parWall, wallSpeedup, seqRefresh, parRefresh, refreshSpeedup,
@@ -296,6 +311,7 @@ internal sealed class BenchOptions
     public int RelayClients { get; private set; } = 4;
     public int RelayRepeats { get; private set; } = 80;
     public int Seed { get; private set; } = 42;
+    public string Mode { get; private set; } = "both";
     public bool NoExport { get; private set; }
     public bool Strict { get; private set; } = true;
     public string? JsonPath { get; private set; }
@@ -328,11 +344,12 @@ internal sealed class BenchOptions
                 case "--relay-clients": o.RelayClients = int.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--relay-repeats": o.RelayRepeats = int.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--seed": o.Seed = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--mode": o.Mode = Next().ToLowerInvariant(); break;
                 case "--no-export": o.NoExport = true; break;
                 case "--no-strict": o.Strict = false; break;
                 case "--json": o.JsonPath = Next(); break;
                 case "--help":
-                    Console.WriteLine("Options: --engines lb,relay,fed --repeat N --warmup-runs N --workers N --measure S --warmup S --drain S --rps N --fed-rps N --brokers N --nets N --publishers N --relay-clients N --relay-repeats N --seed N --no-export --no-strict --json PATH");
+                    Console.WriteLine("Options: --engines lb,relay,fed --mode both|seq|par --repeat N --warmup-runs N --workers N --measure S --warmup S --drain S --rps N --fed-rps N --brokers N --nets N --publishers N --relay-clients N --relay-repeats N --seed N --no-export --no-strict --json PATH");
                     Environment.Exit(0);
                     break;
                 default:
@@ -343,6 +360,7 @@ internal sealed class BenchOptions
         if (o.Repeat < 1) throw new ArgumentOutOfRangeException(nameof(Repeat));
         if (o.Measure <= 0 || o.Warmup < 0 || o.Drain <= 0) throw new ArgumentOutOfRangeException(nameof(Measure));
         if (o.Brokers < 1 || o.Nets < 1 || o.Publishers < 1) throw new ArgumentOutOfRangeException(nameof(Brokers));
+        if (o.Mode is not ("both" or "seq" or "par")) throw new ArgumentException("--mode must be both, seq or par");
         return o;
     }
 }
