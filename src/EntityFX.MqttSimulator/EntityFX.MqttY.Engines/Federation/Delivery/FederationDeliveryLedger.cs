@@ -1,82 +1,162 @@
 using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
+
 namespace EntityFX.MqttY.Federation;
 
+/// <summary>
+/// Federation delivery accounting. Delivery callbacks run on refresh workers,
+/// so publications are read-mostly, duplicate detection is protected per
+/// receiver (one receiver node per site), and receipts are appended concurrently.
+/// </summary>
 public sealed class FederationDeliveryLedger
 {
-    private readonly object _sync = new();
     private readonly FederationOptions options;
-    private readonly Dictionary<long, FederationPublication> publications = new();
-    private readonly Dictionary<int, long> sequences = new();
-    private readonly Dictionary<int, HashSet<long>> received;
-    private readonly Dictionary<int, SortedDictionary<long, long>> histograms;
-    private readonly Dictionary<int, long> duplicates;
-    private readonly List<DeliveryReceipt> receipts = new();
+    private readonly ConcurrentDictionary<long, FederationPublication> publications = new();
+    private readonly ConcurrentDictionary<int, long> sequences = new();
+    private readonly ConcurrentDictionary<int, ReceiverState> receivers;
+    private readonly ConcurrentQueue<DeliveryReceipt> receipts = new();
+    private long nextId;
     private long unknownDeliveries;
     private long warmupDeliveries;
     private long unexpectedDeliveries;
-    public long UnknownDeliveries { get { lock (_sync) return unknownDeliveries; } }
-    public long WarmupDeliveries { get { lock (_sync) return warmupDeliveries; } }
-    public long UnexpectedDeliveries { get { lock (_sync) return unexpectedDeliveries; } }
-    public long Attempted { get { lock (_sync) return publications.Values.LongCount(p => p.Measurement); } }
-    public long Expected { get { lock (_sync) return checked(Attempted * received.Count); } }
-    public long Unique { get { lock (_sync) return received.Values.Sum(r => (long)r.Count); } }
-    public long FullyDelivered { get { lock (_sync) return received.Count == 0 ? 0 : publications.Values.LongCount(p => p.Measurement && received.Values.All(r => r.Contains(p.Id))); } }
+
+    public long UnknownDeliveries => Interlocked.Read(ref unknownDeliveries);
+    public long WarmupDeliveries => Interlocked.Read(ref warmupDeliveries);
+    public long UnexpectedDeliveries => Interlocked.Read(ref unexpectedDeliveries);
+
+    public long Attempted => publications.Values.LongCount(p => p.Measurement);
+
+    public long Expected => checked(Attempted * receivers.Count);
+
+    public long Unique
+    {
+        get
+        {
+            long unique = 0;
+            foreach (var state in receivers.Values)
+            {
+                lock (state.Sync)
+                {
+                    unique += state.Received.Count;
+                }
+            }
+            return unique;
+        }
+    }
+
+    public long FullyDelivered
+    {
+        get
+        {
+            if (receivers.IsEmpty) return 0;
+            return publications.Values.LongCount(publication =>
+                publication.Measurement && receivers.Values.All(state =>
+                {
+                    lock (state.Sync)
+                    {
+                        return state.Received.Contains(publication.Id);
+                    }
+                }));
+        }
+    }
+
     public FederationDeliveryLedger(FederationOptions options)
     {
         this.options = options;
-        received = options.Receivers().ToDictionary(s => s, _ => new HashSet<long>());
-        histograms = options.Receivers().ToDictionary(s => s, _ => new SortedDictionary<long, long>());
-        duplicates = options.Receivers().ToDictionary(s => s, _ => 0L);
+        receivers = new ConcurrentDictionary<int, ReceiverState>(
+            options.Receivers().Select(site => new KeyValuePair<int, ReceiverState>(site, new ReceiverState())));
     }
+
     public FederationPublication Create(int publisher, long tick, bool measurement)
     {
-        lock (_sync)
-        {
-            var id = checked((long)publications.Count + 1);
-            var payload = new byte[options.PayloadBytes];
-            BinaryPrimitives.WriteInt64LittleEndian(payload, id);
-            BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(8), tick);
-            var origin = options.PublisherSite(publisher);
-            var sequence = sequences.GetValueOrDefault(origin) + 1; sequences[origin] = sequence;
-            var p = new FederationPublication(id, origin, sequence, publisher, tick, measurement, payload);
-            publications.Add(id, p); return p;
-        }
+        var id = Interlocked.Increment(ref nextId);
+        var payload = new byte[options.PayloadBytes];
+        BinaryPrimitives.WriteInt64LittleEndian(payload, id);
+        BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(8), tick);
+        var origin = options.PublisherSite(publisher);
+        var sequence = sequences.AddOrUpdate(origin, 1, static (_, value) => value + 1);
+        var publication = new FederationPublication(id, origin, sequence, publisher, tick, measurement, payload);
+        publications[id] = publication;
+        return publication;
     }
+
     public FederationPublication? Find(byte[] payload)
     {
-        lock (_sync)
+        if (payload.Length != options.PayloadBytes)
         {
-            if (payload.Length != options.PayloadBytes) return null;
-            return publications.TryGetValue(BinaryPrimitives.ReadInt64LittleEndian(payload), out var p) && payload.AsSpan().SequenceEqual(p.Payload) ? p : null;
+            return null;
         }
+
+        return publications.TryGetValue(BinaryPrimitives.ReadInt64LittleEndian(payload), out var publication) &&
+               payload.AsSpan().SequenceEqual(publication.Payload)
+            ? publication
+            : null;
     }
+
     public void Receive(int receiver, string topic, byte[] payload, long tick)
     {
-        lock (_sync)
+        // Hashing dominates delivery bookkeeping; compute it outside any lock.
+        var sha = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
+        receipts.Enqueue(new(receiver, payload.Length < 8 ? 0 : BinaryPrimitives.ReadInt64LittleEndian(payload), topic, tick, sha));
+
+        var publication = Find(payload);
+        if (publication == null)
         {
-            receipts.Add(new(receiver, payload.Length < 8 ? 0 : BinaryPrimitives.ReadInt64LittleEndian(payload), topic, tick,
-                Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant()));
-            var p = Find(payload);
-            if (p == null) { unknownDeliveries++; return; }
-            if (!p.Measurement) { warmupDeliveries++; return; }
-            if (!received.ContainsKey(receiver) || topic != FederationTopics.Delivered(p.Origin)) { unexpectedDeliveries++; return; }
-            if (tick < p.Tick) throw new InvalidDataException("Delivery precedes creation.");
-            if (!received[receiver].Add(p.Id)) { duplicates[receiver]++; return; }
-            var h = histograms[receiver]; var elapsed = tick - p.Tick;
-            h[elapsed] = h.GetValueOrDefault(elapsed) + 1;
+            Interlocked.Increment(ref unknownDeliveries);
+            return;
+        }
+        if (!publication.Measurement)
+        {
+            Interlocked.Increment(ref warmupDeliveries);
+            return;
+        }
+        if (!receivers.TryGetValue(receiver, out var state) || topic != FederationTopics.Delivered(publication.Origin))
+        {
+            Interlocked.Increment(ref unexpectedDeliveries);
+            return;
+        }
+        if (tick < publication.Tick)
+        {
+            throw new InvalidDataException("Delivery precedes creation.");
+        }
+
+        lock (state.Sync)
+        {
+            if (!state.Received.Add(publication.Id))
+            {
+                state.Duplicates++;
+                return;
+            }
+
+            var elapsed = tick - publication.Tick;
+            state.Histogram[elapsed] = state.Histogram.GetValueOrDefault(elapsed) + 1;
         }
     }
-    public ReceiverResult[] Snapshot()
+
+    public ReceiverResult[] Snapshot() => receivers.OrderBy(pair => pair.Key)
+        .Select(pair =>
+        {
+            lock (pair.Value.Sync)
+            {
+                return new ReceiverResult(pair.Key, pair.Value.Received.Count, pair.Value.Duplicates,
+                    new SortedDictionary<long, long>(pair.Value.Histogram));
+            }
+        })
+        .ToArray();
+
+    public FederationPublication[] Publications() => publications.Values.ToArray();
+
+    public DeliveryReceipt[] Receipts() => receipts
+        .OrderBy(r => r.Tick).ThenBy(r => r.Receiver)
+        .ThenBy(r => r.PublicationId).ThenBy(r => r.Topic, StringComparer.Ordinal)
+        .ThenBy(r => r.PayloadSha256, StringComparer.Ordinal).ToArray();
+
+    private sealed class ReceiverState
     {
-        lock (_sync) return received.Select(kv => new ReceiverResult(kv.Key, kv.Value.Count, duplicates[kv.Key],
-            new SortedDictionary<long, long>(histograms[kv.Key]))).ToArray();
-    }
-    public FederationPublication[] Publications() { lock (_sync) return publications.Values.ToArray(); }
-    public DeliveryReceipt[] Receipts()
-    {
-        lock (_sync) return receipts.OrderBy(r => r.Tick).ThenBy(r => r.Receiver)
-            .ThenBy(r => r.PublicationId).ThenBy(r => r.Topic, StringComparer.Ordinal)
-            .ThenBy(r => r.PayloadSha256, StringComparer.Ordinal).ToArray();
+        public object Sync { get; } = new();
+        public HashSet<long> Received { get; } = new();
+        public SortedDictionary<long, long> Histogram { get; } = new();
+        public long Duplicates;
     }
 }

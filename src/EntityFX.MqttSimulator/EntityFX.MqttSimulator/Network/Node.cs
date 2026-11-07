@@ -11,11 +11,15 @@ using EntityFX.MqttY.Contracts.Network.Diagnostics;
 public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnostics
 {
     public NodeQueueSnapshot GetQueueSnapshot() =>
-        new(_incommingMessages.Count, _outgoingMessages.Count, _responseMessages.Count);
+        new(Volatile.Read(ref _incommingQueueLength), Volatile.Read(ref _outgoingQueueLength),
+            Volatile.Read(ref _responseCount));
     /// <summary>Overrides should combine base.IsQuiescent with their processing/handshake state.</summary>
     public virtual bool IsQuiescent =>
         _outgoingMessages.IsEmpty && _outgoingDeferred.Count == 0 && _outgoingDeferredNext.Count == 0 &&
         _incommingMessages.IsEmpty && _incommingDeferred.Count == 0 && _incommingDeferredNext.Count == 0;
+
+    /// <summary>True while the legacy blocking request API has a response timer pending.</summary>
+    internal bool HasPendingResponse => Volatile.Read(ref _responseCount) != 0;
     //TODO: NodePacket <- в нём декрементим время таймаута на ожидание
     //храним только Guid, ManualResetEventSlim
     private readonly ConcurrentDictionary<long, ResponseMonitoringPacket> _responseMessages = new();
@@ -26,6 +30,10 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     private readonly ConcurrentQueue<NodeMonitoringPacket> _incommingMessages = new();
     private int _outgoingQueueLength;
     private int _incommingQueueLength;
+    private int _responseCount;
+    // Response timeouts must advance on every Refresh even when the graph tick
+    // does not advance (tests and node-level stepping rely on this).
+    private long _refreshCount;
 
     // Deferred (not-yet-due) packets, split from the ready queues so each tick
     // only touches packets once and never re-enqueues the whole backlog
@@ -94,12 +102,15 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         _incommingDeferred.Clear();
         _incommingDeferredNext.Clear();
         _responseMessages.Clear();
+        _responseCount = 0;
+        _refreshCount = 0;
     }
 
     public override void Refresh()
     {
         var sim = NetworkSimulator!;
         var totalTicks = sim.TotalTicks;
+        _refreshCount++;
 
         ProcessReady(_outgoingMessages, _outgoingDeferred, _outgoingDeferredNext, totalTicks, SendToNetwork,
             ref _outgoingQueueLength);
@@ -116,7 +127,9 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
             base.Refresh();
             counters.SetOutgoingQueueLength(Volatile.Read(ref _outgoingQueueLength) + _outgoingDeferred.Count + _outgoingDeferredNext.Count);
             counters.SetIncommingQueueLength(Volatile.Read(ref _incommingQueueLength) + _incommingDeferred.Count + _incommingDeferredNext.Count);
-            counters.SetReceiveQueueLength(_responseMessages.Count);
+            // ConcurrentDictionary.Count acquires every bucket lock, which made
+            // the empty response table the most expensive part of a node tick.
+            counters.SetReceiveQueueLength(Volatile.Read(ref _responseCount));
         }
     }
 
@@ -248,13 +261,16 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
             outgoing.Reset(tick, packet, true, sim.WaitMode, TicksOptions.OutgoingWaitTicks, sim.GetPacketId(), tick);
         }
         if (ShouldTrackResponse(packet))
-        _responseMessages[packet.Id] = new ResponseMonitoringPacket(sim.WaitMode, tick)
         {
-            RequestPacket = packet,
-            RequestTick = outgoing.SendTick,
-            Marker = packet.Category ?? string.Empty,
-            Id = packet.Id
-        };
+            _responseMessages[packet.Id] = new ResponseMonitoringPacket(sim.WaitMode, _refreshCount)
+            {
+                RequestPacket = packet,
+                RequestTick = outgoing.SendTick,
+                Marker = packet.Category ?? string.Empty,
+                Id = packet.Id
+            };
+            Interlocked.Increment(ref _responseCount);
+        }
         _outgoingMessages.Enqueue(outgoing);
         Interlocked.Increment(ref _outgoingQueueLength);
     }
@@ -296,9 +312,12 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
             return null;
         }
 
-        _responseMessages.TryRemove(packetId, out _);
+        if (_responseMessages.TryRemove(packetId, out _))
+        {
+            Interlocked.Decrement(ref _responseCount);
+        }
 
-        if (monitorPacket.HasExpired(NetworkSimulator!.TotalTicks))
+        if (monitorPacket.HasExpired(_refreshCount))
         {
             return null;
         }
@@ -338,14 +357,17 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
 
         var isSet = monitorPacket.WaitIsSet(TimeSpan.FromMinutes(1));
 
-        _responseMessages.TryRemove(packetId, out _);
+        if (_responseMessages.TryRemove(packetId, out _))
+        {
+            Interlocked.Decrement(ref _responseCount);
+        }
 
         if (isSet != true)
         {
             return null;
         }
 
-        if (monitorPacket.HasExpired(NetworkSimulator!.TotalTicks))
+        if (monitorPacket.HasExpired(_refreshCount))
         {
             return null;
         }

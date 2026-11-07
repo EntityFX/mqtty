@@ -1,17 +1,22 @@
 using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 
 namespace EntityFX.MqttY.LoadBalancing;
 
+/// <summary>
+/// Delivery accounting for the LB experiment. Receiver callbacks run on
+/// refresh workers, so the ledger must not put all deliveries behind one lock:
+/// publications are read-mostly, duplicate detection is an atomic add, and each
+/// backend owns its counters/histogram (one receiver node per backend).
+/// </summary>
 public sealed class DeliveryLedger
 {
-    private readonly object _sync = new();
     private readonly int payloadBytes;
     private readonly double tickMilliseconds;
-    private readonly Dictionary<long, DeliveryPublication> publications = new();
-    private readonly HashSet<long> delivered = new();
-    private readonly SortedDictionary<int, DeliveryBackendState> backends = new();
-    private readonly SortedDictionary<long, long> latencyHistogramTicks = new();
+    private readonly ConcurrentDictionary<long, DeliveryPublication> publications = new();
+    private readonly ConcurrentDictionary<long, byte> delivered = new();
+    private readonly ConcurrentDictionary<int, DeliveryBackendState> backends = new();
     private long nextId;
     private long measurementCreated;
     private long uniqueDelivered;
@@ -32,98 +37,120 @@ public sealed class DeliveryLedger
 
     public byte[] Create(int publisher, int backend, bool measurement, long tick)
     {
-        lock (_sync)
-        {
-            if (publisher < 0) throw new ArgumentOutOfRangeException(nameof(publisher));
-            if (backend < 0) throw new ArgumentOutOfRangeException(nameof(backend));
-            if (tick < 0) throw new ArgumentOutOfRangeException(nameof(tick));
+        if (publisher < 0) throw new ArgumentOutOfRangeException(nameof(publisher));
+        if (backend < 0) throw new ArgumentOutOfRangeException(nameof(backend));
+        if (tick < 0) throw new ArgumentOutOfRangeException(nameof(tick));
 
-            var id = checked(++nextId);
-            var payload = new byte[payloadBytes];
-            BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(0, 8), id);
-            BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(8, 8), tick);
-            publications.Add(id, new DeliveryPublication(publisher, backend, measurement, tick));
-            var state = State(backend);
-            if (measurement)
-            {
-                measurementCreated++;
-                state.MeasurementCreated++;
-            }
-            return payload;
+        var id = Interlocked.Increment(ref nextId);
+        var payload = new byte[payloadBytes];
+        BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(0, 8), id);
+        BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(8, 8), tick);
+        publications[id] = new DeliveryPublication(publisher, backend, measurement, tick);
+        var state = State(backend);
+        if (measurement)
+        {
+            Interlocked.Increment(ref measurementCreated);
+            Interlocked.Increment(ref state.MeasurementCreated);
         }
+        return payload;
     }
 
     public void Receive(int backend, byte[] payload, long tick)
     {
-        lock (_sync)
+        if (backend < 0) throw new ArgumentOutOfRangeException(nameof(backend));
+        ArgumentNullException.ThrowIfNull(payload);
+        if (tick < 0) throw new ArgumentOutOfRangeException(nameof(tick));
+
+        var id = payload.Length >= 8 ? BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(0, 8)) : 0;
+        if (payload.Length != payloadBytes ||
+            !publications.TryGetValue(id, out var publication) ||
+            BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(8, 8)) != publication.Tick)
         {
-            if (backend < 0) throw new ArgumentOutOfRangeException(nameof(backend));
-            ArgumentNullException.ThrowIfNull(payload);
-            if (tick < 0) throw new ArgumentOutOfRangeException(nameof(tick));
+            Interlocked.Increment(ref unknownDeliveries);
+            return;
+        }
+        if (tick < publication.Tick)
+            throw new InvalidDataException("A message cannot arrive before its creation tick.");
+        if (!publication.Measurement)
+        {
+            Interlocked.Increment(ref warmupDeliveries);
+            return;
+        }
 
-            if (payload.Length != payloadBytes ||
-                !publications.TryGetValue(BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(0, 8)), out var publication) ||
-                BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(8, 8)) != publication.Tick)
-            {
-                unknownDeliveries++;
-                return;
-            }
-            if (tick < publication.Tick)
-                throw new InvalidDataException("A message cannot arrive before its creation tick.");
-            if (!publication.Measurement)
-            {
-                warmupDeliveries++;
-                return;
-            }
+        var state = State(backend);
+        if (backend != publication.Backend)
+        {
+            Interlocked.Increment(ref unexpectedDeliveries);
+            Interlocked.Increment(ref state.UnexpectedDeliveries);
+            return;
+        }
+        if (!delivered.TryAdd(id, 0))
+        {
+            Interlocked.Increment(ref duplicateDeliveries);
+            Interlocked.Increment(ref state.DuplicateDeliveries);
+            return;
+        }
 
-            var state = State(backend);
-            if (backend != publication.Backend)
-            {
-                unexpectedDeliveries++;
-                state.UnexpectedDeliveries++;
-                return;
-            }
-            var id = BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(0, 8));
-            if (!delivered.Add(id))
-            {
-                duplicateDeliveries++;
-                state.DuplicateDeliveries++;
-                return;
-            }
-
-            uniqueDelivered++;
-            state.UniqueDelivered++;
-            var elapsedTicks = tick - publication.Tick;
-            Increment(latencyHistogramTicks, elapsedTicks);
+        Interlocked.Increment(ref uniqueDelivered);
+        Interlocked.Increment(ref state.UniqueDelivered);
+        var elapsedTicks = tick - publication.Tick;
+        lock (state.Sync)
+        {
             Increment(state.LatencyHistogramTicks, elapsedTicks);
         }
     }
 
     public DeliveryLedgerSnapshot Snapshot()
     {
-        lock (_sync) return new(
-        measurementCreated, uniqueDelivered, duplicateDeliveries, unexpectedDeliveries,
-        warmupDeliveries, unknownDeliveries,
-        Array.AsReadOnly(backends.Select(pair => new BackendDeliverySnapshot(
-            pair.Key, pair.Value.MeasurementCreated, pair.Value.UniqueDelivered,
-            pair.Value.DuplicateDeliveries, pair.Value.UnexpectedDeliveries,
-            Freeze(pair.Value.LatencyHistogramTicks))).ToArray()),
-        Freeze(latencyHistogramTicks), tickMilliseconds);
+        var backendSnapshots = backends.OrderBy(pair => pair.Key)
+            .Select(pair => new BackendDeliverySnapshot(
+                pair.Key, Interlocked.Read(ref pair.Value.MeasurementCreated),
+                Interlocked.Read(ref pair.Value.UniqueDelivered),
+                Interlocked.Read(ref pair.Value.DuplicateDeliveries),
+                Interlocked.Read(ref pair.Value.UnexpectedDeliveries),
+                FreezeBackend(pair.Value)))
+            .ToArray();
+
+        // The global histogram used to be updated under the lock; merge the
+        // per-backend histograms once at snapshot time instead.
+        var merged = new SortedDictionary<long, long>();
+        foreach (var state in backends.Values)
+        {
+            lock (state.Sync)
+            {
+                foreach (var (elapsed, count) in state.LatencyHistogramTicks)
+                {
+                    merged[elapsed] = merged.GetValueOrDefault(elapsed) + count;
+                }
+            }
+        }
+
+        return new(
+            Interlocked.Read(ref measurementCreated),
+            Interlocked.Read(ref uniqueDelivered),
+            Interlocked.Read(ref duplicateDeliveries),
+            Interlocked.Read(ref unexpectedDeliveries),
+            Interlocked.Read(ref warmupDeliveries),
+            Interlocked.Read(ref unknownDeliveries),
+            Array.AsReadOnly(backendSnapshots),
+            Freeze(merged),
+            tickMilliseconds);
     }
 
-    private DeliveryBackendState State(int backend)
-    {
-        if (!backends.TryGetValue(backend, out var state))
-        {
-            state = new DeliveryBackendState();
-            backends.Add(backend, state);
-        }
-        return state;
-    }
+    private DeliveryBackendState State(int backend) =>
+        backends.GetOrAdd(backend, static _ => new DeliveryBackendState());
 
     private static void Increment(IDictionary<long, long> histogram, long ticks) =>
         histogram[ticks] = histogram.TryGetValue(ticks, out var count) ? count + 1 : 1;
 
     private static IReadOnlyDictionary<long, long> Freeze(SortedDictionary<long, long> histogram) =>
         new ReadOnlyDictionary<long, long>(new SortedDictionary<long, long>(histogram));
+
+    private static IReadOnlyDictionary<long, long> FreezeBackend(DeliveryBackendState state)
+    {
+        lock (state.Sync)
+        {
+            return Freeze(state.LatencyHistogramTicks);
+        }
+    }
 }

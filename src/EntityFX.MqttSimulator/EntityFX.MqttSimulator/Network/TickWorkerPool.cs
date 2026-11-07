@@ -16,13 +16,21 @@ namespace EntityFX.MqttY.Network;
 /// cores uses N workers total. Work is claimed dynamically through an atomic
 /// index, which keeps skew between dense (client) and sparse (hop) networks
 /// from serialising the refresh on one worker.
+///
+/// The phase fence is a sense-reversing spin barrier. The built-in
+/// <see cref="System.Threading.Barrier"/> uses monitor signalling on every pass;
+/// a refresh tick is only tens of microseconds of work, so that signalling cost
+/// dominated the tick and grew with the number of workers.
 /// </summary>
 internal sealed class TickWorkerPool : IDisposable
 {
     // How long an idle worker spins before parking on the monitor. The gap
     // between ticks is normally only a few microseconds, so spinning avoids a
     // kernel wake-up on every single tick.
-    private const int SpinIterations = 64;
+    private static readonly int SpinIterations =
+        int.TryParse(Environment.GetEnvironmentVariable("MQTTY_SPIN_ITERATIONS"), out var spinIterations) && spinIterations > 0
+            ? spinIterations
+            : 64;
 
     private static readonly bool BusyStatsEnabled =
         Environment.GetEnvironmentVariable("MQTTY_WORKER_STATS") == "1";
@@ -32,7 +40,8 @@ internal sealed class TickWorkerPool : IDisposable
     private readonly int[] _workerGenerations;
     private readonly long[] _phase1Busy;
     private readonly long[] _phase2Busy;
-    private readonly Barrier _phaseBarrier;
+    private readonly long[] _barrierBusy;
+    private readonly IPhaseBarrier _phaseBarrier;
     private readonly object _gate = new();
 
     private volatile bool _stop;
@@ -44,15 +53,17 @@ internal sealed class TickWorkerPool : IDisposable
     private int _count2;
     private int _index1;
     private int _index2;
-    private int _chunkSize;
+    private int _chunkSize1;
+    private int _chunkSize2;
     private Exception? _error;
 
     public TickWorkerPool(int workerCount)
     {
         _workerCount = Math.Max(1, workerCount);
-        _phaseBarrier = new Barrier(_workerCount);
+        _phaseBarrier = ResolveBarrier(_workerCount);
         _phase1Busy = new long[_workerCount];
         _phase2Busy = new long[_workerCount];
+        _barrierBusy = new long[_workerCount];
 
         // The calling thread is worker 0; the background threads are 1..N-1.
         _threads = new Thread[_workerCount - 1];
@@ -78,6 +89,7 @@ internal sealed class TickWorkerPool : IDisposable
 
     public long[] Phase1Busy => _phase1Busy;
     public long[] Phase2Busy => _phase2Busy;
+    public long[] BarrierBusy => _barrierBusy;
 
     /// <summary>
     /// Runs both refresh phases. <paramref name="phase1"/> and
@@ -87,25 +99,27 @@ internal sealed class TickWorkerPool : IDisposable
     /// </summary>
     public void Run(Action<int>? phase1, int count1, Action<int>? phase2, int count2)
     {
-        Run(phase1, count1, phase2, count2, chunkSize: 1);
+        Run(phase1, count1, phase2, count2, chunkSize1: 1, chunkSize2: 1);
     }
 
     /// <summary>
     /// Runs both refresh phases with chunked work claiming. Each worker grabs
-    /// <paramref name="chunkSize"/> items per Interlocked operation, reducing
-    /// atomic contention when per-item work is tiny.
+    /// <paramref name="chunkSize1"/> networks or <paramref name="chunkSize2"/>
+    /// nodes per Interlocked operation. Node work is very uneven (an idle
+    /// publisher vs a broker with many subscribers), so nodes are claimed one
+    /// at a time; otherwise a heavy chunk claimed last becomes the tick tail.
     /// </summary>
     public void Run(Action<int>? phase1, int count1, Action<int>? phase2, int count2,
-        int chunkSize)
+        int chunkSize1, int chunkSize2)
     {
         if (_threads.Length == 0)
         {
             var start = Stopwatch.GetTimestamp();
             _index1 = 0;
             _index2 = 0;
-            RunPhaseChunked(phase1, count1, ref _index1, chunkSize);
+            RunPhaseChunked(phase1, count1, ref _index1, chunkSize1);
             var networkEnd = Stopwatch.GetTimestamp();
-            RunPhaseChunked(phase2, count2, ref _index2, chunkSize);
+            RunPhaseChunked(phase2, count2, ref _index2, chunkSize2);
             var end = Stopwatch.GetTimestamp();
             LastNetworkPhaseTicks = networkEnd - start;
             LastNodePhaseTicks = end - networkEnd;
@@ -122,7 +136,8 @@ internal sealed class TickWorkerPool : IDisposable
             _index1 = 0;
             _index2 = 0;
             _error = null;
-            _chunkSize = chunkSize;
+            _chunkSize1 = chunkSize1;
+            _chunkSize2 = chunkSize2;
             _generation++;
             Monitor.PulseAll(_gate);
         }
@@ -134,6 +149,9 @@ internal sealed class TickWorkerPool : IDisposable
         {
             throw new AggregateException(error);
         }
+
+        // The final phase barrier above already guarantees that every worker
+        // left the tick, so there is nothing else to wait for here.
     }
 
     private void WorkerLoop(object? state)
@@ -220,7 +238,7 @@ internal sealed class TickWorkerPool : IDisposable
 
         try
         {
-            RunPhaseChunked(phase1, count1, ref _index1, _chunkSize);
+            RunPhaseChunked(phase1, count1, ref _index1, _chunkSize1);
         }
         catch (Exception exception)
         {
@@ -236,14 +254,22 @@ internal sealed class TickWorkerPool : IDisposable
 
         // Networks must all be refreshed before nodes start: a node send must
         // not race with the refresh of the destination network in the same tick.
+        var barrierStart = Stopwatch.GetTimestamp();
         _phaseBarrier.SignalAndWait();
         var networkPhaseEnd = Stopwatch.GetTimestamp();
+        if (BusyStatsEnabled)
+        {
+            _barrierBusy[worker] += networkPhaseEnd - barrierStart;
+            // Phase 2 timing must start after the barrier, otherwise the wait
+            // for the slowest network worker is charged to the node phase.
+            busyStart = networkPhaseEnd;
+        }
 
         if (Volatile.Read(ref _error) == null)
         {
             try
             {
-                RunPhaseChunked(phase2, count2, ref _index2, _chunkSize);
+                RunPhaseChunked(phase2, count2, ref _index2, _chunkSize2);
             }
             catch (Exception exception)
             {
@@ -256,9 +282,12 @@ internal sealed class TickWorkerPool : IDisposable
             _phase2Busy[worker] += Stopwatch.GetTimestamp() - busyStart;
         }
 
+        barrierStart = Stopwatch.GetTimestamp();
         _phaseBarrier.SignalAndWait();
-
-        LastNetworkPhaseTicks = networkPhaseEnd - tickStart;
+        if (BusyStatsEnabled)
+        {
+            _barrierBusy[worker] += Stopwatch.GetTimestamp() - barrierStart;
+        }
         LastNodePhaseTicks = Stopwatch.GetTimestamp() - networkPhaseEnd;
         LastTickTicks = Stopwatch.GetTimestamp() - tickStart;
     }
@@ -329,5 +358,88 @@ internal sealed class TickWorkerPool : IDisposable
         }
 
         _phaseBarrier.Dispose();
+    }
+
+    private static IPhaseBarrier ResolveBarrier(int workers)
+    {
+        var mode = Environment.GetEnvironmentVariable("MQTTY_BARRIER");
+        if (string.Equals(mode, "spin", StringComparison.OrdinalIgnoreCase))
+        {
+            return new SpinBarrier(workers);
+        }
+
+        if (string.Equals(mode, "monitor", StringComparison.OrdinalIgnoreCase))
+        {
+            return new MonitorBarrier(workers);
+        }
+
+        // One worker per physical core: a spin fence is fastest. More workers
+        // than physical cores means SMT oversubscription, where spinners starve
+        // the worker they wait for, so use the blocking BCL barrier.
+        return workers <= CpuTopology.PhysicalCoreCount()
+            ? new SpinBarrier(workers)
+            : new MonitorBarrier(workers);
+    }
+
+    private interface IPhaseBarrier : IDisposable
+    {
+        void SignalAndWait();
+    }
+
+    /// <summary>Default fence: the BCL Barrier (monitor-based, efficient when oversubscribed).</summary>
+    private sealed class MonitorBarrier : IPhaseBarrier
+    {
+        private readonly Barrier _barrier;
+        public MonitorBarrier(int participants) => _barrier = new Barrier(participants);
+        public void SignalAndWait() => _barrier.SignalAndWait();
+        public void Dispose() => _barrier.Dispose();
+    }
+
+    /// <summary>
+    /// Sense-reversing spin fence for one worker per physical core. The last
+    /// arrival flips the generation; the others spin on it. It is faster than
+    /// the monitor barrier when the worker count equals the physical core count,
+    /// but it must not be used on an SMT-oversubscribed machine (spinners starve
+    /// the worker they are waiting for).
+    /// </summary>
+    private sealed class SpinBarrier : IPhaseBarrier
+    {
+        private readonly int _participants;
+        private int _remaining;
+        private int _generation;
+
+        public SpinBarrier(int participants)
+        {
+            _participants = Math.Max(1, participants);
+            _remaining = _participants;
+        }
+
+        public void SignalAndWait()
+        {
+            var generation = Volatile.Read(ref _generation);
+            if (Interlocked.Decrement(ref _remaining) == 0)
+            {
+                Volatile.Write(ref _remaining, _participants);
+                Volatile.Write(ref _generation, generation + 1);
+                return;
+            }
+
+            var spin = 0;
+            while (Volatile.Read(ref _generation) == generation)
+            {
+                if (spin++ < 4096)
+                {
+                    Thread.SpinWait(32);
+                }
+                else
+                {
+                    Thread.Yield();
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+        }
     }
 }

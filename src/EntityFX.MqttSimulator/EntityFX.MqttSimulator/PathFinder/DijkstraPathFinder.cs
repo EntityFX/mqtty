@@ -11,7 +11,8 @@ public class DijkstraPathFinder : IPathFinder
     // Path lookup runs from Network.Send during parallel refresh (strategy 1),
     // so the cache must be thread-safe; concurrent duplicate computations of the
     // same pair are harmless because Dijkstra is deterministic.
-    private readonly ConcurrentDictionary<string, IEnumerable<INetwork>> _pathCache = new();
+    // A tuple key avoids allocating a string on every lookup.
+    private readonly ConcurrentDictionary<(string Source, string Destination), INetwork[]> _pathCache = new();
 
     public void Build()
     {
@@ -37,11 +38,10 @@ public class DijkstraPathFinder : IPathFinder
 
     public IEnumerable<INetwork> GetPath(INode source, INode destination)
     {
-        var netPair = $"{source}:{destination}";
-        var paths = _pathCache.GetValueOrDefault(netPair);
-        if (paths != null)
+        var key = (source.Name, destination.Name);
+        if (_pathCache.TryGetValue(key, out var cached))
         {
-            return paths;
+            return cached;
         }
 
         if (NetworkGraph?.Networks?.Any() != true)
@@ -59,7 +59,7 @@ public class DijkstraPathFinder : IPathFinder
             .Where(n => n != null).Select(n => n!);
 
         var result = (networks ?? Enumerable.Empty<INetwork>()).ToArray();
-        _pathCache[netPair] = result;
+        _pathCache[key] = result;
 
         return result;
     }

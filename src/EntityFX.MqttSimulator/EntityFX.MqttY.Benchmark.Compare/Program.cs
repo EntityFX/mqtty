@@ -1,202 +1,430 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
-using EntityFX.MqttY.LoadBalancing;
-using EntityFX.MqttY.Federation;
-using EntityFX.MqttY.Network;
-using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Federation;
+using EntityFX.MqttY.LoadBalancing;
+using EntityFX.MqttY.Network;
 
 // =====================================================================
-// Сравнение последовательного (parallel=false) и параллельного (parallel=true)
-// режима выполнения симуляции для трёх движков: LoadBalancing, Relay, Federation.
-// Параллельность управляет обновлением графа симуляции (graph.Refresh / RefreshWithCounters).
+// Reference benchmark: sequential (parallel=false) vs parallel (parallel=true)
+// for LoadBalancing, Relay and Federation.
+//
+// The protocol is deliberately strict:
+//   * a discarded warm-up pair;
+//   * alternating seq/par order between repetitions;
+//   * median (and min/max/CV) instead of a single run;
+//   * export can be excluded from the gate;
+//   * seq and par scientific metrics must match.
+//
+// Example gate run:
+//   dotnet run -c Release --no-build -- --repeat 5 --measure 5 --drain 10 --no-export
 // =====================================================================
 
-var sw = Stopwatch.StartNew();
-
-// Общие параметры топологии (одинаковые для всех трёх движков).
-// Federation ограничивает Brokers <= 16, поэтому берём 16 узлов везде.
-const int nodes = 16;          // брокеры / релеи
-const int netsPerNode = 4;     // сегментов сети на узел (16*4=64 <= 1024)
-const int publishers = 64;     // публикующих клиентов
-const double offeredRps = 10000;
-const double measurementSeconds = 0.5;
-const double warmupSeconds = 0.01;
-const double drainSeconds = 1;
-const int seed = 42;
-var tickPeriod = TimeSpan.FromTicks(1000); // 0.1 мс
-
+var opt = BenchOptions.Parse(args);
+var (logicalCpus, physicalCpus) = Hardware.DetectCores();
+var workers = opt.Workers > 0 ? opt.Workers : Math.Min(logicalCpus, physicalCpus);
+Environment.SetEnvironmentVariable("MQTTY_WORKERS", workers.ToString(CultureInfo.InvariantCulture));
 var tmp = Path.Combine(Path.GetTempPath(), $"mqtty-bench-{Guid.NewGuid():N}");
-Directory.CreateDirectory(tmp);
-Console.WriteLine($"Временная папка: {tmp}");
-Console.WriteLine($"Узлов: {nodes}, сегментов сети: {netsPerNode}, публикующих: {publishers}");
-Console.WriteLine($"Нагрузка: {offeredRps:n0} р/с, измерение: {measurementSeconds} с, прогрев: {warmupSeconds} с");
-Console.WriteLine($"Бюджет публикаций: {offeredRps * (warmupSeconds + measurementSeconds):n0} (лимит 1 000 000)");
-Console.WriteLine($"Сегментов в сети: {nodes * netsPerNode} (лимит 1 024)");
-Console.WriteLine(new string('=', 70));
+if (!opt.NoExport) Directory.CreateDirectory(tmp);
 
-// =====================================================================
-// 1. LOAD BALANCING
-// =====================================================================
-Console.WriteLine("--- LOAD BALANCING ---");
-
-var lbOptions = new LoadBalancingOptions
+Console.WriteLine($"MqttY reference benchmark");
+Console.WriteLine($"CPU: {logicalCpus} logical / {physicalCpus} physical, workers={workers}");
+Console.WriteLine($"Repetitions: {opt.Repeat} (+{opt.WarmupRuns} warm-up), measure={opt.Measure:F2}s, warmup={opt.Warmup:F2}s, drain={opt.Drain:F2}s");
+Console.WriteLine($"Topology: brokers={opt.Brokers}, nets/node={opt.Nets}, publishers={opt.Publishers}, seed={opt.Seed}");
+Console.WriteLine($"Export: {(opt.NoExport ? "disabled" : tmp)}");
+if (opt.Measure < 1 || opt.WarmupRuns == 0)
 {
-    Ideal = true,
-    Mode = BalancingMode.RoundRobin,
-    BrokerType = "Aedes",
-    BackendCount = nodes,
-    TotalPublishers = publishers,
-    PayloadBytes = 16,
-    PublishQos = 1,
-    SubscribeQos = 1,
-    OfferedRps = offeredRps,
-    Seed = seed,
-    WarmupSeconds = warmupSeconds,
-    MeasurementSeconds = measurementSeconds,
-    DrainTimeoutSeconds = drainSeconds,
-    TickPeriod = tickPeriod,
-    NetworkLength = netsPerNode,
-    Network = new NetworkSettings
+    Console.WriteLine("WARNING: smoke configuration (measure < 1 s or no warm-up); not a gate run.");
+}
+Console.WriteLine(new string('=', 78));
+
+var engines = new List<EngineReport>();
+
+if (opt.Engines.Contains("lb"))
+{
+    var lbOptions = BuildLbOptions(opt);
+    var lbInput = ExperimentInput.Prepare(lbOptions,
+        new InputSnapshot("generated-from-benchmark", JsonSerializer.SerializeToUtf8Bytes(lbOptions, ExperimentInput.Json)));
+    var lbRunner = new LoadBalancingExperimentRunner();
+    engines.Add(RunEngine("LoadBalancing", opt, (parallel, rep) =>
     {
-        CapacityBytesPerSecond = 100_000_000,
-        ThroughputWindowTicks = 100,
-        QueueCapacity = 100_000,
-        TransferTicks = 1,
-    }
-};
-lbOptions.Validate();
-
-var lbConfig = new InputSnapshot("generated-from-benchmark",
-    JsonSerializer.SerializeToUtf8Bytes(lbOptions, ExperimentInput.Json));
-var lbInput = ExperimentInput.Prepare(lbOptions, lbConfig);
-var lbRunner = new LoadBalancingExperimentRunner();
-
-(string Status, double Wall, double MeasureWall, double RefreshWall, long Errors) RunLoadBalancing(bool parallel, string dir)
-{
-    var s = Stopwatch.StartNew();
-    var (summary, timing) = lbRunner.RunMeasured(lbInput, dir, parallel: parallel, refreshStrategy: 0);
-    s.Stop();
-    return (summary.Status, s.Elapsed.TotalSeconds,
-        timing.PhaseWallSeconds.GetValueOrDefault("measure"),
-        timing.RefreshWallSeconds,
-        summary.GraphErrors);
+        var sw = Stopwatch.StartNew();
+        var cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
+        var (summary, timing) = lbRunner.RunMeasured(lbInput, ExportDir("lb", parallel, rep), parallel, refreshStrategy: 0);
+        sw.Stop();
+        var cpu = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalSeconds;
+        return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds, timing.RefreshWallSeconds,
+            timing.ExportWallSeconds, summary.GraphErrors, summary.Status, Metrics.Lb(summary), cpu);
+    }));
 }
 
-var (lbSeqStatus, lbSeqWall, lbSeqMeasure, lbSeqRefresh, lbSeqErrors) = RunLoadBalancing(false, Path.Combine(tmp, "lb-sequential"));
-var (lbParStatus, lbParWall, lbParMeasure, lbParRefresh, lbParErrors) = RunLoadBalancing(true, Path.Combine(tmp, "lb-parallel"));
-
-void PrintLb(string label, double wall, double measure, double refresh, long errors, string status)
+if (opt.Engines.Contains("relay"))
 {
-    Console.WriteLine($"  {label,-14} wall={wall:F4} с  measure={measure:F4} с  refresh={refresh:F4} с  errors={errors}  status={status}");
-}
-PrintLb("sequential:", lbSeqWall, lbSeqMeasure, lbSeqRefresh, lbSeqErrors, lbSeqStatus);
-PrintLb("parallel:   ", lbParWall, lbParMeasure, lbParRefresh, lbParErrors, lbParStatus);
-var lbSpeedup = lbSeqWall / lbParWall;
-Console.WriteLine($"  Прирост: {lbSpeedup:F2}x  (параллель быстрее на {(1 - lbParWall / lbSeqWall) * 100:F1}%)");
-Console.WriteLine();
-// =====================================================================
-// 2. RELAY
-// =====================================================================
-Console.WriteLine("--- RELAY ---");
-
-// clients = 4 на брокер => 16*4 = 64 клиента всего; sendRepeats подобрано ~5120 сообщений
-const int relayClients = 4;
-const int relaySendRepeats = 80;
-var relayApp = new MqttRelayApp(null, null);
-
-(string Status, double Wall, long Ticks, long Steps, long Errors) RunRelay(bool isParallel, string label)
-{
-    var s = Stopwatch.StartNew();
-    var graph = relayApp.ExecuteSimulation(isParallel, nodes, netsPerNode, relayClients,
-        relaySendRepeats, enableCounters: false, strategy: 0, bytesTelemetry: null);
-    s.Stop();
-    return ("completed", s.Elapsed.TotalSeconds, graph.TotalTicks, graph.TotalSteps, graph.Errors);
-}
-
-var (relaySeqStatus, relaySeqWall, relaySeqTicks, relaySeqSteps, relaySeqErrors) = RunRelay(false, "sequential");
-var (relayParStatus, relayParWall, relayParTicks, relayParSteps, relayParErrors) = RunRelay(true, "parallel");
-
-void PrintRelay(string label, double wall, long ticks, long steps, long errors, string status)
-{
-    Console.WriteLine($"  {label,-14} wall={wall:F4} с  ticks={ticks:n0}  steps={steps:n0}  errors={errors}  status={status}");
-}
-PrintRelay("sequential:", relaySeqWall, relaySeqTicks, relaySeqSteps, relaySeqErrors, relaySeqStatus);
-PrintRelay("parallel:   ", relayParWall, relayParTicks, relayParSteps, relayParErrors, relayParStatus);
-var relaySpeedup = relaySeqWall / relayParWall;
-Console.WriteLine($"  Прирост: {relaySpeedup:F2}x  (параллель быстрее на {(1 - relayParWall / relaySeqWall) * 100:F1}%)");
-Console.WriteLine();
-
-// =====================================================================
-// 3. FEDERATION
-// =====================================================================
-Console.WriteLine("--- FEDERATION ---");
-
-var fedOptions = new FederationOptions
-{
-    Mode = FederationMode.Federation,
-    Brokers = nodes,
-    Topology = "star",
-    Publishers = publishers,
-    PayloadBytes = 16,
-    Qos = 1,
-    OfferedRps = 5000,
-    Seed = seed,
-    WarmupSeconds = warmupSeconds,
-    MeasurementSeconds = measurementSeconds,
-    DrainTimeoutSeconds = drainSeconds,
-    TickPeriod = tickPeriod,
-    Ideal = true,
-    Network = new FederationNetworkOptions
+    var relayApp = new MqttRelayApp(null, null);
+    engines.Add(RunEngine("Relay", opt, (parallel, rep) =>
     {
-        CapacityBytesPerSecond = 100_000_000,
-        ThroughputWindowTicks = 100,
-        QueueCapacity = 100_000,
-        TransferTicks = 1,
+        var sw = Stopwatch.StartNew();
+        var cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
+        var graph = relayApp.ExecuteSimulation(parallel, opt.Brokers, opt.Nets, opt.RelayClients,
+            opt.RelayRepeats, enableCounters: false, strategy: 0, bytesTelemetry: null);
+        sw.Stop();
+        var cpu = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalSeconds;
+        var refresh = graph is NetworkSimulator simulator ? simulator.RefreshWallSeconds : 0;
+        return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds, refresh, 0,
+            graph.Errors, "completed", Metrics.Relay(graph), cpu);
+    }));
+}
+
+if (opt.Engines.Contains("fed"))
+{
+    var fedOptions = BuildFedOptions(opt);
+    var fedInput = FederationInput.Prepare(fedOptions);
+    var fedRunner = new FederationRunner();
+    engines.Add(RunEngine("Federation", opt, (parallel, rep) =>
+    {
+        var sw = Stopwatch.StartNew();
+        var cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
+        var summary = fedRunner.Run(fedInput, ExportDir("fed", parallel, rep), diagnostics: false,
+            parallel: parallel, refreshStrategy: 1);
+        sw.Stop();
+        var cpu = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalSeconds;
+        return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds, summary.RefreshWallSeconds, 0,
+            summary.ForwardRejected + summary.QueueDrops, summary.Status, Metrics.Fed(summary), cpu);
+    }));
+}
+
+PrintSummary(engines);
+Console.WriteLine($"GC: allocated={GC.GetTotalAllocatedBytes(precise: false) / 1_000_000.0:F0} MB, " +
+                  $"gen0={GC.CollectionCount(0)}, gen1={GC.CollectionCount(1)}, gen2={GC.CollectionCount(2)}");
+Console.WriteLine();
+
+if (opt.Strict && engines.Any(e => !e.MetricsMatch || e.Status != "completed"))
+{
+    Console.WriteLine("STRICT MODE: metric mismatch or non-completed run.");
+    Environment.ExitCode = 2;
+}
+
+if (opt.JsonPath != null)
+{
+    var report = new BenchReport(DateTimeOffset.UtcNow, logicalCpus, physicalCpus, opt, engines);
+    var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
+    File.WriteAllText(opt.JsonPath, json);
+    Console.WriteLine($"JSON: {opt.JsonPath}");
+}
+
+return Environment.ExitCode;
+
+string? ExportDir(string engine, bool parallel, int repetition) =>
+    opt.NoExport ? null : Path.Combine(tmp, $"{engine}-{(parallel ? "par" : "seq")}-{repetition}");
+
+EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSample> run)
+{
+    Console.WriteLine($"--- {name} ---");
+    for (var warm = 0; warm < options.WarmupRuns; warm++)
+    {
+        _ = run(false, 0);
+        _ = run(true, 0);
     }
-};
-fedOptions.Validate();
 
-var fedInput = FederationInput.Prepare(fedOptions);
-var fedRunner = new FederationRunner();
+    var samples = new List<RunSample>(options.Repeat * 2);
+    for (var rep = 0; rep < options.Repeat; rep++)
+    {
+        // Alternate the order: the second run is warmer, so always running seq
+        // first systematically biases the speedup in favour of par.
+        if (rep % 2 == 0)
+        {
+            samples.Add(run(false, rep));
+            samples.Add(run(true, rep));
+        }
+        else
+        {
+            samples.Add(run(true, rep));
+            samples.Add(run(false, rep));
+        }
+    }
 
-(string Status, double Wall, double Goodput, double P99, long Errors) RunFederation(bool parallel, string dir)
-{
-    var s = Stopwatch.StartNew();
-    var summary = fedRunner.Run(fedInput, dir, diagnostics: false,
-        parallel: parallel, refreshStrategy: 1);
-    s.Stop();
-    return (summary.Status, s.Elapsed.TotalSeconds,
-        summary.UniqueGoodput.GetValueOrDefault(),
-        summary.PublishP99Ms.GetValueOrDefault(),
-        summary.ForwardRejected + summary.QueueDrops);
+    var seq = samples.Where(s => s.Mode == "seq").ToArray();
+    var par = samples.Where(s => s.Mode == "par").ToArray();
+    var seqWall = median(seq.Select(s => s.Wall));
+    var parWall = median(par.Select(s => s.Wall));
+    var seqRefresh = median(seq.Select(s => s.Refresh));
+    var parRefresh = median(par.Select(s => s.Refresh));
+    var seqExport = median(seq.Select(s => s.Export));
+    var parExport = median(par.Select(s => s.Export));
+    var seqCpu = median(seq.Select(s => s.CpuSeconds));
+    var parCpu = median(par.Select(s => s.CpuSeconds));
+    var wallSpeedup = seqWall / parWall;
+    var refreshSpeedup = parRefresh > 0 ? seqRefresh / parRefresh : 0;
+    var metricReference = seq[0].Metrics.Core;
+    var metricsMatch = samples.All(s => s.Metrics.Core == metricReference);
+    var diagnosticsMatch = samples.All(s => s.Metrics.Diagnostics == seq[0].Metrics.Diagnostics);
+    var status = par[0].Status;
+    var errors = par.Sum(s => s.Errors) + seq.Sum(s => s.Errors);
+
+    Console.WriteLine($"  seq wall  median={seqWall:F4}s  min={seq.Min(s => s.Wall):F4}  max={seq.Max(s => s.Wall):F4}  cv={cv(seq.Select(s => s.Wall)):F1}%");
+    Console.WriteLine($"  par wall  median={parWall:F4}s  min={par.Min(s => s.Wall):F4}  max={par.Max(s => s.Wall):F4}  cv={cv(par.Select(s => s.Wall)):F1}%");
+    Console.WriteLine($"  refresh   seq={seqRefresh:F4}s  par={parRefresh:F4}s  speedup={(refreshSpeedup > 0 ? refreshSpeedup.ToString("F2") + "x" : "n/a")}");
+    Console.WriteLine($"  export    seq={seqExport:F4}s  par={parExport:F4}s");
+    Console.WriteLine($"  cpu       seq={seqCpu:F3}s  par={parCpu:F3}s  ({(seqCpu > 0 ? parCpu / seqCpu : 0):F2}x)");
+    Console.WriteLine($"  speedup   {wallSpeedup:F2}x   status={status}   errors={errors}   core={(metricsMatch ? "match" : "MISMATCH")}   diagnostics={(diagnosticsMatch ? "match" : "differ")}");
+    Console.WriteLine();
+
+    return new EngineReport(name, seqWall, parWall, wallSpeedup, seqRefresh, parRefresh, refreshSpeedup,
+        seqExport, parExport, seqCpu, parCpu, status, errors, metricsMatch, diagnosticsMatch, samples);
+
+    static double median(IEnumerable<double> values)
+    {
+        var ordered = values.OrderBy(v => v).ToArray();
+        return ordered.Length == 0 ? 0 : ordered.Length % 2 == 1
+            ? ordered[ordered.Length / 2]
+            : (ordered[ordered.Length / 2 - 1] + ordered[ordered.Length / 2]) / 2;
+    }
+
+    static double cv(IEnumerable<double> values)
+    {
+        var array = values.ToArray();
+        if (array.Length < 2) return 0;
+        var mean = array.Average();
+        return mean == 0 ? 0 : Math.Sqrt(array.Sum(v => (v - mean) * (v - mean)) / (array.Length - 1)) / mean * 100;
+    }
 }
 
-var (fedSeqStatus, fedSeqWall, fedSeqGput, fedSeqP99, fedSeqErrors) = RunFederation(false, Path.Combine(tmp, "fed-sequential"));
-var (fedParStatus, fedParWall, fedParGput, fedParP99, fedParErrors) = RunFederation(true, Path.Combine(tmp, "fed-parallel"));
-
-void PrintFed(string label, double wall, double gput, double p99, long errors, string status)
+void PrintSummary(List<EngineReport> reports)
 {
-    Console.WriteLine($"  {label,-14} wall={wall:F4} с  goodput={gput:F0} р/с  p99={p99:F2} мс  errors={errors}  status={status}");
+    Console.WriteLine(new string('=', 78));
+    Console.WriteLine("SUMMARY (wall-clock, median)");
+    Console.WriteLine(new string('=', 78));
+    Console.WriteLine($"{"Engine",-16} {"seq",10} {"par",10} {"wall x",8} {"refresh x",10} {"status",-12} {"core",-8} {"diag",-8}");
+    Console.WriteLine(new string('-', 78));
+    foreach (var e in reports)
+    {
+        Console.WriteLine($"{e.Engine,-16} {e.SeqWall,9:F3}s {e.ParWall,9:F3}s {e.WallSpeedup,7:F2}x " +
+                          $"{(e.RefreshSpeedup > 0 ? e.RefreshSpeedup.ToString("F2") + "x" : "n/a"),9} {e.Status,-12} {(e.MetricsMatch ? "match" : "MISMATCH"),-8} {(e.DiagnosticsMatch ? "match" : "differ"),-8}");
+    }
+    Console.WriteLine();
+    Console.WriteLine("Gate reminder: refresh >= 4x on 8 physical cores; 3.5-4.5x on 4C/8T.");
 }
-PrintFed("sequential:", fedSeqWall, fedSeqGput, fedSeqP99, fedSeqErrors, fedSeqStatus);
-PrintFed("parallel:   ", fedParWall, fedParGput, fedParP99, fedParErrors, fedParStatus);
-var fedSpeedup = fedSeqWall / fedParWall;
-Console.WriteLine($"  Прирост: {fedSpeedup:F2}x  (параллель быстрее на {(1 - fedParWall / fedSeqWall) * 100:F1}%)");
-Console.WriteLine();
 
-// =====================================================================
-// ИТОГОВАЯ ТАБЛИЦА
-// =====================================================================
-sw.Stop();
-Console.WriteLine("============================================================");
-Console.WriteLine("ИТОГОВОЕ СРАВНЕНИЕ (wall-clock, seq vs par)");
-Console.WriteLine("============================================================");
-Console.WriteLine($"{"Движок",-18} {"Последов.",-12} {"Параллель",-12} {"Прирост",-10} {"Быстрее на",-12} {"Статус",-16}");
-Console.WriteLine(new string('-', 80));
-Console.WriteLine($"{"LoadBalancing",-18} {lbSeqWall,10:F4} с {lbParWall,10:F4} с {lbSpeedup,8:F2}x {(1 - lbParWall / lbSeqWall) * 100,10:F1}%   {lbParStatus,-16}");
-Console.WriteLine($"{"Relay",-18} {relaySeqWall,10:F4} с {relayParWall,10:F4} с {relaySpeedup,8:F2}x {(1 - relayParWall / relaySeqWall) * 100,10:F1}%   {relayParStatus,-16}");
-Console.WriteLine($"{"Federation",-18} {fedSeqWall,10:F4} с {fedParWall,10:F4} с {fedSpeedup,8:F2}x {(1 - fedParWall / fedSeqWall) * 100,10:F1}%   {fedParStatus,-16}");
-Console.WriteLine();
-Console.WriteLine($"Общее время бенчмарка: {sw.Elapsed.TotalSeconds:F2} с");
-Console.WriteLine($"Результаты сохранены в: {tmp}");
+LoadBalancingOptions BuildLbOptions(BenchOptions o)
+{
+    var result = new LoadBalancingOptions
+    {
+        Ideal = true,
+        Mode = BalancingMode.RoundRobin,
+        BrokerType = "Aedes",
+        BackendCount = o.Brokers,
+        TotalPublishers = o.Publishers,
+        PayloadBytes = 16,
+        PublishQos = 1,
+        SubscribeQos = 1,
+        OfferedRps = o.LbRps,
+        Seed = o.Seed,
+        WarmupSeconds = o.Warmup,
+        MeasurementSeconds = o.Measure,
+        DrainTimeoutSeconds = o.Drain,
+        TickPeriod = TimeSpan.FromTicks(1000),
+        NetworkLength = o.Nets,
+        Network = new NetworkSettings
+        {
+            CapacityBytesPerSecond = 100_000_000,
+            ThroughputWindowTicks = 100,
+            QueueCapacity = 100_000,
+            TransferTicks = 1,
+        }
+    };
+    result.Validate();
+    return result;
+}
+
+FederationOptions BuildFedOptions(BenchOptions o)
+{
+    var result = new FederationOptions
+    {
+        Mode = FederationMode.Federation,
+        Brokers = Math.Min(o.Brokers, 16),
+        Topology = "star",
+        Publishers = Math.Max(o.Publishers, Math.Min(o.Brokers, 16)),
+        PayloadBytes = 16,
+        Qos = 1,
+        OfferedRps = o.FedRps,
+        Seed = o.Seed,
+        WarmupSeconds = o.Warmup,
+        MeasurementSeconds = o.Measure,
+        DrainTimeoutSeconds = o.Drain,
+        TickPeriod = TimeSpan.FromTicks(1000),
+        Ideal = true,
+        Network = new FederationNetworkOptions
+        {
+            CapacityBytesPerSecond = 100_000_000,
+            ThroughputWindowTicks = 100,
+            QueueCapacity = 100_000,
+            TransferTicks = 1,
+        }
+    };
+    result.Validate();
+    return result;
+}
+
+internal sealed record MetricSet(string Core, string Diagnostics);
+
+internal sealed record RunSample(string Mode, int Repetition, double Wall, double Refresh, double Export,
+    long Errors, string Status, MetricSet Metrics, double CpuSeconds);
+
+internal sealed record EngineReport(string Engine, double SeqWall, double ParWall, double WallSpeedup,
+    double SeqRefresh, double ParRefresh, double RefreshSpeedup, double SeqExport, double ParExport,
+    double SeqCpu, double ParCpu, string Status, long Errors, bool MetricsMatch, bool DiagnosticsMatch,
+    IReadOnlyList<RunSample> Samples);
+
+internal sealed record BenchReport(DateTimeOffset CreatedUtc, int LogicalCpus, int PhysicalCpus,
+    BenchOptions Options, IReadOnlyList<EngineReport> Engines);
+
+internal sealed class BenchOptions
+{
+    public HashSet<string> Engines { get; } = new(StringComparer.OrdinalIgnoreCase) { "lb", "relay", "fed" };
+    public int Repeat { get; private set; } = 3;
+    public int WarmupRuns { get; private set; } = 1;
+    public int Workers { get; private set; }
+    public double Measure { get; private set; } = 0.5;
+    public double Warmup { get; private set; } = 0.01;
+    public double Drain { get; private set; } = 1;
+    public double LbRps { get; private set; } = 10_000;
+    public double FedRps { get; private set; } = 5_000;
+    public int Brokers { get; private set; } = 16;
+    public int Nets { get; private set; } = 4;
+    public int Publishers { get; private set; } = 64;
+    public int RelayClients { get; private set; } = 4;
+    public int RelayRepeats { get; private set; } = 80;
+    public int Seed { get; private set; } = 42;
+    public bool NoExport { get; private set; }
+    public bool Strict { get; private set; } = true;
+    public string? JsonPath { get; private set; }
+
+    public static BenchOptions Parse(string[] args)
+    {
+        var o = new BenchOptions();
+        for (var i = 0; i < args.Length; i++)
+        {
+            var arg = args[i];
+            string Next() => i + 1 < args.Length ? args[++i] : throw new ArgumentException($"Missing value for {arg}");
+            switch (arg)
+            {
+                case "--engines":
+                    o.Engines.Clear();
+                    foreach (var engine in Next().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        o.Engines.Add(engine);
+                    break;
+                case "--repeat": o.Repeat = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--warmup-runs": o.WarmupRuns = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--workers": o.Workers = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--measure": o.Measure = double.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--warmup": o.Warmup = double.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--drain": o.Drain = double.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--rps": o.LbRps = double.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--fed-rps": o.FedRps = double.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--brokers": o.Brokers = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--nets": o.Nets = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--publishers": o.Publishers = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--relay-clients": o.RelayClients = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--relay-repeats": o.RelayRepeats = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--seed": o.Seed = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--no-export": o.NoExport = true; break;
+                case "--no-strict": o.Strict = false; break;
+                case "--json": o.JsonPath = Next(); break;
+                case "--help":
+                    Console.WriteLine("Options: --engines lb,relay,fed --repeat N --warmup-runs N --workers N --measure S --warmup S --drain S --rps N --fed-rps N --brokers N --nets N --publishers N --relay-clients N --relay-repeats N --seed N --no-export --no-strict --json PATH");
+                    Environment.Exit(0);
+                    break;
+                default:
+                    throw new ArgumentException($"Unknown option: {arg}");
+            }
+        }
+
+        if (o.Repeat < 1) throw new ArgumentOutOfRangeException(nameof(Repeat));
+        if (o.Measure <= 0 || o.Warmup < 0 || o.Drain <= 0) throw new ArgumentOutOfRangeException(nameof(Measure));
+        if (o.Brokers < 1 || o.Nets < 1 || o.Publishers < 1) throw new ArgumentOutOfRangeException(nameof(Brokers));
+        return o;
+    }
+}
+
+internal static class Hardware
+{
+    public static (int Logical, int Physical) DetectCores()
+    {
+        try
+        {
+            var lines = File.ReadAllLines("/proc/cpuinfo");
+            var logical = lines.Count(l => l.StartsWith("processor", StringComparison.Ordinal));
+            var coresPerSocket = lines.Where(l => l.StartsWith("cpu cores", StringComparison.Ordinal))
+                .Select(l => int.Parse(l.Split(':')[1].Trim(), CultureInfo.InvariantCulture)).FirstOrDefault();
+            var sockets = lines.Where(l => l.StartsWith("physical id", StringComparison.Ordinal))
+                .Select(l => int.Parse(l.Split(':')[1].Trim(), CultureInfo.InvariantCulture)).Distinct().Count();
+            if (logical > 0 && coresPerSocket > 0 && sockets > 0) return (logical, coresPerSocket * sockets);
+            return (Environment.ProcessorCount, Environment.ProcessorCount);
+        }
+        catch
+        {
+            return (Environment.ProcessorCount, Environment.ProcessorCount);
+        }
+    }
+}
+
+internal static class Metrics
+{
+    public static MetricSet Lb(ExperimentSummary s) => new(
+        JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["status"] = s.Status,
+            ["scheduled"] = s.ScheduledPublishes,
+            ["attempts"] = s.ApiAttempts,
+            ["rejected"] = s.SendRejected,
+            ["unique"] = s.Delivery.UniqueDelivered,
+            ["goodput"] = s.UniqueGoodput,
+            ["publishP50"] = s.PublishP50Ms,
+            ["publishP95"] = s.PublishP95Ms,
+            ["publishP99"] = s.PublishP99Ms,
+            ["errors"] = s.GraphErrors,
+        }),
+        JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["receiverP50"] = s.ReceiverP50Ms,
+            ["receiverP95"] = s.ReceiverP95Ms,
+            ["receiverP99"] = s.ReceiverP99Ms,
+            ["duplicates"] = s.Delivery.DuplicateDeliveries,
+            ["unexpected"] = s.Delivery.UnexpectedDeliveries,
+            ["unknown"] = s.Delivery.UnknownDeliveries,
+        }));
+
+    public static MetricSet Fed(FederationSummary s) => new(
+        JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["status"] = s.Status,
+            ["scheduled"] = s.ScheduledPublishes,
+            ["attempts"] = s.ApiAttempts,
+            ["rejected"] = s.SendRejected,
+            ["unique"] = s.UniqueDeliveries,
+            ["goodput"] = s.UniqueGoodput,
+            ["publishP50"] = s.PublishP50Ms,
+            ["publishP95"] = s.PublishP95Ms,
+            ["publishP99"] = s.PublishP99Ms,
+        }),
+        JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["receiverP50"] = s.ReceiverP50Ms,
+            ["receiverP95"] = s.ReceiverP95Ms,
+            ["receiverP99"] = s.ReceiverP99Ms,
+            ["forwardRejected"] = s.ForwardRejected,
+            ["queueDrops"] = s.QueueDrops,
+            ["hopLimitDrops"] = s.HopLimitDrops,
+            ["unknown"] = s.UnknownDeliveries,
+        }));
+
+    public static MetricSet Relay(EntityFX.MqttY.Contracts.Network.INetworkSimulator graph) => new(
+        JsonSerializer.Serialize(new Dictionary<string, object?>
+        {
+            ["ticks"] = graph.TotalTicks,
+            ["steps"] = graph.TotalSteps,
+            ["errors"] = graph.Errors,
+        }),
+        "{}");
+}

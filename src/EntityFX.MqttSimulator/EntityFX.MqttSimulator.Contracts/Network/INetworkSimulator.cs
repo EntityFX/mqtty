@@ -88,6 +88,9 @@ namespace EntityFX.MqttY.Contracts.Network
 
         long TotalSteps { get; }
 
+        /// <summary>Steps snapshot for the current refresh tick, so per-node counters do not rescan ThreadLocal values.</summary>
+        long CurrentRefreshSteps { get; }
+
         void AddCounterValue<TValue>(string name, string shortName, TValue value)
             where TValue : struct, IEquatable<TValue>;
     }

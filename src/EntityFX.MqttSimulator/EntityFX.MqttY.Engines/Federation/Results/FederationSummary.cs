@@ -1,5 +1,7 @@
 namespace EntityFX.MqttY.Federation;
 
+using System.Text.Json.Serialization;
+
 public sealed record FederationSummary(string Status, string? Error, double MeasurementSeconds, double TickMilliseconds,
     long ScheduledPublishes, long ApiAttempts, long SendRejected, long BackpressureUnsent,
     long SourceCompleted, long SourceCompletedBeforeDrain, long SourceCompletedDuringDrain, double? SourceCompletedRps,
@@ -11,4 +13,9 @@ public sealed record FederationSummary(string Status, string? Error, double Meas
     double? PublishP50Ms, double? PublishP95Ms, double? PublishP99Ms,
     double? ReceiverP50Ms, double? ReceiverP95Ms, double? ReceiverP99Ms,
     SourcePublishResult[] Sources, ReceiverResult[] Receivers, IReadOnlyDictionary<long, long> PublishHistogramTicks,
-    IReadOnlyDictionary<long, long> ReceiverHistogramTicks, FederationPhase[] Phases);
+    IReadOnlyDictionary<long, long> ReceiverHistogramTicks, FederationPhase[] Phases)
+{
+    /// <summary>Accumulated wall time inside graph.Refresh (diagnostics only).</summary>
+    [JsonIgnore]
+    public double RefreshWallSeconds { get; init; }
+}

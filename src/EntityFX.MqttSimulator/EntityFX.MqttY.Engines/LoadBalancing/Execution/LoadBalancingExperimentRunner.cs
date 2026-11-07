@@ -9,11 +9,12 @@ namespace EntityFX.MqttY.LoadBalancing;
 
 public sealed class LoadBalancingExperimentRunner
 {
+    private static readonly bool ParallelPublish =
+        Environment.GetEnvironmentVariable("MQTTY_PARALLEL_PUBLISH") == "1";
     public (ExperimentSummary Summary, LoadBalancingExecutionTiming Timing) RunMeasured(
-        PreparedExperiment input, string output, bool parallel, int refreshStrategy,
+        PreparedExperiment input, string? output, bool parallel, int refreshStrategy,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(output);
         var timing = new LoadBalancingExecutionTiming();
         var started = Stopwatch.GetTimestamp();
         var summary = RunCore(input, output, cancellationToken, null, parallel, refreshStrategy, timing);
@@ -150,9 +151,12 @@ public sealed class LoadBalancingExperimentRunner
                     var each = slots / topology.Publishers.Length;
                     var extra = (int)(slots % topology.Publishers.Length);
 
-                    if (par)
+                    if (par && ParallelPublish)
                     {
-                        Parallel.For(0, topology.Publishers.Length, publisher =>
+                        var maxDop = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_WORKERS"), out var workers) && workers > 0
+                            ? workers
+                            : Environment.ProcessorCount;
+                        Parallel.For(0, topology.Publishers.Length, new ParallelOptions { MaxDegreeOfParallelism = maxDop }, publisher =>
                         {
                             var offset = (publisher - nextScheduledPublisher + topology.Publishers.Length) % topology.Publishers.Length;
                             credit[publisher] = Math.Min(creditCap, credit[publisher] + each + (offset < extra ? 1 : 0));

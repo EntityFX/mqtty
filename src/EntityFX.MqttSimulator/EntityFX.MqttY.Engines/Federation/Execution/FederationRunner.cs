@@ -7,6 +7,8 @@ namespace EntityFX.MqttY.Federation;
 
 public sealed class FederationRunner
 {
+    private static readonly bool ParallelPublish =
+        Environment.GetEnvironmentVariable("MQTTY_PARALLEL_PUBLISH") == "1";
     public FederationSummary Run(FederationInput input, string? output = null, bool diagnostics = false,
         CancellationToken cancellationToken = default, Action<INetworkSimulator, string>? onProgress = null,
         bool parallel = true, int refreshStrategy = 1)
@@ -59,11 +61,13 @@ public sealed class FederationRunner
                     throw new InvalidOperationException("Simulator refresh failed.", topology.Graph.SimulationException);
                 onProgress?.Invoke(topology.Graph, phase);
             }
+
             void Until(Func<bool> condition)
             {
                 for (long i = 0, n = o.ToTicks(o.DrainTimeoutSeconds); !condition() && i < n; i++) Refresh();
                 if (!condition()) throw new TimeoutException(phase + " timed out; partial evidence retained.");
             }
+
             void Drive(long count, bool measurement, bool par)
             {
                 var perTick = o.OfferedRps * o.TickPeriod.TotalSeconds;
@@ -73,9 +77,12 @@ public sealed class FederationRunner
                 {
                     var due = (long)Math.Floor((t + 1) * perTick + 1e-9); var slots = due - planned; planned = due;
                     if (measurement) scheduled += slots;
-                    if (par)
+                    if (par && ParallelPublish)
                     {
-                        Parallel.For(0, o.Publishers, p =>
+                        var maxDop = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_WORKERS"), out var workers) && workers > 0
+                            ? workers
+                            : Environment.ProcessorCount;
+                        Parallel.For(0, o.Publishers, new ParallelOptions { MaxDegreeOfParallelism = maxDop }, p =>
                         {
                             credit[p] = Math.Min(cap, credit[p] + slots / o.Publishers + ((p - next + o.Publishers) % o.Publishers < slots % o.Publishers ? 1 : 0));
                             while (credit[p] > 0 && !topology.Publishers[p].HasPendingPublish)
@@ -133,7 +140,7 @@ public sealed class FederationRunner
             if (output != null) FederationResultWriter.Write(output, input, summary, ledger.Publications(), ledger.Receipts(), transmissions, graphMl,
                 o.Topology == "star" && topology != null ? TransitNetworkEvidence.Capture(o, topology, transitBaseline) : null,
                 drainDiagnostics);
-            return summary;
+            return summary with { RefreshWallSeconds = topology?.Graph.RefreshWallSeconds ?? 0 };
         }
         finally { topology?.Dispose(); }
 

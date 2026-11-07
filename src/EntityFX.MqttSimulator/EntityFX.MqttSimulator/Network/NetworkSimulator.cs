@@ -54,6 +54,25 @@ public class NetworkSimulator : INetworkSimulator
     private long _refreshStatsWall;
     private long _refreshStatsNetworkPhaseWall;
     private long _refreshStatsNodePhaseWall;
+    private long _totalRefreshWallTicks;
+    private long _refreshCallCount;
+    private long _refreshSteps;
+    private long[]? _nodeBusyTicks;
+    private long[]? _nodeCalls;
+
+    /// <summary>Steps snapshot taken at the start of the current refresh tick.</summary>
+    public long CurrentRefreshSteps => _refreshSteps;
+
+    private static readonly bool NodeStatsEnabled =
+        Environment.GetEnvironmentVariable("MQTTY_NODE_STATS") == "1";
+    private static readonly bool ActiveOnly =
+        Environment.GetEnvironmentVariable("MQTTY_ACTIVE_ONLY") == "1";
+
+    /// <summary>Accumulated wall time inside <see cref="Refresh"/> (diagnostics only).</summary>
+    public double RefreshWallSeconds => (double)_totalRefreshWallTicks / Stopwatch.Frequency;
+
+    /// <summary>Number of <see cref="Refresh"/> calls (diagnostics only).</summary>
+    public long RefreshCalls => _refreshCallCount;
 
     public SimulationRunMode RunMode { get; set; } = SimulationRunMode.RealTime;
     public double SpeedMultiplier { get; set; } = 1.0;
@@ -273,6 +292,8 @@ public class NetworkSimulator : INetworkSimulator
 
     public bool Refresh(bool parallel, int strategy)
     {
+        var refreshStart = Stopwatch.GetTimestamp();
+        _refreshSteps = TotalSteps;
         _stopwatch.Start();
         try
         {
@@ -308,6 +329,11 @@ public class NetworkSimulator : INetworkSimulator
             _lastSimulationException = ex;
             return false;
         }
+        finally
+        {
+            _totalRefreshWallTicks += Stopwatch.GetTimestamp() - refreshStart;
+            _refreshCallCount++;
+        }
     }
 
     /// <summary>
@@ -319,6 +345,10 @@ public class NetworkSimulator : INetworkSimulator
     /// <summary>Upper bound of worker threads used by the parallel refresh (0 = default).</summary>
     public int MaxDegreeOfParallelism { get; set; } = 0;
 
+    private static bool IsNodeIdle(object node) =>
+        node is IQuiescenceParticipant participant && participant.IsQuiescent &&
+        (node is not Node tracked || !tracked.HasPendingResponse);
+
     private void EnsureTopologySnapshot()
     {
         var version = Volatile.Read(ref _topologyVersion);
@@ -327,6 +357,55 @@ public class NetworkSimulator : INetworkSimulator
             _orderedNetworks = _networks.OrderBy(item => item.Key, StringComparer.Ordinal).ToArray();
             _orderedNodes = _nodes.OrderBy(item => item.Key.Address, StringComparer.Ordinal).ThenBy(item => item.Key.NodeType).ToArray();
             _orderedTopologyVersion = version;
+            if (NodeStatsEnabled)
+            {
+                _nodeBusyTicks = null;
+                _nodeCalls = null;
+            }
+        }
+    }
+
+    private void EnsureNodeStats(int count)
+    {
+        if (_nodeBusyTicks == null || _nodeBusyTicks.Length < count)
+        {
+            _nodeBusyTicks = new long[count];
+            _nodeCalls = new long[count];
+        }
+    }
+
+    /// <summary>
+    /// Diagnostic dump (MQTTY_NODE_STATS=1): per-node-type and top-node busy time.
+    /// It measures the node body only, so the caller can compare the parallel
+    /// work sum with the sequential refresh wall.
+    /// </summary>
+    private void DumpNodeStats()
+    {
+        if (!NodeStatsEnabled || _nodeBusyTicks == null || _nodeCalls == null)
+        {
+            return;
+        }
+
+        var count = Math.Min(_orderedNodes.Length, _nodeBusyTicks.Length);
+        var rows = Enumerable.Range(0, count)
+            .Select(index => (Name: _orderedNodes[index].Key.Address, Type: _orderedNodes[index].Key.NodeType,
+                Ticks: _nodeBusyTicks[index], Calls: _nodeCalls[index]))
+            .Where(row => row.Calls > 0)
+            .ToArray();
+        if (rows.Length == 0)
+        {
+            return;
+        }
+
+        var frequency = (double)Stopwatch.Frequency;
+        Console.Error.WriteLine($"node-stats total_ms={rows.Sum(r => r.Ticks) * 1000 / frequency:F1} calls={rows.Sum(r => r.Calls)}");
+        foreach (var group in rows.GroupBy(row => row.Type).OrderByDescending(group => group.Sum(row => row.Ticks)))
+        {
+            Console.Error.WriteLine($"  {group.Key,-12} ms={group.Sum(r => r.Ticks) * 1000 / frequency:F1} calls={group.Sum(r => r.Calls)}");
+        }
+        foreach (var row in rows.OrderByDescending(r => r.Ticks).Take(8))
+        {
+            Console.Error.WriteLine($"  {row.Name,-28} {row.Type,-12} ms={row.Ticks * 1000 / frequency:F1} calls={row.Calls}");
         }
     }
 
@@ -336,17 +415,27 @@ public class NetworkSimulator : INetworkSimulator
 
         EnsureTopologySnapshot();
 
+        if (NodeStatsEnabled)
+        {
+            EnsureNodeStats(_orderedNodes.Length);
+        }
+
         // Publish the shared tick clock once per tick so counters do not need a
         // per-instance stamp walk (CounterClock).
-        CounterClock.Publish(TotalTicks, TotalSteps);
+        CounterClock.Publish(TotalTicks, _refreshSteps);
 
-        _counters.Refresh(TotalTicks, TotalSteps);
+        _counters.Refresh(TotalTicks, _refreshSteps);
 
         var networks = _orderedNetworks;
         var nodes = _orderedNodes;
 
         void RefreshNetwork(KeyValuePair<string, INetwork> network)
         {
+            if (ActiveOnly && network.Value.QueueSize == 0)
+            {
+                return;
+            }
+
             if (EnableMonitoring)
             {
                 Monitoring.Push(0, TotalTicks,
@@ -356,8 +445,14 @@ public class NetworkSimulator : INetworkSimulator
             network.Value.Refresh();
         }
 
-        void RefreshNode(KeyValuePair<(string Address, NodeType NodeType), ILeafNode> node)
+        void RefreshNode(int index, KeyValuePair<(string Address, NodeType NodeType), ILeafNode> node)
         {
+            if (ActiveOnly && IsNodeIdle(node.Value))
+            {
+                return;
+            }
+
+            var nodeStart = NodeStatsEnabled ? Stopwatch.GetTimestamp() : 0;
             if (EnableMonitoring)
             {
                 Monitoring.Push(0, TotalTicks,
@@ -366,6 +461,12 @@ public class NetworkSimulator : INetworkSimulator
             }
 
             node.Value.Refresh();
+
+            if (NodeStatsEnabled)
+            {
+                _nodeBusyTicks![index] += Stopwatch.GetTimestamp() - nodeStart;
+                _nodeCalls![index]++;
+            }
         }
 
         // The scheduler setup/teardown costs more than the refresh itself for
@@ -379,9 +480,9 @@ public class NetworkSimulator : INetworkSimulator
                 RefreshNetwork(network);
             }
 
-            foreach (var node in nodes)
+            for (var index = 0; index < nodes.Length; index++)
             {
-                RefreshNode(node);
+                RefreshNode(index, nodes[index]);
             }
         }
         else
@@ -395,11 +496,19 @@ public class NetworkSimulator : INetworkSimulator
             // schedule is both faster and deterministic.
             var pool = EnsureTickWorkerPool();
             var statsStart = RefreshStatsEnabled ? Stopwatch.GetTimestamp() : 0;
-            var chunkSize = Math.Max(1, Math.Min(networks.Length, nodes.Length) / (pool.WorkerCount * 4));
+            // Networks are few and fairly uniform, so batching their claims is
+            // fine. Nodes differ by orders of magnitude in cost (idle client vs
+            // loaded broker); claiming them one at a time avoids a heavy tail.
+            var networkChunk = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_NETWORK_CHUNK"), out var networkOverride) && networkOverride > 0
+                ? networkOverride
+                : Math.Max(1, networks.Length / (pool.WorkerCount * 4));
+            var nodeChunk = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_NODE_CHUNK"), out var nodeOverride) && nodeOverride > 0
+                ? nodeOverride
+                : 1;
             pool.Run(
                 i => RefreshNetwork(networks[i]), networks.Length,
-                i => RefreshNode(nodes[i]), nodes.Length,
-                chunkSize);
+                i => RefreshNode(i, nodes[i]), nodes.Length,
+                networkChunk, nodeChunk);
             if (RefreshStatsEnabled)
             {
                 _refreshStatsTicks++;
@@ -421,8 +530,10 @@ public class NetworkSimulator : INetworkSimulator
     {
         var desired = MaxDegreeOfParallelism > 0
             ? MaxDegreeOfParallelism
-            : Environment.ProcessorCount;
-        desired = Math.Max(1, desired);
+            : int.TryParse(Environment.GetEnvironmentVariable("MQTTY_WORKERS"), out var envWorkers) && envWorkers > 0
+                ? envWorkers
+                : CpuTopology.PhysicalCoreCount();
+        desired = Math.Clamp(desired, 1, 64);
 
         if (_tickWorkerPool != null && _tickWorkerPoolSize == desired)
         {
@@ -441,14 +552,24 @@ public class NetworkSimulator : INetworkSimulator
 
         EnsureTopologySnapshot();
 
-        CounterClock.Publish(TotalTicks, TotalSteps);
+        if (NodeStatsEnabled)
+        {
+            EnsureNodeStats(_orderedNodes.Length);
+        }
 
-        _counters.Refresh(TotalTicks, TotalSteps);
+        CounterClock.Publish(TotalTicks, _refreshSteps);
+
+        _counters.Refresh(TotalTicks, _refreshSteps);
 
         if (strategy == 0)
         {
             foreach (var network in _orderedNetworks)
             {
+                if (ActiveOnly && network.Value.QueueSize == 0)
+                {
+                    continue;
+                }
+
                 if (EnableMonitoring)
                 {
                     Monitoring.Push(0, TotalTicks,
@@ -458,8 +579,15 @@ public class NetworkSimulator : INetworkSimulator
                 network.Value.Refresh();
             }
 
-            foreach (var node in _orderedNodes)
+            for (var index = 0; index < _orderedNodes.Length; index++)
             {
+                var node = _orderedNodes[index];
+                if (ActiveOnly && IsNodeIdle(node.Value))
+                {
+                    continue;
+                }
+
+                var nodeStart = NodeStatsEnabled ? Stopwatch.GetTimestamp() : 0;
                 if (EnableMonitoring)
                 {
                     Monitoring.Push(0, TotalTicks,
@@ -467,12 +595,22 @@ public class NetworkSimulator : INetworkSimulator
                         scope);
                 }
                 node.Value.Refresh();
+                if (NodeStatsEnabled)
+                {
+                    _nodeBusyTicks![index] += Stopwatch.GetTimestamp() - nodeStart;
+                    _nodeCalls![index]++;
+                }
             }
         }
         else
         {
             foreach (var network in _orderedNetworks)
             {
+                if (ActiveOnly && network.Value.QueueSize == 0)
+                {
+                    continue;
+                }
+
                 if (EnableMonitoring)
                 {
                     Monitoring.Push(0, TotalTicks,
@@ -484,6 +622,11 @@ public class NetworkSimulator : INetworkSimulator
                 var nodes = network.Value.Nodes;
                 foreach (var node in nodes)
                 {
+                    if (ActiveOnly && IsNodeIdle(node.Value))
+                    {
+                        continue;
+                    }
+
                     if (EnableMonitoring)
                     {
                         Monitoring.Push(0, TotalTicks,
@@ -854,15 +997,22 @@ public class NetworkSimulator : INetworkSimulator
                     var p1Max = p1.Length > 0 ? p1.Max() : 0;
                     var p2Sum = p2.Sum();
                     var p2Max = p2.Length > 0 ? p2.Max() : 0;
+                    var b = _tickWorkerPool.BarrierBusy;
+                    var bSum = b.Sum();
+                    var bMax = b.Length > 0 ? b.Max() : 0;
                     var wall = _refreshStatsWall;
                     Console.Error.WriteLine(
                         $"worker-stats phase1 sum_ms={p1Sum * 1000 / frequency:F1} max_ms={p1Max * 1000 / frequency:F1} " +
                         $"phase2 sum_ms={p2Sum * 1000 / frequency:F1} max_ms={p2Max * 1000 / frequency:F1} " +
+                        $"barrier sum_ms={bSum * 1000 / frequency:F1} max_ms={bMax * 1000 / frequency:F1} " +
+                        $"barrier_each=[{string.Join(",", b.Select(v => (v * 1000 / frequency).ToString("F0")))}] " +
+                        $"p2_each=[{string.Join(",", p2.Select(v => (v * 1000 / frequency).ToString("F0")))}] " +
                         $"wall_ms={wall * 1000 / frequency:F1} " +
                         $"p2_parallelism={(p2Max > 0 ? (double)p2Sum / p2Max : 0):F2}");
                 }
             }
 
+            DumpNodeStats();
             DisposeTickWorkerPool();
         }
     }

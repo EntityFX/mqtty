@@ -312,6 +312,13 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         // sends from many nodes on the same network no longer serialise on a
         // monitor lock (the shared client LAN was the node-phase bottleneck).
         var bytes = packet.PacketBytes;
+        // The rolling window is pruned once per Network.Refresh, but sends can
+        // also be driven by plain Tick() (and by tests) without a refresh.
+        // Prune lazily only when the new claim may exceed the budget.
+        if (Volatile.Read(ref _windowBytes) + bytes > _throughputBudgetBytes)
+        {
+            PruneAdmissions(NetworkSimulator!.TotalTicks);
+        }
         var windowBytes = Interlocked.Add(ref _windowBytes, bytes);
         if (Volatile.Read(ref _queueLength) >= _networkTypeOption.QueueCapacity ||
             windowBytes > _throughputBudgetBytes)
@@ -510,7 +517,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         if (NetworkSimulator!.EnableCounters)
         {
             _networkCounters.SetQueueLength(Volatile.Read(ref _queueLength) + _deferredPackets.Count + _deferredPacketsNext.Count);
-            Counters.Refresh(NetworkSimulator!.TotalTicks, NetworkSimulator!.TotalSteps);
+            Counters.Refresh(NetworkSimulator!.TotalTicks, NetworkSimulator.CurrentRefreshSteps);
         }
     }
 
