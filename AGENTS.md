@@ -197,5 +197,6 @@ dotnet test src/EntityFX.MqttSimulator/EntityFX.Tests.Integration/EntityFX.Tests
 - `doc/optimization/parallelization-plan.md` — **актуальный план** оптимизации и критерии приёмки.
 - `doc/optimization/scaling-forecast.md` — математическая модель и прогноз масштабирования (per-tick decomposition, прогноз для 8/16 ядер).
 - `doc/code-analysis.md` — верификация code-level гипотез (что подтвердилось, что уже исправлено, что отклонено замерами).
+- `doc/rewrite-review.md` — глубокое ревью и поэтапный план переписывания без изменения функциональности (инварианты, целевая архитектура, S0–S5, риск/выгода).
 - `doc/benchmark-article.md` — статья; её цифры могут отставать от текущего кода.
 - Внешняя документация: `github.com/EntityFX/mqtty-meta`.
