@@ -86,6 +86,7 @@ mqtty/
 - `DeliveryLedger` LB переведён на lock-free структуры; `TotalSteps` кэшируется на тик; active-only refresh (`MQTTY_ACTIVE_ONLY=1`) реализован, но по умолчанию выключен — на плотной нагрузке выигрыша нет.
 - Остаточный per-tick overhead: барьер ~27% wall при 4 воркерах, инфляция работы ~1.4×, ~1.6–5 ГБ аллокаций на прогон. Per-tick `Parallel.For` в `Drive` убран (serial publish по умолчанию), `nodeChunk=1`.
 - Проверены и не дали эффекта: shared LAN ingress, `MQTTY_NONATOMIC_ID`, packet pool, изоляция сетей, статическое распределение. Pointer-chasing 1→4 потока масштабируется на 96% — память не предел.
+- Проверены и отклонены по замерам: pipeline network+outgoing (1.44× vs 1.55×), cost-aware LPT (1.38× vs 1.61×), parallel `Pump` (1.52× vs 1.98×), active-only на large LB (1.97× vs 2.19×). Симуляция CPU-bound и уже занимает все ядра — перекрывать нечего.
 - Federation недетерминирован по receiver-латентности и `queueDrops` при перегрузке; core-метрики (counts, unique, goodput, publish p50–p99) совпадают.
 - `StaticFederator.Pump` сортирует цели через `OrderBy` на каждый тик; `topology.Pump()` последовательный.
 - `topology.IsIdle` в drain сканирует все сети/узлы/федераторы.
