@@ -231,8 +231,8 @@ LoadBalancingOptions BuildLbOptions(BenchOptions o)
         BackendCount = o.Brokers,
         TotalPublishers = o.Publishers,
         PayloadBytes = 16,
-        PublishQos = 1,
-        SubscribeQos = 1,
+        PublishQos = o.LbQos,
+        SubscribeQos = o.LbQos,
         OfferedRps = o.LbRps,
         Seed = o.Seed,
         WarmupSeconds = o.Warmup,
@@ -304,6 +304,7 @@ internal sealed class BenchOptions
     public double Warmup { get; private set; } = 0.01;
     public double Drain { get; private set; } = 1;
     public double LbRps { get; private set; } = 10_000;
+    public int LbQos { get; private set; } = 1;
     public double FedRps { get; private set; } = 5_000;
     public int Brokers { get; private set; } = 16;
     public int Nets { get; private set; } = 4;
@@ -337,6 +338,7 @@ internal sealed class BenchOptions
                 case "--warmup": o.Warmup = double.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--drain": o.Drain = double.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--rps": o.LbRps = double.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--qos": o.LbQos = int.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--fed-rps": o.FedRps = double.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--brokers": o.Brokers = int.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--nets": o.Nets = int.Parse(Next(), CultureInfo.InvariantCulture); break;
@@ -349,7 +351,7 @@ internal sealed class BenchOptions
                 case "--no-strict": o.Strict = false; break;
                 case "--json": o.JsonPath = Next(); break;
                 case "--help":
-                    Console.WriteLine("Options: --engines lb,relay,fed --mode both|seq|par --repeat N --warmup-runs N --workers N --measure S --warmup S --drain S --rps N --fed-rps N --brokers N --nets N --publishers N --relay-clients N --relay-repeats N --seed N --no-export --no-strict --json PATH");
+                    Console.WriteLine("Options: --engines lb,relay,fed --mode both|seq|par --repeat N --warmup-runs N --workers N --measure S --warmup S --drain S --rps N --fed-rps N --brokers N --nets N --publishers N --relay-clients N --relay-repeats N --seed N --qos N --no-export --no-strict --json PATH");
                     Environment.Exit(0);
                     break;
                 default:

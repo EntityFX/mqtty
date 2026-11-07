@@ -45,6 +45,37 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals
             }
         }
 
+        /// <summary>Allocation-free check: returns true if any pending message matches <paramref name="predicate"/>.
+        /// Avoids the <see cref="GetPendingMessages"/> ToArray() copy in the hot ExactlyOnce publish path.</summary>
+        public static bool AnyPendingMessage(this ClientSession session, Func<PendingMessage, bool> predicate)
+        {
+            lock (session.PendingMessagesSync)
+            {
+                foreach (var message in session.PendingMessages)
+                {
+                    if (predicate(message))
+                        return true;
+                }
+                return false;
+            }
+        }
+
+        /// <summary>Allocation-free lookup: returns the first pending acknowledgement matching <paramref name="predicate"/>.
+        /// Avoids the <see cref="GetPendingAcknowledgements"/> ToArray() copy in the hot ExactlyOnce publish path.</summary>
+        public static PendingAcknowledgement? FindPendingAcknowledgement(this ClientSession session,
+            Func<PendingAcknowledgement, bool> predicate)
+        {
+            lock (session.PendingAcknowledgementsSync)
+            {
+                foreach (var acknowledgement in session.PendingAcknowledgements)
+                {
+                    if (predicate(acknowledgement))
+                        return acknowledgement;
+                }
+                return null;
+            }
+        }
+
         public static void AddPendingMessage(this ClientSession session, PendingMessage pending)
         {
             lock (session.PendingMessagesSync)

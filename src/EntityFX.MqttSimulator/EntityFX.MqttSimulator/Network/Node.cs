@@ -43,6 +43,10 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     private List<NodeMonitoringPacket> _incommingDeferred = new();
     private List<NodeMonitoringPacket> _incommingDeferredNext = new();
 
+    // Packet pool shared across nodes. ConcurrentBag is optimized for the
+    // common pattern where the same thread produces and consumes; per-node
+    // pools with ConcurrentStack showed no benefit in measurements (interlocked
+    // cost on every Push/Pop outweighs thread-local advantage).
     private static readonly ConcurrentBag<NodeMonitoringPacket> _packetPool = new();
     private static readonly bool PacketPoolDisabled =
         Environment.GetEnvironmentVariable("MQTTY_NO_PACKET_POOL") == "1";

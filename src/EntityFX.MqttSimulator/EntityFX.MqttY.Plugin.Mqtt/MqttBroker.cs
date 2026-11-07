@@ -304,7 +304,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             if (qos == MqttQos.ExactlyOnce)
             {
                 var packetId = publishPacket.PacketId!.Value;
-                if (session.GetPendingMessages().Any(message =>
+                if (session.AnyPendingMessage(message =>
                         message.Status == PendingMessageStatus.AwaitingPublishRelease &&
                         message.PacketId == packetId))
                 {
@@ -312,7 +312,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                     return;
                 }
 
-                var completed = session.GetPendingAcknowledgements().FirstOrDefault(ack =>
+                var completed = session.FindPendingAcknowledgement(ack =>
                     ack.Type == MqttPacketType.PublishComplete && ack.PacketId == packetId);
                 session.RemovePendingAcknowledgement(completed);
 
