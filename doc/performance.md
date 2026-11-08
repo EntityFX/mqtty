@@ -60,6 +60,11 @@ dotnet run ... -- --engines fed --repeat 5 --warmup-runs 1 --measure 1 --drain 1
 Скорость seq/par на LB L выросла с ~3.9× до **5.06×** после двух изменений
 этого цикла: порядок сетей и GC-настройка бенчмарка.
 
+Кросс-проверка на слабом хосте (Celeron N3350, 2 физических ядра, workers=2):
+LB reference `0.97×`, LB L `1.69×`, Relay `1.73×`, Federation `1.71×`.
+Числа сообщений и сетевых пакетов совпадают с 12-ядерным Xeon; детали —
+[`analysis/message-scaling/article.md`](analysis/message-scaling/article.md).
+
 ## 3. Что дало ускорение
 
 ### 3.1 Планирование и синхронизация

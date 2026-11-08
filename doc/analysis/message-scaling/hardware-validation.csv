@@ -1,0 +1,9 @@
+host,model,cores,threads,config,workers,measure_s,seq_wall_s,par_wall_s,wall_x,refresh_x,scheduled,delivered,net_in
+weak,Celeron N3350,2,2,LB reference,2,2,2.110,2.182,0.97,0.97,20000,20000,402960
+strong,Xeon E5-2680 v3,12,24,LB reference,12,2,1.143,0.493,2.32,2.55,20000,20000,402960
+weak,Celeron N3350,2,2,LB L,2,1,16.392,9.683,1.69,1.74,20000,20000,407840
+strong,Xeon E5-2680 v3,12,24,LB L,12,1,6.339,1.106,5.73,7.22,20000,20000,407840
+weak,Celeron N3350,2,2,Relay,2,1,15.242,8.798,1.73,1.82,2000,32000,382928
+strong,Xeon E5-2680 v3,12,24,Relay,12,1,4.820,1.136,4.24,5.94,2000,32000,383312
+weak,Celeron N3350,2,2,Federation,2,1,41.064,23.978,1.71,1.75,2000,32000,3775504
+strong,Xeon E5-2680 v3,12,24,Federation,12,1,13.257,3.266,4.06,5.17,2000,32000,3775504
