@@ -11,7 +11,14 @@
 **Цель:** одно источник истины для состояния сессии, раздельные inbound/outbound packet-id,
 явная FSM QoS 0/1/2, меньше аллокаций в hot path, admission/metrics вне протокола.
 
-### S3f. SessionAggregate и раздельные flow-namespaces
+### S3f. SessionAggregate и раздельные flow-namespaces — ВЫПОЛНЕНО
+
+**Факт:** `ClientSession` хранит outbound/inbound в отдельных словарях с одним
+session lock; протокол использует `TryStartInboundPublish`, `TryCompleteInboundPublish`,
+`TryAcknowledgeOutbound`, `TryAdvanceOutboundQos2`, `TryCompleteOutboundQos2`,
+`UpsertSubscription`. `PendingMessages`/`PendingAcknowledgements` оставлены
+read-only compatibility-снимками для диагностики. Пять новых FSM-тестов;
+Integration **412/412**, core-метрики LB/Relay совпадают.
 
 **Проблема.** `ClientSession` — три публичных `List<>`; inbound и outbound записи лежат в одном
 `PendingMessages`, ключ — только `PacketId`. PUBACK уже отфильтрован по статусу (S3b), но
