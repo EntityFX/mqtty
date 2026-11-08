@@ -14,6 +14,10 @@ i7-3770: 4 физических / 8 логических ядер). Все ци�
 | 4 | `IsIdle` сканирует всех федераторов каждый drain tick | **уже исправлено** | `StaticFederator.IsIdle` — O(1) `_activeCount`; `FederationTopology.IsIdle` кэшируется на тик. Остаётся один `Federators.All` на тик (16 элементов) — незначимо |
 | 5 | LINQ/`ToArray` каждый тик — часть α | **подтверждено частично** | trace: `EnumerableHelpers.ToArray` 5.4% exclusive, `StorageExtensions.GetPendingMessages` 3.4%. Глобальные static lock'и уже убраны (per-session), но `GetPendingMessages().FirstOrDefault(...)` всё ещё копирует список |
 | 6 | `Interlocked` packet id — конкуренция | **не подтверждено** | `MQTTY_NONATOMIC_ID=1`: 2.80 с vs 2.59 с atomic; выигрыша нет (скорее шум/порча id) |
+| 7 | `GetPendingMessages().Any()` / `.GetPendingAcknowledgements().FirstOrDefault()` — `ToArray()` копирует список под локом на каждой публикации QoS 2 | **подтверждено (код)** | `StorageExtensions.GetPendingMessages` / `GetPendingAcknowledgements` делают `ToArray()` под `lock`. Горячий путь `MqttBroker.ProcessFromClientPublishCore` (QoS ExactlyOnce) вызывает их на каждой публикации. Добавлены allocation-free `AnyPendingMessage` / `FindPendingAcknowledgement` (перечисление под локом без копии). |
+| 8 | Статический `ConcurrentBag<NodeMonitoringPacket> _packetPool` на все узлы → кросс-воркерная争奪 | **отклонена** | Замена на per-node `ConcurrentStack` дала регрессию: `ConcurrentBag` с thread-local списками быстрее для паттерна «один поток пушит/попит», чем `ConcurrentStack` с interlocked на каждую операцию. Измерения: refresh par 1.1844 с (до) vs 1.3783 с (после ConcurrentStack). Возвращено к статичному `ConcurrentBag`. |
+| 9 | `ConcurrentDictionary<long, ResponseMonitoringPacket> _responseMessages` на узле | **не изменено** | Доступ из `Send` API (вне Refresh) и из `Refresh` — требует конкурентной безопасности. `ConcurrentDictionary.TryGetValue/TryRemove` — однокорзинный лок, уже дешево. `.Count` заменено на `_responseCount` (Interlocked int). |
+| 10 | `ProcessReady` deferred-листы `List.Add` / `Clear` на каждом тике | **не изменено** | `deferred.Clear()` не сбрасывает ёмкость, ссылки меняются местами (swap) — ёмкость сохраняется между тиками. Реаллокации происходят только при росте. |
 
 ## Подтверждённые факты профиля
 
@@ -35,27 +39,120 @@ i7-3770: 4 физических / 8 логических ядер). Все ци�
 
 ## Что реально осталось
 
-| Приоритет | Работа | Ожидание |
+| Приоритет | Работа | Статус | Ожидание |
+|---|---|---|---|
+| P0 | H1: `AnyPendingMessage` — убрать `ToArray()` в `GetPendingMessages().Any()` (QoS ExactlyOnce hot path) | **выполнено** (`StorageExtensions.cs` + `MqttBroker.cs`) | −0.05…0.15 α при QoS 2 трафике |
+| P0 | H2: `FindPendingAcknowledgement` — убрать `ToArray()` в `GetPendingAcknowledgements().FirstOrDefault()` | **выполнено** (`StorageExtensions.cs` + `MqttBroker.cs`) | −0.02…0.05 α при QoS 2 трафике |
+| P0 | H3: Per-node packet pool (`ConcurrentStack` вместо `ConcurrentBag`) | **отклонена** | Измерения показали регрессию (1.1844 с → 1.3783 с refresh par). `ConcurrentBag` с thread-local быстрее для паттерна «один поток пушит/попит» |
+| P0 | H4: `Dictionary` вместо `ConcurrentDictionary` для `_responseMessages` | **не выполнено** | Доступ из `Send` API вне Refresh требует конкурентной безопасности; выигрыш маржинален |
+| P1 | H5: Адаптивный SpinBarrier (экспоненциальный бэк-оф) | **не выполнено** | b 10 → <5 мкс/тик |
+| P2 | H6: Federation `Pump()` — пропуск пустых очередей, батч декремент `_activeCount` | **не выполнено** | Modest, ~5–10% времени федерации |
+| P2 | H7: `FederationDeliveryLedger` — поиск публикации по SHA-хэшу | **не выполнено** | Снижение накладных расходов на доставку |
+| P3 | 8+ физических ядер | **не применимо к коду** | на 16 physical идеальный предел large 6.28× |
+
+### Результаты измерений (LB, 4 воркера, measure 3 с, median из 3, QoS=2 / ExactlyOnce)
+
+| Метрика | До H1/H2 | После H1/H2 | Изменение |
+|---|---|---|---|
+| seq wall | 4.1948 с | 3.8191 с | **−9.0%** |
+| refresh seq | 3.9340 с | 3.5908 с | **−8.7%** |
+| par wall | 2.1558 с | 2.1046 с | **−2.4%** |
+| refresh par | 1.9034 с | 1.7991 с | **−5.5%** |
+| GC allocated | 6128 MB | 5895 MB | **−3.8%** |
+
+> **Вывод:** H1/H2 (`AnyPendingMessage` / `FindPendingAcknowledgement` без `ToArray()`) дают измеримый эффект именно при QoS 2 (ExactlyOnce) трафике: seq ускоряется на ~9%, par — на ~2–5%, аллокации снижаются на ~4%. При QoS 1 (дефолт) эффект не проявляется, т.к. горячий путь публикации не вызывает `GetPendingMessages().Any()`.
+
+## Что из исходного анализа неверно
+
+## План дальнейших работ (для следующего агента)
+
+### Завершённое (не трогать)
+
+| Гипотеза | Что сделано | Результат (QoS=2, 4 воркера, median 3) |
 |---|---|---|
-| P0 | Снизить α: убрать оставшиеся копирования pending/subscriptions (`FirstOrDefault` без `ToArray`), LINQ в hot path, allocations/GC | α 1.51 → 1.0–1.2; это единственный путь к 4× на 8 ядрах |
-| P1 | Снизить b: барьер/хвост; scheduling-эксперименты (pipeline, per-network, cost-aware, parallel Pump) уже отклонены | b 10 → <5 мкс/тик |
-| P2 | Federation: serial Pump оставить; оптимизировать node-работу/ledger дальше | Fed ~2.0–2.5× → 2.5–3× |
-| P3 | 8+ физических ядер | на 16 physical идеальный предел large 6.28× |
+| H1/H2 | `AnyPendingMessage` / `FindPendingAcknowledgement` без `ToArray()` | seq −9.0%, par −5.5%, GC −3.8% |
+| H3 | per-node `ConcurrentStack` вместо `ConcurrentBag` | **отклонена**: регрессия +16% refresh par |
+| M1 | `ResolveBarrier` auto spin/monitor | готово, в коде |
+| M2 | serial publish, `nodeChunk=1` | готово, в коде |
 
-**Вывод:** исходный документ правильно указал на α и b как на главные факторы, но ошибся в причинах α и в оценках потенциала. Математическая модель и прогноз — в `doc/optimization/scaling-forecast.md`.
+### Оставшиеся гипотезы (P1 → P3)
 
-## Команды проверки
+#### P1 — H5: Адаптивный SpinBarrier (снижение b)
+- **Место:** `.../Network/TickWorkerPool.cs`, `SpinBarrier.SignalAndWait()` (строки ~427–438)
+- **Проблема:** Жёсткий порог `if (spin++ < 4096) SpinWait(32); else Yield();`. При дисперсии затрат на узел быстрые воркеры спин-ждают медленного. Нет адаптации под смещение фаз.
+- **Фикс:** Адаптивный spin с измерением времени ожидания за N тиков + экспоненциальный бэк-оф (32→64→128…), затем `Yield`/`Sleep(0)`.
+- **Ожидание:** b: 10 → <5 мкс/тик. `WaitForNextGeneration` 31% → ~20%, `SpinBarrier` 19% → ~10%.
+- **Проверка:** `MQTTY_REFRESH_STATS=1 MQTTY_WORKER_STATS=1 ... --engines lb --mode par --workers 4 --no-export`. Сравнить `barrier sum_ms`, `barrier_each`, `p2_parallelism`, `us_per_tick`.
+- **Файл:** `TickWorkerPool.cs`
 
-```bash
-# counters ON/OFF
-MQTTY_REFRESH_STATS=1 MQTTY_WORKER_STATS=1 \
-  dotnet run --project .../EntityFX.MqttY.Benchmark.Compare.csproj -c Release --no-build -- \
-  --engines lb --mode par --repeat 1 --warmup-runs 0 --measure 5 --no-export --workers 4
-# добавить MQTTY_DISABLE_COUNTERS=1 для OFF
+#### P2 — H6: Federation `Pump()` — пропуск пустых очередей, батч декремент
+- **Место:** `.../Federation/Core/StaticFederator.cs`, `Pump()` (~строки 78–88)
+- **Проблема:** Цикл по всем целям каждый тик; `HasPendingPublish` для пустых очередей; `Interlocked.Decrement` на каждое сообщение.
+- **Фикс:** 1) Пропускать `queues[key].Count == 0`. 2) Батч `Interlocked.Add(ref _activeCount, -count)` в конце тика.
+- **Ожидание:** ~5–10% времени федерации.
+- **Проверка:** `--engines fed --mode both --workers 4 --no-export`. Сравнить wall time.
+- **Файл:** `StaticFederator.cs`
 
-# barrier auto vs spin на 8 logical
-MQTTY_BARRIER=spin ... --workers 8
+#### P2 — H7: `FederationDeliveryLedger` — поиск публикации по SHA-хэшу
+- **Место:** `.../Federation/Delivery/FederationDeliveryLedger.cs`, `Find()` (~84–95) и `Receive()` (~97–135)
+- **Проблема:** `Find(payload)` читает payload дважды (SHA уже вычислен, но не используется для индекса).
+- **Фикс:** `ConcurrentDictionary<string, FederationPublication>` по SHA-256 для O(1) поиска.
+- **Ожидание:** снижение накладных расходов на доставку.
+- **Проверка:** запуск `--engines fed --mode both --workers 4 --no-export`, замер времени ledger.
+- **Файл:** `FederationDeliveryLedger.cs`
 
-# packet id
-MQTTY_NONATOMIC_ID=1 ... --workers 4
+#### P2 — H4: `Dictionary` вместо `ConcurrentDictionary` для `_responseMessages`
+- **Место:** `.../Network/Node.cs`, строка ~25
+- **Проблема:** `ConcurrentDictionary` оплачивает хеширование + блокировки корзин; внутри узла refresh однопоточен.
+- **Фикс:** `Dictionary<long, ResponseMonitoringPacket>` per node.
+- **Ожидание:** −0.02…0.06 α.
+- **Риск:** средний — `Send`/`WaitResponse` могут вызываться вне refresh. Проверить все точки вызова.
+- **Проверка:** интеграционные тесты `BrokerMeasurementTests`, `MqttLongConfTests`.
+- **Файл:** `Node.cs`
+
+#### P3 — 8+ физических ядер (аппаратное)
+- На текущем 4C/8T потолок ~2.5–3×. На 8+ физических — 6–8×. Не требует изменений кода.
+
+### Формула масштабирования (ориентир)
+
 ```
+Speedup(N) ≈ N / (α + N·(b + h) / T_tick)
+```
+
+Текущие: α ≈ 1.51, b ≈ 10 мкс, h ≈ 2 мкс. Цель: α → ~1.1–1.2, b → <5 мкс. Даст ~3–3.5× на 4 ядрах, 5–6× на 8 физических.
+
+### Приёмка после каждого этапа (G1–G6)
+1. `dotnet build .../Benchmark.Compare.csproj -c Release --nologo` — 0 ошибок
+2. `dotnet test .../EntityFX.Tests.Integration/... -c Release --nologo` — 388/388, 0 падений
+3. Замер: `--engines lb --mode both --repeat 5 --warmup-runs 1 --measure 3 --workers 4 --no-export`
+4. Сравнить `refresh-stats`, `worker-stats`, `us_per_tick`, GC до/после. Регрессия → откат.
+
+### Команды замеров
+```bash
+# Базовый замер (LB, 4 воркера, QoS=2)
+MQTTY_REFRESH_STATS=1 MQTTY_WORKER_STATS=1 \
+  dotnet run --project src/EntityFX.MqttSimulator/EntityFX.MqttY.Benchmark.Compare/EntityFX.MqttY.Benchmark.Compare.csproj -c Release --no-build -- \
+  --engines lb --mode both --repeat 5 --warmup-runs 1 --measure 3 --workers 4 --qos 2 --no-export
+
+# Federation замер
+MQTTY_REFRESH_STATS=1 MQTTY_WORKER_STATS=1 \
+  dotnet run --project .../Benchmark.Compare.csproj -c Release --no-build -- \
+  --engines fed --mode both --repeat 3 --warmup-runs 1 --measure 3 --workers 4 --no-export
+
+# Кривая масштабирования (1/2/4/8 logical)
+for n in 1 2 4 8; do
+  DOTNET_PROCESSOR_COUNT=$n dotnet run --project .../Benchmark.Compare.csproj -c Release --no-build -- --engines lb --mode both --no-export
+done
+
+# Интеграционные тесты
+dotnet test src/EntityFX.MqttSimulator/EntityFX.Tests.Integration/EntityFX.Tests.Integration.csproj -c Release --nologo
+```
+
+### Список файлов для изменений (осталось)
+
+| Приоритет | Файл | Гипотеза |
+|---|---|---|
+| P1 | `.../Network/TickWorkerPool.cs` | H5 адаптивный SpinBarrier |
+| P2 | `.../Federation/Core/StaticFederator.cs` | H6 Pump оптимизация |
+| P2 | `.../Federation/Delivery/FederationDeliveryLedger.cs` | H7 поиск по SHA-хэшу |
+| P2 | `.../Network/Node.cs` | H4 `Dictionary` для `_responseMessages` |

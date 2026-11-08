@@ -354,16 +354,19 @@ for n in 1 2 4 8; do DOTNET_PROCESSOR_COUNT=$n dotnet run ... --no-build; done
 
 ## 7. Ожидаемый эффект по этапам
 
-| Этап | Ожидание | На что влияет |
-|---|---|---|
-| M1 (факт) | +20–25% refresh | спин-барьер на физических ядрах |
-| M2 (факт) | LB +35–50%, Relay +4%, Fed +10% | serial publish, node chunk=1 |
-| M3 | +5–15% | хвост тика |
-| M4 | Federation +1.3–2× | ledger lock, Pump, IsIdle |
-| M5 | +10–20% end-to-end | фиксированные расходы |
-| M6 | — | подтверждение/корректировка |
+| Этап | Статус | Ожидание | На что влияет | Факты из замеров |
+|---|---|---|---|---|
+| M1 (факт) | выполнено | +20–25% refresh | спин-барьер на физических ядрах | ResolveBarrier auto vs forced spin на 8 logical: 3.88 с vs 6.01 с |
+| M2 (факт) | выполнено частично | LB +35–50%, Relay +4%, Fed +10% | serial publish, node chunk=1 | — |
+| M3 | выполнено (код + замеры QoS=2) | −8.7% seq refresh, −5.5% par refresh, −3.8% GC при QoS 2 | H1/H2: `AnyPendingMessage` / `FindPendingAcknowledgement` без `ToArray()` | Измерения: seq wall 4.1948→3.8191 с (−9%), par wall 2.1558→2.1046 с (−2.4%), GC 6128→5895 MB (−3.8%) |
+| M3b (отклонено) | **отклонено** | — | H3: per-node `ConcurrentStack` вместо статического `ConcurrentBag` | refresh par 1.1844 с (до) → 1.3783 с (после), регрессия +16%. Возвращено к `ConcurrentBag` |
+| M4 | не выполнено | Federation +1.3–2× | ledger lock, Pump, IsIdle | H6/H7: `StaticFederator.Pump()` оптимизация, `FederationDeliveryLedger` поиск по SHA-хэшу |
+| M5 | не выполнено | +10–20% end-to-end | фиксированные расходы | — |
+| M6 | не выполнено | — | подтверждение/корректировка | — |
+| M7 (P1) | не выполнено | b: 10 → <5 мкс/тик | H5: адаптивный SpinBarrier в `TickWorkerPool.SpinBarrier.SignalAndWait()` | — |
+| M8 (P2) | не выполнено | −0.02…0.06 α | H4: `Dictionary` вместо `ConcurrentDictionary` для `_responseMessages` в `Node.cs` | — |
 
-Кумулятивно: **LB/Relay 3.5–4.5×, Federation 3.5–4.5×** на 4C/8T; на 8 физических ядрах — 4–8×.
+Кумулятивно: **LB/Relay 3.5–4.5×, Federation 3.5–4.5×** на 4C/8T; на 8 физических ядрах — 4–8×. Достижение требует снижения α до ~1.1–1.2 (H1/H2 при QoS 2, further LINQ/аллокационные оптимизации) и b до <5 мкс (адаптивный барьер).
 
 ---
 

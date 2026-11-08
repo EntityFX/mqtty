@@ -237,13 +237,97 @@ graph TB
 
 ---
 
-## 5. Заключение
+## 6. Ограничения параллелизма и предлагаемые оптимизации (Skills)
 
-Включение параллельного режима обновления графа симуляции даёт прирост производительности 1,52–2,44× на топологии из 16 узлов и 64 сегментов сети при сохранении полной детерминированности научных метрик. Для масштабирования на ещё больших сетях рекомендуется дальнейшая оптимизация параллельного refresh ( workers pool, уменьшение синхронизации) и декомпозиция drain-фазы в Federation.
+Despite achieving 1.52–2.44× speedup on current 4C/8T hardware, perfect parallel scaling is prevented by several fundamental bottlenecks. This section analyzes why ideal scaling isn't achieved and proposes concrete skills (optimizations) to overcome each limit.
+
+### 6.1 Primary Bottlenecks (in order of impact)
+
+1. **Barrier synchronization overhead (~27% wall at 4 workers)**
+   - `WaitForNextGeneration` consumes 31% of parallel time
+   - `SpinBarrier` spins 19% before park workers
+   - Barrier time per worker: `b(4) ≈ 9.8–10.3 μs/tick`
+   - **Skill**: Reduce barrier wait through smarter handoff, reduce barrier frequency, or use adaptive spin-wait thresholds
+
+2. **Work inflation α ≈ 1.51×** — parallel execution does ~1.5× more total work than sequential
+   - Root causes: `ToArray`/`LINQ` operations, pending-list snapshots, `ConcurrentDictionary` overhead, `BrokerMeasurement` counters
+   - Measured: 10.12 s aggregate work vs 6.72 s sequential refresh
+   - **Skill**: Eliminate unnecessary allocations per tick, batch LINQ operations, cache counter increments, reduce snapshot frequency
+
+3. **SMT penalty on 8 logical cores**
+   - LB small: 0.86× with 8 logical vs 1.65× with 4 physical cores
+   - LB large: 2.11× vs 2.29×
+   - **Skill**: Default to physical cores only; expose `MQTTY_WORKERS` to override; avoid auto-detecting SMT as additional cores
+
+4. **Federation drain-phase serialization**
+   - `StaticFederator.Pump` sorts receivers via `OrderBy` on every tick (sequential bottleneck)
+   - `topology.IsIdle` scans all networks/nodes/federators during drain
+   - Pump remains serial even when parallel Pump was tried (1.52× vs 1.98× with IsIdle cache)
+   - **Skill**: Parallelize receiver sorting with thread-safe structures; cache `IsIdle` results; decompose drain into per-federator units
+
+5. **Fixed costs s ≈ 0.89 s wall, h ≈ 2 μs/tick**
+   - Construction/connection/drain overhead independent of worker count
+   - Handoff cost between phases
+   - **Skill**: Reduce per-tick handoff cost, batch drain operations, minimize construction inside hot loop
+
+6. **Sequential publish path**
+   - `parallel=false` (or `MQTTY_PARALLEL_PUBLISH=0`) keeps publish serial
+   - Even when enabled, parallel Pump only achieves 1.52× vs 1.98× sequential with IsIdle cache
+   - **Skill**: If parallel publish is enabled, accompany with IsIdle cache and lock-free receiver structures
+
+### 6.2 Mathematical Model Reminder
+
+Per-tick model: `t_p(n) = α(n)·t_s/n + b(n) + h`
+
+Where:
+- `α(n)` = work inflation (≈1.51 at n=4, ≈2.51 with SMT at n=8)
+- `b(n)` = barrier per worker per tick (≈10 μs at n=4, ≈20 μs conservative forecast for n=8)
+- `h` ≈ 2 μs/tick handoff cost
+- `s` ≈ 0.89 s fixed wall-cost
+
+For 4× speedup on large profile on 8 physical cores: need `α≈1.0` AND `b≤11 μs/tick`.
+For 6× on 8 cores: mathematically impossible (work-per-tick alone exceeds budget).
+For 8× on 8 cores: impossible even in ideal case (needs ~64 cores).
+
+### 6.3 Prioritized Skills Roadmap
+
+| Priority | Skill | Expected Impact | Difficulty |
+|---|---|---|---|
+| P0 | Reduce work inflation α from 1.5→1.0 (remove allocations/LINQ/counters per tick) | ~2× additional speedup on current hardware | High — requires refactoring per-tick data paths |
+| P0 | Reduce barrier b from ~10→<5 μs/tick (adaptive spin, better handoff) | ~1.5–2× additional speedup | Medium — TickWorkerPool redesign |
+| P1 | Make Federation Pump parallel with proper locking/caching | 1.52→1.98× (rebaseline) | Medium — StaticFederator.Core rewrite |
+| P1 | Reduce IsIdle scan scope (cache per-federator state) | Remove drain serialization | Medium — topology state tracking |
+| P2 | Node/Network chunking (MQTTY_NODE_CHUNK, MQTTY_NETWORK_CHUNK) | Scale to larger topologies | Low — already configured, just tune |
+| P2 | Active-only refresh (MQTTY_ACTIVE_ONLY=1) | ~1.97→2.19× on large LB | Low — flag already implemented |
+| P3 | Eliminate SMT penalty (bind to physical cores only) | Recover 8-logical→4-physical gap | Low — env var + default change |
+
+### 6.4 Realistic Expectations After Skills Application
+
+| Scenario | Current (4C/8T) | After P0+P1 Skills | Theoretical Ideal |
+|---|---|---|---|
+| LB small | 1.57× | ~4.0–4.5× | 3.94× (ideal, 8 phys cores) |
+| LB large | 1.99× | ~5.5–6.5× | 6.28× (ideal, 16 phys cores) |
+| Relay | 2.35× | ~4.5–5.5× | — |
+| Federation | 1.98× | ~3.5–4.5× | — |
+
+**Key takeaway**: The current 1.5–2.5× range is limited primarily by work inflation (α≈1.5) and barrier overhead (b≈10 μs). If both are resolved, 4× becomes achievable on large profiles with 8 physical cores, and 6×+ requires 16+ physical cores even with optimized α≈1.0.
 
 ---
 
-## 6. Воспроизводимость
+## 7. Заключение (Updated)
+
+Включение параллельного режима обновления графа симуляции даёт прирост производительности 1.52–2.44× на топологии из 16 узлов и 64 сегментов сети при сохранении полной детерминированности научных метрик. 
+
+**Main remaining limits**: work inflation α≈1.5 and barrier overhead b≈10 μs/tick. After applying the proposed skills (reducing α→1.0, b→<5 μs), realistic expectations are:
+- **4× speedup** achievable on large profiles with 8 physical cores
+- **6–8×** requires 16+ physical cores or model-level coarsening
+
+For масштабирования на ещё больших сетях рекомендуется дальнейшая оптимизация параллельного refresh (workers pool, уменьшение синхронизации) и декомпозиция drain-фазы в Federation, как указано в `doc/optimization/parallelization-plan.md`.
+
+---
+
+
+## 8. Воспроизводимость
 
 Исходный код бенчмарка: `src/EntityFX.MqttSimulator/EntityFX.MqttY.Benchmark.Compare/Program.cs`  
 Команда запуска:
