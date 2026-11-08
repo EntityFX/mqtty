@@ -24,8 +24,10 @@ using EntityFX.MqttY.Network;
 var opt = BenchOptions.Parse(args);
 var (logicalCpus, physicalCpus) = Hardware.DetectCores();
 var workers = opt.Workers > 0 ? opt.Workers : Math.Min(logicalCpus, physicalCpus);
-Environment.SetEnvironmentVariable("MQTTY_WORKERS", workers.ToString(CultureInfo.InvariantCulture));
+// MQTTY_WORKERS is set per sample in RunEngine and restored afterwards, so an
+// embedded/test host is not left with a mutated process environment.
 var tmp = Path.Combine(Path.GetTempPath(), $"mqtty-bench-{Guid.NewGuid():N}");
+var exportSerial = new int[1];
 if (!opt.NoExport) Directory.CreateDirectory(tmp);
 
 Console.WriteLine($"MqttY reference benchmark");
@@ -55,7 +57,9 @@ if (opt.Engines.Contains("lb"))
         sw.Stop();
         var cpu = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalSeconds;
         return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds, timing.RefreshWallSeconds,
-            timing.ExportWallSeconds, summary.GraphErrors, summary.Status, Metrics.Lb(summary), cpu);
+            timing.ExportWallSeconds, summary.GraphErrors, summary.Status, Metrics.Lb(summary), cpu,
+            Attempts: summary.ApiAttempts, Unique: summary.Delivery.UniqueDelivered,
+            Steps: summary.ScheduledPublishes);
     }));
 }
 
@@ -71,8 +75,10 @@ if (opt.Engines.Contains("relay"))
         sw.Stop();
         var cpu = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalSeconds;
         var refresh = graph is NetworkSimulator simulator ? simulator.RefreshWallSeconds : 0;
+        var status = graph.Errors == 0 && graph.TotalSteps > 0 ? "completed" : "failed";
         return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds, refresh, 0,
-            graph.Errors, "completed", Metrics.Relay(graph), cpu);
+            graph.Errors, status, Metrics.Relay(graph), cpu,
+            Attempts: 0, Unique: 0, Steps: graph.TotalSteps);
     }));
 }
 
@@ -90,7 +96,9 @@ if (opt.Engines.Contains("fed"))
         sw.Stop();
         var cpu = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalSeconds;
         return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds, summary.RefreshWallSeconds, 0,
-            summary.ForwardRejected + summary.QueueDrops, summary.Status, Metrics.Fed(summary), cpu);
+            summary.ForwardRejected + summary.QueueDrops, summary.Status, Metrics.Fed(summary), cpu,
+            Attempts: summary.ApiAttempts, Unique: summary.UniqueDeliveries,
+            Steps: summary.ScheduledPublishes);
     }));
 }
 
@@ -99,9 +107,9 @@ Console.WriteLine($"GC: allocated={GC.GetTotalAllocatedBytes(precise: false) / 1
                   $"gen0={GC.CollectionCount(0)}, gen1={GC.CollectionCount(1)}, gen2={GC.CollectionCount(2)}");
 Console.WriteLine();
 
-if (opt.Strict && engines.Any(e => !e.MetricsMatch || e.Status != "completed"))
+if (opt.Strict && engines.Any(e => !e.MetricsMatch || e.Status != "completed" || !e.Activity))
 {
-    Console.WriteLine("STRICT MODE: metric mismatch or non-completed run.");
+    Console.WriteLine("STRICT MODE: metric mismatch, invalid activity or non-completed run.");
     Environment.ExitCode = 2;
 }
 
@@ -116,7 +124,7 @@ if (opt.JsonPath != null)
 return Environment.ExitCode;
 
 string? ExportDir(string engine, bool parallel, int repetition) =>
-    opt.NoExport ? null : Path.Combine(tmp, $"{engine}-{(parallel ? "par" : "seq")}-{repetition}");
+    opt.NoExport ? null : Path.Combine(tmp, $"{engine}-{(parallel ? "par" : "seq")}-{repetition}-{++exportSerial[0]}");
 
 EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSample> run)
 {
@@ -128,11 +136,31 @@ EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSam
         _ => new[] { "seq", "par" }
     };
 
+    RunSample SafeRun(bool parallel, int rep)
+    {
+        var previousWorkers = Environment.GetEnvironmentVariable("MQTTY_WORKERS");
+        Environment.SetEnvironmentVariable("MQTTY_WORKERS", workers.ToString(CultureInfo.InvariantCulture));
+        try
+        {
+            return run(parallel, rep);
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine($"  {name} {(parallel ? "par" : "seq")} rep={rep} failed: {exception.Message}");
+            return new RunSample(parallel ? "par" : "seq", rep, 0, 0, 0, 0, "error",
+                new MetricSet("{}", "{}"), 0, Failure: exception.ToString());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("MQTTY_WORKERS", previousWorkers);
+        }
+    }
+
     for (var warm = 0; warm < options.WarmupRuns; warm++)
     {
         foreach (var mode in modes)
         {
-            _ = run(mode == "par", 0);
+            _ = SafeRun(mode == "par", 0);
         }
     }
 
@@ -141,7 +169,7 @@ EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSam
     {
         if (modes.Length == 1)
         {
-            samples.Add(run(modes[0] == "par", rep));
+            samples.Add(SafeRun(modes[0] == "par", rep));
             continue;
         }
 
@@ -149,13 +177,13 @@ EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSam
         // first systematically biases the speedup in favour of par.
         if (rep % 2 == 0)
         {
-            samples.Add(run(false, rep));
-            samples.Add(run(true, rep));
+            samples.Add(SafeRun(false, rep));
+            samples.Add(SafeRun(true, rep));
         }
         else
         {
-            samples.Add(run(true, rep));
-            samples.Add(run(false, rep));
+            samples.Add(SafeRun(true, rep));
+            samples.Add(SafeRun(false, rep));
         }
     }
 
@@ -174,7 +202,10 @@ EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSam
     var metricReference = samples[0].Metrics.Core;
     var metricsMatch = samples.All(s => s.Metrics.Core == metricReference);
     var diagnosticsMatch = samples.All(s => s.Metrics.Diagnostics == samples[0].Metrics.Diagnostics);
-    var status = par.Length > 0 ? par[0].Status : seq[0].Status;
+    var status = samples.All(s => s.Status == "completed") ? "completed" : "failed";
+    var activity = samples.All(s => s.Steps > 0) &&
+        (name == "Relay" || samples.All(s => s.Attempts > 0 && s.Unique > 0));
+    if (!activity) status = "invalid";
     var errors = par.Sum(s => s.Errors) + seq.Sum(s => s.Errors);
 
     Console.WriteLine($"  seq wall  median={(seq.Length > 0 ? seqWall.ToString("F4") : "n/a"),8}s  min={(seq.Length > 0 ? seq.Min(s => s.Wall).ToString("F4") : "n/a"),8}  max={(seq.Length > 0 ? seq.Max(s => s.Wall).ToString("F4") : "n/a"),8}  cv={(seq.Length > 0 ? cv(seq.Select(s => s.Wall)) : 0):F1}%");
@@ -182,11 +213,11 @@ EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSam
     Console.WriteLine($"  refresh   seq={seqRefresh:F4}s  par={parRefresh:F4}s  speedup={(refreshSpeedup > 0 ? refreshSpeedup.ToString("F2") + "x" : "n/a")}");
     Console.WriteLine($"  export    seq={seqExport:F4}s  par={parExport:F4}s");
     Console.WriteLine($"  cpu       seq={seqCpu:F3}s  par={parCpu:F3}s  ({(seqCpu > 0 ? parCpu / seqCpu : 0):F2}x)");
-    Console.WriteLine($"  speedup   {(wallSpeedup > 0 ? wallSpeedup.ToString("F2") + "x" : "n/a")}   status={status}   errors={errors}   core={(metricsMatch ? "match" : "MISMATCH")}   diagnostics={(diagnosticsMatch ? "match" : "differ")}");
+    Console.WriteLine($"  speedup   {(wallSpeedup > 0 ? wallSpeedup.ToString("F2") + "x" : "n/a")}   status={status}   errors={errors}   activity={(activity ? "ok" : "EMPTY")}   core={(metricsMatch ? "match" : "MISMATCH")}   diagnostics={(diagnosticsMatch ? "match" : "differ")}");
     Console.WriteLine();
 
     return new EngineReport(name, seqWall, parWall, wallSpeedup, seqRefresh, parRefresh, refreshSpeedup,
-        seqExport, parExport, seqCpu, parCpu, status, errors, metricsMatch, diagnosticsMatch, samples);
+        seqExport, parExport, seqCpu, parCpu, status, errors, metricsMatch, diagnosticsMatch, activity, samples);
 
     static double median(IEnumerable<double> values)
     {
@@ -284,12 +315,13 @@ FederationOptions BuildFedOptions(BenchOptions o)
 internal sealed record MetricSet(string Core, string Diagnostics);
 
 internal sealed record RunSample(string Mode, int Repetition, double Wall, double Refresh, double Export,
-    long Errors, string Status, MetricSet Metrics, double CpuSeconds);
+    long Errors, string Status, MetricSet Metrics, double CpuSeconds,
+    long Attempts = 0, long Unique = 0, long Steps = 0, string? Failure = null);
 
 internal sealed record EngineReport(string Engine, double SeqWall, double ParWall, double WallSpeedup,
     double SeqRefresh, double ParRefresh, double RefreshSpeedup, double SeqExport, double ParExport,
     double SeqCpu, double ParCpu, string Status, long Errors, bool MetricsMatch, bool DiagnosticsMatch,
-    IReadOnlyList<RunSample> Samples);
+    bool Activity, IReadOnlyList<RunSample> Samples);
 
 internal sealed record BenchReport(DateTimeOffset CreatedUtc, int LogicalCpus, int PhysicalCpus,
     BenchOptions Options, IReadOnlyList<EngineReport> Engines);

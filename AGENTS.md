@@ -121,7 +121,7 @@ dotnet run --project .../EntityFX.MqttY.Benchmark.Compare.csproj -c Release --no
 
 Ключевые опции: `--engines`, `--repeat`, `--warmup-runs`, `--workers`, `--measure`, `--warmup`, `--drain`, `--rps`, `--fed-rps`, `--brokers`, `--nets`, `--publishers`, `--relay-clients`, `--relay-repeats`, `--seed`, `--no-export`, `--no-strict`, `--json`.
 
-Бенчмарк делает прогревочный прогон, чередует seq/par, считает медиану и сравнивает **core**-метрики строго, а receiver-латентность и `queueDrops` — как diagnostics.
+Бенчмарк делает прогревочный прогон, чередует seq/par, считает медиану и сравнивает **core**-метрики строго, а receiver-латентность и `queueDrops` — как diagnostics. Каждый сэмпл пишется в уникальный каталог экспорта; `MQTTY_WORKERS` восстанавливается после сэмпла. `activity=ok` требует `steps>0` и для LB/Fed `attempts>0 && unique>0`; иначе статус `invalid`, а strict возвращает 2. Ошибка одного сэмпла не роняет отчёт целиком.
 
 ### 7.2 Профиль фаз и воркеров
 

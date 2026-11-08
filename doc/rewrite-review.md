@@ -393,8 +393,15 @@ seq wall `3.29 с` (было ~3.82), par `1.74 с` (было ~2.10), refresh par
 PUBREL не делает второй fanout. PUBLISH без DUP по-прежнему может переиспользовать packet id.
 Добавлен регрессионный тест. Проверка: **399/399**.
 
-**Следующее по плану:** S4b (общий result schema/экспорт и benchmark на продуктовых движках)
-или eviction завершённых QoS2-маркеров; затем S2 (data-oriented транспорт) и S5 (Web/Designer).
+**S4b выполнен.** Бенчмарк больше не принимает «зелёный пустой» прогон: `activity=ok` требует
+`steps > 0`, а для LB/Fed ещё `attempts > 0 && unique > 0`; иначе `status=invalid`, strict
+возвращает 2. `status=completed` только если все сэмплы completed. Исключение одного сэмпла
+превращается в `status=error` и не роняет отчёт. Каталог экспорта уникален для каждого сэмпла
+(`...-{rep}-{serial}`), а `MQTTY_WORKERS` выставляется на время сэмпла и восстанавливается.
+Smoke с экспортом и warmup проходит; gate LB `activity=ok`, `core=match`.
+
+**Следующее по плану:** eviction завершённых QoS2-маркеров / общий result schema, затем S2
+(data-oriented транспорт) и S5 (Web/Designer).
 
 ---
 
