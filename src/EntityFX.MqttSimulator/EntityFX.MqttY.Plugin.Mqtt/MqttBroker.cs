@@ -5,6 +5,7 @@ using EntityFX.MqttY.Contracts.Mqtt.Packets;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Plugin.Mqtt.Admission;
 using EntityFX.MqttY.Plugin.Mqtt.BrokerProfile;
 using EntityFX.MqttY.Plugin.Mqtt.Counter;
 using EntityFX.MqttY.Plugin.Mqtt.Internals;
@@ -29,14 +30,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         private readonly IMqttPacketManager _packetManager;
         private readonly IMqttTopicEvaluator _topicEvaluator;
 
-        private readonly MqttBrokerProfile? _profile;
-        private readonly ConcurrentDictionary<(int MessageBytes, MqttQos Qos, int Clients), BrokerRateLimiter>
-            _rateLimiters = new();
+        private readonly IBrokerAdmissionModel _admission;
         private readonly BrokerProcessingQueue _processingQueue = new();
         private readonly TimeSpan _tickPeriod;
         private readonly int _randomSeed;
-        private readonly int? _profileClientCount;
-        private readonly BrokerMeasurement _measurement = new();
+        private readonly IBrokerMetricsSink _measurement = new BrokerMeasurement();
 
         // Cached, pre-sorted subscription snapshot. Rebuilding it on every
         // publish (ReadAll + SelectMany + Where + OrderBy + ToArray) dominates
@@ -128,15 +126,21 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             MqttCounters = new MqttCounters(Name, Name.Substring(0, 2), "MqttBroker", "MB", ticksOptions, enableCounters);
             counters.AddCounter(MqttCounters);
 
-            _profile = brokerProfile;
             _tickPeriod = ticksOptions.TickPeriod;
             _randomSeed = randomSeed;
             if (profileClientCount is <= 0) throw new ArgumentOutOfRangeException(nameof(profileClientCount));
-            _profileClientCount = profileClientCount;
 
             if (brokerProfile != null)
             {
                 brokerProfile.Validate();
+                _admission = new ProfileBrokerAdmissionModel(
+                    brokerProfile, ticksOptions.TickPeriod, randomSeed, Name, profileClientCount,
+                    () => EmpiricalProtocolFloorTicks,
+                    () => EmpiricalCapacityPacing);
+            }
+            else
+            {
+                _admission = NoopBrokerAdmissionModel.Instance;
             }
         }
 
@@ -206,73 +210,46 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 return;
             }
 
-            // Обратная совместимость: без профиля брокер обрабатывает сообщения
-            // без ограничений по RPS, задержке и отказам.
-            if (_profile == null)
+            var admission = _admission.TryAdmit(new PublishAdmissionContext(
+                packet.From,
+                publishPacket.QualityOfService,
+                publishPacket.PacketId,
+                publishPacket.Payload.Length,
+                localPublishSequence,
+                NetworkSimulator!.TotalTicks,
+                GetServerClients().Count()));
+
+            if (!admission.Admit)
             {
-                _measurement.Admit(tracker);
+                switch (admission.RejectReason)
+                {
+                    case BrokerRejectReason.RateLimit:
+                        MqttCounters.RefuseByRateLimit(publishPacket.QualityOfService);
+                        _measurement.RejectByRate(tracker);
+                        break;
+                    case BrokerRejectReason.PublishFailure:
+                        MqttCounters.RefuseByFailRate(publishPacket.QualityOfService);
+                        _measurement.FailPublish(tracker);
+                        break;
+                    default:
+                        throw new InvalidOperationException("Admission rejected without a reason.");
+                }
+
+                FailClientPublish(packet.From, publishPacket.PacketId);
+                return;
+            }
+
+            tracker.ConditionalDeliveryLossRate = admission.ConditionalDeliveryLossRate;
+            _measurement.Admit(tracker);
+
+            if (admission.Immediate)
+            {
+                // No profile: keep the legacy immediate path without a processing queue.
                 ProcessFromClientPublishCore(packet, publishPacket);
                 return;
             }
 
-            var clients = _profileClientCount ?? Math.Max(1, GetServerClients().Count());
-            var sample = _profile.For(publishPacket.Payload.Length,
-                publishPacket.QualityOfService, clients);
-
-            // 1. Лимитер RPS (пропускная способность).
-            var limiterKey = (publishPacket.Payload.Length, publishPacket.QualityOfService, clients);
-            var limiter = _rateLimiters.GetOrAdd(limiterKey,
-                _ => new BrokerRateLimiter(sample.CapacityRps, _tickPeriod));
-            var capacityWaitTicks = EmpiricalCapacityPacing ? limiter.Reserve(NetworkSimulator!.TotalTicks) : 0;
-            if (!EmpiricalCapacityPacing && !limiter.TryAcquire(NetworkSimulator!.TotalTicks))
-            {
-                MqttCounters.RefuseByRateLimit(publishPacket.QualityOfService);
-                _measurement.RejectByRate(tracker);
-                FailClientPublish(packet.From, publishPacket.PacketId);
-                return;
-            }
-
-            // 2. Вероятностный отказ.
-            if (sample.PublishFailureRate > 0 &&
-                DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
-                    localPublishSequence, "publish-failure") < sample.PublishFailureRate)
-            {
-                MqttCounters.RefuseByFailRate(publishPacket.QualityOfService);
-                _measurement.FailPublish(tracker);
-                FailClientPublish(packet.From, publishPacket.PacketId);
-                return;
-            }
-
-            // 3. Постановка в очередь обработки с задержкой.
-            tracker.ConditionalDeliveryLossRate = sample.ConditionalDeliveryLossRate;
-            _measurement.Admit(tracker);
-            int processingTicks;
-            if (sample.ObservedLatencyDistribution != null && EmpiricalProtocolFloorTicks.HasValue)
-            {
-                var uniform = DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
-                    localPublishSequence, "processing-latency");
-                processingTicks = checked((int)Math.Max(0,
-                    EmpiricalTicksFromMs(sample.ObservedLatencyDistribution.Sample(uniform)) - EmpiricalProtocolFloorTicks.Value));
-            }
-            else if (sample.ProcessingLatencyDistribution != null)
-            {
-                var uniform = DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
-                    localPublishSequence, "processing-latency");
-                processingTicks = EmpiricalTicksFromMs(sample.ProcessingLatencyDistribution.Sample(uniform));
-            }
-            else if (sample.ProcessingLatencyQuantiles != null)
-            {
-                var uniform = DeterministicMqttSampler.Uniform(_randomSeed, Name, packet.From,
-                    localPublishSequence, "processing-latency");
-                processingTicks = TicksFromMs(DeterministicMqttSampler.InverseCdf(uniform, sample.ProcessingLatencyQuantiles));
-            }
-            else
-            {
-                processingTicks = 1;
-            }
-            // The observed end-to-end CDF already includes native queueing. Capacity
-            // eligibility is an additional lower bound, not an independent delay to add twice.
-            _processingQueue.Enqueue(packet, Math.Max(processingTicks, capacityWaitTicks));
+            _processingQueue.Enqueue(packet, admission.DelayTicks);
         }
 
         private void FailClientPublish(string publisher, ushort? packetId)
@@ -742,25 +719,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         private void UpdateProfileFromClients()
         {
-            _rateLimiters.Clear();
-        }
-
-        private int TicksFromMs(double latencyMs)
-        {
-            if (_tickPeriod <= TimeSpan.Zero)
-            {
-                return 1;
-            }
-
-            return Math.Max(1, (int)Math.Ceiling(latencyMs / _tickPeriod.TotalMilliseconds));
-        }
-
-        private int EmpiricalTicksFromMs(double latencyMs)
-        {
-            var ticks = Math.Ceiling(latencyMs / _tickPeriod.TotalMilliseconds);
-            if (!double.IsFinite(ticks) || ticks < 0 || ticks > int.MaxValue)
-                throw new InvalidDataException("Empirical latency cannot be represented at the selected tick resolution.");
-            return (int)ticks;
+            _admission.ClearRateLimiters();
         }
 
         public long? EmpiricalProtocolFloorTicks { get; set; }

@@ -2,7 +2,7 @@ using EntityFX.MqttY.Contracts.Mqtt;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Counter
 {
-    internal sealed class BrokerMeasurement
+    internal sealed class BrokerMeasurement : IBrokerMetricsSink
     {
         private sealed class Accumulator
         {
@@ -31,8 +31,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
             public bool Admitted { get; set; }
         }
 
+        private readonly record struct PublicationKey(
+            string Publisher, MqttQos Qos, ushort? PacketId, long NetworkPacketId);
+
         private readonly object _sync = new();
-        private readonly Dictionary<string, PublishTracker> _publishes = new();
+        private readonly Dictionary<PublicationKey, PublishTracker> _publishes = new();
         private readonly Dictionary<long, (long Generation, MqttQos Qos)> _deliveries = new();
         private Accumulator[] _accumulators = CreateAccumulators();
         private readonly Dictionary<string, Accumulator[]> _publishers = new(StringComparer.Ordinal);
@@ -238,9 +241,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
         private static Accumulator[] CreateAccumulators() =>
             Enum.GetValues<MqttQos>().Select(_ => new Accumulator()).ToArray();
 
-        private static string Key(string publisher, MqttQos qos, ushort? packetId, long networkPacketId) =>
+        private static PublicationKey Key(string publisher, MqttQos qos, ushort? packetId,
+            long networkPacketId) =>
             qos == MqttQos.AtMostOnce
-                ? $"{publisher}|{(int)qos}|n{networkPacketId}"
-                : $"{publisher}|{(int)qos}|p{packetId}";
+                ? new PublicationKey(publisher, qos, null, networkPacketId)
+                : new PublicationKey(publisher, qos, packetId, 0);
     }
 }
