@@ -144,7 +144,24 @@ parity метрик при counters on/off; negative admission/reject paths.
 
 **Оценка:** 4 ч/д.
 
-### S3i. Полнота протокола (явный scope)
+### S3i. Полнота протокола (явный scope) — SCOPE ЗАФИКСИРОВАН
+
+**Факт:** неподдерживаемые возможности объявлены явно, чтобы модель не теряла
+сообщения молча. `MqttClient.Unsubscribe/BeginUnsubscribe/CompleteUnsubscribe`
+бросают `NotSupportedException` с ссылкой на этот раздел; брокер делает то же при
+получении UNSUBSCRIBE. Integration **425/425**.
+
+| Возможность | Статус | Что делает модель |
+|---|---|---|
+| Keep-alive / PINGREQ / PINGRESP | **не поддерживается** | таймеров нет; входящий PINGREQ игнорируется, клиент не отправляет PING |
+| UNSUBSCRIBE | **не поддерживается** | `NotSupportedException` на клиенте и брокере |
+| DISCONNECT-пакет | **не используется** | `Client.Disconnect()` локально отцепляет клиента; broker удаляет clean-сессию по событию disconnect |
+| Retained store/replay | **не поддерживается** | флаг Retain передаётся подписчикам, но сообщение не хранится и не воспроизводится при SUBSCRIBE |
+| Session resume/DUP | **частично** | persistent-сессия сохраняет подписки и pending-записи, но после reconnect они не переотправляются с DUP |
+| Pending без доставки | **виден** | `IsQuiescent` учитывает pending-сообщения/acknowledgement'ы, поэтому потеря не маскируется |
+
+Реализация этих возможностей вынесена за пределы текущего scope; интерфейс
+`IMqttClient` по-прежнему содержит методы, но они не притворяются работающими.
 
 **Проблема.** Keep-alive/PING, DISCONNECT-очистка, UNSUBSCRIBE, retained store/replay,
 session resume/DUP либо отсутствуют, либо заглушены. Интерфейс обещает больше, чем модель.

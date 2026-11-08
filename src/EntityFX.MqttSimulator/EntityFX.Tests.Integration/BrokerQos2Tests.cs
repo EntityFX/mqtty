@@ -364,6 +364,15 @@ namespace EntityFX.Tests.Integration
         }
 
         [TestMethod]
+        public void Unsubscribe_IsExplicitlyOutsideProtocolScope()
+        {
+            var (_, _, _, subscriber, _) = Build();
+
+            Assert.ThrowsException<NotSupportedException>(() => subscriber.Unsubscribe("test/#"));
+            Assert.ThrowsException<NotSupportedException>(() => subscriber.BeginUnsubscribe("test/#"));
+        }
+
+        [TestMethod]
         public void ReversePacket_SwapsSourceAndDestinationIndexes()
         {
             var (graph, _, publisher, _, _) = Build();

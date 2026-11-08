@@ -306,20 +306,18 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             return sendResult;
         }
 
-        public bool Unsubscribe(string topicFilter)
-        {
-            throw new NotImplementedException();
-        }
+        public bool Unsubscribe(string topicFilter) =>
+            throw UnsupportedProtocolFeature("UNSUBSCRIBE");
 
-        public bool BeginUnsubscribe(string topicFilter)
-        {
-            throw new NotImplementedException();
-        }
+        public bool BeginUnsubscribe(string topicFilter) =>
+            throw UnsupportedProtocolFeature("UNSUBSCRIBE");
 
-        public void CompleteUnsubscribe(INetworkPacket? response, string topicFilter)
-        {
-            throw new NotImplementedException();
-        }
+        public void CompleteUnsubscribe(INetworkPacket? response, string topicFilter) =>
+            throw UnsupportedProtocolFeature("UNSUBSCRIBE");
+
+        private static NotSupportedException UnsupportedProtocolFeature(string feature) =>
+            new($"MQTT {feature} is outside the simulator's protocol scope; " +
+                "see doc/rewrite-plan-s3-s5.md (S3i).");
 
         private long _lastAcknowledgementPruneTick;
 

@@ -184,7 +184,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                     ProcessSubscribe(packet, _packetManager.BytesToPacket<SubscribePacket>(packet.Payload), subscribeContextPacket.TypedContext);
                     break;
                 case MqttPacketType.Unsubscribe:
-                    break;
+                    throw new NotSupportedException(
+                        "MQTT UNSUBSCRIBE is outside the simulator's protocol scope; " +
+                        "see doc/rewrite-plan-s3-s5.md (S3i).");
                 default:
                     return;
             }
