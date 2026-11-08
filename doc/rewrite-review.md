@@ -429,9 +429,6 @@ QoS2-маркеров и общий result schema.
 - другие типы acknowledgement не затрагиваются; добавлены тесты TTL/capacity.
   Проверка: **402/402**. QoS2 LB: seq `3.08 с`, par `1.65 с` (4 воркера, median 3).
 
-**Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем общий
-result schema и Designer (`DesignDocument`).
-
 ### Статус S5b (2026-11-08)
 
 Designer больше не теряет параметры сети и layout:
@@ -445,18 +442,12 @@ Designer больше не теряет параметры сети и layout:
 
 Осталось: persisted layout (позиции/zoom) в сохраняемой топологии — это часть `DesignDocument`.
 
-**Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем общий
-result schema и persisted `DesignDocument`.
-
 ### Статус S4c (2026-11-08)
 
 Детерминизм экспорта Federation: `FederationDeliveryLedger.Publications()` теперь сортирует по
 `(Origin, Sequence, Id)`. Раньше возвращался `ConcurrentDictionary.Values`, поэтому
 `publications.json` и `sha256.json` могли отличаться между эквивалентными прогонами.
 Добавлен `FederationDeterminismTests`. Проверка: **403/403**.
-
-**Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем общий
-result schema и persisted `DesignDocument`.
 
 ### Статус S2a (2026-11-08)
 
@@ -469,6 +460,15 @@ result schema и persisted `DesignDocument`.
 - Добавлен `NodeMonitoringPacketTests`. Проверка: **400/400**.
 
 Полный S2 (slot rings вместо обёрток/deferred/pool) остаётся отдельным крупным шагом.
+
+### Статус S3e (2026-11-08)
+
+`PendingMessage.Status` и `ClientSubscription.MaximumQualityOfService` переведены на
+`Volatile.Read/Write`. QoS2-переходы меняют статус вне lock списка, а fanout-снимок читает QoS
+вне lock сессии; теперь запись видна читателям без гонки. Проверка: **403/403**.
+
+**Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем общий
+result schema и persisted `DesignDocument`.
 
 ---
 

@@ -4,7 +4,15 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals
 {
     internal class PendingMessage
     {
-        public PendingMessageStatus Status { get; set; }
+        private int _status;
+
+        // Status is updated by QoS2 transitions that run outside the pending-list
+        // lock; a volatile write makes the change visible to locked readers.
+        public PendingMessageStatus Status
+        {
+            get => (PendingMessageStatus)Volatile.Read(ref _status);
+            set => Volatile.Write(ref _status, (int)value);
+        }
 
         public MqttQos QualityOfService { get; set; }
 
