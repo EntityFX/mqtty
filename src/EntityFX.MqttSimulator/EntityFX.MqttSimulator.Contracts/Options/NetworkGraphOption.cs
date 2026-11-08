@@ -13,5 +13,8 @@
 
         public int RandomSeed { get; set; }
 
+        /// <summary>Optional designer layout (positions and zoom); not used by the simulator.</summary>
+        public GraphLayoutOption? Layout { get; set; }
+
     }
 }

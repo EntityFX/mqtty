@@ -1,3 +1,4 @@
+using EntityFX.MqttY.Contracts.Options;
 using EntityFX.MqttY.Designer.Models;
 using Xunit;
 
@@ -5,6 +6,38 @@ namespace EntityFX.Tests.Web;
 
 public sealed class DesignerModelTests
 {
+    [Fact]
+    public void Layout_RoundTripsThroughGraphOption()
+    {
+        var model = new NetworkDesignModel
+        {
+            Layout = new GraphLayoutOption
+            {
+                ZoomLevel = 1.5,
+                NetworkPositions = new Dictionary<string, GraphPositionOption>
+                {
+                    ["net"] = new() { X = 10, Y = 20 }
+                },
+                NodePositions = new Dictionary<string, GraphPositionOption>
+                {
+                    ["node"] = new() { X = 30, Y = 40 }
+                }
+            }
+        };
+
+        var option = model.ToNetworkGraphOption();
+        Assert.NotNull(option.Layout);
+        Assert.Equal(1.5, option.Layout!.ZoomLevel);
+
+        var roundTrip = NetworkDesignModel.FromNetworkGraphOption(option);
+        Assert.NotNull(roundTrip.Layout);
+        Assert.Equal(1.5, roundTrip.Layout!.ZoomLevel);
+        Assert.Equal(10, roundTrip.Layout.NetworkPositions["net"].X);
+        Assert.Equal(20, roundTrip.Layout.NetworkPositions["net"].Y);
+        Assert.Equal(30, roundTrip.Layout.NodePositions["node"].X);
+        Assert.Equal(40, roundTrip.Layout.NodePositions["node"].Y);
+    }
+
     [Fact]
     public void NetworkTypeMapping_PreservesQueueCapacityAndSendTicks()
     {

@@ -467,8 +467,19 @@ Designer больше не теряет параметры сети и layout:
 `Volatile.Read/Write`. QoS2-переходы меняют статус вне lock списка, а fanout-снимок читает QoS
 вне lock сессии; теперь запись видна читателям без гонки. Проверка: **403/403**.
 
+### Статус S5c (2026-11-08)
+
+Layout Designer сохраняется вместе с топологией:
+
+- в contracts добавлены `GraphLayoutOption` / `GraphPositionOption` (без Avalonia), поле
+  `NetworkGraphOption.Layout`; старые файлы без layout загружаются как раньше;
+- `NetworkDesignModel` round-trip-ит layout; `NetworkEditorViewModel` экспортирует текущие
+  позиции/zoom в модель при rebuild/zoom и применяет persisted layout при открытии файла
+  (текущие позиции имеют приоритет над сохранёнными);
+- добавлен round-trip тест. Web **56/56**, Integration **403/403**.
+
 **Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем общий
-result schema и persisted `DesignDocument`.
+result schema.
 
 ---
 

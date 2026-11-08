@@ -11,12 +11,16 @@ public class NetworkDesignModel
     public TicksOptions Ticks { get; set; } = new();
     public bool EnableCounters { get; set; }
 
+    /// <summary>Optional persisted editor layout (positions and zoom).</summary>
+    public GraphLayoutOption? Layout { get; set; }
+
     public NetworkGraphOption ToNetworkGraphOption()
     {
         var option = new NetworkGraphOption
         {
             Ticks = Ticks,
             EnableCounters = EnableCounters,
+            Layout = Layout,
             NetworkTypes = new SortedDictionary<string, NetworkOptions>(),
             Networks = new SortedDictionary<string, NetworkNodeOption>(),
             Nodes = new SortedDictionary<string, NodeOption>()
@@ -72,7 +76,8 @@ public class NetworkDesignModel
         var model = new NetworkDesignModel
         {
             Ticks = option.Ticks,
-            EnableCounters = option.EnableCounters
+            EnableCounters = option.EnableCounters,
+            Layout = option.Layout
         };
 
         foreach (var (name, nt) in option.NetworkTypes)

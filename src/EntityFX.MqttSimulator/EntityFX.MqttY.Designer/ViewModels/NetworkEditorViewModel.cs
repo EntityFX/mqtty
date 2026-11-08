@@ -35,9 +35,13 @@ public class NetworkEditorViewModel : ReactiveObject
         get => _designModel;
         set
         {
+            var changed = !ReferenceEquals(_designModel, value);
             this.RaiseAndSetIfChanged(ref _designModel, value);
             if (value != null)
+            {
+                if (changed) _layout = new GraphLayoutModel();
                 RebuildGraph();
+            }
         }
     }
 
@@ -96,7 +100,12 @@ public class NetworkEditorViewModel : ReactiveObject
     public double ZoomLevel
     {
         get => _zoomLevel;
-        set => this.RaiseAndSetIfChanged(ref _zoomLevel, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _zoomLevel, value);
+            _layout.ZoomLevel = value;
+            ExportLayoutToModel();
+        }
     }
 
     // Inspector visibility
@@ -225,6 +234,19 @@ public class NetworkEditorViewModel : ReactiveObject
         var previous = _layout;
         SaveCurrentPositions();
         var calculated = _graphLayoutService.CalculateLayout(DesignModel);
+        if (DesignModel.Layout != null)
+        {
+            foreach (var (name, position) in DesignModel.Layout.NetworkPositions ?? new())
+            {
+                calculated.NetworkPositions[name] = new Point(position.X, position.Y);
+            }
+            foreach (var (name, position) in DesignModel.Layout.NodePositions ?? new())
+            {
+                calculated.NodePositions[name] = new Point(position.X, position.Y);
+            }
+            calculated.ZoomLevel = DesignModel.Layout.ZoomLevel;
+            this.RaiseAndSetIfChanged(ref _zoomLevel, calculated.ZoomLevel);
+        }
         foreach (var (name, position) in previous.NetworkPositions)
         {
             calculated.NetworkPositions[name] = position;
@@ -237,6 +259,7 @@ public class NetworkEditorViewModel : ReactiveObject
         _layout = calculated;
         BuildGraphItems();
         BuildGraphLinks();
+        ExportLayoutToModel();
     }
 
     /// <summary>
@@ -251,6 +274,23 @@ public class NetworkEditorViewModel : ReactiveObject
         SaveCurrentPositions();
         BuildGraphItems();
         BuildGraphLinks();
+        ExportLayoutToModel();
+    }
+
+    /// <summary>Copies the current editor layout into the model so it is saved with the topology.</summary>
+    private void ExportLayoutToModel()
+    {
+        if (DesignModel == null) return;
+        DesignModel.Layout = new GraphLayoutOption
+        {
+            ZoomLevel = _layout.ZoomLevel,
+            NetworkPositions = _layout.NetworkPositions.ToDictionary(
+                pair => pair.Key,
+                pair => new GraphPositionOption { X = pair.Value.X, Y = pair.Value.Y }),
+            NodePositions = _layout.NodePositions.ToDictionary(
+                pair => pair.Key,
+                pair => new GraphPositionOption { X = pair.Value.X, Y = pair.Value.Y })
+        };
     }
 
     /// <summary>
