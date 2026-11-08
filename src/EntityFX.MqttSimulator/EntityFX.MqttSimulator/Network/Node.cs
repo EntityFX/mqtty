@@ -109,6 +109,24 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         var totalTicks = sim.TotalTicks;
         _refreshCount++;
 
+        // Most nodes are empty on most ticks. Processing two empty
+        // ConcurrentQueues and rotating empty deferred lists is pure overhead;
+        // counters still observe the same zero queue lengths.
+        if (Volatile.Read(ref _outgoingQueueLength) == 0 &&
+            Volatile.Read(ref _incommingQueueLength) == 0 &&
+            _outgoingDeferred.Count == 0 && _outgoingDeferredNext.Count == 0 &&
+            _incommingDeferred.Count == 0 && _incommingDeferredNext.Count == 0)
+        {
+            if (sim.EnableCounters)
+            {
+                base.Refresh();
+                counters.SetOutgoingQueueLength(0);
+                counters.SetIncommingQueueLength(0);
+                counters.SetReceiveQueueLength(Volatile.Read(ref _responseCount));
+            }
+            return;
+        }
+
         ProcessReady(_outgoingMessages, _outgoingDeferred, _outgoingDeferredNext, totalTicks, SendToNetwork,
             ref _outgoingQueueLength);
         ProcessReady(_incommingMessages, _incommingDeferred, _incommingDeferredNext, totalTicks, CompleteReceive,
