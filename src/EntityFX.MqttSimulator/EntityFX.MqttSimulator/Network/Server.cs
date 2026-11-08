@@ -105,7 +105,7 @@ public class Server : Node, IServer
     {
         if (!IsStarted) return;
 
-        var result = Network!.RemoveServer(Address);
+        var result = Network!.RemoveServer(Name);
 
         IsStarted = !result;
 

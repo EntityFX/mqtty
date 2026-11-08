@@ -715,6 +715,10 @@ public class NetworkSimulator : INetworkSimulator
             _topology.AddNodeCount();
             _topology.MarkChanged();
         }
+        else
+        {
+            _topology.ClientMap.TryRemove(client.Name, out _);
+        }
 
 
         return result;
@@ -742,6 +746,10 @@ public class NetworkSimulator : INetworkSimulator
             _topology.AddNodeCount();
             _topology.MarkChanged();
         }
+        else
+        {
+            _topology.ServerMap.TryRemove(server.Name, out _);
+        }
 
         return result;
     }
@@ -767,6 +775,10 @@ public class NetworkSimulator : INetworkSimulator
             ((ApplicationBase)application).NetworkSimulator = this;
             _topology.AddNodeCount();
             _topology.MarkChanged();
+        }
+        else
+        {
+            _topology.ApplicationMap.TryRemove(application.Name, out _);
         }
 
 

@@ -507,18 +507,20 @@ LB `1.63× wall / 1.78× refresh`, Relay `2.29× / 2.49×`, Federation `1.93× /
 
 | # | Дефект | Файл | Эффект |
 |---|---|---|---|
-| 1 | `Stop()` удаляет по `Address`, `Start()` добавляет по `Name` | `Server.cs:99-110`, `Application.cs:143-155` | сервер/приложение не удаляются, флаг врёт |
-| 2 | outbound-счётчик берёт inbound `TickFirstValue`, деление без guard | `Counter/NetworkCounters.cs:145-153` | неверная серия throughput |
+| 1 | `Stop()` удаляет по `Address`, `Start()` добавляет по `Name` | `Server.cs:99-110`, `Application.cs:143-155` | сервер/приложение не удаляются, флаг врёт — **исправлено (QW batch)** |
+| 2 | outbound-счётчик берёт inbound `TickFirstValue`, деление без guard | `Counter/NetworkCounters.cs:145-153` | неверная серия throughput — **исправлено (QW batch)** |
 | 3 | `RefreshWithCounters` делает `Reset()` при ошибке; relay-runner игнорирует `bool` | `NetworkSimulator.cs:910-925`, `MqttRelayExperimentRunner.cs:340-366` | «Completed» при пустых метриках |
 | 4 | `InMemoryRepository.Update` пересобирает snapshot | `Internals/InMemoryRepository.cs:34-38` | O(сессий) аллокаций на пакет |
 | 5 | packet pool асимметричен при `MQTTY_NO_PACKET_POOL` | `Node.cs:195-212` | утечка bag — **устранено в S2 (пул удалён)** |
 | 6 | `_responseCount` не декрементится при доставке | `Node.cs:276,321,366` | ложный `HasPendingResponse` |
-| 7 | `AddClient` оставляет `_clients` при провале `_nodes.TryAdd` | `NetworkSimulator.cs:775-798` | фантомный клиент |
+| 7 | `AddClient` оставляет `_clients` при провале `_nodes.TryAdd` | `NetworkSimulator.cs:775-798` | фантомный клиент — **исправлено (rollback, QW batch)** |
 | 8 | `Pump` игнорирует результат `Publish` | `StaticFederator.cs:97-107` | потеря доставки без счётчика |
 | 9 | parallel refresh игнорирует `strategy` | `NetworkSimulator.cs:412` | seq/par несравнимы |
-| 10 | `Publications()` не сортируется | `FederationDeliveryLedger.cs:148` | недетерминированный sha256 |
-| 11 | Benchmark: Relay `"completed"`, нет delivery-метрик, конфликт export/warmup | `Benchmark.Compare/Program.cs:74-75,118-159` | ложный зелёный результат |
-| 12 | QoS2 duplicate-after-PUBREL делает повторный fanout | `MqttBroker.cs:304-322,589-590` | нарушение exactly-once |
+| 10 | `Publications()` не сортируется | `FederationDeliveryLedger.cs:148` | недетерминированный sha256 — **исправлено (S4c)** |
+| 11 | Benchmark: Relay `"completed"`, нет delivery-метрик, конфликт export/warmup | `Benchmark.Compare/Program.cs:74-75,118-159` | ложный зелёный результат — **исправлено (S4b)** |
+| 12 | QoS2 duplicate-after-PUBREL делает повторный fanout | `MqttBroker.cs:304-322,589-590` | нарушение exactly-once — **исправлено (S3c)** |
+
+Проверка QW batch: `NodeLifecycleTests`, `NetworkCountersTests`; Integration **407/407**.
 
 ---
 

@@ -149,7 +149,7 @@ namespace EntityFX.MqttY.Application
         {
             if (!IsStarted) return;
 
-            var result = Network?.RemoveApplication(Address);
+            var result = Network?.RemoveApplication(Name);
 
             IsStarted = result != true;
         }
