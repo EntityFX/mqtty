@@ -27,6 +27,7 @@ dotnet run --project src/EntityFX.MqttSimulator/EntityFX.MqttY.LoadBalancing.App
 
 - [`doc/architecture.md`](doc/architecture.md) — устройство проекта, инварианты тика, MQTT-сессии, harness, Web/Designer и статус переписывания S0–S5.
 - [`doc/performance.md`](doc/performance.md) — методика замеров, текущие результаты seq/par, фазовый профиль и отклонённые оптимизации.
+- [`doc/progress.md`](doc/progress.md) — прогресс плана: общий объём, остаток и гейты.
 - [`AGENTS.md`](AGENTS.md) — команды сборки/тестов и правила работы агента.
 
 Исходники находятся в `src/EntityFX.MqttSimulator`, solution — `EntityFX.Mqtty.sln`. Готовые исследовательские отчёты и данные хранятся в [mqtty-meta/reports](https://github.com/EntityFX/mqtty-meta/blob/develop/reports/mqtty/README.md).

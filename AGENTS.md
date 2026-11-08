@@ -217,5 +217,6 @@ in-process host и делят временные каталоги, из-за ч�
 - `README.md` — быстрый старт и обзор.
 - `doc/architecture.md` — слои, инварианты, тик, MQTT, harness, Web/Designer, статус S0–S5.
 - `doc/performance.md` — методика замеров, текущие результаты, фазовый профиль, принятые и отклонённые оптимизации.
+- `doc/progress.md` — прогресс плана, остаток в часах и статус гейтов.
 - `src/EntityFX.MqttSimulator/EntityFX.MqttY.Web.App/README.md` — API и запуск Web.
 - Внешние исследовательские отчёты и данные: `github.com/EntityFX/mqtty-meta`.

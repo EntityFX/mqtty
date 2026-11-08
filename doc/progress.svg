@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="780" viewBox="0 0 980 780">
+  <rect width="980" height="780" fill="#ffffff"/>
+  <style>
+    .title { font: 700 26px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; fill: #0f172a; }
+    .sub { font: 400 14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; fill: #64748b; }
+    .h2 { font: 700 17px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; fill: #0f172a; }
+    .label { font: 600 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; fill: #334155; }
+    .value { font: 600 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; fill: #0f172a; }
+    .small { font: 400 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; fill: #64748b; }
+    .chip { font: 600 12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  </style>
+
+  <text x="40" y="48" class="title">MqttY — прогресс плана</text>
+  <text x="40" y="72" class="sub">Оценка по плановым часам · 12C/24T · 2026-11-08</text>
+
+  <!-- Overall -->
+  <text x="40" y="116" class="h2">Общий объём</text>
+  <rect x="40" y="130" width="900" height="40" rx="8" fill="#e5e7eb"/>
+  <rect x="40" y="130" width="855" height="40" rx="8" fill="#16a34a"/>
+  <text x="52" y="156" class="chip" fill="#ffffff">выполнено 554 ч · 95 %</text>
+  <text x="806" y="156" class="chip" fill="#7c2d12">30 ч</text>
+  <text x="40" y="190" class="small">Всего 584 ч: переписывание S0–S5 — 384 ч, производительность M0–M8 — 200 ч.</text>
+
+  <!-- Streams -->
+  <text x="40" y="236" class="h2">Направления</text>
+
+  <text x="40" y="266" class="label">Переписывание S0–S5</text>
+  <rect x="250" y="252" width="600" height="24" rx="6" fill="#e5e7eb"/>
+  <rect x="250" y="252" width="600" height="24" rx="6" fill="#16a34a"/>
+  <text x="862" y="269" class="value">100 %</text>
+  <text x="250" y="294" class="small">384 / 384 ч · S3f–S3i, S4d–S4g, S5d–S5g закрыты</text>
+
+  <text x="40" y="336" class="label">Производительность M0–M8</text>
+  <rect x="250" y="322" width="600" height="24" rx="6" fill="#e5e7eb"/>
+  <rect x="250" y="322" width="510" height="24" rx="6" fill="#f59e0b"/>
+  <text x="862" y="339" class="value">85 %</text>
+  <text x="250" y="364" class="small">170 / 200 ч · остаток 30 ч</text>
+
+  <!-- Remaining -->
+  <text x="40" y="414" class="h2">Остаток работ, ч</text>
+  <text x="40" y="438" class="small">Суммарно 30 ч, включая буфер 3 ч</text>
+
+  <!-- rows: label y, hours, width scale 18 px per hour -->
+  <text x="40" y="474" class="label">M2b · инфляция node-работы</text>
+  <rect x="300" y="460" width="216" height="22" rx="5" fill="#dc2626"/>
+  <text x="526" y="476" class="value">12 ч</text>
+
+  <text x="40" y="514" class="label">M4 · Federation drain / broker hot path</text>
+  <rect x="300" y="500" width="144" height="22" rx="5" fill="#ea580c"/>
+  <text x="454" y="516" class="value">8 ч</text>
+
+  <text x="40" y="554" class="label">M5 · construct / connect</text>
+  <rect x="300" y="540" width="72" height="22" rx="5" fill="#f59e0b"/>
+  <text x="382" y="556" class="value">4 ч</text>
+
+  <text x="40" y="594" class="label">M6 · CI-порог G1/G2</text>
+  <rect x="300" y="580" width="54" height="22" rx="5" fill="#eab308"/>
+  <text x="364" y="596" class="value">3 ч</text>
+
+  <text x="40" y="634" class="label">Буфер на замеры/откаты</text>
+  <rect x="300" y="620" width="54" height="22" rx="5" fill="#94a3b8"/>
+  <text x="364" y="636" class="value">3 ч</text>
+
+  <!-- Gates -->
+  <text x="40" y="684" class="h2">Приёмочные гейты</text>
+  <g transform="translate(40,700)">
+    <rect x="0" y="0" width="132" height="30" rx="15" fill="#dcfce7"/><text x="14" y="20" class="chip" fill="#166534">G1 refresh  ok</text>
+    <rect x="144" y="0" width="132" height="30" rx="15" fill="#fef3c7"/><text x="158" y="20" class="chip" fill="#92400e">G2 wall  border</text>
+    <rect x="288" y="0" width="132" height="30" rx="15" fill="#fee2e2"/><text x="302" y="20" class="chip" fill="#991b1b">G3 efficiency</text>
+    <rect x="432" y="0" width="132" height="30" rx="15" fill="#fef3c7"/><text x="446" y="20" class="chip" fill="#92400e">G4 Fed diag</text>
+    <rect x="576" y="0" width="132" height="30" rx="15" fill="#dcfce7"/><text x="590" y="20" class="chip" fill="#166534">G5 scale  ok</text>
+    <rect x="720" y="0" width="132" height="30" rx="15" fill="#dcfce7"/><text x="734" y="20" class="chip" fill="#166534">G6 tests  ok</text>
+  </g>
+  <text x="40" y="756" class="small">LB L 5.0× / 5.9× · Relay 5.3× / 6.4× · Fed 4.0–4.2× / 5.0–5.3× · LB ref 2.98× / 3.36×</text>
+</svg>

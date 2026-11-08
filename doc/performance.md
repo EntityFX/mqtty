@@ -53,7 +53,7 @@ dotnet run ... -- --engines fed --repeat 5 --warmup-runs 1 --measure 1 --drain 1
 | **LB L** (64 брокера, 256 publishers, 20k rps) | 9.95 с | **1.99 с** | **5.01×** | **5.91×** | match |
 | **LB reference** (16 брокеров, 64 publishers, 10k rps) | 1.92 с | **0.64 с** | **2.98×** | **3.36×** | match |
 | **Relay** (2k rps) | 14.85 с | **2.80 с** | **5.31×** | **6.38×** | match |
-| **Federation L** (16 брокеров, 2k rps) | 14.9 с | **3.7–3.8 с** | **3.97–4.14×** | **4.93–5.22×** | match / diag differ |
+| **Federation L** (16 брокеров, 2k rps) | 14.3 с | **3.4–3.8 с** | **4.0–4.2×** | **5.0–5.3×** | match / diag differ |
 
 Скорость seq/par на LB L выросла с ~3.9× до **5.06×** после двух изменений
 этого цикла: порядок сетей и GC-настройка бенчмарка.
@@ -130,9 +130,14 @@ dotnet run ... -- --engines fed --repeat 5 --warmup-runs 1 --measure 1 --drain 1
   `FederationTopology.Pump(parallel)`: федераторы владеют раздельными
   output-клиентами и очередями, поэтому качаются параллельно на том же
   постоянном пуле. Результат: Fed L wall `7.06 → 3.7–3.8 с`, speedup
-  `2.12 → 3.97–4.14×`, refresh `3.03 → 4.93–5.22×`. Дробление работы до
+  `2.12 → 4.0–4.2×`, refresh `3.03 → 5.0–5.3×`. Дробление работы до
   пар «федератор × target» выигрыша не дало (лишние 5 млн claim'ов) и
   откатано. Старый `Parallel.For` на каждый тик по-прежнему не используется.
+- **Хеш payload один раз на публикацию.** `TransmissionLedger.Observe` считал
+  SHA-256 на каждую из ~1 млн пересылок; теперь хеш считается в
+  `FederationDeliveryLedger.Create` и переиспользуется в transmission/receipt
+  записях. Fed L: wall `3.74 → 3.44 с` (−8 %), speedup `4.00 → 4.16×`,
+  refresh `5.01 → 5.33×`; Relay без регрессии.
 
 ## 4. Фазовый профиль
 
@@ -241,6 +246,7 @@ phase2 ≈ 13.9–14.5 с суммы, barrier ≈ 4.8–5.2 с суммы, wall 
 | 2026-11-01 | Relay original | 24.81 с | 9.77 с | object pooling, guard monitoring, Step per transfer |
 | 2026-11-01 | Federation ring | 6.25 с | 1.24 с | lock-free ledger, Pump без OrderBy, IsIdle cache |
 | 2026-11-08 | Fed L reference | 7.06 с | 3.75 с | параллельный Pump на пуле тика, `RunSingle` |
+| 2026-11-08 | Fed L reference | 3.74 с | 3.44 с | SHA-256 payload один раз на публикацию |
 
 Эти цифры — про разные конфигурации и железо; для приёмки используйте только
 reference-бенчмарк из §1–2.
