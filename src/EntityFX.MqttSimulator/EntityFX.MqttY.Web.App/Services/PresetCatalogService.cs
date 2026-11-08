@@ -26,7 +26,7 @@ public sealed class PresetCatalogService : IPresetCatalogService
         var result = new List<BrokerPresetDto>();
         foreach (var id in _store.ListFiles(BrokersDir, "*.json"))
         {
-            var preset = await _store.ReadAsync<BrokerPresetDto>($"{BrokersDir}/{id}.json");
+            var preset = await _store.TryReadAsync<BrokerPresetDto>($"{BrokersDir}/{id}.json");
             if (preset != null)
             {
                 result.Add(preset);
@@ -37,7 +37,7 @@ public sealed class PresetCatalogService : IPresetCatalogService
     }
 
     public Task<BrokerPresetDto?> GetBrokerPresetAsync(string id) =>
-        _store.ReadAsync<BrokerPresetDto>($"{BrokersDir}/{Sanitize(id)}.json");
+        _store.TryReadAsync<BrokerPresetDto>($"{BrokersDir}/{Sanitize(id)}.json");
 
     public async Task<BrokerPresetDto> SaveBrokerPresetAsync(BrokerPresetDto preset)
     {
@@ -58,7 +58,7 @@ public sealed class PresetCatalogService : IPresetCatalogService
         var result = new List<TopologyPresetDto>();
         foreach (var id in _store.ListFiles(TopologiesDir, "*.json"))
         {
-            var preset = await _store.ReadAsync<TopologyPresetDto>($"{TopologiesDir}/{id}.json");
+            var preset = await _store.TryReadAsync<TopologyPresetDto>($"{TopologiesDir}/{id}.json");
             if (preset != null)
             {
                 result.Add(preset);
@@ -69,7 +69,7 @@ public sealed class PresetCatalogService : IPresetCatalogService
     }
 
     public Task<TopologyPresetDto?> GetTopologyPresetAsync(string id) =>
-        _store.ReadAsync<TopologyPresetDto>($"{TopologiesDir}/{Sanitize(id)}.json");
+        _store.TryReadAsync<TopologyPresetDto>($"{TopologiesDir}/{Sanitize(id)}.json");
 
     public async Task<TopologyPresetDto> SaveTopologyPresetAsync(TopologyPresetDto preset)
     {

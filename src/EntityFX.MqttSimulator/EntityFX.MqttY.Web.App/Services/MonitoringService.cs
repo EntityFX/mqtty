@@ -19,9 +19,10 @@ public sealed class MonitoringService : IMonitoringService
         if (store == null) return;
         foreach (var id in store.ListFiles("monitoring", "*.json"))
         {
-            var snapshot = store.ReadAsync<MonitoringSnapshotDto>($"monitoring/{id}.json").GetAwaiter().GetResult();
+            var snapshot = store.TryReadAsync<MonitoringSnapshotDto>($"monitoring/{id}.json").GetAwaiter().GetResult();
             if (snapshot != null) _snapshots[id] = snapshot;
         }
+        store.Prune("monitoring", "*.json", 200);
     }
 
     public event Action<string, MonitoringSnapshotDto>? MonitoringUpdated;

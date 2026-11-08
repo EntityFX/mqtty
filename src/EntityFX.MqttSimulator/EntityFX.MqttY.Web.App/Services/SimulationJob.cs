@@ -6,6 +6,8 @@ namespace EntityFX.MqttY.Web.App.Services;
 /// <summary>Задание симуляции в реестре.</summary>
 public sealed class SimulationJob
 {
+    public int SchemaVersion { get; set; } = 1;
+
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
 
     public string? TopologyId { get; set; }

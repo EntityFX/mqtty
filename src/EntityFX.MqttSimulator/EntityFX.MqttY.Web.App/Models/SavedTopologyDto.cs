@@ -3,6 +3,8 @@ namespace EntityFX.MqttY.Web.App.Models;
 /// <summary>Сохранённая пользовательская топология (граф + параметры генерации).</summary>
 public sealed class SavedTopologyDto
 {
+    public int SchemaVersion { get; set; } = 1;
+
     public string Id { get; set; } = string.Empty;
 
     public string Name { get; set; } = string.Empty;

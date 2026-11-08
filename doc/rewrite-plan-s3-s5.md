@@ -295,7 +295,18 @@ Integration **431/431**, Web.App собирается с 0 ошибок.
 
 **Оценка:** 5 ч/д.
 
-### S5e. Versioned persistence
+### S5e. Versioned persistence — ВЫПОЛНЕНО
+
+**Факт:** `SchemaVersion` добавлен в `SavedTopologyDto`, `SimulationJob`,
+`MonitoringSnapshotDto`; `PersistenceMigrations.CurrentVersion = 2` повышает V1
+без `schemaVersion` при чтении. `JsonFileStore` реализует `IJsonDocumentStore`:
+атомарная запись через temp+rename, `Flush(flushToDisk: true)`, per-path
+`SemaphoreSlim`, `TryReadAsync` для corrupt-файлов, `Prune` с retention
+(мониторинг — 200 последних снимков). `JobRegistry`/`MonitoringService`/
+`PresetCatalogService` переведены на `TryReadAsync`, поэтому битый файл не
+валит startup. Тесты добавлены в `EntityFX.Tests.Web`
+(`VersionedPersistenceTests`: V1→V2, corrupt, concurrent writes, Prune);
+локально Web-набор не запускается из-за внешней ошибки NuGet-сертификата.
 
 1. `SavedTopologyRecordV1`, `JobRecordV1`, `MonitoringSnapshotRecordV1` + миграции.
 2. `IJsonDocumentStore`: атомарная запись, fsync, per-path lock, retention (workers/logs/

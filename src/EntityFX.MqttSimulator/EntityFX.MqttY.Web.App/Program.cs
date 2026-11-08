@@ -29,6 +29,7 @@ builder.Services.AddSingleton(sp =>
     return options;
 });
 builder.Services.AddSingleton(sp => new JsonFileStore(sp.GetRequiredService<DataDirectoryOptions>().DataDirectory));
+builder.Services.AddSingleton<IJsonDocumentStore>(sp => sp.GetRequiredService<JsonFileStore>());
 
 // Движки
 builder.Services.AddSingleton<NetworkSimulationEngine>();

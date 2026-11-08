@@ -11,7 +11,7 @@ public sealed class JobRegistry : IJobRegistry
         _store = store;
         foreach (var id in store.ListFiles("jobs", "*.json"))
         {
-            var job = store.ReadAsync<SimulationJob>($"jobs/{id}.json").GetAwaiter().GetResult();
+            var job = store.TryReadAsync<SimulationJob>($"jobs/{id}.json").GetAwaiter().GetResult();
             if (job == null) continue;
             // This host does not claim ownership of an old process or silently restart a scientific run.
             if (job.State is "Running" or "Queued" or "Paused" or "Cancelling")

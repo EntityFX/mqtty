@@ -3,6 +3,8 @@ namespace EntityFX.MqttY.Web.App.Models;
 /// <summary>Снимок мониторинга симуляции.</summary>
 public sealed class MonitoringSnapshotDto
 {
+    public int SchemaVersion { get; set; } = 1;
+
     public string SimulationId { get; set; } = string.Empty;
 
     public string State { get; set; } = string.Empty;
