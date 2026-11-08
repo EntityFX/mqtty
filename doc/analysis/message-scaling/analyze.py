@@ -125,9 +125,81 @@ def svg_scatter(path: Path, points: list[tuple[float, float]], fit: tuple[float,
     path.write_text("\n".join(parts))
 
 
+def holdout_lb(rows: list[dict]) -> dict:
+    # Train X = a*M*L + b*M + c*B + d*P + e on L in {1,2}; test on L=4.
+    train = [r for r in rows if r["nets_per_backend"] < 4]
+    test = [r for r in rows if r["nets_per_backend"] == 4]
+    def design(rs):
+        return np.array([[r["scheduled"] * r["nets_per_backend"], r["scheduled"],
+                          r["brokers"], r["publishers"], 1.0] for r in rs])
+    y = np.array([r["net_in"] for r in train], dtype=float)
+    coef, *_ = np.linalg.lstsq(design(train), y, rcond=None)
+    pred = float(np.mean(design(test) @ coef))
+    actual = float(np.mean([r["net_in"] for r in test]))
+    return {"train_rows": len(train), "test_rows": len(test),
+            "predicted": pred, "actual": actual,
+            "relative_error": abs(pred - actual) / actual}
+
+
+def svg_series(path: Path, series: list[tuple[str, list[tuple[float, float]], tuple[float, ...], str]],
+               xlabel: str, ylabel: str, title: str) -> None:
+    width, height = 820, 500
+    left, right, top, bottom = 80, 760, 70, 400
+    xs = [x for _, pts, _, _ in series for x, _ in pts]
+    ys = [y for _, pts, _, _ in series for _, y in pts]
+    xmin, xmax = min(xs), max(xs)
+    ymin, ymax = min(ys), max(ys)
+    ypad = (ymax - ymin) * .12 or 1
+    ymin, ymax = max(0, ymin - ypad), ymax + ypad
+
+    def px(x): return left + (x - xmin) / (xmax - xmin) * (right - left)
+    def py(y): return bottom - (y - ymin) / (ymax - ymin) * (bottom - top)
+
+    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">',
+             '<rect width="100%" height="100%" fill="#fff"/>',
+             f'<text x="{left}" y="34" font-family="sans-serif" font-size="18" font-weight="700">{title}</text>',
+             f'<line x1="{left}" y1="{bottom}" x2="{right}" y2="{bottom}" stroke="#334155"/>',
+             f'<line x1="{left}" y1="{top}" x2="{left}" y2="{bottom}" stroke="#334155"/>']
+    for x in range(int(xmin), int(xmax) + 1):
+        if x % 2 == 0:
+            parts.append(f'<text x="{px(x):.1f}" y="{bottom + 20}" font-family="sans-serif" font-size="11" text-anchor="middle">{x}</text>')
+    for v in range(0, int(ymax) + 1, max(1, int(ymax / 5))):
+        parts.append(f'<text x="{left - 8}" y="{py(v) + 4:.1f}" font-family="sans-serif" font-size="11" text-anchor="end">{v}</text>')
+        parts.append(f'<line x1="{left}" y1="{py(v):.1f}" x2="{right}" y2="{py(v):.1f}" stroke="#e2e8f0"/>')
+    for name, pts, coef, color in series:
+        degree = len(coef) - 1
+        fit_x = np.linspace(xmin, xmax, 100)
+        fit_y = sum(coef[k] * fit_x ** (degree - k) for k in range(degree + 1))
+        parts.append(f'<polyline points="{" ".join(f"{px(x):.1f},{py(y):.1f}" for x, y in zip(fit_x, fit_y))}" fill="none" stroke="{color}" stroke-width="2"/>')
+        for x, y in pts:
+            parts.append(f'<circle cx="{px(x):.1f}" cy="{py(y):.1f}" r="5" fill="{color}" opacity=".85"/>')
+    for i, (name, _, _, color) in enumerate(series):
+        lx = left + 10 + i * 150
+        parts.append(f'<rect x="{lx}" y="{top + 6}" width="13" height="13" fill="{color}"/>')
+        parts.append(f'<text x="{lx + 18}" y="{top + 17}" font-family="sans-serif" font-size="12">{name}</text>')
+    parts.append(f'<text x="{(left + right) / 2}" y="{height - 18}" font-family="sans-serif" font-size="13" text-anchor="middle">{xlabel}</text>')
+    parts.append(f'<text x="22" y="{(top + bottom) / 2}" font-family="sans-serif" font-size="13" text-anchor="middle" transform="rotate(-90 22 {(top + bottom) / 2})">{ylabel}</text>')
+    parts.append("</svg>")
+    path.write_text("\n".join(parts))
+
+
 def main() -> None:
     lb = [r for r in ROWS if r["engine"] == "lb"]
-    fed = [r for r in ROWS if r["engine"] == "fed"]
+    fed_all = [r for r in ROWS if r["engine"] == "fed" and r["topology"] == "star"]
+    # Deduplicate the grid overlap and exclude the saturated R=5000 points
+    # from the star fit; keep the full set only for the raw plot.
+    seen = set()
+    fed = []
+    for row in fed_all:
+        if row["delivered"] != row["scheduled"] * row["brokers"]:
+            continue
+        key = (row["brokers"], row["publishers"], row["rps"])
+        if key in seen:
+            continue
+        seen.add(key)
+        fed.append(row)
+    ring = [r for r in ROWS if r["engine"] == "fed" and r["topology"] == "ring"]
+    line = [r for r in ROWS if r["engine"] == "fed" and r["topology"] == "line"]
 
     lb_fit = fit_lb(lb)
     fed_fit = fit_fed(fed)
@@ -135,6 +207,31 @@ def main() -> None:
     relay_x = np.array([[r["brokers"], 1.0] for r in relay])
     relay_y = np.array([r["net_in"] / r["scheduled"] for r in relay])
     relay_coef, relay_r2, relay_rmse = ols(relay_x, relay_y)
+
+    def fit_topology(rows: list[dict], degree: int) -> dict:
+        x = np.array([[r["brokers"] ** k for k in range(degree, -1, -1)] for r in rows])
+        y = np.array([r["net_in"] / r["scheduled"] for r in rows])
+        coef, r2, rmse = ols(x, y)
+        return {"coef": [float(v) for v in coef], "r2": r2, "rmse": rmse}
+
+    def holdout(rows: list[dict], degree: int) -> dict:
+        train = [r for r in rows if r["brokers"] < 16]
+        test = [r for r in rows if r["brokers"] == 16]
+        x = np.array([[r["brokers"] ** k for k in range(degree, -1, -1)] for r in train])
+        y = np.array([r["net_in"] / r["scheduled"] for r in train])
+        coef, _, _ = ols(x, y)
+        pred = sum(coef[k] * 16 ** (degree - k) for k in range(degree + 1))
+        actual = np.mean([r["net_in"] / r["scheduled"] for r in test])
+        return {"train_rows": len(train), "test_rows": len(test),
+                "predicted": float(pred), "actual": float(actual),
+                "relative_error": float(abs(pred - actual) / actual)}
+
+    topologies = {
+        "star": {"degree": 2, **fit_topology(fed, 2), "holdout": holdout(fed, 2)},
+        "ring": {"degree": 1, **fit_topology(ring, 1), "holdout": holdout(ring, 1)},
+        "line": {"degree": 1, **fit_topology(line, 1), "holdout": holdout(line, 1)},
+    }
+    lb_holdout = holdout_lb(lb)
 
     # LB: X/M = a*L + b (setup folded into b); Fed: X/M = a*B^2+b*B+c
     lb_norm_x = np.array([[r["nets_per_backend"], 1.0] for r in lb])
@@ -157,6 +254,8 @@ def main() -> None:
                  np.log10(np.array([r["networks"] for r in lb], dtype=float)),
                  np.log10(np.array([r["clients"] for r in lb], dtype=float))]),
         },
+        "topologies": topologies,
+        "lb_holdout": lb_holdout,
         "relay": {
             "fit_X_per_M_vs_B": {"coef": [float(v) for v in relay_coef],
                                   "r2": relay_r2, "rmse": relay_rmse, "rows": len(relay)},
@@ -203,6 +302,16 @@ def main() -> None:
         (float(fed_fit["coef"][1]), float(fed_fit["coef"][2])),
         "B = число брокеров (star)", "X / M, сетевых пакетов на сообщение",
         "Federation: квадратичный рост по брокерам")
+    svg_series(
+        HERE / "figures" / "fed-topologies-net-per-message.svg",
+        [("star", [(r["brokers"], r["net_in"] / r["scheduled"]) for r in fed],
+          tuple(topologies["star"]["coef"]), "#dc2626"),
+         ("ring", [(r["brokers"], r["net_in"] / r["scheduled"]) for r in ring],
+          tuple(topologies["ring"]["coef"]), "#2563eb"),
+         ("line", [(r["brokers"], r["net_in"] / r["scheduled"]) for r in line],
+          tuple(topologies["line"]["coef"]), "#16a34a")],
+        "B = число брокеров", "X / M, сетевых пакетов на сообщение",
+        "Federation: star, ring и line")
     svg_scatter(
         HERE / "figures" / "relay-net-per-message-vs-brokers.svg",
         [(r["brokers"], r["net_in"] / r["scheduled"]) for r in relay],

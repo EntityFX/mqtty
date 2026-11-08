@@ -23,12 +23,15 @@ BASE = ["dotnet", "run", "--project", str(PROJECT), "-c", "Release", "--no-build
         "--drain", "10", "--workers", "4", "--no-export", "--no-strict"]
 
 
-def run(engine: str, brokers: int, publishers: int, nets: int, rps: int) -> dict:
+def run(engine: str, brokers: int, publishers: int, nets: int, rps: int,
+        topology: str | None = None) -> dict:
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as tmp:
         json_path = tmp.name
     args = BASE + ["--engines", engine, "--brokers", str(brokers),
                    "--publishers", str(publishers), "--nets", str(nets),
                    "--rps", str(rps), "--fed-rps", str(rps), "--json", json_path]
+    if topology is not None:
+        args += ["--fed-topology", topology]
     try:
         subprocess.run(args, cwd=ROOT, check=True, capture_output=True, text=True)
         report = json.loads(Path(json_path).read_text())
@@ -36,6 +39,7 @@ def run(engine: str, brokers: int, publishers: int, nets: int, rps: int) -> dict
         core = json.loads(sample["Metrics"]["Core"])
         return {
             "engine": engine,
+            "topology": topology or "n/a",
             "brokers": brokers,
             "publishers": publishers,
             "nets_per_backend": nets,
@@ -58,7 +62,7 @@ def main() -> None:
 
     # LB: vary one factor at a time around the reference point.
     def lb(b, p, n, r):
-        row = run("lb", b, p, n, r)
+        row = run("lb", b, p, n, r, "n/a")
         row["clients"] = p + b
         row["networks"] = 1 + b * n
         rows.append(row)
@@ -76,10 +80,14 @@ def main() -> None:
         lb(b, p, n, r)
 
     # Federation: star topology has B sites + one transit network.
-    def fed(b, p, r):
-        row = run("fed", b, p, 1, r)
-        row["clients"] = p + b + b * (b + 1)
-        row["networks"] = b + 1
+    def fed(b, p, r, topology="star"):
+        row = run("fed", b, p, 1, r, topology)
+        if topology == "star":
+            row["clients"] = p + b + b * (b + 1)
+            row["networks"] = b + 1
+        else:
+            row["clients"] = p + b + b * (3 + 1)
+            row["networks"] = b
         rows.append(row)
 
     for b in (2, 4, 8, 16):
@@ -91,9 +99,14 @@ def main() -> None:
     for b, p, r in ((2, 8, 2000), (4, 16, 5000), (8, 64, 500), (16, 64, 2000)):
         fed(b, max(p, b), r)
 
+    # Three Federation topologies at fixed P/R.
+    for topology in ("star", "ring", "line"):
+        for b in (2, 4, 8, 16):
+            fed(b, max(32, b), 1000, topology)
+
     # Relay: B sites, one transit network; each site runs 3B-1 relay clients.
     def relay(b, p, r):
-        row = run("relay", b, max(p, b), 1, r)
+        row = run("relay", b, max(p, b), 1, r, "star")
         row["clients"] = p + 3 * b * b
         row["networks"] = b + 1
         rows.append(row)

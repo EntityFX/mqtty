@@ -22,14 +22,12 @@
 <circle cx="204.9" cy="365.1" r="5" fill="#2563eb" opacity=".85"/>
 <circle cx="204.9" cy="365.1" r="5" fill="#2563eb" opacity=".85"/>
 <circle cx="204.9" cy="365.1" r="5" fill="#2563eb" opacity=".85"/>
-<circle cx="204.9" cy="365.1" r="5" fill="#2563eb" opacity=".85"/>
 <circle cx="365.0" cy="311.7" r="5" fill="#2563eb" opacity=".85"/>
-<circle cx="365.0" cy="311.8" r="5" fill="#2563eb" opacity=".85"/>
 <circle cx="365.0" cy="311.9" r="5" fill="#2563eb" opacity=".85"/>
 <circle cx="124.8" cy="376.6" r="5" fill="#2563eb" opacity=".85"/>
 <circle cx="365.0" cy="311.7" r="5" fill="#2563eb" opacity=".85"/>
 <circle cx="685.2" cy="83.6" r="5" fill="#2563eb" opacity=".85"/>
-<line x1="80.0" y1="379.5" x2="730.0" y2="410.1" stroke="#dc2626" stroke-width="2"/>
+<line x1="80.0" y1="379.5" x2="730.0" y2="410.0" stroke="#dc2626" stroke-width="2"/>
 <text x="405.0" y="462" font-family="sans-serif" font-size="13" text-anchor="middle">B = число брокеров (star)</text>
 <text x="20" y="230.0" font-family="sans-serif" font-size="13" text-anchor="middle" transform="rotate(-90 20 230.0)">X / M, сетевых пакетов на сообщение</text>
 </svg>
