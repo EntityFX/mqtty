@@ -418,6 +418,18 @@ Web hardening без изменения API:
 **Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем eviction
 QoS2-маркеров и общий result schema.
 
+### Статус S2a (2026-11-08)
+
+Подготовка к S2 без смены модели доставки:
+
+- `Node.SendToNetwork` уважает `MQTTY_NO_PACKET_POOL` — при выключенном пуле пакет больше не
+  добавляется в `ConcurrentBag` (раньше bag рос без границ).
+- `NodeMonitoringPacket.Reset` очищает `ManualResetEventSlim` в WaitMode; переиспользованный
+  пакет больше не наследует старое `Release()`.
+- Добавлен `NodeMonitoringPacketTests`. Проверка: **400/400**.
+
+Полный S2 (slot rings вместо обёрток/deferred/pool) остаётся отдельным крупным шагом.
+
 ---
 
 ## 7. Быстрые исправления независимо от переписывания

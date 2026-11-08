@@ -199,7 +199,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
 
         Network?.Send(packet);
 
-        _packetPool.Add(outgoing);
+        if (!PacketPoolDisabled) _packetPool.Add(outgoing);
     }
 
     private void CompleteReceive(NodeMonitoringPacket incomming)

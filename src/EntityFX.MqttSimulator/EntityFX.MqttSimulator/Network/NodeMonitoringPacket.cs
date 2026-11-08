@@ -49,6 +49,12 @@ internal class NodeMonitoringPacket
         SendTick = sendTick;
         Released = false;
         _outgoingWaitTicks = waitTicks;
+        // A pooled packet may have been released while waiting in WaitMode.
+        // Clear the event so the next waiter cannot observe a stale release.
+        if (waitMode)
+        {
+            ResetEventSlim.Reset();
+        }
     }
 
     public bool WaitIsReleased(TimeSpan timeSpan)
