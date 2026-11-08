@@ -418,6 +418,20 @@ Web hardening без изменения API:
 **Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем eviction
 QoS2-маркеров и общий result schema.
 
+### Статус S3d (2026-11-08)
+
+`PendingAcknowledgements` больше не растёт без границ:
+
+- у `PendingAcknowledgement` появился `Tick`; broker и client проставляют его при завершении QoS2;
+- `PrunePendingAcknowledgements` удаляет `PublishComplete` старше `MQTTY_QOS2_COMPLETED_TTL`
+  (по умолчанию 4096 тиков) и ограничивает их число `MQTTY_QOS2_COMPLETED_CAP` (4096) на сессию;
+- очистка запускается раз в 64 тика в `MqttBroker.Refresh` и `MqttClient.Refresh`;
+- другие типы acknowledgement не затрагиваются; добавлены тесты TTL/capacity.
+  Проверка: **402/402**. QoS2 LB: seq `3.08 с`, par `1.65 с` (4 воркера, median 3).
+
+**Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем общий
+result schema и Designer (`DesignDocument`).
+
 ### Статус S2a (2026-11-08)
 
 Подготовка к S2 без смены модели доставки:

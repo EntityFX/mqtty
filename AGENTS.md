@@ -158,6 +158,8 @@ done
 | `MQTTY_ISOLATE_NETWORKS=1` | изолировать сети клиентов в LB |
 | `MQTTY_NONATOMIC_ID=1` | неатомарная выдача packet id (только для замеров) |
 | `MQTTY_NO_PACKET_POOL=1` | отключить пул пакетов |
+| `MQTTY_QOS2_COMPLETED_TTL=N` | сколько тиков хранить завершённые QoS2-маркеры (по умолчанию 4096) |
+| `MQTTY_QOS2_COMPLETED_CAP=N` | максимум завершённых QoS2-маркеров на сессию (по умолчанию 4096) |
 | `DOTNET_PROCESSOR_COUNT=N` | ограничить число логических CPU |
 
 ### 7.5 Другие запуски

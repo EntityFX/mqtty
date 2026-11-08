@@ -4,6 +4,16 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals
 {
     internal static class StorageExtensions
     {
+        private static int ReadLimit(string name, int fallback) =>
+            int.TryParse(Environment.GetEnvironmentVariable(name), out var value) && value > 0 ? value : fallback;
+
+        /// <summary>How long a completed QoS2 marker is kept to suppress retransmissions.</summary>
+        internal static readonly int CompletedAcknowledgementRetentionTicks =
+            ReadLimit("MQTTY_QOS2_COMPLETED_TTL", 4096);
+
+        /// <summary>Hard cap per session; oldest completed markers are evicted first.</summary>
+        internal static readonly int MaxCompletedAcknowledgements =
+            ReadLimit("MQTTY_QOS2_COMPLETED_CAP", 4096);
         public static IEnumerable<ClientSubscription> GetSubscriptions(this ClientSession session)
         {
             lock (session.SubscriptionsSync)
@@ -143,6 +153,50 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals
             lock (session.PendingAcknowledgementsSync)
             {
                 session.PendingAcknowledgements.Remove(pending);
+            }
+        }
+
+        /// <summary>
+        /// Evicts completed QoS2 markers that are older than the retention window
+        /// and enforces the per-session cap. Other acknowledgement types are kept.
+        /// </summary>
+        public static void PrunePendingAcknowledgements(this ClientSession session, long tick)
+        {
+            var retention = CompletedAcknowledgementRetentionTicks;
+            var capacity = MaxCompletedAcknowledgements;
+            lock (session.PendingAcknowledgementsSync)
+            {
+                var acknowledgements = session.PendingAcknowledgements;
+                if (acknowledgements.Count == 0)
+                {
+                    return;
+                }
+
+                acknowledgements.RemoveAll(ack =>
+                    ack.Type == MqttPacketType.PublishComplete && tick - ack.Tick >= retention);
+
+                var completed = 0;
+                foreach (var acknowledgement in acknowledgements)
+                {
+                    if (acknowledgement.Type == MqttPacketType.PublishComplete)
+                    {
+                        completed++;
+                    }
+                }
+
+                var excess = completed - capacity;
+                for (var i = 0; i < acknowledgements.Count && excess > 0;)
+                {
+                    if (acknowledgements[i].Type == MqttPacketType.PublishComplete)
+                    {
+                        acknowledgements.RemoveAt(i);
+                        excess--;
+                    }
+                    else
+                    {
+                        i++;
+                    }
+                }
             }
         }
     }

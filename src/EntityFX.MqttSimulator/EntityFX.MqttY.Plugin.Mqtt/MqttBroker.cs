@@ -596,7 +596,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 session.AddPendingAcknowledgement(new PendingAcknowledgement
                 {
                     Type = MqttPacketType.PublishComplete,
-                    PacketId = publishReleasePacket.PacketId
+                    PacketId = publishReleasePacket.PacketId,
+                    Tick = NetworkSimulator!.TotalTicks
                 });
                 _sessionRepository.Update(session);
             }
@@ -783,11 +784,29 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         public override void Refresh()
         {
             base.Refresh();
+            PruneCompletedAcknowledgements();
 
             foreach (var packet in _processingQueue.DrainReady())
             {
                 var publishPacket = _packetManager.BytesToPacket<PublishPacket>(packet.Payload);
                 ProcessFromClientPublishCore(packet, publishPacket);
+            }
+        }
+
+        private long _lastAcknowledgementPruneTick;
+
+        private void PruneCompletedAcknowledgements()
+        {
+            var tick = NetworkSimulator!.TotalTicks;
+            if (tick - _lastAcknowledgementPruneTick < 64)
+            {
+                return;
+            }
+
+            _lastAcknowledgementPruneTick = tick;
+            foreach (var session in _sessionRepository.ReadAll())
+            {
+                session.PrunePendingAcknowledgements(tick);
             }
         }
 
