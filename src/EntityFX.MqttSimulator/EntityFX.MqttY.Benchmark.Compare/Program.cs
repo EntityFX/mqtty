@@ -56,6 +56,12 @@ if (opt.Engines.Contains("lb"))
         var cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
         var (summary, timing) = lbRunner.RunMeasured(lbInput, ExportDir("lb", parallel, rep), parallel, refreshStrategy: 0);
         sw.Stop();
+        if (parallel && Environment.GetEnvironmentVariable("MQTTY_PHASE_STATS") == "1")
+        {
+            Console.Error.WriteLine("phases-wall " + string.Join(" ", timing.PhaseWallSeconds.Select(p => $"{p.Key}={p.Value:F4}")));
+            Console.Error.WriteLine("phases-refresh " + string.Join(" ", timing.RefreshWallSecondsByPhase.Select(p => $"{p.Key}={p.Value:F4}")));
+            Console.Error.WriteLine("phases-calls " + string.Join(" ", timing.RefreshCallsByPhase.Select(p => $"{p.Key}={p.Value}")));
+        }
         var cpu = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalSeconds;
         return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds, timing.RefreshWallSeconds,
             timing.ExportWallSeconds, summary.GraphErrors, summary.Status, Metrics.Lb(summary), cpu,
@@ -145,6 +151,12 @@ EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSam
     {
         var previousWorkers = Environment.GetEnvironmentVariable("MQTTY_WORKERS");
         Environment.SetEnvironmentVariable("MQTTY_WORKERS", workers.ToString(CultureInfo.InvariantCulture));
+        // Samples share a process. Reclaim the previous topology before the
+        // next timed run so its collection is not charged to construct/connect
+        // (a standalone run never inherits another simulation's heap).
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
         try
         {
             return run(parallel, rep);

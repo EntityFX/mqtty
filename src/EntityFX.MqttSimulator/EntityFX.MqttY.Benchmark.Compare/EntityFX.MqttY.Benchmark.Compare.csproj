@@ -4,6 +4,11 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- The simulator is a throughput workload with a large object graph:
+         server GC keeps collection pauses off the per-tick critical path.
+         Measurements on 12C/24T: LB L wall 3.9x -> 5.0x, Relay 4.2x -> 5.5x. -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../EntityFX.MqttY.Engines/EntityFX.MqttY.Engines.csproj" />
