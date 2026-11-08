@@ -219,5 +219,6 @@ in-process host и делят временные каталоги, из-за ч�
 - `doc/performance.md` — методика замеров, текущие результаты, фазовый профиль, принятые и отклонённые оптимизации.
 - `doc/progress.md` — прогресс плана, остаток в часах и статус гейтов.
 - `doc/skills/dotnet-performance.md` — сохранённый skill по C#/.NET-производительности.
+- `doc/analysis/message-scaling/article.md` — математическая статья о связи числа сообщений с топологией; данные и скрипты рядом.
 - `src/EntityFX.MqttSimulator/EntityFX.MqttY.Web.App/README.md` — API и запуск Web.
 - Внешние исследовательские отчёты и данные: `github.com/EntityFX/mqtty-meta`.

@@ -29,6 +29,7 @@ dotnet run --project src/EntityFX.MqttSimulator/EntityFX.MqttY.LoadBalancing.App
 - [`doc/performance.md`](doc/performance.md) — методика замеров, текущие результаты seq/par, фазовый профиль и отклонённые оптимизации.
 - [`doc/progress.md`](doc/progress.md) — прогресс плана: общий объём, остаток и гейты.
 - [`doc/skills/dotnet-performance.md`](doc/skills/dotnet-performance.md) — skill по C#/.NET-производительности и параллелизации.
+- [`doc/analysis/message-scaling/article.md`](doc/analysis/message-scaling/article.md) — статья о масштабировании числа сообщений от сетей, брокеров и клиентов.
 - [`AGENTS.md`](AGENTS.md) — команды сборки/тестов и правила работы агента.
 
 Исходники находятся в `src/EntityFX.MqttSimulator`, solution — `EntityFX.Mqtty.sln`. Готовые исследовательские отчёты и данные хранятся в [mqtty-meta/reports](https://github.com/EntityFX/mqtty-meta/blob/develop/reports/mqtty/README.md).

@@ -1,0 +1,269 @@
+{
+  "rows": 35,
+  "lb": {
+    "fit_X_ML_M_B_1": {
+      "coef": [
+        4.069486531109837,
+        3.948715272682711,
+        19.744166728647116,
+        8.142053429224593,
+        -43.65883317096482
+      ],
+      "r2": 0.9999922078339943,
+      "rmse": 57.85503603904463
+    },
+    "fit_X_per_M_vs_L": {
+      "coef": [
+        4.157446376811596,
+        3.9805420289855085
+      ],
+      "r2": 0.997245368526091,
+      "rmse": 0.19105496798902538
+    },
+    "delivered_equals_scheduled": true,
+    "correlations": [
+      {
+        "variable": "log B",
+        "log B": 1.0,
+        "log P": 0.536,
+        "log C": 0.646,
+        "log N": 0.862,
+        "log M": -0.061,
+        "log D": -0.061,
+        "log X": 0.055
+      },
+      {
+        "variable": "log P",
+        "log B": 0.536,
+        "log P": 1.0,
+        "log C": 0.989,
+        "log N": 0.447,
+        "log M": 0.068,
+        "log D": 0.068,
+        "log X": 0.119
+      },
+      {
+        "variable": "log C",
+        "log B": 0.646,
+        "log P": 0.989,
+        "log C": 1.0,
+        "log N": 0.544,
+        "log M": 0.053,
+        "log D": 0.053,
+        "log X": 0.118
+      },
+      {
+        "variable": "log N",
+        "log B": 0.862,
+        "log P": 0.447,
+        "log C": 0.544,
+        "log N": 1.0,
+        "log M": -0.068,
+        "log D": -0.068,
+        "log X": 0.243
+      },
+      {
+        "variable": "log M",
+        "log B": -0.061,
+        "log P": 0.068,
+        "log C": 0.053,
+        "log N": -0.068,
+        "log M": 1.0,
+        "log D": 1.0,
+        "log X": 0.903
+      },
+      {
+        "variable": "log D",
+        "log B": -0.061,
+        "log P": 0.068,
+        "log C": 0.053,
+        "log N": -0.068,
+        "log M": 1.0,
+        "log D": 1.0,
+        "log X": 0.903
+      },
+      {
+        "variable": "log X",
+        "log B": 0.055,
+        "log P": 0.119,
+        "log C": 0.118,
+        "log N": 0.243,
+        "log M": 0.903,
+        "log D": 0.903,
+        "log X": 1.0
+      }
+    ],
+    "normalized_correlations": [
+      {
+        "variable": "log X/M",
+        "log X/M": 1.0,
+        "log L": 0.995,
+        "log B": 0.256,
+        "log N": 0.708,
+        "log C": 0.162
+      },
+      {
+        "variable": "log L",
+        "log X/M": 0.995,
+        "log L": 1.0,
+        "log B": 0.23,
+        "log N": 0.688,
+        "log C": 0.143
+      },
+      {
+        "variable": "log B",
+        "log X/M": 0.256,
+        "log L": 0.23,
+        "log B": 1.0,
+        "log N": 0.862,
+        "log C": 0.646
+      },
+      {
+        "variable": "log N",
+        "log X/M": 0.708,
+        "log L": 0.688,
+        "log B": 0.862,
+        "log N": 1.0,
+        "log C": 0.544
+      },
+      {
+        "variable": "log C",
+        "log X/M": 0.162,
+        "log L": 0.143,
+        "log B": 0.646,
+        "log N": 0.544,
+        "log C": 1.0
+      }
+    ]
+  },
+  "fed": {
+    "fit_X_per_M_vs_B": {
+      "coef": [
+        8.078046891615546,
+        -11.991910920245472,
+        11.867022004090327
+      ],
+      "r2": 0.9999998227917075,
+      "rmse": 0.2551111334534781,
+      "rows": 14,
+      "excluded": 2
+    },
+    "delivered_equals_MB_unsaturated": true,
+    "delivered_ratio_min": 0.840425,
+    "delivered_ratio_max": 1.0,
+    "correlations": [
+      {
+        "variable": "log B",
+        "log B": 1.0,
+        "log P": 0.532,
+        "log C": 0.937,
+        "log N": 0.999,
+        "log M": -0.039,
+        "log D": 0.693,
+        "log X": 0.913
+      },
+      {
+        "variable": "log P",
+        "log B": 0.532,
+        "log P": 1.0,
+        "log C": 0.764,
+        "log N": 0.53,
+        "log M": -0.249,
+        "log D": 0.201,
+        "log X": 0.389
+      },
+      {
+        "variable": "log C",
+        "log B": 0.937,
+        "log P": 0.764,
+        "log C": 1.0,
+        "log N": 0.942,
+        "log M": -0.128,
+        "log D": 0.585,
+        "log X": 0.818
+      },
+      {
+        "variable": "log N",
+        "log B": 0.999,
+        "log P": 0.53,
+        "log C": 0.942,
+        "log N": 1.0,
+        "log M": -0.034,
+        "log D": 0.697,
+        "log X": 0.914
+      },
+      {
+        "variable": "log M",
+        "log B": -0.039,
+        "log P": -0.249,
+        "log C": -0.128,
+        "log N": -0.034,
+        "log M": 1.0,
+        "log D": 0.692,
+        "log X": 0.371
+      },
+      {
+        "variable": "log D",
+        "log B": 0.693,
+        "log P": 0.201,
+        "log C": 0.585,
+        "log N": 0.697,
+        "log M": 0.692,
+        "log D": 1.0,
+        "log X": 0.927
+      },
+      {
+        "variable": "log X",
+        "log B": 0.913,
+        "log P": 0.389,
+        "log C": 0.818,
+        "log N": 0.914,
+        "log M": 0.371,
+        "log D": 0.927,
+        "log X": 1.0
+      }
+    ],
+    "normalized_correlations": [
+      {
+        "variable": "log X/M",
+        "log X/M": 1.0,
+        "log B": 0.998,
+        "log N": 0.997,
+        "log C": 0.939,
+        "log P": 0.539
+      },
+      {
+        "variable": "log B",
+        "log X/M": 0.998,
+        "log B": 1.0,
+        "log N": 0.999,
+        "log C": 0.937,
+        "log P": 0.532
+      },
+      {
+        "variable": "log N",
+        "log X/M": 0.997,
+        "log B": 0.999,
+        "log N": 1.0,
+        "log C": 0.942,
+        "log P": 0.53
+      },
+      {
+        "variable": "log C",
+        "log X/M": 0.939,
+        "log B": 0.937,
+        "log N": 0.942,
+        "log C": 1.0,
+        "log P": 0.764
+      },
+      {
+        "variable": "log P",
+        "log X/M": 0.539,
+        "log B": 0.532,
+        "log N": 0.53,
+        "log C": 0.764,
+        "log P": 1.0
+      }
+    ]
+  }
+}
