@@ -85,8 +85,11 @@ def main() -> None:
         if topology == "star":
             row["clients"] = p + b + b * (b + 1)
             row["networks"] = b + 1
-        else:
-            row["clients"] = p + b + b * (3 + 1)
+        elif topology == "ring":
+            row["clients"] = p + 5 * b
+            row["networks"] = b
+        else:  # line
+            row["clients"] = p + 5 * b - 2
             row["networks"] = b
         rows.append(row)
 
