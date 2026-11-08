@@ -308,29 +308,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             if (qos == MqttQos.ExactlyOnce)
             {
-                var packetId = publishPacket.PacketId!.Value;
-                if (session.AnyPendingMessage(message =>
-                        message.Status == PendingMessageStatus.AwaitingPublishRelease &&
-                        message.PacketId == packetId))
-                {
-                    SendPublishReceived(packet, publishPacket);
-                    return;
-                }
-
-                var completed = session.FindPendingAcknowledgement(ack =>
-                    ack.Type == MqttPacketType.PublishComplete && ack.PacketId == packetId);
-                if (completed != null && publishPacket.Duplicated)
-                {
-                    // A retransmitted PUBLISH after PUBCOMP must only repeat the
-                    // PUBREC/PUBREL handshake; re-fanning it out would break
-                    // exactly-once. A non-DUP PUBLISH may legitimately reuse the
-                    // packet id, so the completed marker is dropped for it.
-                    SendPublishReceived(packet, publishPacket);
-                    return;
-                }
-                session.RemovePendingAcknowledgement(completed);
-
-                SaveMessage(publishPacket, clientId, PendingMessageStatus.AwaitingPublishRelease);
+                // Inbound and outbound packet-id namespaces are independent. A
+                // repeated PUBLISH (active flow or completed marker) only repeats
+                // PUBREC; a non-DUP PUBLISH may legitimately reuse the id.
+                session.TryStartInboundPublish(
+                    PendingMessage.FromPublish(publishPacket, PendingMessageStatus.AwaitingPublishRelease),
+                    publishPacket.Duplicated);
                 SendPublishReceived(packet, publishPacket);
                 return;
             }
@@ -458,13 +441,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 throw new MqttException($"Client Session {clientId} Not Found");
             }
 
-            var pendingMessage = session
-                .GetPendingMessages()
-                .FirstOrDefault(p => p.PacketId.HasValue &&
-                    p.PacketId.Value == publishAckPacket.PacketId &&
-                    p.Status == PendingMessageStatus.PendingToAcknowledge);
-
-            session.RemovePendingMessage(pendingMessage);
+            // PUBACK only consumes the outbound QoS1 flow, never an inbound
+            // QoS2 record that happens to use the same packet id.
+            session.TryAcknowledgeOutbound(publishAckPacket.PacketId, out _);
 
             _sessionRepository.Update(session);
 
@@ -485,18 +464,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 throw new MqttException(string.Format($"Client Session {clientId} Not Found", clientId));
             }
 
-            var savedMessage = new PendingMessage
-            {
-                Status = status,
-                QualityOfService = message.QualityOfService,
-                Duplicated = message.Duplicated,
-                Retain = message.Retain,
-                Topic = message.Topic,
-                PacketId = message.PacketId,
-                Payload = message.Payload
-            };
-
-            session.AddPendingMessage(savedMessage);
+            session.AddOutboundPending(PendingMessage.FromPublish(message, status));
 
             _sessionRepository.Update(session);
         }
@@ -546,16 +514,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 throw new MqttException($"Client Session {packet.From} Not Found");
             }
 
-            var pendingMessage = session.GetPendingMessages().FirstOrDefault(message =>
-                message.PacketId == publishReceivedPacket.PacketId &&
-                (message.Status == PendingMessageStatus.AwaitingPublishReceived ||
-                 message.Status == PendingMessageStatus.AwaitingPublishComplete));
-            if (pendingMessage == null)
+            if (!session.TryAdvanceOutboundQos2(publishReceivedPacket.PacketId, out _))
             {
                 return;
             }
 
-            pendingMessage.Status = PendingMessageStatus.AwaitingPublishComplete;
             _sessionRepository.Update(session);
             SendPublishRelease(packet, publishReceivedPacket.PacketId);
         }
@@ -575,30 +538,15 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 throw new MqttException($"Client Session {clientId} Not Found");
             }
 
-            var pendingMessage = session.GetPendingMessages().FirstOrDefault(message =>
-                message.PacketId == publishReleasePacket.PacketId &&
-                message.Status == PendingMessageStatus.AwaitingPublishRelease);
+            // A duplicate PUBREL finds no active inbound flow and only repeats
+            // PUBCOMP, so it can never fan a message out twice.
+            var completed = session.TryCompleteInboundPublish(
+                publishReleasePacket.PacketId, NetworkSimulator!.TotalTicks, out var pendingMessage);
 
             PublishPacket? publishPacket = null;
-            if (pendingMessage != null)
+            if (completed && pendingMessage != null)
             {
-                publishPacket = new PublishPacket(
-                    pendingMessage.Topic,
-                    pendingMessage.QualityOfService,
-                    pendingMessage.Retain,
-                    pendingMessage.Duplicated,
-                    pendingMessage.PacketId)
-                {
-                    Payload = pendingMessage.Payload
-                };
-
-                session.RemovePendingMessage(pendingMessage);
-                session.AddPendingAcknowledgement(new PendingAcknowledgement
-                {
-                    Type = MqttPacketType.PublishComplete,
-                    PacketId = publishReleasePacket.PacketId,
-                    Tick = NetworkSimulator!.TotalTicks
-                });
+                publishPacket = pendingMessage.ToPublishPacket();
                 _sessionRepository.Update(session);
             }
 
@@ -621,10 +569,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 throw new MqttException($"Client Session {packet.From} Not Found");
             }
 
-            var pendingMessage = session.GetPendingMessages().FirstOrDefault(message =>
-                message.PacketId == publishCompletePacket.PacketId &&
-                message.Status == PendingMessageStatus.AwaitingPublishComplete);
-            session.RemovePendingMessage(pendingMessage);
+            session.TryCompleteOutboundQos2(publishCompletePacket.PacketId, out _);
             _sessionRepository.Update(session);
         }
 
@@ -687,24 +632,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                         continue;
                     }
 
-                    var clientSubscription = session
-                        .GetSubscriptions()
-                        .FirstOrDefault(s => s.TopicFilter == subscription.TopicFilter);
-
-                    if (clientSubscription != null)
+                    if (session.UpsertSubscription(clientId, subscription.TopicFilter,
+                            subscription.MaximumQualityOfService))
                     {
-                        clientSubscription.MaximumQualityOfService = subscription.MaximumQualityOfService;
-                    }
-                    else
-                    {
-                        clientSubscription = new ClientSubscription
-                        {
-                            ClientId = clientId,
-                            TopicFilter = subscription.TopicFilter,
-                            MaximumQualityOfService = subscription.MaximumQualityOfService
-                        };
-
-                        session.AddSubscription(clientSubscription);
                         InvalidateSubscriptionSnapshot();
                     }
 

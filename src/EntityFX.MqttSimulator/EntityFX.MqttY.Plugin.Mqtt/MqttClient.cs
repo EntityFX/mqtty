@@ -59,13 +59,13 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 !session.HasPendingAcknowledgements(excludePublishComplete: true));
 
         public IReadOnlyDictionary<string, MqttSubscribtion[]> Subscribtions => 
-            _sessionRepository.ReadAll().ToDictionary(s => s.Id, s => s.Subscriptions.Select(cs => new MqttSubscribtion(cs.TopicFilter, cs.MaximumQualityOfService)).ToArray()).ToImmutableDictionary();
+            _sessionRepository.ReadAll().ToDictionary(s => s.Id, s => s.GetSubscriptions().Select(cs => new MqttSubscribtion(cs.TopicFilter, cs.MaximumQualityOfService)).ToArray()).ToImmutableDictionary();
 
         public bool IsSubscribed(string topicFilter)
         {
             if (string.IsNullOrEmpty(topicFilter)) return false;
             var session = _sessionRepository.Read(Name);
-            return session?.GetSubscriptions().Any(subscription => subscription.TopicFilter == topicFilter) == true;
+            return session?.FindSubscription(topicFilter) != null;
         }
 
         public SessionState Connect(string server, bool cleanSession = false)
@@ -279,7 +279,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             if (!IsConnected)
             {
-                SaveMessage(publish, Name, PendingMessageStatus.PendingToSend);
+                SaveMessage(publish, PendingMessageStatus.PendingToSend);
                 return true;
             }
 
@@ -288,7 +288,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 var status = qos == MqttQos.ExactlyOnce
                     ? PendingMessageStatus.AwaitingPublishReceived
                     : PendingMessageStatus.PendingToAcknowledge;
-                SaveMessage(publish, Name, status);
+                SaveMessage(publish, status);
             }
             _mqttCounters.Increment(publish.Type);
 
@@ -405,14 +405,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             if (publishPacket.QualityOfService == MqttQos.ExactlyOnce)
             {
-                var session = GetSession();
-                var pendingMessage = session.GetPendingMessages().FirstOrDefault(message =>
-                    message.PacketId == publishPacket.PacketId &&
-                    message.Status == PendingMessageStatus.AwaitingPublishRelease);
-                if (pendingMessage == null)
-                {
-                    SaveMessage(publishPacket, Name, PendingMessageStatus.AwaitingPublishRelease, packet.Id);
-                }
+                // Inbound QoS2 state is keyed separately from our outbound
+                // publishes, so the broker's packet id cannot clash with ours.
+                GetSession().TryStartInboundPublish(
+                    PendingMessage.FromPublish(publishPacket,
+                        PendingMessageStatus.AwaitingPublishRelease, packet.Id),
+                    publishPacket.Duplicated);
 
                 SendPublishReceived(packet, publishPacket.PacketId ?? 0);
                 return;
@@ -456,16 +454,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             }
 
             var session = GetSession();
-            var pendingMessage = session.GetPendingMessages().FirstOrDefault(message =>
-                message.PacketId == publishReceivedPacket.PacketId &&
-                (message.Status == PendingMessageStatus.AwaitingPublishReceived ||
-                 message.Status == PendingMessageStatus.AwaitingPublishComplete));
-            if (pendingMessage == null)
+            if (!session.TryAdvanceOutboundQos2(publishReceivedPacket.PacketId, out _))
             {
                 return;
             }
 
-            pendingMessage.Status = PendingMessageStatus.AwaitingPublishComplete;
             _sessionRepository.Update(session);
 
             var release = new PublishReleasePacket(publishReceivedPacket.PacketId);
@@ -484,19 +477,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             }
 
             var session = GetSession();
-            var pendingMessage = session.GetPendingMessages().FirstOrDefault(message =>
-                message.PacketId == publishReleasePacket.PacketId &&
-                message.Status == PendingMessageStatus.AwaitingPublishRelease);
-
-            if (pendingMessage != null)
+            if (session.TryCompleteInboundPublish(publishReleasePacket.PacketId,
+                    NetworkSimulator!.TotalTicks, out var pendingMessage) && pendingMessage != null)
             {
-                session.RemovePendingMessage(pendingMessage);
-                session.AddPendingAcknowledgement(new PendingAcknowledgement
-                {
-                    Type = MqttPacketType.PublishComplete,
-                    PacketId = publishReleasePacket.PacketId,
-                    Tick = NetworkSimulator!.TotalTicks
-                });
                 _sessionRepository.Update(session);
 
                 MessageReceived?.Invoke(this,
@@ -522,10 +505,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             }
 
             var session = GetSession();
-            var pendingMessage = session.GetPendingMessages().FirstOrDefault(message =>
-                message.PacketId == publishCompletePacket.PacketId &&
-                message.Status == PendingMessageStatus.AwaitingPublishComplete);
-            session.RemovePendingMessage(pendingMessage);
+            session.TryCompleteOutboundQos2(publishCompletePacket.PacketId, out _);
             _sessionRepository.Update(session);
             CompletePublisher(packet.From, MqttQos.ExactlyOnce,
                 publishCompletePacket.PacketId, NetworkSimulator!.TotalTicks);
@@ -553,13 +533,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                 throw new MqttException($"Client Session {ClientId} Not Found");
             }
 
-            var pendingMessage = session
-                .GetPendingMessages()
-                .FirstOrDefault(p => p.PacketId.HasValue &&
-                    p.PacketId.Value == publishAckPacket.PacketId &&
-                    p.Status == PendingMessageStatus.PendingToAcknowledge);
-
-            session.RemovePendingMessage(pendingMessage);
+            // PUBACK only consumes our outbound QoS1 flow; an inbound QoS2
+            // record that reused the same packet id stays untouched.
+            session.TryAcknowledgeOutbound(publishAckPacket.PacketId, out _);
 
             _sessionRepository.Update(session);
 
@@ -588,71 +564,22 @@ namespace EntityFX.MqttY.Plugin.Mqtt
             }
         }
 
-        private void RemovePendingAcknowledgement(string clientId, ushort packetId, MqttPacketType type)
+        private void RemoveOutboundMessage(ushort packetId)
         {
-            var session = _sessionRepository.Read(clientId);
-
-            if (session == null)
-            {
-                throw new MqttException(string.Format($"Client Session {clientId} Not Found", clientId));
-            }
-
-            var pendingAcknowledgement = session
-                .GetPendingAcknowledgements()
-                .FirstOrDefault(u => u.Type == type && u.PacketId == packetId);
-
-            session.RemovePendingAcknowledgement(pendingAcknowledgement);
-
+            var session = GetSession();
+            session.TryRemoveOutbound(packetId, out _);
             _sessionRepository.Update(session);
         }
 
-        private void RemovePendingMessage(string clientId, ushort packetId)
-        {
-            var session = _sessionRepository.Read(clientId);
-
-            if (session == null)
-            {
-                throw new MqttException(string.Format($"Client Session {clientId} Not Found", clientId));
-            }
-
-            var pendingMessage = session
-                .GetPendingMessages()
-                .FirstOrDefault(p => p.PacketId.HasValue && p.PacketId.Value == packetId);
-
-            session.RemovePendingMessage(pendingMessage);
-
-            _sessionRepository.Update(session);
-        }
-
-        private void SaveMessage(PublishPacket message, string clientId, PendingMessageStatus status,
-            long? correlationId = null)
+        private void SaveMessage(PublishPacket message, PendingMessageStatus status)
         {
             if (message.QualityOfService == MqttQos.AtMostOnce)
             {
                 return;
             }
 
-            var session = _sessionRepository.Read(clientId);
-
-            if (session == null)
-            {
-                throw new MqttException(string.Format($"Client Session {clientId} Not Found", clientId));
-            }
-
-            var savedMessage = new PendingMessage
-            {
-                Status = status,
-                QualityOfService = message.QualityOfService,
-                Duplicated = message.Duplicated,
-                Retain = message.Retain,
-                Topic = message.Topic,
-                PacketId = message.PacketId,
-                Payload = message.Payload,
-                CorrelationId = correlationId
-            };
-
-            session.AddPendingMessage(savedMessage);
-
+            var session = GetSession();
+            session.AddOutboundPending(PendingMessage.FromPublish(message, status));
             _sessionRepository.Update(session);
         }
 
@@ -736,7 +663,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         void IMqttClientPublishStateSink.FailPublish(ushort packetId)
         {
-            RemovePendingMessage(Name, packetId);
+            RemoveOutboundMessage(packetId);
             ObservePublicationOutcome(packetId, false, "brokerPublishFailed");
         }
 
@@ -747,25 +674,8 @@ namespace EntityFX.MqttY.Plugin.Mqtt
                     NetworkSimulator!.TotalTicks, completed, reason));
         }
 
-        private void UpsertSubscription(ClientSession session, string topicFilter, MqttQos qos)
-        {
-            var subscription = session.GetSubscriptions()
-                .FirstOrDefault(item => item.TopicFilter == topicFilter);
-            if (subscription == null)
-            {
-                session.AddSubscription(new ClientSubscription
-                {
-                    ClientId = ClientId,
-                    MaximumQualityOfService = qos,
-                    TopicFilter = topicFilter
-                });
-            }
-            else
-            {
-                subscription.MaximumQualityOfService = qos;
-            }
-
-        }
+        private void UpsertSubscription(ClientSession session, string topicFilter, MqttQos qos) =>
+            session.UpsertSubscription(ClientId, topicFilter, qos);
 
         public override void Clear()
         {

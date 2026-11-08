@@ -26,8 +26,7 @@ internal static class MqttPendingSnapshotBuilder
             .Select(p => new MqttPendingAcknowledgementSnapshot(p.Session, p.Item.Type.ToString(), p.Item.PacketId)).ToArray();
         var sessionDetails = sessions.Take(sessionLimit).Select(s => new MqttSessionPendingSnapshot(s.Id,
             s.GetPendingMessages().Count(), s.GetPendingAcknowledgements().Count(),
-            s.GetPendingMessages().Where(p => p.PacketId.HasValue).GroupBy(p => p.PacketId)
-                .Count(g => g.Count() > 1))).ToArray();
+            s.CountDuplicatePendingMessageIds())).ToArray();
         return new(sessions.Length, messageCount, ackCount, processingQueue, states, types,
             sessionDetails, messageDetails, ackDetails,
             sessionDetails.Length < sessions.Length || messageDetails.Length < messageCount || ackDetails.Length < ackCount);
