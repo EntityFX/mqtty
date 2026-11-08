@@ -316,7 +316,17 @@ Integration **431/431**, Web.App собирается с 0 ошибок.
 
 **Оценка:** 4 ч/д.
 
-### S5f. Security
+### S5f. Security — ВЫПОЛНЕНО
+
+**Факт:** добавлен опциональный `SecurityOptions` (`MqttYWeb:Security`):
+API key (`X-Api-Key` или `Authorization: Bearer`), fixed-window rate limit на
+мутирующие API (60/мин по умолчанию), CORS allow-list, HTTPS/HSTS switches,
+лимит загрузки (`MaxImportBytes`, Kestrel). Пустой API key сохраняет локальный
+open-режим; при заданном ключе действует fallback authorization policy.
+Rate limit возвращает `429 application/problem+json`. Пути данных по-прежнему
+проверяются `JsonFileStore.Resolve/IsWithinRoot` (path traversal, symlink).
+Тесты добавлены в `EntityFX.Tests.Web` (`SecurityTests`: traversal, rate limit);
+локально Web-набор не запускается из-за внешней ошибки NuGet-сертификата.
 
 1. AuthN/AuthZ (API key или OIDC) с опциональным включением; `[Authorize]` на API.
 2. CORS policy, HTTPS/HSTS, rate limiting на тяжёлые endpoints, лимиты загрузок.

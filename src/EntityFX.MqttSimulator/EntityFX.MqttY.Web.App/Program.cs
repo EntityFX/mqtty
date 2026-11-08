@@ -6,7 +6,10 @@ using EntityFX.MqttY.Engines.LoadBalancing;
 using EntityFX.MqttY.Engines.Relay;
 using EntityFX.MqttY.Web.App.Application;
 using EntityFX.MqttY.Web.App.Hubs;
+using EntityFX.MqttY.Web.App.Security;
 using EntityFX.MqttY.Web.App.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 
@@ -17,7 +20,9 @@ if (args.Length == 2 && args[0] == "--execute-simulation")
 }
 
 var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 2 * 1024 * 1024);
+var securityConfig = builder.Configuration.GetSection("MqttYWeb:Security");
+var securityOptions = securityConfig.Get<SecurityOptions>() ?? new SecurityOptions();
+builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = securityOptions.MaxImportBytes);
 
 // Настройки
 builder.Services.Configure<DataDirectoryOptions>(builder.Configuration.GetSection("MqttYWeb"));
@@ -60,6 +65,22 @@ builder.Services.AddSingleton<TwinValidationHandler>();
 builder.Services.AddHostedService(sp => (SimulationJobRunner)sp.GetRequiredService<ISimulationJobRunner>());
 builder.Services.AddHostedService<MonitoringHubForwarder>();
 
+// Security (optional API key; empty key keeps local usage open)
+builder.Services.AddAuthentication(ApiKeyAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
+        ApiKeyAuthenticationHandler.SchemeName, _ => { });
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+if (securityOptions.CorsOrigins.Length > 0)
+{
+    builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
+        policy.WithOrigins(securityOptions.CorsOrigins).AllowAnyHeader().AllowAnyMethod()));
+}
+
 // SignalR
 builder.Services.AddSignalR();
 
@@ -98,6 +119,12 @@ if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("MqttYWe
     app.UseSwaggerUI();
 }
 
+if (securityOptions.UseHsts) app.UseHsts();
+if (securityOptions.UseHttpsRedirection) app.UseHttpsRedirection();
+if (securityOptions.CorsOrigins.Length > 0) app.UseCors();
+app.UseAuthentication();
+app.UseMiddleware<ApiRateLimitMiddleware>();
+app.UseAuthorization();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapControllers();
@@ -108,7 +135,7 @@ app.MapGet("/healthz", (IJobRegistry registry, JsonFileStore store) => new
     dataDirectoryAvailable = Directory.Exists(store.Root),
     runningJobs = registry.GetAll().Count(j => j.State == "Running"),
     queuedJobs = registry.GetAll().Count(j => j.State is "Queued" or "Paused")
-});
+}).AllowAnonymous();
 app.MapHub<MonitoringHub>("/hubs/monitoring");
 
 app.Run();
