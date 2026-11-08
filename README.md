@@ -25,6 +25,8 @@ dotnet run --project src/EntityFX.MqttSimulator/EntityFX.MqttY.LoadBalancing.App
 
 ## Документация
 
-Подробные руководства централизованы в [mqtty-meta/docs/mqtty](https://github.com/EntityFX/mqtty-meta/blob/develop/docs/mqtty/README.md): архитектура, калибровка, Relay, балансировка, федерация и запуск экспериментов. В локальной копии мета-репозитория откройте `docs/mqtty/README.md` из его корня.
+- [`doc/architecture.md`](doc/architecture.md) — устройство проекта, инварианты тика, MQTT-сессии, harness, Web/Designer и статус переписывания S0–S5.
+- [`doc/performance.md`](doc/performance.md) — методика замеров, текущие результаты seq/par, фазовый профиль и отклонённые оптимизации.
+- [`AGENTS.md`](AGENTS.md) — команды сборки/тестов и правила работы агента.
 
 Исходники находятся в `src/EntityFX.MqttSimulator`, solution — `EntityFX.Mqtty.sln`. Готовые исследовательские отчёты и данные хранятся в [mqtty-meta/reports](https://github.com/EntityFX/mqtty-meta/blob/develop/reports/mqtty/README.md).

@@ -18,11 +18,8 @@ mqtty/
 ├── README.md
 ├── config/                     # примеры конфигураций экспериментов
 ├── doc/
-│   ├── benchmark-article.md    # статья seq vs par (числа могут отставать от кода)
-│   └── optimization/
-│       ├── optimization-results.md
-│       ├── baseline-metrics.md
-│       └── parallelization-plan.md   # актуальный план выхода на 4–8×
+│   ├── architecture.md         # устройство, инварианты, статус S0–S5
+│   └── performance.md          # методика, результаты, отклонённые оптимизации
 ├── results/                    # результаты экспериментов (не коммитить)
 ├── src/EntityFX.MqttSimulator/
 │   ├── EntityFX.MqttSimulator.Contracts/  # базовые контракты сети/счётчиков
@@ -49,64 +46,60 @@ mqtty/
 
 - .NET SDK: `6.0.136` и `8.0.121` (проверка: `dotnet --list-sdks`).
 - `net6.0` выведен из поддержки — предупреждения `NETSDK1138` ожидаемы.
-- Текущий хост: **24 логических CPU = 12 физических ядер / 24 потока** (Xeon E5-2680 v3). Это важно для оценки ускорения (см. §4). Исторические цифры ниже сняты на прежнем 4C/8T-хосте и помечены отдельно.
+- Текущий хост: **24 логических CPU = 12 физических ядер / 24 потока** (Xeon E5-2680 v3). Для гейта используйте `workers=12` (физические ядра); SMT-переподписка на 24 потоках даёт регрессию.
 
 ## 4. Текущее состояние производительности
 
-Параллельный режим (`parallel=true`) есть во всех трёх движках: параллельный двухфазный refresh (сети → узлы) на постоянном пуле `TickWorkerPool`. Флаг параллелизма **не** входит в `LoadBalancingOptions`/`FederationOptions` — он передаётся в метод раннера. Параллельный refresh всегда использует flat two-phase порядок (strategy 0); `strategy=1` (сеть + её узлы) — только sequential.
+Параллельный режим (`parallel=true`) есть во всех трёх движках: двухфазный
+refresh (сети → fence → узлы → fence) на постоянном пуле `TickWorkerPool`.
+Параллельный refresh всегда использует flat two-phase (strategy 0);
+`strategy=1` — только sequential. Флаг параллелизма передаётся в метод раннера,
+а не в `LoadBalancingOptions`/`FederationOptions`.
 
-Фактические цифры reference-бенчмарка (прогретые медианы, текущий 4C/8T хост, 4 воркера):
-
-| Движок | seq | par | wall speedup | refresh speedup | Комментарий |
-|---|---:|---:|---:|---:|---|
-| LoadBalancing | 3.34 с | 2.13 с | **1.57×** | **1.70×** | после per-session locks / ideal-sampler skip; ratio в пределах шума |
-| Relay | 7.08 с | 3.02 с | **2.35×** | **2.47×** | лучший движок |
-| Federation | 33.6 с | 17.2 с | **1.98×** | **2.49×** | lock-free ledger, SHA вне lock, Pump без OrderBy, IsIdle cache; Pump остаётся serial (parallel отклонён) |
-
-**Чего пока нет:** целевых 4–8×. На 4C/8T потолок ~4–4.5× из-за SMT; 6–8× возможны только на 8 физических ядрах. План выхода — `doc/optimization/parallelization-plan.md`.
-
-Кривая масштабирования (`DOTNET_PROCESSOR_COUNT` = 1/2/4/8): LB `1.16 → 1.93 → 1.99 → 1.61`, Relay `1.10 → 1.65 → 2.06 → 2.49`, Federation `1.12 → 1.57 → 1.81 → 1.67`. Для старого 4C/8T-хоста оптимум — **физические ядра (4)**; 8 логических хуже для LB из-за стоимости `Barrier` и SMT.
-
-Проверка на текущем **12C/24T** (2026-11-08, workers=12, measure 3 с, repeat 3, `--no-export`):
+Текущий reference-бенчмарк (12C/24T, workers=12, медианы, `--no-export`):
 
 | Конфиг | wall speedup | refresh speedup | core |
 |---|---:|---:|---|
-| LB reference (16 брокеров, 64 публикатора, 10k rps) | **2.01×** | **2.14×** | match |
-| Relay reference | **3.23×** | **3.47×** | match |
-| LB L (64 брокера, 256 публикаторов, 20k rps) | **3.94×** | **4.52×** | match |
-| Relay L (16 релеев, 16 клиентов, 80 повторов) | **2.89×** | **2.99×** | match |
-| Fed L (16 брокеров, 256 публикаторов, 2k rps) | **2.20×** | **2.81×** | MISMATCH |
+| LB L (64 брокера, 256 publishers, 20k rps) | **5.06×** | **6.03×** | match |
+| LB reference | **2.98×** | **3.36×** | match |
+| Relay (2k rps) | **5.44×** | **6.30×** | match |
+| Federation L (16 брокеров, 256 publishers, 2k rps) | **2.12×** | **3.03×** | match / diag differ |
 
-Кривая LB L (workers 1/2/4/8/12): wall `0.98 → 1.66 → 2.60 → 3.47 → 3.90×`; refresh `0.96 → 1.69 → 2.85 → 3.98 → 4.64×`. Эффективность на 12 физических ядрах — 33% wall / 39% refresh (G3 не достигнут). `--workers 24` катастрофичен для LB (`0.05×`) и плох для Relay (`1.11×`) — SMT-переподписка запрещена. Fed core-mismatch воспроизводится и на baseline `cee4ab5`.
+Ключевые факты:
 
-После M0/M1/M2/M2b по умолчанию: **физические ядра**, спин-барьер, serial publish и `nodeChunk=1`. `MQTTY_WORKERS`/`MQTTY_BARRIER`/`MQTTY_PARALLEL_PUBLISH` переопределяют. Главные оставшиеся тормоза — барьер (~27% wall при 4 воркерах) и инфляция работы ~1.4×; per-tick `Parallel.For` в `Drive` убран (он сжигал ~6× CPU и давал LB 1.0×).
+- по умолчанию — физические ядра, spin-барьер при `workers ≤ physical`,
+  serial publish и `nodeChunk=1`;
+- `MQTTY_WORKERS`/`MQTTY_BARRIER`/`MQTTY_PARALLEL_PUBLISH` — только для
+  экспериментов; `--workers 24` на 12 физических ядрах даёт SMT-переподписку и
+  катастрофичен для LB;
+- бенчмарк и единый CLI собираются с `ServerGarbageCollection=true` и
+  `ConcurrentGarbageCollection=false`; между сэмплами делается полный GC вне
+  измеряемого участка;
+- главные оставшиеся тормоза — инфляция работы узлов (~1.8× в параллели) и
+  Federation drain (~50 % wall). Барьер после сортировки сетей — это в основном
+  дисбаланс тяжёлых узлов, а не стоимость fence.
 
-Почему старый прогон нельзя было считать строгим гейтом (исправлено в M0):
-- measurement = 0.5 с, фиксированные расходы сопоставимы с полезной работой;
-- seq всегда запускался первым — второй прогон теплее (при `DOTNET_PROCESSOR_COUNT=1` видно 1.10–1.16× вместо 1.0×);
-- экспорт результатов входил в wall-clock;
-- Federation упиралась в `DrainTimeoutSeconds=1`.
-
-Новый harness делает прогрев, чередует порядок, считает медиану, умеет `--no-export` и `--measure 3–5`; для гейта используйте именно его.
-
-Масштабная проверка (4C/8T): LB L `2.27×/2.51×`, Relay L `2.12×/2.15×`, Fed L (non-overload) `1.93×/2.39×`; Fed на 10k rps перегружен (core mismatch) и для G4 не годится.
+Подробная методика, фазовый профиль и отклонённые эксперименты —
+`doc/performance.md`.
 
 ## 5. Известные ограничения и долги
 
-- Federation: `Brokers ≤ 16`, публикаций ≤ 100 000, `publications × receivers ≤ 1 000 000`.
-- `FederationDeliveryLedger` переведён на lock-free структуры (ConcurrentDictionary + per-receiver lock); `Pump` остаётся последовательным — параллельный вариант через `Parallel.For` оказался хуже (1.52× против 1.98×).
-- `DeliveryLedger` LB переведён на lock-free структуры; `TotalSteps` кэшируется на тик; active-only refresh (`MQTTY_ACTIVE_ONLY=1`) реализован, но по умолчанию выключен — на плотной нагрузке выигрыша нет.
-- Профиль parallel-only: **~50% времени — ожидание/спин** (`WaitForNextGeneration` 31%, `SpinBarrier` 19%); полезная node-работа ~29%; инфляция работы ×1.51 (10.12 с против 6.72 с sequential refresh); загрузка 3.33/4 ядра. Узкие места работы: `ToArray`/LINQ, pending-list snapshots, `ConcurrentDictionary`, `BrokerMeasurement`.
-- Аллокации ~1.6–5 ГБ на прогон; per-tick `Parallel.For` в `Drive` убран (serial publish), `nodeChunk=1`.
-- Проверены и не дали эффекта: shared LAN ingress, `MQTTY_NONATOMIC_ID`, packet pool (удалён в S2), изоляция сетей, статическое распределение. Pointer-chasing 1→4 потока масштабируется на 96% — память не предел.
-- Проверены и отклонены по замерам: pipeline network+outgoing (1.44× vs 1.55×), cost-aware LPT (1.38× vs 1.61×), parallel `Pump` (1.52× vs 1.98×), active-only на large LB (1.97× vs 2.19×), fast-idle (без эффекта), per-network dependency scheduler (small 1.51× vs 1.59×, large 1.94× vs 2.25×). Симуляция CPU-bound; очередь задач и спин дороже снятого барьера.
-- 8 логических потоков на этом 4C/8T хосте хуже 4 физических: LB small 0.86× vs 1.65×, large 2.11× vs 2.29×. Для целевых 4–8× нужен хост с 8 физическими ядрами.
-- Federation недетерминирован по receiver-латентности и `queueDrops` при перегрузке; core-метрики (counts, unique, goodput, publish p50–p99) совпадают.
-- `StaticFederator.Pump` сортирует цели через `OrderBy` на каждый тик; `topology.Pump()` последовательный.
-- `topology.IsIdle` в drain сканирует все сети/узлы/федераторы.
-- `TotalSteps` перебирает `ThreadLocal.Values`; `NodeBase.Refresh` дергает его на каждом узле.
-- Два теста падали **и на чистом `HEAD`**; сейчас исправлены, полный набор **388/388**. Регрессий нет.
-- В рабочей копии могут быть незакоммиченные оптимизации (`NetworkSimulator.cs`, `Node.cs`, `TickWorkerPool.cs`, `StaticFederator.cs`, `FederationRunner.cs`, `FederationTopology.cs`, `InMemoryRepository.cs`). Не коммитьте их без согласия автора.
+- Federation: `Brokers ≤ 16`, публикаций ≤ 100 000,
+  `publications × receivers ≤ 1 000 000`.
+- Federation недетерминирован по receiver-латентности и `queueDrops` при
+  перегрузке; core-метрики (counts, unique, goodput, publish p50–p99)
+  совпадают. `diagnostics=differ` у Fed L воспроизводится и на baseline.
+- `FederationDeliveryLedger` — `ConcurrentDictionary` + per-receiver lock;
+  `StaticFederator.Pump` последовательный (параллельный вариант хуже).
+- `DeliveryLedger` LB lock-free; `TotalSteps` кэшируется на тик через
+  `CurrentRefreshSteps`; active-only refresh реализован, но по умолчанию
+  выключен — на плотной нагрузке выигрыша нет.
+- Главные остаточные резервы: инфляция node-работы ~1.8× в параллели и
+  Federation drain ≈ 50 % wall. Подробности — `doc/performance.md`.
+- Тесты: Integration **436/436**, Web **62/62** (запускать последовательно,
+  не параллельно).
+- Не коммитьте чужие незакоммиченные правки; `results/`, `bin/`, `obj/` не
+  коммитятся.
 
 ## 6. Сборка
 
@@ -188,6 +181,10 @@ DOTNET_NUGET_SIGNATURE_VERIFICATION=false \
   dotnet test src/EntityFX.MqttSimulator/EntityFX.Tests.Web/EntityFX.Tests.Web.csproj -c Release --nologo
 ```
 
+Integration и Web наборы нельзя запускать одновременно: API-тесты поднимают
+in-process host и делят временные каталоги, из-за чего часть тестов падает по
+таймаутам. Запускайте последовательно; Web — 62/62, Integration — 436/436.
+
 ## 8. Ключевые компоненты
 
 | Компонент | Путь | Назначение |
@@ -199,11 +196,11 @@ DOTNET_NUGET_SIGNATURE_VERIFICATION=false \
 | `PacketTrace` | `EntityFX.MqttSimulator/Network/PacketTrace.cs` | S0 characterization: NDJSON send/receive-трасса (env-gated) |
 | `NodePacketSlot` / `NetworkPacketSlot` | `EntityFX.MqttSimulator/Network/NodePacketSlot.cs`, `NetworkPacketSlot.cs` | Data-oriented транспортные слоты (S2): без wrapper/pool, path-массив + NextHop |
 | `CreditLoadDriver` / `HistogramStatistics` | `EntityFX.MqttY.Engines/Execution/` | Общий credit-драйвер нагрузки, drain-loop и гистограммы LB/Fed |
-| `TickWorkerPool` | `EntityFX.MqttSimulator/Network/TickWorkerPool.cs` | Постоянный пул, двухфазный refresh, `Barrier` |
+| `TickWorkerPool` | `EntityFX.MqttSimulator/Network/TickWorkerPool.cs` | Постоянный пул, двухфазный refresh, spin/monitor fence |
 | `Node` / `Network` | `EntityFX.MqttSimulator/Network/` | Очереди, отложенные пакеты, quiescence |
 | `LoadBalancingOptions` / `...Runner` | `Engines/LoadBalancing/` | Параметры и запуск LB |
 | `FederationOptions` / `...Runner` | `Engines/Federation/` | Параметры, запуск, drain |
-| `FederationDeliveryLedger` | `Engines/Federation/Delivery/` | Учёт публикаций/доставок (сейчас глобальный lock) |
+| `FederationDeliveryLedger` | `Engines/Federation/Delivery/` | Учёт публикаций/доставок, `ConcurrentDictionary` + per-receiver lock |
 | `StaticFederator` | `Engines/Federation/Core/` | Очереди федератора, `Pump`, `IsIdle` |
 | `MqttRelayApp` | `Engines/Relay/MqttRelayApp.cs` | Запуск relay-симуляции |
 | `Benchmark.Compare` | `EntityFX.MqttY.Benchmark.Compare/Program.cs` | Reference-бенчмарк seq/par |
@@ -216,11 +213,8 @@ DOTNET_NUGET_SIGNATURE_VERIFICATION=false \
 
 ## 10. Документация
 
-- `README.md` — быстрый старт.
-- `doc/optimization/parallelization-plan.md` — **актуальный план** оптимизации и критерии приёмки.
-- `doc/optimization/scaling-forecast.md` — математическая модель и прогноз масштабирования (per-tick decomposition, прогноз для 8/16 ядер).
-- `doc/code-analysis.md` — верификация code-level гипотез (что подтвердилось, что уже исправлено, что отклонено замерами).
-- `doc/rewrite-review.md` — глубокое ревью и поэтапный план переписывания без изменения функциональности (инварианты, целевая архитектура, S0–S5, риск/выгода).
-- `doc/rewrite-plan-s3-s5.md` — детальный план S3–S5: шаги, файлы, тесты, критерии приёмки, порядок коммитов.
-- `doc/benchmark-article.md` — статья; её цифры могут отставать от текущего кода.
-- Внешняя документация: `github.com/EntityFX/mqtty-meta`.
+- `README.md` — быстрый старт и обзор.
+- `doc/architecture.md` — слои, инварианты, тик, MQTT, harness, Web/Designer, статус S0–S5.
+- `doc/performance.md` — методика замеров, текущие результаты, фазовый профиль, принятые и отклонённые оптимизации.
+- `src/EntityFX.MqttSimulator/EntityFX.MqttY.Web.App/README.md` — API и запуск Web.
+- Внешние исследовательские отчёты и данные: `github.com/EntityFX/mqtty-meta`.

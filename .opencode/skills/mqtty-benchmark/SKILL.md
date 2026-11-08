@@ -8,7 +8,7 @@ description: Run, extend, and interpret MqttY seq-vs-par benchmarks and phase pr
 ## Source of truth
 
 - Reference harness: `src/EntityFX.MqttSimulator/EntityFX.MqttY.Benchmark.Compare/Program.cs`.
-- Gates and current baseline: `doc/optimization/parallelization-plan.md`.
+- Gates and current baseline: `doc/performance.md`.
 - Do not create a second benchmark project or extra docs.
 
 ## Hardware first
@@ -65,5 +65,5 @@ A faster run with different metrics is a regression, not an optimization.
 ## Reporting
 
 Record: CPU model, physical/logical cores, workers, median, min/max, CV, phase breakdown,
-and the exact command. Put results in `doc/optimization/parallelization-plan.md`;
+and the exact command. Put results in `doc/performance.md`;
 do not add new report files.
