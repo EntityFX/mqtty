@@ -209,6 +209,9 @@ phase2 ≈ 13.9–14.5 с суммы, barrier ≈ 4.8–5.2 с суммы, wall 
 | Per-node `ConcurrentStack` вместо `ConcurrentBag` | +16 % refresh par |
 | `_responseMessages` → `Dictionary` | маржинально: таблица пуста в измеряемых сценариях |
 | O(1)-счётчики pending + `T[] ReadAll` | без измеримого выигрыша; откатано |
+| Прогрев path-cache перед connect | connect `0.45 → 0.003 с`, но construct `+0.4…0.9 с` (Dijkstra/GC сериализуются); суммарно без выигрыша, откатано |
+| Форсированный GC после construct / `NoGCRegion` вокруг connect | connect не ускорился; `NoGCRegion` сорвал фазу — откатано |
+| `MQTTY_SPIN_ITERATIONS` 64…4096 | 64 лучший; больше — хуже |
 | Path-cache без копирования | ~0.5 % аллокаций, wall без изменений |
 | Передача parsed `PublishPacket` через `Context` | ~1 % аллокаций, wall без изменений |
 | Отключение delivery-метрик | ~2 % node-работы, не окупает изменение семантики |

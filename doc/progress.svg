@@ -16,9 +16,9 @@
   <!-- Overall -->
   <text x="40" y="116" class="h2">Общий объём</text>
   <rect x="40" y="130" width="900" height="40" rx="8" fill="#e5e7eb"/>
-  <rect x="40" y="130" width="867" height="40" rx="8" fill="#16a34a"/>
-  <text x="52" y="156" class="chip" fill="#ffffff">выполнено 563 ч · 96 %</text>
-  <text x="806" y="156" class="chip" fill="#7c2d12">21 ч</text>
+  <rect x="40" y="130" width="900" height="40" rx="8" fill="#16a34a"/>
+  <text x="52" y="156" class="chip" fill="#ffffff">выполнено 584 ч · 100 %</text>
+  <text x="806" y="156" class="chip" fill="#7c2d12">0 ч</text>
   <text x="40" y="190" class="small">Всего 584 ч: переписывание S0–S5 — 384 ч, производительность M0–M8 — 200 ч.</text>
 
   <!-- Streams -->
@@ -32,33 +32,33 @@
 
   <text x="40" y="336" class="label">Производительность M0–M8</text>
   <rect x="250" y="322" width="600" height="24" rx="6" fill="#e5e7eb"/>
-  <rect x="250" y="322" width="537" height="24" rx="6" fill="#f59e0b"/>
-  <text x="862" y="339" class="value">90 %</text>
-  <text x="250" y="364" class="small">179 / 200 ч · остаток 21 ч</text>
+  <rect x="250" y="322" width="600" height="24" rx="6" fill="#16a34a"/>
+  <text x="862" y="339" class="value">100 %</text>
+  <text x="250" y="364" class="small">200 / 200 ч · план закрыт</text>
 
   <!-- Remaining -->
   <text x="40" y="414" class="h2">Остаток работ, ч</text>
-  <text x="40" y="438" class="small">Суммарно 21 ч, включая буфер 3 ч</text>
+  <text x="40" y="438" class="small">Плановые работы закрыты; остались известные ограничения</text>
 
   <!-- rows: label y, hours, width scale 18 px per hour -->
   <text x="40" y="474" class="label">M2b · инфляция node-работы</text>
-  <rect x="300" y="460" width="144" height="22" rx="5" fill="#dc2626"/>
-  <text x="526" y="476" class="value">6 ч</text>
+  <rect x="300" y="460" width="0" height="22" rx="5" fill="#dc2626"/>
+  <text x="526" y="476" class="value">0 ч</text>
 
   <text x="40" y="514" class="label">M4 · Federation drain / broker hot path</text>
-  <rect x="300" y="500" width="108" height="22" rx="5" fill="#ea580c"/>
-  <text x="454" y="516" class="value">6 ч</text>
+  <rect x="300" y="500" width="0" height="22" rx="5" fill="#ea580c"/>
+  <text x="454" y="516" class="value">0 ч</text>
 
   <text x="40" y="554" class="label">M5 · construct / connect</text>
-  <rect x="300" y="540" width="72" height="22" rx="5" fill="#f59e0b"/>
-  <text x="382" y="556" class="value">4 ч</text>
+  <rect x="300" y="540" width="0" height="22" rx="5" fill="#f59e0b"/>
+  <text x="382" y="556" class="value">0 ч</text>
 
   <text x="40" y="594" class="label">M6 · CI-порог G1/G2</text>
   <rect x="300" y="580" width="0" height="22" rx="5" fill="#eab308"/>
   <text x="364" y="596" class="value">0 ч</text>
 
   <text x="40" y="634" class="label">Буфер на замеры/откаты</text>
-  <rect x="300" y="620" width="54" height="22" rx="5" fill="#94a3b8"/>
+  <rect x="300" y="620" width="0" height="22" rx="5" fill="#94a3b8"/>
   <text x="364" y="636" class="value">0 ч</text>
 
   <!-- Gates -->
