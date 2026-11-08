@@ -2,22 +2,22 @@ using EntityFX.MqttY.Web.App.Security;
 using EntityFX.MqttY.Web.App.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace EntityFX.Tests.Web;
 
-[TestClass]
 public class SecurityTests
 {
-    [TestMethod]
+    [Fact]
     public void JsonStore_RejectsPathTraversal()
     {
         var root = Path.Combine(Path.GetTempPath(), "mqtty-security-tests-" + Guid.NewGuid());
         try
         {
             var store = new JsonFileStore(root);
-            Assert.ThrowsException<InvalidOperationException>(() => store.Resolve("../outside.json"));
-            Assert.ThrowsException<InvalidOperationException>(() => store.Resolve("/tmp/outside.json"));
-            Assert.IsFalse(store.IsWithinRoot(Path.Combine(root, "..", "outside.json")));
+            Assert.Throws<InvalidOperationException>(() => store.Resolve("../outside.json"));
+            Assert.Throws<InvalidOperationException>(() => store.Resolve("/tmp/outside.json"));
+            Assert.False(store.IsWithinRoot(Path.Combine(root, "..", "outside.json")));
         }
         finally
         {
@@ -25,7 +25,7 @@ public class SecurityTests
         }
     }
 
-    [TestMethod]
+    [Fact]
     public async Task RateLimit_AppliesOnlyToMutatingApiCalls()
     {
         var calls = 0;
@@ -42,13 +42,13 @@ public class SecurityTests
         await middleware.InvokeAsync(post);
         await middleware.InvokeAsync(post);
         await middleware.InvokeAsync(post);
-        Assert.AreEqual(2, calls);
-        Assert.AreEqual(StatusCodes.Status429TooManyRequests, post.Response.StatusCode);
+        Assert.Equal(2, calls);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, post.Response.StatusCode);
 
         var get = new DefaultHttpContext();
         get.Request.Method = HttpMethods.Get;
         get.Request.Path = "/api/simulations";
         await middleware.InvokeAsync(get);
-        Assert.AreEqual(3, calls);
+        Assert.Equal(3, calls);
     }
 }

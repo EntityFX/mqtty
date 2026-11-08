@@ -23,6 +23,11 @@ var builder = WebApplication.CreateBuilder(args);
 var securityConfig = builder.Configuration.GetSection("MqttYWeb:Security");
 var securityOptions = securityConfig.Get<SecurityOptions>() ?? new SecurityOptions();
 builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = securityOptions.MaxImportBytes);
+// The middleware takes the options directly; the authentication handler uses
+// IOptions<SecurityOptions>. Register both so middleware activation and the
+// authentication scheme can resolve their dependencies.
+builder.Services.Configure<SecurityOptions>(securityConfig);
+builder.Services.AddSingleton(securityOptions);
 
 // Настройки
 builder.Services.Configure<DataDirectoryOptions>(builder.Configuration.GetSection("MqttYWeb"));

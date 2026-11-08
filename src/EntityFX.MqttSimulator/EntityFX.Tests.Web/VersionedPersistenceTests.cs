@@ -1,15 +1,15 @@
 using EntityFX.MqttY.Web.App.Models;
 using EntityFX.MqttY.Web.App.Services;
+using Xunit;
 
 namespace EntityFX.Tests.Web;
 
-[TestClass]
 public class VersionedPersistenceTests
 {
-    [TestMethod]
+    [Fact]
     public async Task Read_MigratesV1DocumentToCurrentVersion()
     {
-        WithStore(async store =>
+        await WithStore(async store =>
         {
             var path = store.Resolve("topologies/v1.json");
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -18,47 +18,47 @@ public class VersionedPersistenceTests
 
             var saved = await store.ReadAsync<SavedTopologyDto>("topologies/v1.json");
 
-            Assert.IsNotNull(saved);
-            Assert.AreEqual(PersistenceMigrations.CurrentVersion, saved!.SchemaVersion);
-            Assert.AreEqual("legacy", saved.Name);
+            Assert.NotNull(saved);
+            Assert.Equal(PersistenceMigrations.CurrentVersion, saved!.SchemaVersion);
+            Assert.Equal("legacy", saved.Name);
         });
     }
 
-    [TestMethod]
+    [Fact]
     public async Task CorruptDocument_DoesNotEscapeTryRead()
     {
-        WithStore(async store =>
+        await WithStore(async store =>
         {
             var path = store.Resolve("jobs/broken.json");
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             await File.WriteAllTextAsync(path, "{ not json");
 
-            Assert.IsNull(await store.TryReadAsync<SimulationJob>("jobs/broken.json"));
-            await Assert.ThrowsExceptionAsync<System.Text.Json.JsonException>(
+            Assert.Null(await store.TryReadAsync<SimulationJob>("jobs/broken.json"));
+            await Assert.ThrowsAsync<System.Text.Json.JsonException>(
                 () => store.ReadAsync<SimulationJob>("jobs/broken.json"));
         });
     }
 
-    [TestMethod]
+    [Fact]
     public async Task ConcurrentWrites_AreAtomicAndLeaveNoTemporaryFiles()
     {
-        WithStore(async store =>
+        await WithStore(async store =>
         {
             var writes = Enumerable.Range(0, 20).Select(value =>
                 store.WriteAsync("jobs/job.json", new SimulationJob { Name = $"job-{value}" }));
             await Task.WhenAll(writes);
 
             var job = await store.ReadAsync<SimulationJob>("jobs/job.json");
-            Assert.IsNotNull(job);
-            StringAssert.StartsWith(job!.Name, "job-");
-            Assert.AreEqual(0, Directory.GetFiles(Path.GetDirectoryName(store.Resolve("jobs/job.json"))!, "*.tmp").Length);
+            Assert.NotNull(job);
+            Assert.StartsWith("job-", job!.Name);
+            Assert.Equal(0, Directory.GetFiles(Path.GetDirectoryName(store.Resolve("jobs/job.json"))!, "*.tmp").Length);
         });
     }
 
-    [TestMethod]
+    [Fact]
     public async Task Prune_KeepsNewestDocuments()
     {
-        WithStore(store =>
+        await WithStore(store =>
         {
             var directory = Path.GetDirectoryName(store.Resolve("monitoring/x.json"))!;
             Directory.CreateDirectory(directory);
@@ -69,9 +69,9 @@ public class VersionedPersistenceTests
                 File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(i));
             }
 
-            Assert.AreEqual(3, store.Prune("monitoring", "*.json", 2));
-            CollectionAssert.AreEquivalent(new[] { "3.json", "4.json" },
-                Directory.GetFiles(directory, "*.json").Select(Path.GetFileName).ToArray());
+            Assert.Equal(3, store.Prune("monitoring", "*.json", 2));
+            Assert.Equal(new[] { "3.json", "4.json" },
+                Directory.GetFiles(directory, "*.json").Select(Path.GetFileName).OrderBy(name => name).ToArray());
             return Task.CompletedTask;
         });
     }

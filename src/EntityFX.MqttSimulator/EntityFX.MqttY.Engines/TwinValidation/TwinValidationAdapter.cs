@@ -68,7 +68,11 @@ public static class TwinValidationAdapter
             referenceScope=nativeControl==null?"calibration profile; not new independent native validation":NativeControlReference.Scope,
             nativeControlReferenceSha256=configuration.NativeControlReferenceSha256,totalTicks,steps,errors
         },new JsonSerializerOptions { PropertyNamingPolicy=JsonNamingPolicy.CamelCase,WriteIndented=true }));
-        var hashes=Directory.GetFiles(output!).OrderBy(p=>p,StringComparer.Ordinal).ToDictionary(path=>Path.GetFileName(path)!,
+        // A seal cannot contain its own hash: exclude sha256.json like the
+        // shared JsonResultWriter.Seal does.
+        var hashes=Directory.GetFiles(output!)
+            .Where(path=>!string.Equals(Path.GetFileName(path),"sha256.json",StringComparison.Ordinal))
+            .OrderBy(p=>p,StringComparer.Ordinal).ToDictionary(path=>Path.GetFileName(path)!,
             path=>Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant());
         File.WriteAllText(Path.Combine(output!,"sha256.json"),JsonSerializer.Serialize(hashes,new JsonSerializerOptions { WriteIndented=true }));
         var completed=result.Summary.Status==ExperimentRunStatus.Completed;

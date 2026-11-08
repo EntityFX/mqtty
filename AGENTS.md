@@ -182,6 +182,10 @@ dotnet run --project .../EntityFX.MqttY.LoadBalancing.App.csproj -c Release --no
 
 # Интеграционные тесты
 dotnet test src/EntityFX.MqttSimulator/EntityFX.Tests.Integration/EntityFX.Tests.Integration.csproj -c Release --nologo
+
+# Web tests (в этом окружении restore требует отключения проверки подписи NuGet)
+DOTNET_NUGET_SIGNATURE_VERIFICATION=false \
+  dotnet test src/EntityFX.MqttSimulator/EntityFX.Tests.Web/EntityFX.Tests.Web.csproj -c Release --nologo
 ```
 
 ## 8. Ключевые компоненты
