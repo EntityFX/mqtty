@@ -9,8 +9,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals
 
         // ConcurrentDictionary.Values snapshots the whole table under every
         // bucket lock. ReadAll() is called per publisher per tick (HasPendingPublish)
-        // and per node during drain (IsQuiescent), so keep a lock-free snapshot
-        // that is rebuilt only on (rare) membership changes.
+        // and per node during drain (IsQuiescent), so keep a lock-free snapshot.
+        // It is rebuilt only on membership changes or when Update replaces the
+        // stored instance; the MQTT code updates the same ClientSession object,
+        // which used to trigger an O(sessions) copy on every protocol message.
         private readonly object _snapshotGate = new();
         private volatile T[] _snapshot = Array.Empty<T>();
 
@@ -33,7 +35,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals
 
         public void Update(T element)
         {
-            _elements.AddOrUpdate(element.Id, element, (key, value) => element);
+            if (_elements.TryGetValue(element.Id, out var existing) && ReferenceEquals(existing, element))
+            {
+                return;
+            }
+
+            _elements[element.Id] = element;
             RebuildSnapshot();
         }
 
