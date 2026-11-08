@@ -100,7 +100,23 @@ direction/status; `IsQuiescent` не меняется.
 
 **Оценка:** 4 ч/д.
 
-### S3h. Admission и metrics вне протокола
+### S3h. Admission и metrics вне протокола — ВЫПОЛНЕНО
+
+**Факт:** добавлены `IBrokerAdmissionModel`, `NoopBrokerAdmissionModel`,
+`ProfileBrokerAdmissionModel` (`Admission/`) и `IBrokerMetricsSink`
+(`Counter/`). `MqttBroker` больше не содержит профиль/sampler/rate-limiter и
+latency-формулы — он получает `BrokerAdmission` с `Admit`, `DelayTicks`,
+`RejectReason`, `ConditionalDeliveryLossRate`. `BrokerMeasurement` ключуется
+value-tuple `PublicationKey`, `LatencyHistogram` стал dense tick-массивом с
+overflow-картой (запись O(1), snapshot без копирования `SortedDictionary` на
+каждый тик). Scientific metrics сознательно остаются включёнными при
+`EnableCounters=false`: их использует benchmark/экспорт; флаг отключает
+legacy-счётчики. Integration **424/424**, negative admission paths покрыты
+`BrokerAdmissionTests`.
+
+Замеры 12C/24T, workers=12, repeat 3: LB reference **1.96×/2.06×**, Relay
+reference **2.90×/3.23×**, LB L **3.82×/4.47×**, Relay L **3.11×/3.30×**;
+core/diagnostics match.
 
 **Проблема.** `MqttBroker.ProcessFromClientPublish` совмещает protocol, profile, rate limiter,
 failure sampler, latency model, `BrokerMeasurement`; глобальный `lock` и строковые ключи в
