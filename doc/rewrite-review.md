@@ -371,6 +371,27 @@ golden-набор `Fixtures/core-packet-trace-{seq0,seq1,par1}.golden.ndjson`. �
 LB `1.61× wall / 1.74× refresh`, Relay `2.28× / 2.38×`, Federation `1.98× / 2.47×` — в пределах
 шума относительно baseline. `CounterClock` оставлен как совместимый shim до этапа S3/S4.
 
+### Статус S4a / S3a / S3b (2026-11-08)
+
+**S4a выполнен.** Общий harness-слой: `CreditLoadDriver` (кумулятивный credit-планировщик,
+serial/parallel), `ExperimentLoops.Until` (drain с таймаутом) и `HistogramStatistics`
+(merge/quantile). LB и Federation используют их; арифметика распределения слотов, `scheduled`,
+`attempts`, `rejected` и порядок refresh сохранены. Проверка: 392/392, LB `1.58× wall / 1.74× refresh`.
+
+**S3a выполнен.** `InMemoryRepository.Update` больше не пересобирает snapshot, если хранится тот
+же экземпляр (MQTT обновляет именно его). Это убирает O(сессий) копию с каждого протокольного
+сообщения. Добавлены `InMemoryRepositoryTests`. Замер LB QoS2 (4 воркера, median 5):
+seq wall `3.29 с` (было ~3.82), par `1.74 с` (было ~2.10), refresh par `1.51 с` (было ~1.80).
+
+**S3b выполнен.** PUBACK теперь матчит только `PendingToAcknowledge`: раньше `FirstOrDefault`
+по одному `PacketId` мог удалить входящий QoS2-рекорд (`AwaitingPublishRelease`) из той же
+сессии. Исправлено на broker и client; добавлены два регрессионных теста на коллизию id.
+Проверка: **398/398**.
+
+**Следующее по плану:** S4b (общий result schema/экспорт и benchmark на продуктовых движках)
+или S3c (bounded dedup завершённых QoS2 + eviction `PendingAcknowledgements`); затем S2
+(data-oriented транспорт) и S5 (Web/Designer).
+
 ---
 
 ## 7. Быстрые исправления независимо от переписывания

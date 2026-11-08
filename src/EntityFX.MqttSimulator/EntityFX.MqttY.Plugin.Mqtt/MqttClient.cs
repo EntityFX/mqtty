@@ -21,6 +21,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
         private readonly IRepository<ClientSession> _sessionRepository
             = new InMemoryRepository<ClientSession>();
+        internal IRepository<ClientSession> SessionRepository => _sessionRepository;
         private readonly IMqttPacketManager _packetManager;
         private long _localPublishSequence;
 
@@ -535,7 +536,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             var pendingMessage = session
                 .GetPendingMessages()
-                .FirstOrDefault(p => p.PacketId.HasValue && p.PacketId.Value == publishAckPacket.PacketId);
+                .FirstOrDefault(p => p.PacketId.HasValue &&
+                    p.PacketId.Value == publishAckPacket.PacketId &&
+                    p.Status == PendingMessageStatus.PendingToAcknowledge);
 
             session.RemovePendingMessage(pendingMessage);
 

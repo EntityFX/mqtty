@@ -241,6 +241,80 @@ namespace EntityFX.Tests.Integration
         }
 
         [TestMethod]
+        public void BrokerPubAck_DoesNotConsumeInboundQos2RecordWithSamePacketId()
+        {
+            var (graph, broker, _, subscriber, packetManager) = Build();
+            var session = new ClientSession(subscriber.Name, subscriber.ClientId);
+            var inbound = new PendingMessage
+            {
+                Status = PendingMessageStatus.AwaitingPublishRelease,
+                QualityOfService = MqttQos.ExactlyOnce,
+                PacketId = 7,
+                Topic = "test/in",
+                Payload = new byte[] { 1 }
+            };
+            var outbound = new PendingMessage
+            {
+                Status = PendingMessageStatus.PendingToAcknowledge,
+                QualityOfService = MqttQos.AtLeastOnce,
+                PacketId = 7,
+                Topic = "test/out",
+                Payload = new byte[] { 2 }
+            };
+            session.AddPendingMessage(inbound);
+            session.AddPendingMessage(outbound);
+            broker.SessionRepository.Create(session);
+
+            var ack = new PublishAckPacket(7);
+            var ackPacket = new NetworkPacket<int>(graph.GetPacketId(), null, 0,
+                subscriber.Name, broker.Name, NodeType.Client, NodeType.Server, subscriber.Index, broker.Index,
+                packetManager.PacketToBytes(ack), "mqtt", 0, 1, Category: "MQTT PubAck");
+            broker.Inject(ackPacket);
+
+            Assert.IsTrue(session.PendingMessages.Any(message => ReferenceEquals(message, inbound)),
+                "PUBACK must not consume the inbound QoS2 record.");
+            Assert.IsFalse(session.PendingMessages.Any(message => ReferenceEquals(message, outbound)),
+                "PUBACK must consume the outbound QoS1 delivery with the same packet id.");
+        }
+
+        [TestMethod]
+        public void ClientPubAck_DoesNotConsumeInboundQos2RecordWithSamePacketId()
+        {
+            var (graph, broker, _, subscriber, packetManager) = Build();
+            var session = new ClientSession(subscriber.Name, subscriber.ClientId);
+            var inbound = new PendingMessage
+            {
+                Status = PendingMessageStatus.AwaitingPublishRelease,
+                QualityOfService = MqttQos.ExactlyOnce,
+                PacketId = 7,
+                Topic = "test/in",
+                Payload = new byte[] { 1 }
+            };
+            var outbound = new PendingMessage
+            {
+                Status = PendingMessageStatus.PendingToAcknowledge,
+                QualityOfService = MqttQos.AtLeastOnce,
+                PacketId = 7,
+                Topic = "test/out",
+                Payload = new byte[] { 2 }
+            };
+            session.AddPendingMessage(inbound);
+            session.AddPendingMessage(outbound);
+            subscriber.SessionRepository.Create(session);
+
+            var ack = new PublishAckPacket(7);
+            var ackPacket = new NetworkPacket<int>(graph.GetPacketId(), null, 0,
+                broker.Name, subscriber.Name, NodeType.Server, NodeType.Client, broker.Index, subscriber.Index,
+                packetManager.PacketToBytes(ack), "mqtt", 0, 1, Category: "MQTT PubAck");
+            subscriber.Inject(ackPacket);
+
+            Assert.IsTrue(session.PendingMessages.Any(message => ReferenceEquals(message, inbound)),
+                "PUBACK must not consume the inbound QoS2 record.");
+            Assert.IsFalse(session.PendingMessages.Any(message => ReferenceEquals(message, outbound)),
+                "PUBACK must consume the outbound QoS1 publish with the same packet id.");
+        }
+
+        [TestMethod]
         public void Subscribe_WithoutConnectionFailsClearly()
         {
             var (_, _, _, subscriber, _) = Build();

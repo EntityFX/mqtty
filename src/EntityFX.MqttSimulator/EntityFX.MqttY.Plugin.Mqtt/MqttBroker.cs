@@ -20,6 +20,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt
         protected override bool ShouldTrackResponse(INetworkPacket packet) => false;
         private readonly IRepository<ClientSession> _sessionRepository = new InMemoryRepository<ClientSession>();
 
+        // Test seam (S3): lets the characterization suite exercise the session
+        // state machine without a full network. Production code keeps using the
+        // repository through the protocol handlers only.
+        internal IRepository<ClientSession> SessionRepository => _sessionRepository;
+
         private readonly MqttQos _maximumQualityOfService = MqttQos.ExactlyOnce;
         private readonly IMqttPacketManager _packetManager;
         private readonly IMqttTopicEvaluator _topicEvaluator;
@@ -446,7 +451,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
             var pendingMessage = session
                 .GetPendingMessages()
-                .FirstOrDefault(p => p.PacketId.HasValue && p.PacketId.Value == publishAckPacket.PacketId);
+                .FirstOrDefault(p => p.PacketId.HasValue &&
+                    p.PacketId.Value == publishAckPacket.PacketId &&
+                    p.Status == PendingMessageStatus.PendingToAcknowledge);
 
             session.RemovePendingMessage(pendingMessage);
 

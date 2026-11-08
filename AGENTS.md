@@ -180,6 +180,7 @@ dotnet test src/EntityFX.MqttSimulator/EntityFX.Tests.Integration/EntityFX.Tests
 | `TopologyRegistry` / `TopologySnapshot` | `EntityFX.MqttSimulator/Network/TopologyRegistry.cs` | Реестры топологии и неизменяемый снапшот на тик |
 | `TokenWindowAdmission` | `EntityFX.MqttSimulator/Network/TokenWindowAdmission.cs` | Rolling byte budget: reserve/commit/rollback |
 | `PacketTrace` | `EntityFX.MqttSimulator/Network/PacketTrace.cs` | S0 characterization: NDJSON send/receive-трасса (env-gated) |
+| `CreditLoadDriver` / `HistogramStatistics` | `EntityFX.MqttY.Engines/Execution/` | Общий credit-драйвер нагрузки, drain-loop и гистограммы LB/Fed |
 | `TickWorkerPool` | `EntityFX.MqttSimulator/Network/TickWorkerPool.cs` | Постоянный пул, двухфазный refresh, `Barrier` |
 | `Node` / `Network` | `EntityFX.MqttSimulator/Network/` | Очереди, отложенные пакеты, quiescence |
 | `LoadBalancingOptions` / `...Runner` | `Engines/LoadBalancing/` | Параметры и запуск LB |
