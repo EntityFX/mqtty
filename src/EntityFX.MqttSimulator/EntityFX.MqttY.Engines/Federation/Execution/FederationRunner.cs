@@ -1,5 +1,6 @@
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Experiment;
 using EntityFX.MqttY.Utils;
 using System.Threading;
 using System.Threading.Tasks;
@@ -64,52 +65,32 @@ public sealed class FederationRunner
 
             void Until(Func<bool> condition)
             {
-                for (long i = 0, n = o.ToTicks(o.DrainTimeoutSeconds); !condition() && i < n; i++) Refresh();
-                if (!condition()) throw new TimeoutException(phase + " timed out; partial evidence retained.");
+                ExperimentLoops.Until(condition, o.ToTicks(o.DrainTimeoutSeconds), Refresh,
+                    phase + " timed out; partial evidence retained.");
             }
 
             void Drive(long count, bool measurement, bool par)
             {
                 var perTick = o.OfferedRps * o.TickPeriod.TotalSeconds;
-                var credit = new long[o.Publishers]; var cap = checked((long)Math.Ceiling(perTick / o.Publishers) + 1);
-                long planned = 0; var next = 0;
-                for (long t = 0; t < count; t++)
-                {
-                    var due = (long)Math.Floor((t + 1) * perTick + 1e-9); var slots = due - planned; planned = due;
-                    if (measurement) scheduled += slots;
-                    if (par && ParallelPublish)
+                var slots = CreditLoadDriver.Drive(
+                    o.Publishers,
+                    count,
+                    perTick,
+                    publisher => topology.Publishers[publisher].HasPendingPublish,
+                    publisher =>
                     {
-                        var maxDop = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_WORKERS"), out var workers) && workers > 0
-                            ? workers
-                            : Environment.ProcessorCount;
-                        Parallel.For(0, o.Publishers, new ParallelOptions { MaxDegreeOfParallelism = maxDop }, p =>
+                        var publication = ledger.Create(publisher, topology.Graph.TotalTicks, measurement);
+                        var topic = o.Mode == FederationMode.Single
+                            ? FederationTopics.Delivered(publication.Origin)
+                            : FederationTopics.Input(publication.Origin);
+                        if (!topology.Publishers[publisher].Publish(topic, publication.Payload, (MqttQos)o.Qos) && measurement)
                         {
-                            credit[p] = Math.Min(cap, credit[p] + slots / o.Publishers + ((p - next + o.Publishers) % o.Publishers < slots % o.Publishers ? 1 : 0));
-                            while (credit[p] > 0 && !topology.Publishers[p].HasPendingPublish)
-                            {
-                                var publication = ledger.Create(p, topology.Graph.TotalTicks, measurement);
-                                var topic = o.Mode == FederationMode.Single ? FederationTopics.Delivered(publication.Origin) : FederationTopics.Input(publication.Origin);
-                                if (!topology.Publishers[p].Publish(topic, publication.Payload, (MqttQos)o.Qos) && measurement) Interlocked.Increment(ref rejected);
-                                credit[p]--;
-                            }
-                        });
-                    }
-                    else
-                    {
-                        for (var p = 0; p < o.Publishers; p++)
-                        {
-                            credit[p] = Math.Min(cap, credit[p] + slots / o.Publishers + ((p - next + o.Publishers) % o.Publishers < slots % o.Publishers ? 1 : 0));
-                            while (credit[p] > 0 && !topology.Publishers[p].HasPendingPublish)
-                            {
-                                var publication = ledger.Create(p, topology.Graph.TotalTicks, measurement);
-                                var topic = o.Mode == FederationMode.Single ? FederationTopics.Delivered(publication.Origin) : FederationTopics.Input(publication.Origin);
-                                if (!topology.Publishers[p].Publish(topic, publication.Payload, (MqttQos)o.Qos) && measurement) rejected++;
-                                credit[p]--;
-                            }
+                            Interlocked.Increment(ref rejected);
                         }
-                    }
-                    next = (int)((next + slots % o.Publishers) % o.Publishers); Refresh();
-                }
+                    },
+                    Refresh,
+                    par && ParallelPublish);
+                if (measurement) scheduled += slots;
             }
         }
         catch (Exception ex)

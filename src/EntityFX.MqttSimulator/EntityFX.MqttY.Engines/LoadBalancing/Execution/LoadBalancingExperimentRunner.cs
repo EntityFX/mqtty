@@ -1,5 +1,6 @@
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Experiment;
 using EntityFX.MqttY.Utils;
 using System.Diagnostics;
 using System.Threading;
@@ -131,62 +132,30 @@ public sealed class LoadBalancingExperimentRunner
             void Until(Func<bool> condition)
             {
                 var limit = options.ToTicks(options.DrainTimeoutSeconds);
-                for (long tick = 0; !condition() && tick < limit; tick++) Refresh();
-                if (!condition()) throw new TimeoutException($"{phase} timed out after {limit} ticks.");
+                ExperimentLoops.Until(condition, limit, Refresh, $"{phase} timed out after {limit} ticks.");
             }
             void Drive(long ticks, bool measurement, bool par)
             {
                 var perTick = options.OfferedRps * options.TickPeriod.TotalSeconds;
-                var credit = new long[topology.Publishers.Length];
-                var creditCap = checked((long)Math.Ceiling(perTick / topology.Publishers.Length) + 1);
-                long scheduledSoFar = 0;
-                var nextScheduledPublisher = 0;
-                for (long tick = 0; tick < ticks; tick++)
-                {
-                    // Compute cumulative schedule to avoid repeatedly rounding away fractional intensity.
-                    var due = checked((long)Math.Floor((tick + 1) * perTick + 1e-9));
-                    var slots = due - scheduledSoFar;
-                    if (measurement) scheduled += slots;
-                    scheduledSoFar = due;
-                    var each = slots / topology.Publishers.Length;
-                    var extra = (int)(slots % topology.Publishers.Length);
-
-                    if (par && ParallelPublish)
+                var slots = CreditLoadDriver.Drive(
+                    topology.Publishers.Length,
+                    ticks,
+                    perTick,
+                    publisher => topology.Publishers[publisher].HasPendingPublish,
+                    publisher =>
                     {
-                        var maxDop = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_WORKERS"), out var workers) && workers > 0
-                            ? workers
-                            : Environment.ProcessorCount;
-                        Parallel.For(0, topology.Publishers.Length, new ParallelOptions { MaxDegreeOfParallelism = maxDop }, publisher =>
+                        var payload = ledger.Create(publisher, input.Assignments[publisher], measurement, graph.TotalTicks);
+                        var accepted = topology.Publishers[publisher].Publish(
+                            LoadBalancingTopologyBuilder.Topic, payload, (MqttQos)options.PublishQos);
+                        if (measurement)
                         {
-                            var offset = (publisher - nextScheduledPublisher + topology.Publishers.Length) % topology.Publishers.Length;
-                            credit[publisher] = Math.Min(creditCap, credit[publisher] + each + (offset < extra ? 1 : 0));
-                            while (credit[publisher] > 0 && !topology.Publishers[publisher].HasPendingPublish)
-                            {
-                                var payload = ledger.Create(publisher, input.Assignments[publisher], measurement, graph.TotalTicks);
-                                var accepted = topology.Publishers[publisher].Publish(LoadBalancingTopologyBuilder.Topic, payload, (MqttQos)options.PublishQos);
-                                if (measurement) { Interlocked.Increment(ref attempts); if (!accepted) Interlocked.Increment(ref rejected); }
-                                credit[publisher]--;
-                            }
-                        });
-                    }
-                    else
-                    {
-                        for (var publisher = 0; publisher < topology.Publishers.Length; publisher++)
-                        {
-                            var offset = (publisher - nextScheduledPublisher + topology.Publishers.Length) % topology.Publishers.Length;
-                            credit[publisher] = Math.Min(creditCap, credit[publisher] + each + (offset < extra ? 1 : 0));
-                            while (credit[publisher] > 0 && !topology.Publishers[publisher].HasPendingPublish)
-                            {
-                                var payload = ledger.Create(publisher, input.Assignments[publisher], measurement, graph.TotalTicks);
-                                var accepted = topology.Publishers[publisher].Publish(LoadBalancingTopologyBuilder.Topic, payload, (MqttQos)options.PublishQos);
-                                if (measurement) { attempts++; if (!accepted) rejected++; }
-                                credit[publisher]--;
-                            }
+                            Interlocked.Increment(ref attempts);
+                            if (!accepted) Interlocked.Increment(ref rejected);
                         }
-                    }
-                    nextScheduledPublisher = (nextScheduledPublisher + extra) % topology.Publishers.Length;
-                    Refresh();
-                }
+                    },
+                    Refresh,
+                    par && ParallelPublish);
+                if (measurement) scheduled += slots;
             }
         }
         catch (Exception exception)
@@ -236,23 +205,9 @@ public sealed class LoadBalancingExperimentRunner
         finally { topology?.Graph.Clear(); }
     }
 
-    public static SortedDictionary<long, long> MergeHistograms(IEnumerable<IReadOnlyDictionary<long, long>> histograms)
-    {
-        var merged = new SortedDictionary<long, long>();
-        foreach (var histogram in histograms)
-            foreach (var (tick, count) in histogram)
-                merged[tick] = merged.GetValueOrDefault(tick) + count;
-        return merged;
-    }
+    public static SortedDictionary<long, long> MergeHistograms(IEnumerable<IReadOnlyDictionary<long, long>> histograms) =>
+        HistogramStatistics.Merge(histograms);
 
-    public static double? Quantile(IReadOnlyDictionary<long, long> histogram, double q, double tickMilliseconds)
-    {
-        var total = histogram.Values.Sum();
-        if (total == 0) return null;
-        var rank = Math.Max(1, (long)Math.Ceiling(q * total));
-        long cumulative = 0;
-        foreach (var (tick, count) in histogram.OrderBy(p => p.Key))
-            if ((cumulative += count) >= rank) return tick * tickMilliseconds;
-        throw new InvalidDataException("Invalid histogram.");
-    }
+    public static double? Quantile(IReadOnlyDictionary<long, long> histogram, double q, double tickMilliseconds) =>
+        HistogramStatistics.Quantile(histogram, q, tickMilliseconds);
 }
