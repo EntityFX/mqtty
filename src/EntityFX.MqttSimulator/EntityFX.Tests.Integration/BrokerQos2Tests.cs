@@ -315,6 +315,46 @@ namespace EntityFX.Tests.Integration
         }
 
         [TestMethod]
+        public void PublisherQos2_DuplicatePublishAfterCompleteDoesNotReopenFlow()
+        {
+            var (graph, broker, publisher, _, packetManager) = Build();
+            var session = new ClientSession(publisher.Name, publisher.ClientId);
+            session.AddPendingAcknowledgement(new PendingAcknowledgement
+            {
+                Type = MqttPacketType.PublishComplete,
+                PacketId = 77
+            });
+            broker.SessionRepository.Create(session);
+
+            broker.Inject(BuildPublishPacket(graph, packetManager, publisher.Name, broker.Name,
+                publisher.Index, broker.Index, duplicated: true, 77));
+            Assert.AreEqual(0, session.PendingMessages.Count,
+                "A DUP PUBLISH after PUBCOMP must not reopen the QoS2 flow.");
+            Assert.IsTrue(session.PendingAcknowledgements.Any(ack =>
+                ack.Type == MqttPacketType.PublishComplete && ack.PacketId == 77));
+
+            broker.Inject(BuildPublishPacket(graph, packetManager, publisher.Name, broker.Name,
+                publisher.Index, broker.Index, duplicated: false, 77));
+            Assert.AreEqual(1, session.PendingMessages.Count,
+                "A non-DUP PUBLISH may reuse the packet id and must open a new flow.");
+            Assert.AreEqual(PendingMessageStatus.AwaitingPublishRelease, session.PendingMessages[0].Status);
+            Assert.IsFalse(session.PendingAcknowledgements.Any(ack =>
+                ack.Type == MqttPacketType.PublishComplete && ack.PacketId == 77));
+        }
+
+        private static INetworkPacket BuildPublishPacket(NetworkSimulator graph, IMqttPacketManager packetManager,
+            string from, string to, int fromIndex, int toIndex, bool duplicated, ushort packetId)
+        {
+            var publish = new PublishPacket("test/data", MqttQos.ExactlyOnce, false, duplicated, packetId)
+            {
+                Payload = new byte[] { 1, 2, 3 }
+            };
+            return new NetworkPacket<int>(graph.GetPacketId(), null, 0,
+                from, to, NodeType.Client, NodeType.Server, fromIndex, toIndex,
+                packetManager.PacketToBytes(publish), "mqtt", 0, 1, Category: "MQTT Publish");
+        }
+
+        [TestMethod]
         public void Subscribe_WithoutConnectionFailsClearly()
         {
             var (_, _, _, subscriber, _) = Build();

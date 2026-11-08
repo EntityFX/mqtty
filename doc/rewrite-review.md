@@ -388,9 +388,13 @@ seq wall `3.29 с` (было ~3.82), par `1.74 с` (было ~2.10), refresh par
 сессии. Исправлено на broker и client; добавлены два регрессионных теста на коллизию id.
 Проверка: **398/398**.
 
+**S3c выполнен.** Повторный QoS2 PUBLISH с `DUP=1` после PUBCOMP больше не открывает flow
+заново: broker отвечает PUBREC и не сохраняет `AwaitingPublishRelease`, поэтому повторный
+PUBREL не делает второй fanout. PUBLISH без DUP по-прежнему может переиспользовать packet id.
+Добавлен регрессионный тест. Проверка: **399/399**.
+
 **Следующее по плану:** S4b (общий result schema/экспорт и benchmark на продуктовых движках)
-или S3c (bounded dedup завершённых QoS2 + eviction `PendingAcknowledgements`); затем S2
-(data-oriented транспорт) и S5 (Web/Designer).
+или eviction завершённых QoS2-маркеров; затем S2 (data-oriented транспорт) и S5 (Web/Designer).
 
 ---
 

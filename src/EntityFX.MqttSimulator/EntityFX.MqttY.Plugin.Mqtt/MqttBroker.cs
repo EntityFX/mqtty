@@ -319,6 +319,15 @@ namespace EntityFX.MqttY.Plugin.Mqtt
 
                 var completed = session.FindPendingAcknowledgement(ack =>
                     ack.Type == MqttPacketType.PublishComplete && ack.PacketId == packetId);
+                if (completed != null && publishPacket.Duplicated)
+                {
+                    // A retransmitted PUBLISH after PUBCOMP must only repeat the
+                    // PUBREC/PUBREL handshake; re-fanning it out would break
+                    // exactly-once. A non-DUP PUBLISH may legitimately reuse the
+                    // packet id, so the completed marker is dropped for it.
+                    SendPublishReceived(packet, publishPacket);
+                    return;
+                }
                 session.RemovePendingAcknowledgement(completed);
 
                 SaveMessage(publishPacket, clientId, PendingMessageStatus.AwaitingPublishRelease);
