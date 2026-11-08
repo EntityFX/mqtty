@@ -131,6 +131,10 @@ def main() -> None:
 
     lb_fit = fit_lb(lb)
     fed_fit = fit_fed(fed)
+    relay = [r for r in ROWS if r["engine"] == "relay"]
+    relay_x = np.array([[r["brokers"], 1.0] for r in relay])
+    relay_y = np.array([r["net_in"] / r["scheduled"] for r in relay])
+    relay_coef, relay_r2, relay_rmse = ols(relay_x, relay_y)
 
     # LB: X/M = a*L + b (setup folded into b); Fed: X/M = a*B^2+b*B+c
     lb_norm_x = np.array([[r["nets_per_backend"], 1.0] for r in lb])
@@ -152,6 +156,18 @@ def main() -> None:
                  np.log10(np.array([r["brokers"] for r in lb], dtype=float)),
                  np.log10(np.array([r["networks"] for r in lb], dtype=float)),
                  np.log10(np.array([r["clients"] for r in lb], dtype=float))]),
+        },
+        "relay": {
+            "fit_X_per_M_vs_B": {"coef": [float(v) for v in relay_coef],
+                                  "r2": relay_r2, "rmse": relay_rmse, "rows": len(relay)},
+            "delivered_equals_MB": all(r["delivered"] == r["scheduled"] * r["brokers"] for r in relay),
+            "normalized_correlations": normalized_correlation_table(relay,
+                ["log X/M", "log B", "log N", "log C", "log P"],
+                [np.log10(np.array([r["net_in"] / r["scheduled"] for r in relay])),
+                 np.log10(np.array([r["brokers"] for r in relay], dtype=float)),
+                 np.log10(np.array([r["networks"] for r in relay], dtype=float)),
+                 np.log10(np.array([r["clients"] for r in relay], dtype=float)),
+                 np.log10(np.array([r["publishers"] for r in relay], dtype=float))]),
         },
         "fed": {
             "fit_X_per_M_vs_B": fed_fit,
@@ -187,6 +203,12 @@ def main() -> None:
         (float(fed_fit["coef"][1]), float(fed_fit["coef"][2])),
         "B = число брокеров (star)", "X / M, сетевых пакетов на сообщение",
         "Federation: квадратичный рост по брокерам")
+    svg_scatter(
+        HERE / "figures" / "relay-net-per-message-vs-brokers.svg",
+        [(r["brokers"], r["net_in"] / r["scheduled"]) for r in relay],
+        (float(relay_coef[0]), float(relay_coef[1])),
+        "B = число брокеров (star relay)", "X / M, сетевых пакетов на сообщение",
+        "Relay: линейный рост по брокерам")
     svg_scatter(
         HERE / "figures" / "fed-delivered-vs-scheduled.svg",
         [(r["scheduled"] * r["brokers"], r["delivered"]) for r in fed],

@@ -91,6 +91,22 @@ def main() -> None:
     for b, p, r in ((2, 8, 2000), (4, 16, 5000), (8, 64, 500), (16, 64, 2000)):
         fed(b, max(p, b), r)
 
+    # Relay: B sites, one transit network; each site runs 3B-1 relay clients.
+    def relay(b, p, r):
+        row = run("relay", b, max(p, b), 1, r)
+        row["clients"] = p + 3 * b * b
+        row["networks"] = b + 1
+        rows.append(row)
+
+    for b in (2, 4, 8, 16):
+        relay(b, max(32, b), 1000)
+    for p in (8, 16, 32, 64):
+        relay(4, max(p, 4), 1000)
+    for r in (500, 1000, 2000, 5000):
+        relay(8, 32, r)
+    for b, p, r in ((2, 8, 2000), (4, 16, 5000), (8, 64, 500), (16, 64, 2000)):
+        relay(b, max(p, b), r)
+
     with OUT.open("w", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
         writer.writeheader()
