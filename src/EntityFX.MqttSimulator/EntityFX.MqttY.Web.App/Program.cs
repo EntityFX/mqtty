@@ -4,6 +4,7 @@ using EntityFX.MqttY.Engines.Federation;
 using EntityFX.MqttY.Engines.Hosting;
 using EntityFX.MqttY.Engines.LoadBalancing;
 using EntityFX.MqttY.Engines.Relay;
+using EntityFX.MqttY.Web.App.Application;
 using EntityFX.MqttY.Web.App.Hubs;
 using EntityFX.MqttY.Web.App.Services;
 using Microsoft.Extensions.Options;
@@ -51,6 +52,10 @@ builder.Services.AddSingleton<IMonitoringService, MonitoringService>();
 builder.Services.AddSingleton<InProcessJobExecutor>();
 builder.Services.AddSingleton<OutOfProcessJobExecutor>();
 builder.Services.AddSingleton<ISimulationJobRunner, SimulationJobRunner>();
+builder.Services.AddSingleton<SimulationCreationHandler>();
+builder.Services.AddSingleton<SimulationJobHandler>();
+builder.Services.AddSingleton<SaveTopologyHandler>();
+builder.Services.AddSingleton<TwinValidationHandler>();
 builder.Services.AddHostedService(sp => (SimulationJobRunner)sp.GetRequiredService<ISimulationJobRunner>());
 builder.Services.AddHostedService<MonitoringHubForwarder>();
 

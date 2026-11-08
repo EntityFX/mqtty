@@ -1,0 +1,138 @@
+using System.Security.Cryptography;
+using System.Text.Json;
+using EntityFX.MqttY.Engines.Execution;
+using EntityFX.MqttY.Engines.TwinValidation;
+using EntityFX.MqttY.Web.App.Controllers;
+using EntityFX.MqttY.Web.App.Models;
+using EntityFX.MqttY.Web.App.Services;
+
+namespace EntityFX.MqttY.Web.App.Application;
+
+/// <summary>Creates twin-validation jobs and their pinned profile/reference snapshots.</summary>
+public sealed class TwinValidationHandler
+{
+    private readonly IPresetCatalogService _catalog;
+    private readonly JsonFileStore _store;
+    private readonly ISimulationJobRunner _runner;
+    private readonly DataDirectoryOptions _storage;
+
+    public TwinValidationHandler(IPresetCatalogService catalog, JsonFileStore store,
+        ISimulationJobRunner runner, DataDirectoryOptions storage)
+    {
+        _catalog = catalog;
+        _store = store;
+        _runner = runner;
+        _storage = storage;
+    }
+
+    public async Task<ApplicationResult<object>> HandleAsync(TwinValidationCreateDto request)
+    {
+        try
+        {
+            SimulationStorageGuard.Check(_storage, _store.Root);
+            if (request.TimeLimitSeconds is < 1 or > 21600 ||
+                string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 200)
+            {
+                throw new InvalidDataException("Укажите имя и ограничение времени от 1 до 21600 секунд.");
+            }
+
+            var preset = await _catalog.GetBrokerPresetAsync(request.BrokerPresetId);
+            if (preset == null || string.IsNullOrWhiteSpace(preset.ProfilePath))
+                throw new InvalidDataException("Выберите пресет с измеренным профилем.");
+
+            var bytes = await File.ReadAllBytesAsync(_store.Resolve(preset.ProfilePath));
+            var sha = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+            var snapshot = _store.Resolve($"profile-snapshots/{sha}.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(snapshot)!);
+            if (!File.Exists(snapshot))
+            {
+                try
+                {
+                    await using var stream = new FileStream(snapshot, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                    await stream.WriteAsync(bytes);
+                }
+                catch (IOException) when (File.Exists(snapshot))
+                {
+                }
+            }
+
+            var config = new TwinValidationOptions
+            {
+                Broker = preset.BrokerType,
+                Publishers = request.Publishers,
+                Qos = request.Qos,
+                Seed = request.Seed,
+                WarmupSeconds = request.WarmupSeconds,
+                MeasurementSeconds = request.MeasurementSeconds,
+                DrainSeconds = request.DrainSeconds,
+                TickSeconds = request.TickSeconds,
+                ProfilePath = snapshot,
+                ProfileSha256 = sha,
+                RuntimeIdentity = "sha256:" + Convert.ToHexString(SHA256.HashData(
+                    await File.ReadAllBytesAsync(typeof(TwinValidationAdapter).Assembly.Location))).ToLowerInvariant()
+            };
+
+            if (!string.IsNullOrWhiteSpace(request.NativeControlReferenceId))
+            {
+                var referenceBytes = NativeControlReferencesController.Load(_store, request.NativeControlReferenceId);
+                var reference = NativeControlReference.Parse(referenceBytes);
+                reference.ValidateFor(config, bytes);
+                var referenceSha = NativeControlReference.Sha(referenceBytes);
+                var referencePath = _store.Resolve($"native-control-snapshots/{referenceSha}.json");
+                Directory.CreateDirectory(Path.GetDirectoryName(referencePath)!);
+                try
+                {
+                    await using var stream = new FileStream(referencePath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                    await stream.WriteAsync(referenceBytes);
+                }
+                catch (IOException) when (File.Exists(referencePath))
+                {
+                }
+
+                config.NativeControlReferencePath = referencePath;
+                config.NativeControlReferenceSha256 = referenceSha;
+            }
+
+            var options = new SimulationRunOptions
+            {
+                Engine = "twinValidation",
+                ExpectedProfileSha256 = sha,
+                NativeConfiguration = JsonSerializer.SerializeToElement(config)
+            };
+            NativeExperimentAdapter.Run(options, null, validateOnly: true);
+            options.Graph.Ticks = config.TickOptions();
+            if (request.ValidateOnly)
+            {
+                return ApplicationResult<object>.Ok(new
+                {
+                    valid = true,
+                    profileSha256 = sha,
+                    nativeControlReferenceSha256 = config.NativeControlReferenceSha256,
+                    referenceScope = config.NativeControlReferencePath == null
+                        ? "calibration only"
+                        : NativeControlReference.Scope,
+                    warmupTicks = config.Ticks(config.WarmupSeconds),
+                    measurementTicks = config.Ticks(config.MeasurementSeconds),
+                    drainTicks = config.Ticks(config.DrainSeconds)
+                });
+            }
+
+            var job = new SimulationJob
+            {
+                Name = request.Name,
+                Engine = "twinValidation",
+                RunOptions = options,
+                ExecutionMode = "OutOfProcess",
+                Parallel = false,
+                TimeLimit = TimeSpan.FromSeconds(request.TimeLimitSeconds)
+            };
+            await _runner.EnqueueAsync(job);
+            return ApplicationResult<object>.Accepted(new { id = job.Id, engine = job.Engine, state = job.State });
+        }
+        catch (Exception error) when (error is ArgumentException or IOException or InvalidDataException
+            or InvalidOperationException or KeyNotFoundException)
+        {
+            return ApplicationResult<object>.BadRequest(error.Message);
+        }
+    }
+}

@@ -1,3 +1,4 @@
+using EntityFX.MqttY.Web.App.Application;
 using EntityFX.MqttY.Web.App.Models;
 using EntityFX.MqttY.Web.App.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -14,44 +15,33 @@ public sealed class TopologiesController : ControllerBase
     private readonly ITopologyGeneratorService _generator;
     private readonly IConfigurationMapperService _mapper;
     private readonly JsonFileStore _store;
+    private readonly SaveTopologyHandler _save;
 
     public TopologiesController(
         ITopologyGeneratorService generator,
         IConfigurationMapperService mapper,
-        JsonFileStore store)
+        JsonFileStore store,
+        SaveTopologyHandler save)
     {
         _generator = generator;
         _mapper = mapper;
         _store = store;
+        _save = save;
     }
 
     /// <summary>Клонирует существующую топологию с новым именем.</summary>
     [HttpPost("{id}/clone")]
     public async Task<IActionResult> CloneTopology(string id, [FromBody] CloneTopologyRequest? request = null)
     {
-        var saved = await _store.ReadAsync<SavedTopologyDto>($"{TopologiesDir}/{id}.json");
-        if (saved == null) return NotFound();
-
-        var clone = new SavedTopologyDto
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            Name = string.IsNullOrWhiteSpace(request?.Name) ? $"Копия {saved.Name}" : request.Name,
-            Graph = saved.Graph,
-            Spec = saved.Spec
-        };
-
-        await _store.WriteAsync($"{TopologiesDir}/{clone.Id}.json", clone);
-        return Ok(clone);
+        var result = await _save.CloneAsync(id, request);
+        return result.Status == ApplicationStatus.Ok ? Ok(result.Value) : NotFound();
     }
 
     /// <summary>Очищает все сохранённые топологии (в ноль).</summary>
     [HttpDelete]
     public IActionResult ClearAllTopologies()
     {
-        foreach (var file in _store.ListFiles(TopologiesDir, "*.json"))
-        {
-            _store.Delete($"{TopologiesDir}/{file}.json");
-        }
+        _save.ClearAll();
         return NoContent();
     }
 
@@ -98,27 +88,21 @@ public sealed class TopologiesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> SaveTopology([FromBody] SavedTopologyDto topology)
     {
-        if (string.IsNullOrWhiteSpace(topology.Id))
-        {
-            topology.Id = Guid.NewGuid().ToString("N");
-        }
-
-        await _store.WriteAsync($"{TopologiesDir}/{topology.Id}.json", topology);
-        return Ok(topology);
+        var result = await _save.SaveAsync(topology);
+        return result.Status == ApplicationStatus.Ok ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateTopology(string id, [FromBody] SavedTopologyDto topology)
     {
-        topology.Id = id;
-        await _store.WriteAsync($"{TopologiesDir}/{id}.json", topology);
-        return Ok(topology);
+        var result = await _save.UpdateAsync(id, topology);
+        return result.Status == ApplicationStatus.Ok ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
     [HttpDelete("{id}")]
     public IActionResult DeleteTopology(string id)
     {
-        _store.Delete($"{TopologiesDir}/{id}.json");
+        _save.Delete(id);
         return NoContent();
     }
 }

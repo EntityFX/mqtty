@@ -275,7 +275,17 @@ Integration **431/431**, добавлены тесты goodput/nearest-rank/conc
 
 ## S5. Приложения: Web, persistence, Designer
 
-### S5d. Web application layer
+### S5d. Web application layer — ВЫПОЛНЕНО
+
+**Факт:** добавлен слой `EntityFX.MqttY.Web.App.Application`:
+`ApplicationResult<T>` (Ok/Accepted/NoContent/BadRequest/NotFound/Conflict),
+`SimulationCreationHandler`, `SimulationJobHandler`, `SaveTopologyHandler`,
+`TwinValidationHandler`, `SimulationDtoMapper`. Мутирующие endpoints
+`SimulationsController`, `TopologiesController`, `TwinValidationsController`
+стали тонкими адаптерами; бизнес-логика больше не живёт в контроллерах.
+Глобальный `ProblemDetails`-обработчик уже был в `Program.cs`. Web-тесты
+локально не запускаются из-за внешней ошибки NuGet-сертификата (`NU3018`);
+Integration **431/431**, Web.App собирается с 0 ошибок.
 
 1. `MqttY.Application`: `CreateSimulationHandler`, `ValidateTwinHandler`,
    `ManageJobHandler`, `SaveTopologyHandler`; typed results (`ValidationError`, `NotFound`,
