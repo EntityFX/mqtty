@@ -145,7 +145,11 @@ public sealed class FederationDeliveryLedger
         })
         .ToArray();
 
-    public FederationPublication[] Publications() => publications.Values.ToArray();
+    public FederationPublication[] Publications() => publications.Values
+        .OrderBy(publication => publication.Origin)
+        .ThenBy(publication => publication.Sequence)
+        .ThenBy(publication => publication.Id)
+        .ToArray();
 
     public DeliveryReceipt[] Receipts() => receipts
         .OrderBy(r => r.Tick).ThenBy(r => r.Receiver)

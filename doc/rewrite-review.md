@@ -448,6 +448,16 @@ Designer больше не теряет параметры сети и layout:
 **Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем общий
 result schema и persisted `DesignDocument`.
 
+### Статус S4c (2026-11-08)
+
+Детерминизм экспорта Federation: `FederationDeliveryLedger.Publications()` теперь сортирует по
+`(Origin, Sequence, Id)`. Раньше возвращался `ConcurrentDictionary.Values`, поэтому
+`publications.json` и `sha256.json` могли отличаться между эквивалентными прогонами.
+Добавлен `FederationDeterminismTests`. Проверка: **403/403**.
+
+**Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем общий
+result schema и persisted `DesignDocument`.
+
 ### Статус S2a (2026-11-08)
 
 Подготовка к S2 без смены модели доставки:
