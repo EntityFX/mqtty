@@ -565,6 +565,28 @@ public class NetworkSimulator : INetworkSimulator
         return _tickWorkerPool;
     }
 
+    /// <summary>
+    /// Runs one parallel phase on the persistent tick workers and fences before
+    /// returning. Engines use it for work that belongs between two simulator
+    /// ticks (federation pumping) without paying a second fence.
+    /// </summary>
+    public void RunParallel(Action<int> body, int count, int chunkSize = 1)
+    {
+        if (count <= 0)
+        {
+            return;
+        }
+
+        var pool = EnsureTickWorkerPool();
+        if (pool.WorkerCount <= 1)
+        {
+            for (var i = 0; i < count; i++) body(i);
+            return;
+        }
+
+        pool.RunSingle(body, count, chunkSize);
+    }
+
     public bool Reset()
     {
         try

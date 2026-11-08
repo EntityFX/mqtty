@@ -45,6 +45,7 @@ internal sealed class TickWorkerPool : IDisposable
     private int _index2;
     private int _chunkSize1;
     private int _chunkSize2;
+    private bool _twoPhase = true;
     private Exception? _error;
 
     public TickWorkerPool(int workerCount, RuntimeOptions? runtime = null)
@@ -94,6 +95,55 @@ internal sealed class TickWorkerPool : IDisposable
     }
 
     /// <summary>
+    /// Runs a single parallel phase and fences before returning. Used for work
+    /// that must finish between two simulator ticks (for example federation
+    /// pumping) without paying the second phase fence.
+    /// </summary>
+    public void RunSingle(Action<int>? body, int count, int chunkSize)
+    {
+        if (count <= 0 || body == null)
+        {
+            return;
+        }
+
+        if (_threads.Length == 0)
+        {
+            var start = Stopwatch.GetTimestamp();
+            _index1 = 0;
+            RunPhaseChunked(body, count, ref _index1, chunkSize);
+            var end = Stopwatch.GetTimestamp();
+            LastNetworkPhaseTicks = end - start;
+            LastNodePhaseTicks = 0;
+            LastTickTicks = end - start;
+            return;
+        }
+
+        lock (_gate)
+        {
+            _phase1 = body;
+            _phase2 = null;
+            _count1 = count;
+            _count2 = 0;
+            _index1 = 0;
+            _index2 = 0;
+            _error = null;
+            _chunkSize1 = chunkSize;
+            _chunkSize2 = 1;
+            _twoPhase = false;
+            _generation++;
+            Monitor.PulseAll(_gate);
+        }
+
+        ExecuteTick();
+
+        var error = Volatile.Read(ref _error);
+        if (error != null)
+        {
+            throw new AggregateException(error);
+        }
+    }
+
+    /// <summary>
     /// Runs both refresh phases with chunked work claiming. Each worker grabs
     /// <paramref name="chunkSize1"/> networks or <paramref name="chunkSize2"/>
     /// nodes per Interlocked operation. Node work is very uneven (an idle
@@ -129,6 +179,7 @@ internal sealed class TickWorkerPool : IDisposable
             _error = null;
             _chunkSize1 = chunkSize1;
             _chunkSize2 = chunkSize2;
+            _twoPhase = true;
             _generation++;
             Monitor.PulseAll(_gate);
         }
@@ -161,6 +212,7 @@ internal sealed class TickWorkerPool : IDisposable
             Action<int>? phase2;
             int count1;
             int count2;
+            bool twoPhase;
 
             lock (_gate)
             {
@@ -174,9 +226,10 @@ internal sealed class TickWorkerPool : IDisposable
                 phase2 = _phase2;
                 count1 = _count1;
                 count2 = _count2;
+                twoPhase = _twoPhase;
             }
 
-            ExecuteTick(phase1, count1, phase2, count2, worker + 1);
+            ExecuteTick(phase1, count1, phase2, count2, worker + 1, twoPhase);
         }
     }
 
@@ -219,10 +272,12 @@ internal sealed class TickWorkerPool : IDisposable
         var count1 = _count1;
         var phase2 = _phase2;
         var count2 = _count2;
-        ExecuteTick(phase1, count1, phase2, count2, 0);
+        var twoPhase = _twoPhase;
+        ExecuteTick(phase1, count1, phase2, count2, 0, twoPhase);
     }
 
-    private void ExecuteTick(Action<int>? phase1, int count1, Action<int>? phase2, int count2, int worker)
+    private void ExecuteTick(Action<int>? phase1, int count1, Action<int>? phase2, int count2, int worker,
+        bool twoPhase)
     {
         var tickStart = Stopwatch.GetTimestamp();
         var busyStart = _runtime.WorkerStats ? tickStart : 0;

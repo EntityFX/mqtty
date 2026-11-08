@@ -23,6 +23,22 @@ public sealed class FederationTopology : IDisposable
 
     public void Pump() { foreach (var federator in Federators) federator.Pump(); }
 
+    /// <summary>
+    /// Federators own disjoint output clients and queues, so pumping them in
+    /// parallel is safe. A single phase is fenced before the graph refresh
+    /// starts; no packet can enter a network while that network is refreshing.
+    /// </summary>
+    public void Pump(bool parallel)
+    {
+        if (!parallel || Federators.Count < 2)
+        {
+            Pump();
+            return;
+        }
+
+        Graph.RunParallel(index => Federators[index].Pump(), Federators.Count, chunkSize: 1);
+    }
+
     private long _idleTick = -1;
     private bool _idle;
 

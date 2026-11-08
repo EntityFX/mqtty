@@ -64,7 +64,7 @@ public sealed class FederationRunner
             void Refresh()
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                topology.Pump();
+                topology.Pump(parallel);
                 if (!topology.Graph.Refresh(parallel, refreshStrategy) || topology.Graph.Errors != 0)
                     throw new InvalidOperationException("Simulator refresh failed.", topology.Graph.SimulationException);
                 onProgress?.Invoke(topology.Graph, phase);
