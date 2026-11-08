@@ -370,7 +370,7 @@ FederationOptions BuildFedOptions(BenchOptions o)
     {
         Mode = FederationMode.Federation,
         Brokers = Math.Min(o.Brokers, 16),
-        Topology = "star",
+        Topology = o.FedTopology,
         Publishers = Math.Max(o.Publishers, Math.Min(o.Brokers, 16)),
         PayloadBytes = 16,
         Qos = 1,
@@ -426,6 +426,7 @@ internal sealed class BenchOptions
     public int RelayClients { get; private set; } = 4;
     public int RelayRepeats { get; private set; } = 80;
     public int Seed { get; private set; } = 42;
+    public string FedTopology { get; private set; } = "star";
     public string Mode { get; private set; } = "both";
     public bool NoExport { get; private set; }
     public bool Strict { get; private set; } = true;
@@ -462,6 +463,7 @@ internal sealed class BenchOptions
                 case "--relay-clients": o.RelayClients = int.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--relay-repeats": o.RelayRepeats = int.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--seed": o.Seed = int.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--fed-topology": o.FedTopology = Next().ToLowerInvariant(); break;
                 case "--mode": o.Mode = Next().ToLowerInvariant(); break;
                 case "--no-export": o.NoExport = true; break;
                 case "--no-strict": o.Strict = false; break;
@@ -469,7 +471,7 @@ internal sealed class BenchOptions
                 case "--gate-min-refresh": o.GateMinRefresh = double.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--json": o.JsonPath = Next(); break;
                 case "--help":
-                    Console.WriteLine("Options: --engines lb,relay,fed --mode both|seq|par --repeat N --warmup-runs N --workers N --measure S --warmup S --drain S --rps N --fed-rps N --brokers N --nets N --publishers N --relay-clients N --relay-repeats N --seed N --qos N --no-export --no-strict --gate-min-wall X --gate-min-refresh X --json PATH");
+                    Console.WriteLine("Options: --engines lb,relay,fed --mode both|seq|par --repeat N --warmup-runs N --workers N --measure S --warmup S --drain S --rps N --fed-rps N --brokers N --nets N --publishers N --relay-clients N --relay-repeats N --seed N --qos N --fed-topology star|ring|line --no-export --no-strict --gate-min-wall X --gate-min-refresh X --json PATH");
                     Environment.Exit(0);
                     break;
                 default:
