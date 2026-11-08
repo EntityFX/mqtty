@@ -212,7 +212,17 @@ Integration **427/427**; golden-тест `JsonResultWriterTests` проверя�
 **Файлы:** `Engines/*/Results/*`, `MqttRelayExperimentRunner.Export`, `Benchmark.Compare`.
 **Оценка:** 4 ч/д.
 
-### S4e. Options/JSON policy
+### S4e. Options/JSON policy — ВЫПОЛНЕНО
+
+**Факт:** добавлен `EntityFX.MqttY.RuntimeOptions` — снимок `MQTTY_*`
+переменных на момент создания симуляции. `NetworkSimulator` и `TickWorkerPool`
+больше не держат process-wide `static readonly` для workers/barrier/spin/chunks/
+stats/counters/active-only/nonatomic; benchmark может менять окружение между
+сэмплами. LB/Fed-раннеры читают `MQTTY_PARALLEL_PUBLISH`/`MQTTY_ISOLATE_NETWORKS`
+из снимка, `CreditLoadDriver` — из того же источника. Добавлен единый
+`JsonPolicies.Result` (camelCase, indented, enum names only); его используют
+LB/Fed/Relay. Для входов LB/Fed сохранена строгая проверка неизвестных полей.
+Integration **428/428**.
 
 1. Immutable record options на движок + `Validate()`; один `JsonSerializerOptions` policy.
 2. `RuntimeOptions` для env (`MQTTY_WORKERS`, barrier, chunks, counters) с defaults/override;

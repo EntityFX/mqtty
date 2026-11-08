@@ -8,14 +8,13 @@ namespace EntityFX.MqttY.Federation;
 
 public sealed class FederationRunner
 {
-    private static readonly bool ParallelPublish =
-        Environment.GetEnvironmentVariable("MQTTY_PARALLEL_PUBLISH") == "1";
     public FederationSummary Run(FederationInput input, string? output = null, bool diagnostics = false,
         CancellationToken cancellationToken = default, Action<INetworkSimulator, string>? onProgress = null,
         bool parallel = true, int refreshStrategy = 1)
     {
         var drainDiagnostics = diagnostics ? new FederationDrainDiagnostics() : null;
         if (output != null) FederationResultWriter.Claim(output);
+        var runtime = RuntimeOptions.FromEnvironment();
         var o = input.Options; var ledger = new FederationDeliveryLedger(o); var traffic = new TransmissionLedger(ledger);
         FederationTopology? topology = null; var phases = new List<FederationPhase>(); var phase = "construct"; long phaseStart = 0;
         long scheduled = 0, rejected = 0, uniqueBefore = 0, completeBefore = 0;
@@ -89,7 +88,7 @@ public sealed class FederationRunner
                         }
                     },
                     Refresh,
-                    par && ParallelPublish);
+                    par && runtime.ParallelPublish);
                 if (measurement) scheduled += slots;
             }
         }

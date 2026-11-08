@@ -34,6 +34,9 @@ public static class CreditLoadDriver
         long planned = 0;
         long totalSlots = 0;
         var nextScheduledPublisher = 0;
+        var maxDop = publishInParallel
+            ? RuntimeOptions.FromEnvironment().Workers ?? Environment.ProcessorCount
+            : 1;
 
         for (long tick = 0; tick < ticks; tick++)
         {
@@ -49,9 +52,6 @@ public static class CreditLoadDriver
 
             if (publishInParallel)
             {
-                var maxDop = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_WORKERS"), out var workers) && workers > 0
-                    ? workers
-                    : Environment.ProcessorCount;
                 Parallel.For(0, publishers, new ParallelOptions { MaxDegreeOfParallelism = maxDop }, publisher =>
                 {
                     var offset = (publisher - nextScheduledPublisher + publishers) % publishers;

@@ -24,27 +24,7 @@ namespace EntityFX.MqttY.Network;
 /// </summary>
 internal sealed class TickWorkerPool : IDisposable
 {
-    // How long an idle worker spins before parking on the monitor. The gap
-    // between ticks is normally only a few microseconds, so spinning avoids a
-    // kernel wake-up on every single tick.
-    private static readonly int SpinIterations =
-        int.TryParse(Environment.GetEnvironmentVariable("MQTTY_SPIN_ITERATIONS"), out var spinIterations) && spinIterations > 0
-            ? spinIterations
-            : 64;
-
-    private static readonly bool BusyStatsEnabled =
-        Environment.GetEnvironmentVariable("MQTTY_WORKER_STATS") == "1";
-
-    // How many SpinWait(32) rounds the barrier spins before falling back to
-    // Thread.Yield(). Spinning avoids a syscall when the tail is short, but
-    // burns a core that the slowest worker may still need. Measurements on a
-    // 4C/8T host: 64 rounds beat the old fixed 4096 by ~5% wall speedup
-    // (1.62x vs 1.54x); 0 (always yield) and 512+ were worse.
-    private static readonly int BarrierSpinIterations =
-        int.TryParse(Environment.GetEnvironmentVariable("MQTTY_BARRIER_SPIN"), out var barrierSpin) && barrierSpin >= 0
-            ? barrierSpin
-            : 64;
-
+    private readonly RuntimeOptions _runtime;
     private readonly int _workerCount;
     private readonly Thread[] _threads;
     private readonly int[] _workerGenerations;
@@ -67,8 +47,9 @@ internal sealed class TickWorkerPool : IDisposable
     private int _chunkSize2;
     private Exception? _error;
 
-    public TickWorkerPool(int workerCount)
+    public TickWorkerPool(int workerCount, RuntimeOptions? runtime = null)
     {
+        _runtime = runtime ?? RuntimeOptions.FromEnvironment();
         _workerCount = Math.Max(1, workerCount);
         _phaseBarrier = ResolveBarrier(_workerCount);
         _phase1Busy = new long[_workerCount];
@@ -204,7 +185,7 @@ internal sealed class TickWorkerPool : IDisposable
         // Fast path: a tick is published while the worker is still spinning.
         // The spin must happen outside _gate, otherwise the caller cannot
         // acquire the lock to publish the next tick.
-        for (var spin = 0; spin < SpinIterations; spin++)
+        for (var spin = 0; spin < _runtime.SpinIterations; spin++)
         {
             if (Volatile.Read(ref _generation) != lastGeneration)
             {
@@ -244,7 +225,7 @@ internal sealed class TickWorkerPool : IDisposable
     private void ExecuteTick(Action<int>? phase1, int count1, Action<int>? phase2, int count2, int worker)
     {
         var tickStart = Stopwatch.GetTimestamp();
-        var busyStart = BusyStatsEnabled ? tickStart : 0;
+        var busyStart = _runtime.WorkerStats ? tickStart : 0;
 
         try
         {
@@ -255,7 +236,7 @@ internal sealed class TickWorkerPool : IDisposable
             RecordError(exception);
         }
 
-        if (BusyStatsEnabled)
+        if (_runtime.WorkerStats)
         {
             var now = Stopwatch.GetTimestamp();
             _phase1Busy[worker] += now - busyStart;
@@ -267,7 +248,7 @@ internal sealed class TickWorkerPool : IDisposable
         var barrierStart = Stopwatch.GetTimestamp();
         _phaseBarrier.SignalAndWait();
         var networkPhaseEnd = Stopwatch.GetTimestamp();
-        if (BusyStatsEnabled)
+        if (_runtime.WorkerStats)
         {
             _barrierBusy[worker] += networkPhaseEnd - barrierStart;
             // Phase 2 timing must start after the barrier, otherwise the wait
@@ -287,14 +268,14 @@ internal sealed class TickWorkerPool : IDisposable
             }
         }
 
-        if (BusyStatsEnabled)
+        if (_runtime.WorkerStats)
         {
             _phase2Busy[worker] += Stopwatch.GetTimestamp() - busyStart;
         }
 
         barrierStart = Stopwatch.GetTimestamp();
         _phaseBarrier.SignalAndWait();
-        if (BusyStatsEnabled)
+        if (_runtime.WorkerStats)
         {
             _barrierBusy[worker] += Stopwatch.GetTimestamp() - barrierStart;
         }
@@ -370,15 +351,14 @@ internal sealed class TickWorkerPool : IDisposable
         _phaseBarrier.Dispose();
     }
 
-    private static IPhaseBarrier ResolveBarrier(int workers)
+    private IPhaseBarrier ResolveBarrier(int workers)
     {
-        var mode = Environment.GetEnvironmentVariable("MQTTY_BARRIER");
-        if (string.Equals(mode, "spin", StringComparison.OrdinalIgnoreCase))
+        if (_runtime.Barrier == TickBarrierMode.Spin)
         {
-            return new SpinBarrier(workers);
+            return new SpinBarrier(workers, _runtime.BarrierSpinIterations);
         }
 
-        if (string.Equals(mode, "monitor", StringComparison.OrdinalIgnoreCase))
+        if (_runtime.Barrier == TickBarrierMode.Monitor)
         {
             return new MonitorBarrier(workers);
         }
@@ -387,7 +367,7 @@ internal sealed class TickWorkerPool : IDisposable
         // than physical cores means SMT oversubscription, where spinners starve
         // the worker they wait for, so use the blocking BCL barrier.
         return workers <= CpuTopology.PhysicalCoreCount()
-            ? new SpinBarrier(workers)
+            ? new SpinBarrier(workers, _runtime.BarrierSpinIterations)
             : new MonitorBarrier(workers);
     }
 
@@ -415,12 +395,14 @@ internal sealed class TickWorkerPool : IDisposable
     private sealed class SpinBarrier : IPhaseBarrier
     {
         private readonly int _participants;
+        private readonly int _spinLimit;
         private int _remaining;
         private int _generation;
 
-        public SpinBarrier(int participants)
+        public SpinBarrier(int participants, int spinLimit)
         {
             _participants = Math.Max(1, participants);
+            _spinLimit = Math.Max(0, spinLimit);
             _remaining = _participants;
         }
 
@@ -435,10 +417,9 @@ internal sealed class TickWorkerPool : IDisposable
             }
 
             var spin = 0;
-            var spinLimit = BarrierSpinIterations;
             while (Volatile.Read(ref _generation) == generation)
             {
-                if (spin++ < spinLimit)
+                if (spin++ < _spinLimit)
                 {
                     Thread.SpinWait(32);
                 }

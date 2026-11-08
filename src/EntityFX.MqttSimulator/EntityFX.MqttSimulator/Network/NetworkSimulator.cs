@@ -40,8 +40,8 @@ public class NetworkSimulator : INetworkSimulator
     private TickWorkerPool? _tickWorkerPool;
     private int _tickWorkerPoolSize;
 
-    private static readonly bool RefreshStatsEnabled =
-        Environment.GetEnvironmentVariable("MQTTY_REFRESH_STATS") == "1";
+    private readonly RuntimeOptions _runtime;
+    private bool RefreshStatsEnabled => _runtime.RefreshStats;
     private long _refreshStatsTicks;
     private long _refreshStatsWall;
     private long _refreshStatsNetworkPhaseWall;
@@ -54,10 +54,8 @@ public class NetworkSimulator : INetworkSimulator
     /// <summary>Steps snapshot taken at the start of the current refresh tick.</summary>
     public long CurrentRefreshSteps => _clock.CurrentRefreshSteps;
 
-    private static readonly bool NodeStatsEnabled =
-        Environment.GetEnvironmentVariable("MQTTY_NODE_STATS") == "1";
-    private static readonly bool ActiveOnly =
-        Environment.GetEnvironmentVariable("MQTTY_ACTIVE_ONLY") == "1";
+    private bool NodeStatsEnabled => _runtime.NodeStats;
+    private bool ActiveOnly => _runtime.ActiveOnly;
 
     /// <summary>Accumulated wall time inside <see cref="Refresh"/> (diagnostics only).</summary>
     public double RefreshWallSeconds => (double)_totalRefreshWallTicks / Stopwatch.Frequency;
@@ -101,11 +99,11 @@ public class NetworkSimulator : INetworkSimulator
         INetworkLogger monitoring, TicksOptions ticksOptions, bool enableCounters)
     {
         ticksOptions.Validate();
+        _runtime = RuntimeOptions.FromEnvironment();
         PathFinder = pathFinder;
         Monitoring = monitoring;
         this._ticksOptions = ticksOptions;
-        this.EnableCounters = enableCounters &&
-            Environment.GetEnvironmentVariable("MQTTY_DISABLE_COUNTERS") != "1";
+        this.EnableCounters = enableCounters && !_runtime.DisableCounters;
         this.EnableMonitoring = false;
         PathFinder.NetworkGraph = this;
 
@@ -430,12 +428,9 @@ public class NetworkSimulator : INetworkSimulator
         // Networks are few and fairly uniform, so batching their claims is
         // fine. Nodes differ by orders of magnitude in cost (idle client vs
         // loaded broker); claiming them one at a time avoids a heavy tail.
-        var networkChunk = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_NETWORK_CHUNK"), out var networkOverride) && networkOverride > 0
-            ? networkOverride
-            : Math.Max(1, networks.Length / (pool.WorkerCount * 4));
-        var nodeChunk = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_NODE_CHUNK"), out var nodeOverride) && nodeOverride > 0
-            ? nodeOverride
-            : 1;
+        var networkChunk = _runtime.NetworkChunk
+            ?? Math.Max(1, networks.Length / (pool.WorkerCount * 4));
+        var nodeChunk = _runtime.NodeChunk ?? 1;
         pool.Run(
             i => RefreshNetwork(networks[i], tick, scope), networks.Length,
             i => RefreshNode(nodes[i], tick, scope, i), nodes.Length,
@@ -547,9 +542,7 @@ public class NetworkSimulator : INetworkSimulator
     {
         var desired = MaxDegreeOfParallelism > 0
             ? MaxDegreeOfParallelism
-            : int.TryParse(Environment.GetEnvironmentVariable("MQTTY_WORKERS"), out var envWorkers) && envWorkers > 0
-                ? envWorkers
-                : CpuTopology.PhysicalCoreCount();
+            : _runtime.ResolveWorkers();
         desired = Math.Clamp(desired, 1, 64);
 
         if (_tickWorkerPool != null && _tickWorkerPoolSize == desired)
@@ -558,7 +551,7 @@ public class NetworkSimulator : INetworkSimulator
         }
 
         _tickWorkerPool?.Dispose();
-        _tickWorkerPool = new TickWorkerPool(desired);
+        _tickWorkerPool = new TickWorkerPool(desired, _runtime);
         _tickWorkerPoolSize = desired;
         return _tickWorkerPool;
     }
@@ -922,8 +915,7 @@ public class NetworkSimulator : INetworkSimulator
                     $"node_ms={_refreshStatsNodePhaseWall * 1000 / frequency:F1} " +
                     $"us_per_tick={_refreshStatsWall / frequency * 1e6 / _refreshStatsTicks:F1}");
 
-                if (_tickWorkerPool != null &&
-                    Environment.GetEnvironmentVariable("MQTTY_WORKER_STATS") == "1")
+                if (_tickWorkerPool != null && _runtime.WorkerStats)
                 {
                     var p1 = _tickWorkerPool.Phase1Busy;
                     var p2 = _tickWorkerPool.Phase2Busy;
@@ -958,8 +950,7 @@ public class NetworkSimulator : INetworkSimulator
         _tickWorkerPoolSize = 0;
     }
 
-    private static readonly bool NonAtomicPacketId =
-        Environment.GetEnvironmentVariable("MQTTY_NONATOMIC_ID") == "1";
+    private bool NonAtomicPacketId => _runtime.NonAtomicPacketId;
 
     public long GetPacketId()
     {

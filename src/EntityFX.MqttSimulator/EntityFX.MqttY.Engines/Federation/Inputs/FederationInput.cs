@@ -1,21 +1,16 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Mqtt.BrokerProfile;
 using EntityFX.MqttY.Plugin.Mqtt.BrokerProfile;
+using EntityFX.MqttY.Results;
 namespace EntityFX.MqttY.Federation;
 
 public sealed record FederationInput(FederationOptions Options, byte[] Configuration, byte[]? ProfileBytes,
     MqttBrokerProfile? Profile, string? ProfileSha256)
 {
-    public static readonly JsonSerializerOptions Json = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, false) }
-    };
+    public static readonly JsonSerializerOptions Json = JsonPolicies.Result;
     public static FederationInput Load(string path)
     {
         var bytes = File.ReadAllBytes(path);

@@ -1,16 +1,12 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using EntityFX.MqttY.Results;
 
 namespace EntityFX.MqttY.LoadBalancing;
 
 public static class ExperimentInput
 {
     public static readonly string[] BrokerTypes = { "Aedes", "Mosquitto", "ActiveMQ", "EMQX" };
-    public static readonly JsonSerializerOptions Json = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase, PropertyNameCaseInsensitive = false, WriteIndented = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false) }
-    };
+    public static readonly JsonSerializerOptions Json = JsonPolicies.Result;
 
     public static IReadOnlyList<PreparedExperiment> Load(string path, bool matrix)
     {

@@ -2,7 +2,6 @@ using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Mqtt.BrokerProfile;
 using EntityFX.MqttY.Contracts.Network;
@@ -24,12 +23,7 @@ public sealed class MqttRelayExperimentRunner
     private readonly NetworkOptions _network;
     private readonly IBrokerBenchmarkRepository _profiles;
     private static readonly IResultWriter ResultWriter = JsonResultWriter.Default;
-    private readonly JsonSerializerOptions _json = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
-    };
+    private readonly JsonSerializerOptions _json = JsonPolicies.Result;
 
     public MqttRelayExperimentRunner(
         TicksOptions ticks, NetworkOptions network,

@@ -10,8 +10,6 @@ namespace EntityFX.MqttY.LoadBalancing;
 
 public sealed class LoadBalancingExperimentRunner
 {
-    private static readonly bool ParallelPublish =
-        Environment.GetEnvironmentVariable("MQTTY_PARALLEL_PUBLISH") == "1";
     public (ExperimentSummary Summary, LoadBalancingExecutionTiming Timing) RunMeasured(
         PreparedExperiment input, string? output, bool parallel, int refreshStrategy,
         CancellationToken cancellationToken = default)
@@ -49,6 +47,7 @@ public sealed class LoadBalancingExperimentRunner
         // Claim a new directory before simulation; previous evidence is never overwritten.
         if (output != null) ExperimentResultWriter.CreateOutput(output);
         var options = input.Options;
+        var runtime = RuntimeOptions.FromEnvironment();
         var ledger = new DeliveryLedger(options.PayloadBytes, options.TickPeriod.TotalMilliseconds);
         LoadBalancingTopology? topology = null;
         var phases = new List<PhaseResult>();
@@ -66,7 +65,7 @@ public sealed class LoadBalancingExperimentRunner
         {
             cancellationToken.ThrowIfCancellationRequested();
             topology = LoadBalancingTopologyBuilder.Build(input,
-                Environment.GetEnvironmentVariable("MQTTY_ISOLATE_NETWORKS") == "1");
+                runtime.IsolateNetworks);
             var graph = topology.Graph;
             if (output != null)
             {
@@ -154,7 +153,7 @@ public sealed class LoadBalancingExperimentRunner
                         }
                     },
                     Refresh,
-                    par && ParallelPublish);
+                    par && runtime.ParallelPublish);
                 if (measurement) scheduled += slots;
             }
         }
