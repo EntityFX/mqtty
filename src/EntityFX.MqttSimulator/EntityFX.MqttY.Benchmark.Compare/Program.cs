@@ -65,20 +65,24 @@ if (opt.Engines.Contains("lb"))
 
 if (opt.Engines.Contains("relay"))
 {
-    var relayApp = new MqttRelayApp(null, null);
+    // Product relay engine: FederationRunner in Relay mode, not the legacy
+    // MqttRelayApp benchmark path.
+    var relayOptions = BuildRelayOptions(opt);
+    var relayInput = FederationInput.Prepare(relayOptions);
+    var relayRunner = new FederationRunner();
     engines.Add(RunEngine("Relay", opt, (parallel, rep) =>
     {
         var sw = Stopwatch.StartNew();
         var cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
-        var graph = relayApp.ExecuteSimulation(parallel, opt.Brokers, opt.Nets, opt.RelayClients,
-            opt.RelayRepeats, enableCounters: false, strategy: 0, bytesTelemetry: null);
+        var summary = relayRunner.Run(relayInput, ExportDir("relay", parallel, rep), diagnostics: false,
+            parallel: parallel, refreshStrategy: 1);
         sw.Stop();
         var cpu = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalSeconds;
-        var refresh = graph is NetworkSimulator simulator ? simulator.RefreshWallSeconds : 0;
-        var status = graph.Errors == 0 && graph.TotalSteps > 0 ? "completed" : "failed";
-        return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds, refresh, 0,
-            graph.Errors, status, Metrics.Relay(graph), cpu,
-            Attempts: 0, Unique: 0, Steps: graph.TotalSteps);
+        return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds,
+            summary.RefreshWallSeconds, 0, summary.ForwardRejected + summary.QueueDrops,
+            summary.Status, Metrics.Fed(summary), cpu,
+            Attempts: summary.ApiAttempts, Unique: summary.UniqueDeliveries,
+            Steps: summary.ScheduledPublishes);
     }));
 }
 
@@ -203,8 +207,7 @@ EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSam
     var metricsMatch = samples.All(s => s.Metrics.Core == metricReference);
     var diagnosticsMatch = samples.All(s => s.Metrics.Diagnostics == samples[0].Metrics.Diagnostics);
     var status = samples.All(s => s.Status == "completed") ? "completed" : "failed";
-    var activity = samples.All(s => s.Steps > 0) &&
-        (name == "Relay" || samples.All(s => s.Attempts > 0 && s.Unique > 0));
+    var activity = samples.All(s => s.Steps > 0 && s.Attempts > 0 && s.Unique > 0);
     if (!activity) status = "invalid";
     var errors = par.Sum(s => s.Errors) + seq.Sum(s => s.Errors);
 
@@ -272,6 +275,35 @@ LoadBalancingOptions BuildLbOptions(BenchOptions o)
         TickPeriod = TimeSpan.FromTicks(1000),
         NetworkLength = o.Nets,
         Network = new NetworkSettings
+        {
+            CapacityBytesPerSecond = 100_000_000,
+            ThroughputWindowTicks = 100,
+            QueueCapacity = 100_000,
+            TransferTicks = 1,
+        }
+    };
+    result.Validate();
+    return result;
+}
+
+FederationOptions BuildRelayOptions(BenchOptions o)
+{
+    var result = new FederationOptions
+    {
+        Mode = FederationMode.Relay,
+        Brokers = Math.Min(o.Brokers, 16),
+        Topology = "star",
+        Publishers = Math.Max(o.Publishers, Math.Min(o.Brokers, 16)),
+        PayloadBytes = 16,
+        Qos = 1,
+        OfferedRps = o.FedRps,
+        Seed = o.Seed,
+        WarmupSeconds = o.Warmup,
+        MeasurementSeconds = o.Measure,
+        DrainTimeoutSeconds = o.Drain,
+        TickPeriod = TimeSpan.FromTicks(1000),
+        Ideal = true,
+        Network = new FederationNetworkOptions
         {
             CapacityBytesPerSecond = 100_000_000,
             ThroughputWindowTicks = 100,
