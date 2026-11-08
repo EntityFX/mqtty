@@ -54,7 +54,25 @@ direction/status; `IsQuiescent` не меняется.
 
 **Оценка:** 5 ч/д.
 
-### S3g. Codec без `List<byte>` и LINQ по байтам
+### S3g. Codec без `List<byte>` и LINQ по байтам — ВЫПОЛНЕНО
+
+**Факт:** все formatters пишут в один `byte[]` через `Span<byte>` и
+`BinaryPrimitives`; `MqttEncoder` больше не строит `List<byte>`, `ByteExtensions`
+не использует `Skip/Take/FirstOrDefault`, `ConnectFormatter` держит статический
+`Regex`. `MqttTopicEvaluator` кэширует разобранные topic/filter (bounded 8192,
+счётчик без `ConcurrentDictionary.Count`), поэтому fanout не делает `Split('/')`
+на каждый publish. Integration **420/420**, core LB/Relay совпадает.
+
+Замеры на 12C/24T, workers=12, repeat 3:
+
+| Конфиг | до S3g | после S3g |
+|---|---|---|
+| LB reference wall/refresh | 2.01× / 2.14× | **2.12× / 2.31×** |
+| Relay reference wall/refresh | 3.23× / 3.47× | **3.02× / 3.34×** |
+| LB L wall/refresh | 3.94× / 4.52× | **3.68× / 4.27×** |
+| Relay L wall/refresh | 2.89× / 2.99× | **3.12× / 3.25×** |
+| Relay L allocated | 75.8 ГБ | **29.0 ГБ (−62%)** |
+| Federation seq, 256 pub / 2k rps | 57.1 с, 44.5 ГБ | **45.8 с, 13.4 ГБ (−70%)** |
 
 **Проблема.** `PublishFormatter`/`MqttEncoder`/`ByteExtensions` делают `List<byte>`, `Skip/Take`,
 копируют payload на каждого подписчика; `MqttTopicEvaluator` делает `Split('/')` на каждый матч;
