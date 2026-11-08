@@ -231,9 +231,11 @@ Integration **428/428**.
 
 **Оценка:** 3 ч/д.
 
-### S4f. Единый CLI и benchmark на продуктовых движках — ВЫПОЛНЕНО ЧАСТИЧНО
+### S4f. Единый CLI и benchmark на продуктовых движках — ВЫПОЛНЕНО
 
-**Факт:** reference benchmark больше не использует legacy `MqttRelayApp`:
+**Факт:** добавлен единый host `EntityFX.MqttY.Experiment.Cli`
+(`lb|fed|relay` → `demo/validate/run/matrix` или `experiment/calibrate`,
+коды 0/1/2, `--help`). Reference benchmark больше не использует legacy `MqttRelayApp`:
 Relay-плечо идёт через `FederationRunner(Mode=Relay)` — тот же путь, что у
 продуктового `RelayEngine`. Activity-гейт теперь одинаков для всех движков:
 `steps > 0 && attempts > 0 && unique > 0`; у Relay появились реальные
@@ -241,10 +243,6 @@ attempts/unique/core-метрики. `--no-export` по-прежнему не м
 метрики, seq/par используют одну топологию и QoS. Проверка: Relay
 `--repeat 1 --measure 1 --fed-rps 2000` дал `completed`, `activity=ok`,
 `core=match`, `wall 3.72× / refresh 4.87×`.
-
-**Осталось:** один общий CLI-host (`demo/validate/run/matrix`) поверх
-`LoadBalancingEngine`/`RelayEngine`/`FederationEngine`; сейчас команды живут в
-трёх отдельных приложениях.
 
 1. Один CLI-host: `demo/validate/run/matrix`, общий парсер, коды 0/1/2, `--help`.
 2. Benchmark: `RelayEngine`/`FederationEngine`/`LoadBalancingEngine` вместо legacy

@@ -10,7 +10,7 @@ using EntityFX.MqttY.Plugin.Mqtt.Experiments;
 
 namespace EntityFX.MqttY.MqttRelay.App;
 
-internal static class MqttRelayExperimentCommand
+public static class MqttRelayExperimentCommand
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
