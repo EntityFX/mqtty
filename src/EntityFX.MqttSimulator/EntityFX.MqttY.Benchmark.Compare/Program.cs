@@ -81,9 +81,14 @@ if (opt.Engines.Contains("relay"))
     {
         var sw = Stopwatch.StartNew();
         var cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
+        var relayPhaseWalls = new Dictionary<string, double>();
         var summary = relayRunner.Run(relayInput, ExportDir("relay", parallel, rep), diagnostics: false,
-            parallel: parallel, refreshStrategy: 1);
+            parallel: parallel, refreshStrategy: 1, phaseWallSeconds: relayPhaseWalls);
         sw.Stop();
+        if (parallel && Environment.GetEnvironmentVariable("MQTTY_PHASE_STATS") == "1")
+        {
+            Console.Error.WriteLine("fed-phases-wall " + string.Join(" ", relayPhaseWalls.Select(p => $"{p.Key}={p.Value:F4}")));
+        }
         var cpu = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalSeconds;
         return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds,
             summary.RefreshWallSeconds, 0, summary.ForwardRejected + summary.QueueDrops,
@@ -102,9 +107,14 @@ if (opt.Engines.Contains("fed"))
     {
         var sw = Stopwatch.StartNew();
         var cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
+        var fedPhaseWalls = new Dictionary<string, double>();
         var summary = fedRunner.Run(fedInput, ExportDir("fed", parallel, rep), diagnostics: false,
-            parallel: parallel, refreshStrategy: 1);
+            parallel: parallel, refreshStrategy: 1, phaseWallSeconds: fedPhaseWalls);
         sw.Stop();
+        if (parallel && Environment.GetEnvironmentVariable("MQTTY_PHASE_STATS") == "1")
+        {
+            Console.Error.WriteLine("fed-phases-wall " + string.Join(" ", fedPhaseWalls.Select(p => $"{p.Key}={p.Value:F4}")));
+        }
         var cpu = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalSeconds;
         return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds, summary.RefreshWallSeconds, 0,
             summary.ForwardRejected + summary.QueueDrops, summary.Status, Metrics.Fed(summary), cpu,

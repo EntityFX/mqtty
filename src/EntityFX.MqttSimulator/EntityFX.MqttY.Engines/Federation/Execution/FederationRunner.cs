@@ -3,6 +3,7 @@ using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Engines.Execution;
 using EntityFX.MqttY.Experiment;
 using EntityFX.MqttY.Utils;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 namespace EntityFX.MqttY.Federation;
@@ -11,13 +12,15 @@ public sealed class FederationRunner
 {
     public FederationSummary Run(FederationInput input, string? output = null, bool diagnostics = false,
         CancellationToken cancellationToken = default, Action<INetworkSimulator, string>? onProgress = null,
-        bool parallel = true, int refreshStrategy = 1)
+        bool parallel = true, int refreshStrategy = 1,
+        IDictionary<string, double>? phaseWallSeconds = null)
     {
         var drainDiagnostics = diagnostics ? new FederationDrainDiagnostics() : null;
         if (output != null) FederationResultWriter.Claim(output);
         var runtime = RuntimeOptions.FromEnvironment();
         var o = input.Options; var ledger = new FederationDeliveryLedger(o); var traffic = new TransmissionLedger(ledger);
         FederationTopology? topology = null; var phases = new List<FederationPhase>(); var phase = "construct"; long phaseStart = 0;
+        var phaseWallStart = Stopwatch.GetTimestamp();
         var metrics = new MetricsCollector();
         long uniqueBefore = 0, completeBefore = 0;
         var measured = false; var measurementStarted = false; var status = "failed"; string? error = null; string? graphMl = null;
@@ -48,12 +51,15 @@ public sealed class FederationRunner
             void Begin(string name)
             {
                 phase = name; phaseStart = topology.Graph.TotalTicks;
+                phaseWallStart = Stopwatch.GetTimestamp();
                 if (phase is "warmupDrain" or "drain") drainDiagnostics?.Capture(topology, phase, "entry");
             }
             void Finish()
             {
                 if (phase is "warmupDrain" or "drain") drainDiagnostics?.Capture(topology, phase, "completed");
+                var wall = (Stopwatch.GetTimestamp() - phaseWallStart) / (double)Stopwatch.Frequency;
                 phases.Add(new(phase, phaseStart, topology.Graph.TotalTicks, "completed"));
+                if (phaseWallSeconds != null) phaseWallSeconds[phase] = wall;
             }
             void Refresh()
             {
