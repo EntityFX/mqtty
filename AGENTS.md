@@ -63,7 +63,7 @@ refresh (сети → fence → узлы → fence) на постоянном п
 | LB L (64 брокера, 256 publishers, 20k rps) | **5.06×** | **6.03×** | match |
 | LB reference | **2.98×** | **3.36×** | match |
 | Relay (2k rps) | **5.44×** | **6.30×** | match |
-| Federation L (16 брокеров, 256 publishers, 2k rps) | **2.12×** | **3.03×** | match / diag differ |
+| Federation L (16 брокеров, 256 publishers, 2k rps) | **3.97–4.14×** | **4.93–5.22×** | match / diag differ |
 
 Ключевые факты:
 
@@ -76,8 +76,8 @@ refresh (сети → fence → узлы → fence) на постоянном п
   `ConcurrentGarbageCollection=false`; между сэмплами делается полный GC вне
   измеряемого участка;
 - главные оставшиеся тормоза — инфляция работы узлов (~1.8× в параллели) и
-  Federation drain (~50 % wall). Барьер после сортировки сетей — это в основном
-  дисбаланс тяжёлых узлов, а не стоимость fence.
+  Federation drain (~45 % его wall). Барьер после сортировки сетей — это в
+  основном дисбаланс тяжёлых узлов, а не стоимость fence.
 
 Подробная методика, фазовый профиль и отклонённые эксперименты —
 `doc/performance.md`.
@@ -90,12 +90,13 @@ refresh (сети → fence → узлы → fence) на постоянном п
   перегрузке; core-метрики (counts, unique, goodput, publish p50–p99)
   совпадают. `diagnostics=differ` у Fed L воспроизводится и на baseline.
 - `FederationDeliveryLedger` — `ConcurrentDictionary` + per-receiver lock;
-  `StaticFederator.Pump` последовательный (параллельный вариант хуже).
+  `StaticFederator.Pump` идёт параллельно на пуле тика (`RunSingle`), дробление
+  до пар «федератор × target» выигрыша не дало.
 - `DeliveryLedger` LB lock-free; `TotalSteps` кэшируется на тик через
   `CurrentRefreshSteps`; active-only refresh реализован, но по умолчанию
   выключен — на плотной нагрузке выигрыша нет.
 - Главные остаточные резервы: инфляция node-работы ~1.8× в параллели и
-  Federation drain ≈ 50 % wall. Подробности — `doc/performance.md`.
+  Federation drain ≈ 45 % его wall. Подробности — `doc/performance.md`.
 - Тесты: Integration **436/436**, Web **62/62** (запускать последовательно,
   не параллельно).
 - Не коммитьте чужие незакоммиченные правки; `results/`, `bin/`, `obj/` не
