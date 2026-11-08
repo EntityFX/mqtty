@@ -53,7 +53,7 @@ mqtty/
 
 ## 4. Текущее состояние производительности
 
-Параллельный режим (`parallel=true`) есть во всех трёх движках: параллельный двухфазный refresh (сети → узлы) на постоянном пуле `TickWorkerPool`. Флаг параллелизма **не** входит в `LoadBalancingOptions`/`FederationOptions` — он передаётся в метод раннера.
+Параллельный режим (`parallel=true`) есть во всех трёх движках: параллельный двухфазный refresh (сети → узлы) на постоянном пуле `TickWorkerPool`. Флаг параллелизма **не** входит в `LoadBalancingOptions`/`FederationOptions` — он передаётся в метод раннера. Параллельный refresh всегда использует flat two-phase порядок (strategy 0); `strategy=1` (сеть + её узлы) — только sequential.
 
 Фактические цифры reference-бенчмарка (прогретые медианы, текущий 4C/8T хост, 4 воркера):
 
@@ -176,6 +176,10 @@ dotnet test src/EntityFX.MqttSimulator/EntityFX.Tests.Integration/EntityFX.Tests
 | Компонент | Путь | Назначение |
 |---|---|---|
 | `NetworkSimulator` | `EntityFX.MqttSimulator/Network/NetworkSimulator.cs` | Тик, `Refresh(parallel, strategy)`, порядок фаз |
+| `SimulationClock` / `TickPipeline` | `EntityFX.MqttSimulator/Network/SimulationClock.cs`, `TickPipeline.cs` | Модельные часы, `TickContext`, стадии `PublishClock → RefreshTopology → CompleteTick` |
+| `TopologyRegistry` / `TopologySnapshot` | `EntityFX.MqttSimulator/Network/TopologyRegistry.cs` | Реестры топологии и неизменяемый снапшот на тик |
+| `TokenWindowAdmission` | `EntityFX.MqttSimulator/Network/TokenWindowAdmission.cs` | Rolling byte budget: reserve/commit/rollback |
+| `PacketTrace` | `EntityFX.MqttSimulator/Network/PacketTrace.cs` | S0 characterization: NDJSON send/receive-трасса (env-gated) |
 | `TickWorkerPool` | `EntityFX.MqttSimulator/Network/TickWorkerPool.cs` | Постоянный пул, двухфазный refresh, `Barrier` |
 | `Node` / `Network` | `EntityFX.MqttSimulator/Network/` | Очереди, отложенные пакеты, quiescence |
 | `LoadBalancingOptions` / `...Runner` | `Engines/LoadBalancing/` | Параметры и запуск LB |

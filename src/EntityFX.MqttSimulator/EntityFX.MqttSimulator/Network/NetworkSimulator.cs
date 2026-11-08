@@ -22,27 +22,19 @@ public enum SimulationRunMode
 
 public class NetworkSimulator : INetworkSimulator
 {
-    public bool IsQuiescent => _networks.Values.All(n => n.QueueSize == 0 &&
+    public bool IsQuiescent => _topology.Networks.Values.All(n => n.QueueSize == 0 &&
             (n is not IQuiescenceParticipant participant || participant.IsQuiescent)) &&
-        _nodes.Values.OfType<IQuiescenceParticipant>().All(n => n.IsQuiescent);
-    private readonly ConcurrentDictionary<(string Address, NodeType NodeType), ILeafNode> _nodes = new();
-    private readonly ConcurrentDictionary<string, INetwork> _networks = new();
-    private readonly ConcurrentDictionary<string, IClient> _clients = new();
-    private readonly ConcurrentDictionary<string, IServer> _servers = new();
-    private readonly ConcurrentDictionary<string, IApplication> _apps = new();
+        _topology.Nodes.Values.OfType<IQuiescenceParticipant>().All(n => n.IsQuiescent);
+    private readonly TopologyRegistry _topology = new();
 
-    private long _tick = 0;
-    // Per-worker step deltas summed on read: removes the interlocked cache-line
-    // contention of a single shared counter on every Send/Receive (R4).
-    private readonly ThreadLocal<long> _stepDeltas = new(trackAllValues: true);
     private long _errors = 0;
     private long _packetId = 0;
-    private int _countNodes = 0;
-    private long _topologyVersion;
     private long _orderedTopologyVersion = -1;
     private KeyValuePair<string, INetwork>[] _orderedNetworks = Array.Empty<KeyValuePair<string, INetwork>>();
     private KeyValuePair<(string Address, NodeType NodeType), ILeafNode>[] _orderedNodes = Array.Empty<KeyValuePair<(string Address, NodeType NodeType), ILeafNode>>();
     private readonly object _measurementResetLock = new();
+    private readonly SimulationClock _clock = new();
+    private readonly TickPipeline _pipeline;
 
     // Persistent refresh workers (created lazily on the first parallel tick).
     private TickWorkerPool? _tickWorkerPool;
@@ -56,12 +48,11 @@ public class NetworkSimulator : INetworkSimulator
     private long _refreshStatsNodePhaseWall;
     private long _totalRefreshWallTicks;
     private long _refreshCallCount;
-    private long _refreshSteps;
     private long[]? _nodeBusyTicks;
     private long[]? _nodeCalls;
 
     /// <summary>Steps snapshot taken at the start of the current refresh tick.</summary>
-    public long CurrentRefreshSteps => _refreshSteps;
+    public long CurrentRefreshSteps => _clock.CurrentRefreshSteps;
 
     private static readonly bool NodeStatsEnabled =
         Environment.GetEnvironmentVariable("MQTTY_NODE_STATS") == "1";
@@ -119,6 +110,7 @@ public class NetworkSimulator : INetworkSimulator
         PathFinder.NetworkGraph = this;
 
         _counters = new NetworkSimulatorCounters("NetworkSimulator", "NN", ticksOptions, enableCounters);
+        _pipeline = new TickPipeline(PublishClock, RefreshTopology, CompleteTick);
     }
 
     public string? OptionsPath { get; set; }
@@ -127,35 +119,26 @@ public class NetworkSimulator : INetworkSimulator
 
     public INetworkLogger Monitoring { get; }
 
-    public IDictionary<string, INetwork> Networks => _networks;
+    public IDictionary<string, INetwork> Networks => _topology.Networks;
 
-    public IDictionary<string, IClient> Clients => _clients;
-    public IDictionary<string, IServer> Servers => _servers;
+    public IDictionary<string, IClient> Clients => _topology.Clients;
+    public IDictionary<string, IServer> Servers => _topology.Servers;
 
-    public IDictionary<string, IApplication> Applications => _apps;
+    public IDictionary<string, IApplication> Applications => _topology.Applications;
 
-    public long TotalTicks => _tick;
+    public long TotalTicks => _clock.TotalTicks;
+
+    public ISimulationClock Clock => _clock;
 
     public bool Construction { get; set; }
 
-    public long TotalSteps
-    {
-        get
-        {
-            long sum = 0;
-            foreach (var delta in _stepDeltas.Values)
-            {
-                sum += delta;
-            }
-            return sum;
-        }
-    }
+    public long TotalSteps => _clock.TotalSteps;
 
     public bool WaitMode { get; private set; }
     public bool EnableCounters { get; private set; }
     public bool EnableMonitoring { get; set; }
 
-    public int CountNodes => _countNodes;
+    public int CountNodes => _topology.CountNodes;
 
     public TimeSpan VirtualTime => _ticksOptions.TickPeriod * TotalTicks;
 
@@ -173,15 +156,7 @@ public class NetworkSimulator : INetworkSimulator
         return GetNode(address, nodeType)?.Network;
     }
 
-    public ILeafNode? GetNode(string address, NodeType nodeType)
-    {
-        if (!_nodes.ContainsKey((address, nodeType)))
-        {
-            return null;
-        }
-
-        return _nodes[(address, nodeType)];
-    }
+    public ILeafNode? GetNode(string address, NodeType nodeType) => _topology.GetNode(address, nodeType);
 
     public INetworkPacket GetReversePacket(INetworkPacket packet, byte[] payload, string? category)
     {
@@ -205,12 +180,12 @@ public class NetworkSimulator : INetworkSimulator
 
     public void RemoveClient(string clientAddress)
     {
-        if (!_nodes.ContainsKey((clientAddress, NodeType.Client)))
+        if (!_topology.ContainsNode(clientAddress, NodeType.Client))
         {
             return;
         }
 
-        var client = GetNode(clientAddress, NodeType.Client) as IClient;
+        var client = _topology.GetNode(clientAddress, NodeType.Client) as IClient;
         if (client == null)
         {
             return;
@@ -221,16 +196,18 @@ public class NetworkSimulator : INetworkSimulator
             client.Disconnect();
         }
 
-        _nodes.Remove((clientAddress, NodeType.Client), out _);
-        _clients.Remove(clientAddress, out _);
-        Interlocked.Decrement(ref _countNodes);
-        Interlocked.Increment(ref _topologyVersion);
+        _topology.Nodes.TryRemove((clientAddress, NodeType.Client), out _);
+        _topology.Clients.Remove(clientAddress);
+        _topology.RemoveNodeCount();
+        _topology.MarkChanged();
         client.Clear();
     }
 
     public void RemoveNetwork(string networkAddress)
     {
-        var network = _networks.GetValueOrDefault(networkAddress);
+        var network = _topology.Networks.ContainsKey(networkAddress)
+            ? _topology.Networks[networkAddress]
+            : null;
         if (network == null)
         {
             return;
@@ -238,22 +215,22 @@ public class NetworkSimulator : INetworkSimulator
 
         network.UnlinkAll();
 
-        _networks.Remove(networkAddress, out _);
+        _topology.Networks.Remove(networkAddress);
 
         UpdateRoutes();
-        Interlocked.Decrement(ref _countNodes);
-        Interlocked.Increment(ref _topologyVersion);
+        _topology.RemoveNodeCount();
+        _topology.MarkChanged();
         network.Clear();
     }
 
     public void RemoveServer(string serverAddress)
     {
-        if (!_nodes.ContainsKey((serverAddress, NodeType.Server)))
+        if (!_topology.ContainsNode(serverAddress, NodeType.Server))
         {
             return;
         }
 
-        var server = GetNode(serverAddress, NodeType.Server) as IServer;
+        var server = _topology.GetNode(serverAddress, NodeType.Server) as IServer;
         if (server == null)
         {
             return;
@@ -261,21 +238,21 @@ public class NetworkSimulator : INetworkSimulator
 
         server.Stop();
 
-        _nodes.Remove((serverAddress, NodeType.Server), out _);
-        _servers.Remove(serverAddress, out _);
-        Interlocked.Decrement(ref _countNodes);
-        Interlocked.Increment(ref _topologyVersion);
+        _topology.Nodes.TryRemove((serverAddress, NodeType.Server), out _);
+        _topology.Servers.Remove(serverAddress);
+        _topology.RemoveNodeCount();
+        _topology.MarkChanged();
         server.Clear();
     }
 
     private void RemoveApplication(string name)
     {
-        if (!_nodes.ContainsKey((name, NodeType.Application)))
+        if (!_topology.ContainsNode(name, NodeType.Application))
         {
             return;
         }
 
-        var application = GetNode(name, NodeType.Application) as IApplication;
+        var application = _topology.GetNode(name, NodeType.Application) as IApplication;
         if (application == null)
         {
             return;
@@ -283,17 +260,17 @@ public class NetworkSimulator : INetworkSimulator
 
         application.Stop();
 
-        _nodes.Remove((name, NodeType.Application), out _);
-        _apps.Remove(name, out _);
-        Interlocked.Decrement(ref _countNodes);
-        Interlocked.Increment(ref _topologyVersion);
+        _topology.Nodes.TryRemove((name, NodeType.Application), out _);
+        _topology.Applications.Remove(name);
+        _topology.RemoveNodeCount();
+        _topology.MarkChanged();
         application.Clear();
     }
 
     public bool Refresh(bool parallel, int strategy)
     {
         var refreshStart = Stopwatch.GetTimestamp();
-        _refreshSteps = TotalSteps;
+        _clock.BeginRefresh();
         _stopwatch.Start();
         try
         {
@@ -304,17 +281,8 @@ public class NetworkSimulator : INetworkSimulator
                 Monitoring.Push(0, TotalTicks, NetworkLoggerType.Refresh, $"Refresh whole sourceNetwork", "Network", "Refresh", scope);
             }
 
-            if (parallel)
-            {
-                ParallelRefreshImplementation(scope, strategy);
-            }
-            else
-            {
-                RefreshImplementation(scope, strategy);
-            }
-
-            _counters.SetRealTime(_stopwatch.Elapsed);
-            _counters.SetVirtualTime(VirtualTime);
+            var context = new TickContext(TotalTicks, CurrentRefreshSteps, parallel, strategy, scope);
+            _pipeline.Run(in context);
 
             if (EnableMonitoring)
             {
@@ -351,12 +319,12 @@ public class NetworkSimulator : INetworkSimulator
 
     private void EnsureTopologySnapshot()
     {
-        var version = Volatile.Read(ref _topologyVersion);
-        if (_orderedTopologyVersion != version)
+        var snapshot = _topology.GetSnapshot();
+        if (_orderedTopologyVersion != snapshot.Version)
         {
-            _orderedNetworks = _networks.OrderBy(item => item.Key, StringComparer.Ordinal).ToArray();
-            _orderedNodes = _nodes.OrderBy(item => item.Key.Address, StringComparer.Ordinal).ThenBy(item => item.Key.NodeType).ToArray();
-            _orderedTopologyVersion = version;
+            _orderedNetworks = snapshot.Networks;
+            _orderedNodes = snapshot.Nodes;
+            _orderedTopologyVersion = snapshot.Version;
             if (NodeStatsEnabled)
             {
                 _nodeBusyTicks = null;
@@ -409,10 +377,8 @@ public class NetworkSimulator : INetworkSimulator
         }
     }
 
-    private void ParallelRefreshImplementation(NetworkLoggerScope? scope, int strategy)
+    private void PublishClock(in TickContext context)
     {
-        var bytes = Array.Empty<byte>();
-
         EnsureTopologySnapshot();
 
         if (NodeStatsEnabled)
@@ -422,103 +388,154 @@ public class NetworkSimulator : INetworkSimulator
 
         // Publish the shared tick clock once per tick so counters do not need a
         // per-instance stamp walk (CounterClock).
-        CounterClock.Publish(TotalTicks, _refreshSteps);
+        CounterClock.Publish(context.Tick, context.Steps);
 
-        _counters.Refresh(TotalTicks, _refreshSteps);
+        _counters.Refresh(context.Tick, context.Steps);
+    }
 
+    private void CompleteTick(in TickContext context)
+    {
+        // The clock advances before the wall/virtual counter sample, matching the
+        // historical order of Refresh (tick first, then counter timestamps).
+        Tick();
+        _counters.SetRealTime(_stopwatch.Elapsed);
+        _counters.SetVirtualTime(VirtualTime);
+    }
+
+    private void RefreshTopology(in TickContext context)
+    {
         var networks = _orderedNetworks;
         var nodes = _orderedNodes;
-
-        void RefreshNetwork(KeyValuePair<string, INetwork> network)
-        {
-            if (ActiveOnly && network.Value.QueueSize == 0)
-            {
-                return;
-            }
-
-            if (EnableMonitoring)
-            {
-                Monitoring.Push(0, TotalTicks,
-                    network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                    "Network", "Refresh", scope);
-            }
-            network.Value.Refresh();
-        }
-
-        void RefreshNode(int index, KeyValuePair<(string Address, NodeType NodeType), ILeafNode> node)
-        {
-            if (ActiveOnly && IsNodeIdle(node.Value))
-            {
-                return;
-            }
-
-            var nodeStart = NodeStatsEnabled ? Stopwatch.GetTimestamp() : 0;
-            if (EnableMonitoring)
-            {
-                Monitoring.Push(0, TotalTicks,
-                    node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
-                    scope);
-            }
-
-            node.Value.Refresh();
-
-            if (NodeStatsEnabled)
-            {
-                _nodeBusyTicks![index] += Stopwatch.GetTimestamp() - nodeStart;
-                _nodeCalls![index]++;
-            }
-        }
+        var tick = context.Tick;
+        var scope = context.Scope;
 
         // The scheduler setup/teardown costs more than the refresh itself for
         // small topologies, so tiny simulations always run sequentially.
-        var runParallel = networks.Length + nodes.Length >= ParallelThreshold;
+        if (!context.Parallel || networks.Length + nodes.Length < ParallelThreshold)
+        {
+            RefreshTopologySerial(context.Strategy, networks, nodes, tick, scope);
+            return;
+        }
 
-        if (!runParallel)
+        // Bulk-synchronous two-phase refresh on persistent worker threads:
+        // every network is refreshed, then every node. The flat node list is
+        // scheduled dynamically, so networks that own most of the nodes (the
+        // shared client LAN in particular) no longer pin the tick to one
+        // worker. Strategy 1 used to shard "network + its nodes", which made
+        // that dense shard the serial bottleneck; the balanced two-phase
+        // schedule is both faster and deterministic. Parallel refresh therefore
+        // intentionally ignores `context.Strategy`.
+        var pool = EnsureTickWorkerPool();
+        var statsStart = RefreshStatsEnabled ? Stopwatch.GetTimestamp() : 0;
+        // Networks are few and fairly uniform, so batching their claims is
+        // fine. Nodes differ by orders of magnitude in cost (idle client vs
+        // loaded broker); claiming them one at a time avoids a heavy tail.
+        var networkChunk = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_NETWORK_CHUNK"), out var networkOverride) && networkOverride > 0
+            ? networkOverride
+            : Math.Max(1, networks.Length / (pool.WorkerCount * 4));
+        var nodeChunk = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_NODE_CHUNK"), out var nodeOverride) && nodeOverride > 0
+            ? nodeOverride
+            : 1;
+        pool.Run(
+            i => RefreshNetwork(networks[i], tick, scope), networks.Length,
+            i => RefreshNode(nodes[i], tick, scope, i), nodes.Length,
+            networkChunk, nodeChunk);
+        if (RefreshStatsEnabled)
+        {
+            _refreshStatsTicks++;
+            _refreshStatsWall += Stopwatch.GetTimestamp() - statsStart;
+            _refreshStatsNetworkPhaseWall += pool.LastNetworkPhaseTicks;
+            _refreshStatsNodePhaseWall += pool.LastNodePhaseTicks;
+        }
+    }
+
+    private void RefreshTopologySerial(int strategy,
+        KeyValuePair<string, INetwork>[] networks,
+        KeyValuePair<(string Address, NodeType NodeType), ILeafNode>[] nodes,
+        long tick, NetworkLoggerScope? scope)
+    {
+        if (strategy == 0)
         {
             foreach (var network in networks)
             {
-                RefreshNetwork(network);
+                RefreshNetwork(network, tick, scope);
             }
 
             for (var index = 0; index < nodes.Length; index++)
             {
-                RefreshNode(index, nodes[index]);
+                RefreshNode(nodes[index], tick, scope, index);
             }
-        }
-        else
-        {
-            // Bulk-synchronous two-phase refresh on persistent worker threads:
-            // every network is refreshed, then every node. The flat node list is
-            // scheduled dynamically, so networks that own most of the nodes (the
-            // shared client LAN in particular) no longer pin the tick to one
-            // worker. Strategy 1 used to shard "network + its nodes", which made
-            // that dense shard the serial bottleneck; the balanced two-phase
-            // schedule is both faster and deterministic.
-            var pool = EnsureTickWorkerPool();
-            var statsStart = RefreshStatsEnabled ? Stopwatch.GetTimestamp() : 0;
-            // Networks are few and fairly uniform, so batching their claims is
-            // fine. Nodes differ by orders of magnitude in cost (idle client vs
-            // loaded broker); claiming them one at a time avoids a heavy tail.
-            var networkChunk = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_NETWORK_CHUNK"), out var networkOverride) && networkOverride > 0
-                ? networkOverride
-                : Math.Max(1, networks.Length / (pool.WorkerCount * 4));
-            var nodeChunk = int.TryParse(Environment.GetEnvironmentVariable("MQTTY_NODE_CHUNK"), out var nodeOverride) && nodeOverride > 0
-                ? nodeOverride
-                : 1;
-            pool.Run(
-                i => RefreshNetwork(networks[i]), networks.Length,
-                i => RefreshNode(i, nodes[i]), nodes.Length,
-                networkChunk, nodeChunk);
-            if (RefreshStatsEnabled)
-            {
-                _refreshStatsTicks++;
-                _refreshStatsWall += Stopwatch.GetTimestamp() - statsStart;
-                _refreshStatsNetworkPhaseWall += pool.LastNetworkPhaseTicks;
-                _refreshStatsNodePhaseWall += pool.LastNodePhaseTicks;
-            }
+            return;
         }
 
-        Tick();
+        foreach (var network in networks)
+        {
+            RefreshNetwork(network, tick, scope);
+
+            var networkNodes = network.Value.Nodes;
+            foreach (var node in networkNodes)
+            {
+                RefreshNode(node, tick, scope);
+            }
+        }
+    }
+
+    private void RefreshNetwork(KeyValuePair<string, INetwork> network, long tick, NetworkLoggerScope? scope)
+    {
+        if (ActiveOnly && network.Value.QueueSize == 0)
+        {
+            return;
+        }
+
+        if (EnableMonitoring)
+        {
+            Monitoring.Push(0, tick,
+                network.Value, network.Value, Array.Empty<byte>(), NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
+                "Network", "Refresh", scope);
+        }
+        network.Value.Refresh();
+    }
+
+    private void RefreshNode(KeyValuePair<string, INode> node, long tick, NetworkLoggerScope? scope)
+    {
+        if (ActiveOnly && IsNodeIdle(node.Value))
+        {
+            return;
+        }
+
+        if (EnableMonitoring)
+        {
+            Monitoring.Push(0, tick,
+                node.Value, node.Value, Array.Empty<byte>(), NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                scope);
+        }
+
+        node.Value.Refresh();
+    }
+
+    private void RefreshNode(KeyValuePair<(string Address, NodeType NodeType), ILeafNode> node, long tick,
+        NetworkLoggerScope? scope, int statsIndex)
+    {
+        if (ActiveOnly && IsNodeIdle(node.Value))
+        {
+            return;
+        }
+
+        var nodeStart = NodeStatsEnabled && statsIndex >= 0 ? Stopwatch.GetTimestamp() : 0;
+        if (EnableMonitoring)
+        {
+            Monitoring.Push(0, tick,
+                node.Value, node.Value, Array.Empty<byte>(), NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
+                scope);
+        }
+
+        node.Value.Refresh();
+
+        if (NodeStatsEnabled && statsIndex >= 0)
+        {
+            _nodeBusyTicks![statsIndex] += Stopwatch.GetTimestamp() - nodeStart;
+            _nodeCalls![statsIndex]++;
+        }
     }
 
     /// <summary>
@@ -546,101 +563,6 @@ public class NetworkSimulator : INetworkSimulator
         return _tickWorkerPool;
     }
 
-    private void RefreshImplementation(NetworkLoggerScope? scope, int strategy)
-    {
-        var bytes = Array.Empty<byte>();
-
-        EnsureTopologySnapshot();
-
-        if (NodeStatsEnabled)
-        {
-            EnsureNodeStats(_orderedNodes.Length);
-        }
-
-        CounterClock.Publish(TotalTicks, _refreshSteps);
-
-        _counters.Refresh(TotalTicks, _refreshSteps);
-
-        if (strategy == 0)
-        {
-            foreach (var network in _orderedNetworks)
-            {
-                if (ActiveOnly && network.Value.QueueSize == 0)
-                {
-                    continue;
-                }
-
-                if (EnableMonitoring)
-                {
-                    Monitoring.Push(0, TotalTicks,
-                        network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                        "Network", "Refresh", scope);
-                }
-                network.Value.Refresh();
-            }
-
-            for (var index = 0; index < _orderedNodes.Length; index++)
-            {
-                var node = _orderedNodes[index];
-                if (ActiveOnly && IsNodeIdle(node.Value))
-                {
-                    continue;
-                }
-
-                var nodeStart = NodeStatsEnabled ? Stopwatch.GetTimestamp() : 0;
-                if (EnableMonitoring)
-                {
-                    Monitoring.Push(0, TotalTicks,
-                        node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
-                        scope);
-                }
-                node.Value.Refresh();
-                if (NodeStatsEnabled)
-                {
-                    _nodeBusyTicks![index] += Stopwatch.GetTimestamp() - nodeStart;
-                    _nodeCalls![index]++;
-                }
-            }
-        }
-        else
-        {
-            foreach (var network in _orderedNetworks)
-            {
-                if (ActiveOnly && network.Value.QueueSize == 0)
-                {
-                    continue;
-                }
-
-                if (EnableMonitoring)
-                {
-                    Monitoring.Push(0, TotalTicks,
-                        network.Value, network.Value, bytes, NetworkLoggerType.Refresh, $"Refresh sourceNetwork {network.Key}",
-                        "Network", "Refresh", scope);
-                }
-                network.Value.Refresh();
-
-                var nodes = network.Value.Nodes;
-                foreach (var node in nodes)
-                {
-                    if (ActiveOnly && IsNodeIdle(node.Value))
-                    {
-                        continue;
-                    }
-
-                    if (EnableMonitoring)
-                    {
-                        Monitoring.Push(0, TotalTicks,
-                            node.Value, node.Value, bytes, NetworkLoggerType.Refresh, $"Refresh node {node.Key}", "Network", "Refresh",
-                            scope);
-                    }
-                    node.Value.Refresh();
-                }
-            }
-        }
-
-        Tick();
-    }
-
     public bool Reset()
     {
         try
@@ -650,7 +572,7 @@ public class NetworkSimulator : INetworkSimulator
 
             var bytes = Array.Empty<byte>();
 
-            foreach (var network in _networks)
+            foreach (var network in _topology.Networks)
             {
                 Monitoring.Push(0, TotalTicks,
                     network.Value, network.Value, bytes, NetworkLoggerType.Reset, $"Reset sourceNetwork {network.Key}",
@@ -658,7 +580,7 @@ public class NetworkSimulator : INetworkSimulator
                 network.Value.Reset();
             }
 
-            foreach (var node in _nodes)
+            foreach (var node in _topology.Nodes)
             {
                 Monitoring.Push(0, TotalTicks,
                     node.Value, node.Value, bytes, NetworkLoggerType.Reset, $"Reset node {node.Key}", "Network", "Reset",
@@ -740,18 +662,18 @@ public class NetworkSimulator : INetworkSimulator
 
     public void Tick()
     {
-        Interlocked.Increment(ref _tick);
+        _clock.Tick();
     }
 
-    public void Step() => _stepDeltas.Value++;
+    public void Step() => _clock.Step();
 
     public void ResetMeasurement()
     {
         lock (_measurementResetLock)
         {
             var startTick = TotalTicks;
-            var sources = _nodes.Values.Cast<object>()
-                .Concat(_networks.Values)
+            var sources = _topology.Nodes.Values.Cast<object>()
+                .Concat(_topology.Networks.Values)
                 .OfType<IMeasurementSource>()
                 .Distinct()
                 .ToArray();
@@ -773,25 +695,25 @@ public class NetworkSimulator : INetworkSimulator
 
     public bool AddClient(IClient client)
     {
-        if (_nodes.ContainsKey((client.Name, NodeType.Client)))
+        if (_topology.ContainsNode(client.Name, NodeType.Client))
         {
             return false;
         }
 
-        var cResult = _clients.TryAdd(client.Name, client);
+        var cResult = _topology.ClientMap.TryAdd(client.Name, client);
 
         if (!cResult)
         {
             return false;
         }
 
-        var result = _nodes.TryAdd((client.Name, NodeType.Client), client);
+        var result = _topology.Nodes.TryAdd((client.Name, NodeType.Client), client);
 
         if (result)
         {
             ((NodeBase)client).NetworkSimulator = this;
-            Interlocked.Increment(ref _countNodes);
-        Interlocked.Increment(ref _topologyVersion);
+            _topology.AddNodeCount();
+            _topology.MarkChanged();
         }
 
 
@@ -800,25 +722,25 @@ public class NetworkSimulator : INetworkSimulator
 
     public bool AddServer(IServer server)
     {
-        if (_nodes.ContainsKey((server.Name, NodeType.Server)))
+        if (_topology.ContainsNode(server.Name, NodeType.Server))
         {
             return false;
         }
 
-        var sResult = _servers.TryAdd(server.Name, server);
+        var sResult = _topology.ServerMap.TryAdd(server.Name, server);
 
         if (!sResult)
         {
             return false;
         }
 
-        var result = _nodes.TryAdd((server.Name, NodeType.Server), server);
+        var result = _topology.Nodes.TryAdd((server.Name, NodeType.Server), server);
 
         if (result)
         {
             ((NodeBase)server).NetworkSimulator = this;
-            Interlocked.Increment(ref _countNodes);
-        Interlocked.Increment(ref _topologyVersion);
+            _topology.AddNodeCount();
+            _topology.MarkChanged();
         }
 
         return result;
@@ -826,25 +748,25 @@ public class NetworkSimulator : INetworkSimulator
 
     public bool AddApplication(IApplication application)
     {
-        if (_nodes.ContainsKey((application.Name, NodeType.Application)))
+        if (_topology.ContainsNode(application.Name, NodeType.Application))
         {
             return false;
         }
 
-        var aResult = _apps.TryAdd(application.Name, application);
+        var aResult = _topology.ApplicationMap.TryAdd(application.Name, application);
 
         if (!aResult)
         {
             return false;
         }
 
-        var result = _nodes.TryAdd((application.Name, NodeType.Application), application);
+        var result = _topology.Nodes.TryAdd((application.Name, NodeType.Application), application);
 
         if (result)
         {
             ((ApplicationBase)application).NetworkSimulator = this;
-            Interlocked.Increment(ref _countNodes);
-        Interlocked.Increment(ref _topologyVersion);
+            _topology.AddNodeCount();
+            _topology.MarkChanged();
         }
 
 
@@ -853,12 +775,12 @@ public class NetworkSimulator : INetworkSimulator
 
     public bool AddNetwork(INetwork network)
     {
-        if (_networks.ContainsKey(network.Name))
+        if (_topology.Networks.ContainsKey(network.Name))
         {
             return false;
         }
 
-        var result = _networks.TryAdd(network.Name, network);
+        var result = _topology.NetworkMap.TryAdd(network.Name, network);
 
         if (!result)
         {
@@ -869,8 +791,8 @@ public class NetworkSimulator : INetworkSimulator
 
         ((NodeBase)network).NetworkSimulator = this;
 
-        Interlocked.Increment(ref _countNodes);
-        Interlocked.Increment(ref _topologyVersion);
+        _topology.AddNodeCount();
+        _topology.MarkChanged();
 
         return result;
     }
@@ -882,18 +804,18 @@ public class NetworkSimulator : INetworkSimulator
             return;
         }
         PathFinder.Build();
-        _counters.WithNetworks(_networks.Values);
+        _counters.WithNetworks(_topology.Networks.Values);
     }
 
     public bool Link(string sourceNetwork, string destinationNetwork)
     {
-        var source = _networks.GetValueOrDefault(sourceNetwork);
+        var source = _topology.NetworkMap.TryGetValue(sourceNetwork, out var sourceValue) ? sourceValue : null;
         if (source == null)
         {
             return false;
         }
 
-        var destination = _networks.GetValueOrDefault(destinationNetwork);
+        var destination = _topology.NetworkMap.TryGetValue(destinationNetwork, out var destinationValue) ? destinationValue : null;
         if (destination == null)
         {
             return false;
@@ -933,7 +855,7 @@ public class NetworkSimulator : INetworkSimulator
 
             var bytes = Array.Empty<byte>();
 
-            foreach (var node in _nodes.Values)
+            foreach (var node in _topology.Nodes.Values)
             {
                 Monitoring.Push(0, TotalTicks,
                     node, node, Array.Empty<byte>(), NetworkLoggerType.Disconnect, $"Clean {node.NodeType} {node.Name}", node.NodeType.ToString(), "Clean",
@@ -957,7 +879,7 @@ public class NetworkSimulator : INetworkSimulator
                 }
             }
 
-            foreach (var network in _networks)
+            foreach (var network in _topology.Networks)
             {
                 Monitoring.Push(0, TotalTicks,
                     network.Value, network.Value, bytes, NetworkLoggerType.Disconnect, $"Clean sourceNetwork {network.Key}",

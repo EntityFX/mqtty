@@ -88,6 +88,9 @@ namespace EntityFX.MqttY.Contracts.Network
 
         long TotalSteps { get; }
 
+        /// <summary>The model clock owned by this simulator.</summary>
+        ISimulationClock Clock { get; }
+
         /// <summary>Steps snapshot for the current refresh tick, so per-node counters do not rescan ThreadLocal values.</summary>
         long CurrentRefreshSteps { get; }
 

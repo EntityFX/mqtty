@@ -37,9 +37,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
     private readonly NetworkOptions _networkTypeOption;
     private readonly object _admissionLock = new();
-    private readonly ConcurrentQueue<(long Tick, int Bytes)> _admissions = new();
-    private readonly double _throughputBudgetBytes;
-    private long _windowBytes;
+    private readonly IAdmissionPolicy _admission;
 
     //private Dictionary<Guid, NetworkMonitoringPacket> _monitoringPacketsQueue = new();
 
@@ -136,8 +134,9 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         _networkCounters = new NetworkCounters(Name, "NC", ticksOptions, enableCounters,
             throughputWindowTicks: networkTypeOption.ThroughputWindowTicks);
         _counters = new CounterGroup(Name, "NN", "Network", "NG", enableCounters);
-        _throughputBudgetBytes = networkTypeOption.CapacityBytesPerSecond *
+        var throughputBudgetBytes = networkTypeOption.CapacityBytesPerSecond *
             ticksOptions.TickPeriod.TotalSeconds * networkTypeOption.ThroughputWindowTicks;
+        _admission = new TokenWindowAdmission(throughputBudgetBytes, networkTypeOption.ThroughputWindowTicks);
         NetworkType = networkType;
     }
 
@@ -307,23 +306,20 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
             return false;
         }
 
-        // The throughput window is claimed with a single interlocked add. The
-        // window entries are pruned once per tick in Refresh, so concurrent
-        // sends from many nodes on the same network no longer serialise on a
-        // monitor lock (the shared client LAN was the node-phase bottleneck).
+        var tick = NetworkSimulator!.TotalTicks;
         var bytes = packet.PacketBytes;
-        // The rolling window is pruned once per Network.Refresh, but sends can
-        // also be driven by plain Tick() (and by tests) without a refresh.
-        // Prune lazily only when the new claim may exceed the budget.
-        if (Volatile.Read(ref _windowBytes) + bytes > _throughputBudgetBytes)
+        if (!_admission.TryReserve(tick, bytes))
         {
-            PruneAdmissions(NetworkSimulator!.TotalTicks);
+            _networkCounters.Refuse();
+            return false;
         }
-        var windowBytes = Interlocked.Add(ref _windowBytes, bytes);
-        if (Volatile.Read(ref _queueLength) >= _networkTypeOption.QueueCapacity ||
-            windowBytes > _throughputBudgetBytes)
+
+        // Re-check after the byte claim: another worker may have filled the
+        // queue between the fast-fail and the reservation. A failed second
+        // check releases the claim without enqueueing a window entry.
+        if (Volatile.Read(ref _queueLength) >= _networkTypeOption.QueueCapacity)
         {
-            Interlocked.Add(ref _windowBytes, -bytes);
+            _admission.Rollback(bytes);
             _networkCounters.Refuse();
             return false;
         }
@@ -331,25 +327,9 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         if (isTransfer) packet.DecrementTtl();
         _monitoringPacketsQueue.Enqueue(networkPacket);
         Interlocked.Increment(ref _queueLength);
-        _admissions.Enqueue((NetworkSimulator!.TotalTicks, bytes));
+        _admission.Commit(tick, bytes);
         _networkCounters.CountInbound(packet);
         return true;
-    }
-
-    /// <summary>
-    /// Drops expired throughput-window entries. Runs from <see cref="Refresh"/>,
-    /// which is single-threaded for a given network.
-    /// </summary>
-    private void PruneAdmissions(long tick)
-    {
-        while (_admissions.TryPeek(out var admission) &&
-               tick - admission.Tick >= _networkTypeOption.ThroughputWindowTicks)
-        {
-            if (_admissions.TryDequeue(out var expired))
-            {
-                Interlocked.Add(ref _windowBytes, -expired.Bytes);
-            }
-        }
     }
 
     private NetworkMonitoringPacket GetNetworkPacketType(INetworkPacket packet)
@@ -488,7 +468,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
         // Expire the throughput window before the node phase can enqueue new
         // packets. Sends only claim budget; the prune stays single-threaded.
-        PruneAdmissions(totalTicks);
+        _admission.Prune(totalTicks);
 
         var pendingCount = Volatile.Read(ref _queueLength);
         for (var i = 0; i < pendingCount && _monitoringPacketsQueue.TryDequeue(out var pendingPacket); i++)
@@ -651,8 +631,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
             Interlocked.Exchange(ref _queueLength, 0);
             _deferredPackets.Clear();
             _deferredPacketsNext.Clear();
-            _admissions.Clear();
-            _windowBytes = 0;
+            _admission.Reset();
         }
     }
 }

@@ -349,6 +349,28 @@ UNSUBSCRIBE, retained store и replay, session resume с DUP. Это надо л
 harness сразу даёт сравнимые метрики и убирает самые дорогие в поддержке копии; S2 — последним
 из «ядра», так как это самый рискованный по латентностям этап.
 
+### Статус S0/S1 (2026-11-08)
+
+**S0 выполнен.** Добавлен `PacketTrace` (включается только на время characterization-прогона) и
+golden-набор `Fixtures/core-packet-trace-{seq0,seq1,par1}.golden.ndjson`. Тест
+`CharacterizationPacketTraceTests` фиксирует send/enqueue/receive-тики для локального и
+удалённого пакета, проверяет детерминизм и сравнивает seq/parallel (1 воркер) со снапшотом.
+При выключенном трассировщике горячий путь платит только один `Volatile.Read` на Send/Receive.
+
+**S1 выполнен в объёме швов:**
+
+| Шов | Реализация | Что сохранено |
+|---|---|---|
+| Часы | `ISimulationClock` / `SimulationClock`; `INetworkSimulator.Clock` | тот же тик, те же `ThreadLocal`-дельты шагов, тот же снапшот на refresh |
+| Топология | `TopologyRegistry` + `TopologySnapshot` | те же компараторы (`Ordinal` по имени; адрес → тип узла), сортировка только при смене версии |
+| Тик | `TickContext` + `TickPipeline` (`PublishClock → RefreshTopology → CompleteTick`) | прежний порядок: topology snapshot → clock/counters → refresh → `Tick()` → real/virtual time |
+| Admission | `IAdmissionPolicy` / `TokenWindowAdmission` | reserve → повторная проверка очереди → commit/rollback, тот же rolling byte budget |
+| Strategy | явно задокументировано | parallel всегда использует flat two-phase (strategy 0); strategy 1 остаётся sequential-only |
+
+Проверка: **392/392** теста; golden-трассы совпали. Замеры после S1 (4 воркера):
+LB `1.61× wall / 1.74× refresh`, Relay `2.28× / 2.38×`, Federation `1.98× / 2.47×` — в пределах
+шума относительно baseline. `CounterClock` оставлен как совместимый shim до этапа S3/S4.
+
 ---
 
 ## 7. Быстрые исправления независимо от переписывания
