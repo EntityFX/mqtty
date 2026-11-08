@@ -19,7 +19,7 @@ public class FederationResultWriterTests
             var value = new
             {
                 mode = FederationMode.Federation, text = "Проверка", latency = 1.2, optional = (double?)null,
-                publications = new[] { new FederationPublication(1, 0, 0, 0, 3, true, new byte[] { 0, 32, 255 }) },
+                publications = new[] { new FederationPublication(1, 0, 0, 0, 3, true, new byte[] { 0, 32, 255 }, "hash") },
                 transmissions = new[] { new TransmissionResult(4, "federator0", 0, 1, 1, true, "forward", "federation/routing/0/0", 3, "hash", 27, true) },
                 histogram = new Dictionary<long, long> { [4] = 1 }
             };

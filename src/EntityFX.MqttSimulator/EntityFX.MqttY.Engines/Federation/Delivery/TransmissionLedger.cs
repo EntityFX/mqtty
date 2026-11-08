@@ -14,7 +14,7 @@ public sealed class TransmissionLedger
         var role = client.StartsWith("publisher", StringComparison.Ordinal) ? "source" :
             topic.StartsWith("federation/routing/", StringComparison.Ordinal) ? "forward" : "localDelivery";
         records.Enqueue(new(tick, client, site, target, p.Id, p.Measurement, role, topic, payload.Length,
-            Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant(),
+            p.PayloadSha256,
             checked(Encoding.UTF8.GetByteCount(topic) + payload.Length), accepted));
     }
     // Same-tick callbacks can finish in any thread order. Export a total order,

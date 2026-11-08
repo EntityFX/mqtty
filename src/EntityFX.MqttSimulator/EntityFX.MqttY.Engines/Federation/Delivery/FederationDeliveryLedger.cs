@@ -76,7 +76,11 @@ public sealed class FederationDeliveryLedger
         BinaryPrimitives.WriteInt64LittleEndian(payload.AsSpan(8), tick);
         var origin = options.PublisherSite(publisher);
         var sequence = sequences.AddOrUpdate(origin, 1, static (_, value) => value + 1);
-        var publication = new FederationPublication(id, origin, sequence, publisher, tick, measurement, payload);
+        // The payload is forwarded many times; hash it once here instead of on
+        // every transmission/delivery bookkeeping record.
+        var payloadSha256 = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
+        var publication = new FederationPublication(id, origin, sequence, publisher, tick, measurement, payload,
+            payloadSha256);
         publications[id] = publication;
         return publication;
     }
@@ -96,16 +100,20 @@ public sealed class FederationDeliveryLedger
 
     public void Receive(int receiver, string topic, byte[] payload, long tick)
     {
-        // Hashing dominates delivery bookkeeping; compute it outside any lock.
-        var sha = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
-        receipts.Enqueue(new(receiver, payload.Length < 8 ? 0 : BinaryPrimitives.ReadInt64LittleEndian(payload), topic, tick, sha));
-
         var publication = Find(payload);
         if (publication == null)
         {
+            // Unknown payloads still need evidence; known ones reuse the hash
+            // computed when the publication was created.
+            var unknownSha = Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant();
+            receipts.Enqueue(new(receiver,
+                payload.Length < 8 ? 0 : BinaryPrimitives.ReadInt64LittleEndian(payload),
+                topic, tick, unknownSha));
             Interlocked.Increment(ref unknownDeliveries);
             return;
         }
+
+        receipts.Enqueue(new(receiver, publication.Id, topic, tick, publication.PayloadSha256));
         if (!publication.Measurement)
         {
             Interlocked.Increment(ref warmupDeliveries);
