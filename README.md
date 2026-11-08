@@ -29,6 +29,7 @@ dotnet run --project src/EntityFX.MqttSimulator/EntityFX.MqttY.LoadBalancing.App
 - [`doc/performance.md`](doc/performance.md) — методика замеров, текущие результаты seq/par, фазовый профиль и отклонённые оптимизации.
 - [`doc/progress.md`](doc/progress.md) — прогресс плана: общий объём, остаток и гейты.
 - [`doc/skills/dotnet-performance.md`](doc/skills/dotnet-performance.md) — skill по C#/.NET-производительности и параллелизации.
+- [`doc/analysis/message-scaling/super-article.md`](doc/analysis/message-scaling/super-article.md) — единая супер-статья: топологии, трафик и стоимость доставки.
 - [`doc/analysis/message-scaling/article.md`](doc/analysis/message-scaling/article.md) — статья о масштабировании числа сообщений.
 - [`doc/analysis/message-scaling/topologies.md`](doc/analysis/message-scaling/topologies.md) — отдельное описание топологий star/ring/line, Relay и LB.
 - [`doc/analysis/message-scaling/topologies-summary.md`](doc/analysis/message-scaling/topologies-summary.md) — краткая научная сводка и результаты по топологиям.

@@ -1,41 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="420" height="300">
 <rect width="100%" height="100%" fill="#fff"/>
-<text x="20" y="28" font-family="sans-serif" font-size="16" font-weight="700">Star: B sites + transit</text>
-<circle cx="210" cy="135" r="22" fill="#7c3aed"/><text x="210" y="139" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">transit</text>
-<line x1="210" y1="135" x2="210.0" y2="45.0" stroke="#94a3b8"/>
-<circle cx="210.0" cy="45.0" r="18" fill="#2563eb"/>
-<text x="210.0" y="49.0" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s0</text>
-<rect x="187.0" y="64.0" width="10" height="10" fill="#16a34a"/>
-<rect x="223.0" y="64.0" width="10" height="10" fill="#dc2626"/>
-<line x1="210" y1="135" x2="313.92304845413264" y2="90.0" stroke="#94a3b8"/>
-<circle cx="313.92304845413264" cy="90.0" r="18" fill="#2563eb"/>
-<text x="313.92304845413264" y="94.0" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s1</text>
-<rect x="290.92304845413264" y="109.0" width="10" height="10" fill="#16a34a"/>
-<rect x="326.92304845413264" y="109.0" width="10" height="10" fill="#dc2626"/>
-<line x1="210" y1="135" x2="313.92304845413264" y2="180.0" stroke="#94a3b8"/>
-<circle cx="313.92304845413264" cy="180.0" r="18" fill="#2563eb"/>
-<text x="313.92304845413264" y="184.0" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s2</text>
-<rect x="290.92304845413264" y="199.0" width="10" height="10" fill="#16a34a"/>
-<rect x="326.92304845413264" y="199.0" width="10" height="10" fill="#dc2626"/>
-<line x1="210" y1="135" x2="210.0" y2="225.0" stroke="#94a3b8"/>
-<circle cx="210.0" cy="225.0" r="18" fill="#2563eb"/>
-<text x="210.0" y="229.0" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s3</text>
-<rect x="187.0" y="244.0" width="10" height="10" fill="#16a34a"/>
-<rect x="223.0" y="244.0" width="10" height="10" fill="#dc2626"/>
-<line x1="210" y1="135" x2="106.07695154586739" y2="180.00000000000003" stroke="#94a3b8"/>
-<circle cx="106.07695154586739" cy="180.00000000000003" r="18" fill="#2563eb"/>
-<text x="106.07695154586739" y="184.00000000000003" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s4</text>
-<rect x="83.07695154586739" y="199.00000000000003" width="10" height="10" fill="#16a34a"/>
-<rect x="119.07695154586739" y="199.00000000000003" width="10" height="10" fill="#dc2626"/>
-<line x1="210" y1="135" x2="106.07695154586737" y2="90.0" stroke="#94a3b8"/>
-<circle cx="106.07695154586737" cy="90.0" r="18" fill="#2563eb"/>
-<text x="106.07695154586737" y="94.0" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s5</text>
-<rect x="83.07695154586737" y="109.0" width="10" height="10" fill="#16a34a"/>
-<rect x="119.07695154586737" y="109.0" width="10" height="10" fill="#dc2626"/>
-<rect x="20" y="275" width="10" height="10" fill="#2563eb"/><text x="36" y="284" font-family="sans-serif" font-size="10">broker / site</text>
-<rect x="130" y="275" width="10" height="10" fill="#16a34a"/><text x="146" y="284" font-family="sans-serif" font-size="10">publisher</text>
-<rect x="230" y="275" width="10" height="10" fill="#dc2626"/><text x="246" y="284" font-family="sans-serif" font-size="10">receiver</text>
-</svg>
+<text x="20" y="28" font-family="sans-serif" font-size="16" font-weight="700">Ring: B sites in a cycle</text>
 <line x1="210.0" y1="69.4" x2="284.2" y2="91.5" stroke="#94a3b8"/>
 <line x1="284.2" y1="91.5" x2="315.0" y2="145.0" stroke="#94a3b8"/>
 <line x1="315.0" y1="145.0" x2="284.2" y2="198.5" stroke="#94a3b8"/>
@@ -46,37 +11,37 @@
 <line x1="135.8" y1="91.5" x2="210.0" y2="69.4" stroke="#94a3b8"/>
 <circle cx="210.0" cy="69.4" r="18" fill="#2563eb"/>
 <text x="210.0" y="73.4" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s0</text>
-<rect x="189.0" y="88.4" width="10" height="10" fill="#16a34a"/>
-<rect x="221.0" y="88.4" width="10" height="10" fill="#dc2626"/>
-<circle cx="284.2462120245875" cy="91.54272734229701" r="18" fill="#2563eb"/>
-<text x="284.2462120245875" y="95.54272734229701" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s1</text>
-<rect x="263.2462120245875" y="110.54272734229701" width="10" height="10" fill="#16a34a"/>
-<rect x="295.2462120245875" y="110.54272734229701" width="10" height="10" fill="#dc2626"/>
+<rect x="194.0" y="91.4" width="8" height="8" fill="#16a34a"/>
+<rect x="218.0" y="91.4" width="8" height="8" fill="#dc2626"/>
+<circle cx="284.2" cy="91.5" r="18" fill="#2563eb"/>
+<text x="284.2" y="95.5" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s1</text>
+<rect x="268.2" y="113.5" width="8" height="8" fill="#16a34a"/>
+<rect x="292.2" y="113.5" width="8" height="8" fill="#dc2626"/>
 <circle cx="315.0" cy="145.0" r="18" fill="#2563eb"/>
 <text x="315.0" y="149.0" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s2</text>
-<rect x="294.0" y="164.0" width="10" height="10" fill="#16a34a"/>
-<rect x="326.0" y="164.0" width="10" height="10" fill="#dc2626"/>
-<circle cx="284.2462120245875" cy="198.457272657703" r="18" fill="#2563eb"/>
-<text x="284.2462120245875" y="202.457272657703" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s3</text>
-<rect x="263.2462120245875" y="217.457272657703" width="10" height="10" fill="#16a34a"/>
-<rect x="295.2462120245875" y="217.457272657703" width="10" height="10" fill="#dc2626"/>
+<rect x="299.0" y="167.0" width="8" height="8" fill="#16a34a"/>
+<rect x="323.0" y="167.0" width="8" height="8" fill="#dc2626"/>
+<circle cx="284.2" cy="198.5" r="18" fill="#2563eb"/>
+<text x="284.2" y="202.5" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s3</text>
+<rect x="268.2" y="220.5" width="8" height="8" fill="#16a34a"/>
+<rect x="292.2" y="220.5" width="8" height="8" fill="#dc2626"/>
 <circle cx="210.0" cy="220.6" r="18" fill="#2563eb"/>
 <text x="210.0" y="224.6" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s4</text>
-<rect x="189.0" y="239.6" width="10" height="10" fill="#16a34a"/>
-<rect x="221.0" y="239.6" width="10" height="10" fill="#dc2626"/>
-<circle cx="135.75378797541254" cy="198.457272657703" r="18" fill="#2563eb"/>
-<text x="135.75378797541254" y="202.457272657703" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s5</text>
-<rect x="114.75378797541254" y="217.457272657703" width="10" height="10" fill="#16a34a"/>
-<rect x="146.75378797541254" y="217.457272657703" width="10" height="10" fill="#dc2626"/>
+<rect x="194.0" y="242.6" width="8" height="8" fill="#16a34a"/>
+<rect x="218.0" y="242.6" width="8" height="8" fill="#dc2626"/>
+<circle cx="135.8" cy="198.5" r="18" fill="#2563eb"/>
+<text x="135.8" y="202.5" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s5</text>
+<rect x="119.8" y="220.5" width="8" height="8" fill="#16a34a"/>
+<rect x="143.8" y="220.5" width="8" height="8" fill="#dc2626"/>
 <circle cx="105.0" cy="145.0" r="18" fill="#2563eb"/>
 <text x="105.0" y="149.0" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s6</text>
-<rect x="84.0" y="164.0" width="10" height="10" fill="#16a34a"/>
-<rect x="116.0" y="164.0" width="10" height="10" fill="#dc2626"/>
-<circle cx="135.75378797541248" cy="91.54272734229701" r="18" fill="#2563eb"/>
-<text x="135.75378797541248" y="95.54272734229701" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s7</text>
-<rect x="114.75378797541248" y="110.54272734229701" width="10" height="10" fill="#16a34a"/>
-<rect x="146.75378797541248" y="110.54272734229701" width="10" height="10" fill="#dc2626"/>
-<rect x="20" y="275" width="10" height="10" fill="#2563eb"/><text x="36" y="284" font-family="sans-serif" font-size="10">broker / site</text>
-<rect x="130" y="275" width="10" height="10" fill="#16a34a"/><text x="146" y="284" font-family="sans-serif" font-size="10">publisher</text>
-<rect x="230" y="275" width="10" height="10" fill="#dc2626"/><text x="246" y="284" font-family="sans-serif" font-size="10">receiver</text>
+<rect x="89.0" y="167.0" width="8" height="8" fill="#16a34a"/>
+<rect x="113.0" y="167.0" width="8" height="8" fill="#dc2626"/>
+<circle cx="135.8" cy="91.5" r="18" fill="#2563eb"/>
+<text x="135.8" y="95.5" font-family="sans-serif" font-size="10" fill="#fff" text-anchor="middle">s7</text>
+<rect x="119.8" y="113.5" width="8" height="8" fill="#16a34a"/>
+<rect x="143.8" y="113.5" width="8" height="8" fill="#dc2626"/>
+<rect x="20" y="272" width="10" height="10" fill="#2563eb"/><text x="36" y="281" font-family="sans-serif" font-size="10">broker / site</text>
+<rect x="140" y="272" width="10" height="10" fill="#16a34a"/><text x="156" y="281" font-family="sans-serif" font-size="10">publisher</text>
+<rect x="250" y="272" width="10" height="10" fill="#dc2626"/><text x="266" y="281" font-family="sans-serif" font-size="10">receiver</text>
 </svg>

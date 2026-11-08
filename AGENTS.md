@@ -225,6 +225,7 @@ in-process host и делят временные каталоги, из-за ч�
 - `doc/performance.md` — методика замеров, текущие результаты, фазовый профиль, принятые и отклонённые оптимизации.
 - `doc/progress.md` — прогресс плана, остаток в часах и статус гейтов.
 - `doc/skills/dotnet-performance.md` — сохранённый skill по C#/.NET-производительности.
+- `doc/analysis/message-scaling/super-article.md` — единая статья: топологии, трафик и стоимость доставки.
 - `doc/analysis/message-scaling/article.md` — математическая статья о связи числа сообщений с топологией; данные и скрипты рядом.
 - `doc/analysis/message-scaling/topologies.md` — отдельное описание топологий star/ring/line, Relay и LB.
 - `doc/analysis/message-scaling/topologies-summary.md` — краткая сводка и научные результаты по топологиям.
