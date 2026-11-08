@@ -60,10 +60,10 @@ refresh (сети → fence → узлы → fence) на постоянном п
 
 | Конфиг | wall speedup | refresh speedup | core |
 |---|---:|---:|---|
-| LB L (64 брокера, 256 publishers, 20k rps) | **5.06×** | **6.03×** | match |
+| LB L (64 брокера, 256 publishers, 20k rps) | **4.98×** | **6.00×** | match |
 | LB reference | **2.98×** | **3.36×** | match |
-| Relay (2k rps) | **5.44×** | **6.30×** | match |
-| Federation L (16 брокеров, 256 publishers, 2k rps) | **3.97–4.14×** | **4.93–5.22×** | match / diag differ |
+| Relay (2k rps) | **5.26×** | **6.28×** | match |
+| Federation L (16 брокеров, 256 publishers, 2k rps) | **3.9–4.2×** | **4.9–5.3×** | match / diag differ |
 
 Ключевые факты:
 
@@ -218,5 +218,6 @@ in-process host и делят временные каталоги, из-за ч�
 - `doc/architecture.md` — слои, инварианты, тик, MQTT, harness, Web/Designer, статус S0–S5.
 - `doc/performance.md` — методика замеров, текущие результаты, фазовый профиль, принятые и отклонённые оптимизации.
 - `doc/progress.md` — прогресс плана, остаток в часах и статус гейтов.
+- `doc/skills/dotnet-performance.md` — сохранённый skill по C#/.NET-производительности.
 - `src/EntityFX.MqttSimulator/EntityFX.MqttY.Web.App/README.md` — API и запуск Web.
 - Внешние исследовательские отчёты и данные: `github.com/EntityFX/mqtty-meta`.

@@ -14,9 +14,9 @@ description: Run, extend, and interpret MqttY seq-vs-par benchmarks and phase pr
 ## Hardware first
 
 Record `lscpu`: logical CPUs, threads per core, physical cores, NUMA.
-This host is 8 logical / 4 physical. Target speedup is bounded by physical cores,
-not logical ones. 6–8× is impossible here; gate is 3.5–4.5×. On 8 physical cores
-the gate is 4–8×.
+This host is 24 logical / 12 physical (Xeon E5-2680 v3). Use `--workers 12`
+(physical cores); SMT oversubscription at 24 workers regresses LB. Gate is
+≥ 4× refresh/wall on 12 physical cores; 3.5–4.5× is the 4C/8T fallback.
 
 ## Fair protocol
 

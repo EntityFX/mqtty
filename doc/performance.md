@@ -37,8 +37,8 @@ dotnet run ... -- --engines fed --repeat 5 --warmup-runs 1 --measure 1 --drain 1
 
 | Гейт | Критерий | Статус |
 |---|---|---|
-| G1 | refresh ≥ 3.5× (4C/8T) / ≥ 4× (8 физ.) | LB L 5.9×, Relay 6.4×, Fed 4.9–5.2× — да; LB ref 3.4× — нет |
-| G2 | end-to-end ≥ 3.5× / ≥ 4× | LB L 5.01×, Relay 5.31× — да; Fed 3.97–4.14× — на границе; LB ref 2.98× — нет |
+| G1 | refresh ≥ 3.5× (4C/8T) / ≥ 4× (8 физ.) | LB L 6.0×, Relay 6.3×, Fed 4.9–5.3× — да; LB ref 3.4× — нет |
+| G2 | end-to-end ≥ 3.5× / ≥ 4× | LB L 4.98×, Relay 5.26× — да; Fed 3.9–4.2× — на границе; LB ref 2.98× — нет |
 | G3 | efficiency(physical) ≥ 50 % | LB L 42 %, Relay 44 %, Fed 33–35 % — нет |
 | G4 | seq == par, `errors=0` | core match везде; Fed diagnostics differ (pre-existing) |
 | G5 | масштабный конфиг ≥ 4× | LB L / Relay — да, Fed — на границе 3.97–4.14× |
@@ -50,10 +50,10 @@ dotnet run ... -- --engines fed --repeat 5 --warmup-runs 1 --measure 1 --drain 1
 
 | Конфиг | seq | par | wall speedup | refresh speedup | core |
 |---|---:|---:|---:|---:|---|
-| **LB L** (64 брокера, 256 publishers, 20k rps) | 9.95 с | **1.99 с** | **5.01×** | **5.91×** | match |
+| **LB L** (64 брокера, 256 publishers, 20k rps) | 9.24 с | **1.86 с** | **4.98×** | **6.00×** | match |
 | **LB reference** (16 брокеров, 64 publishers, 10k rps) | 1.92 с | **0.64 с** | **2.98×** | **3.36×** | match |
-| **Relay** (2k rps) | 14.85 с | **2.80 с** | **5.31×** | **6.38×** | match |
-| **Federation L** (16 брокеров, 2k rps) | 14.3 с | **3.4–3.8 с** | **4.0–4.2×** | **5.0–5.3×** | match / diag differ |
+| **Relay** (2k rps) | 11.97 с | **2.27 с** | **5.26×** | **6.28×** | match |
+| **Federation L** (16 брокеров, 2k rps) | 13.5–14.3 с | **3.4–3.8 с** | **3.9–4.2×** | **4.9–5.3×** | match / diag differ |
 
 Скорость seq/par на LB L выросла с ~3.9× до **5.06×** после двух изменений
 этого цикла: порядок сетей и GC-настройка бенчмарка.
@@ -138,6 +138,16 @@ dotnet run ... -- --engines fed --repeat 5 --warmup-runs 1 --measure 1 --drain 1
   `FederationDeliveryLedger.Create` и переиспользуется в transmission/receipt
   записях. Fed L: wall `3.74 → 3.44 с` (−8 %), speedup `4.00 → 4.16×`,
   refresh `5.01 → 5.33×`; Relay без регрессии.
+
+### 3.3a Пустые узлы (2026-11-08)
+
+`Node.Refresh` обрабатывал две пустые `ConcurrentQueue` и проворачивал пустые
+deferred-списки на каждом узле каждый тик. Добавлен early-out: если обе
+очереди и все deferred-списки пусты, счётчики обновляются, а ротация
+пропускается. Абсолютные времена: LB L `1.99 → 1.86 с`, Relay `2.80 → 2.27 с`,
+Fed seq `14.3 → 13.5 с`; `core=match` во всех режимах. Speedup-ratio почти не
+меняется, потому что выигрывают и seq, и par (для Fed ratio 3.9–4.2× — в
+пределах шума).
 
 ## 4. Фазовый профиль
 
@@ -247,6 +257,7 @@ phase2 ≈ 13.9–14.5 с суммы, barrier ≈ 4.8–5.2 с суммы, wall 
 | 2026-11-01 | Federation ring | 6.25 с | 1.24 с | lock-free ledger, Pump без OrderBy, IsIdle cache |
 | 2026-11-08 | Fed L reference | 7.06 с | 3.75 с | параллельный Pump на пуле тика, `RunSingle` |
 | 2026-11-08 | Fed L reference | 3.74 с | 3.44 с | SHA-256 payload один раз на публикацию |
+| 2026-11-08 | LB L / Relay | 1.99 / 2.80 с | 1.86 / 2.27 с | early-out пустых очередей узла |
 
 Эти цифры — про разные конфигурации и железо; для приёмки используйте только
 reference-бенчмарк из §1–2.

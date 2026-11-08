@@ -16,9 +16,9 @@
   <!-- Overall -->
   <text x="40" y="116" class="h2">Общий объём</text>
   <rect x="40" y="130" width="900" height="40" rx="8" fill="#e5e7eb"/>
-  <rect x="40" y="130" width="855" height="40" rx="8" fill="#16a34a"/>
-  <text x="52" y="156" class="chip" fill="#ffffff">выполнено 554 ч · 95 %</text>
-  <text x="806" y="156" class="chip" fill="#7c2d12">30 ч</text>
+  <rect x="40" y="130" width="860" height="40" rx="8" fill="#16a34a"/>
+  <text x="52" y="156" class="chip" fill="#ffffff">выполнено 558 ч · 95 %</text>
+  <text x="806" y="156" class="chip" fill="#7c2d12">26 ч</text>
   <text x="40" y="190" class="small">Всего 584 ч: переписывание S0–S5 — 384 ч, производительность M0–M8 — 200 ч.</text>
 
   <!-- Streams -->
@@ -32,18 +32,18 @@
 
   <text x="40" y="336" class="label">Производительность M0–M8</text>
   <rect x="250" y="322" width="600" height="24" rx="6" fill="#e5e7eb"/>
-  <rect x="250" y="322" width="510" height="24" rx="6" fill="#f59e0b"/>
-  <text x="862" y="339" class="value">85 %</text>
-  <text x="250" y="364" class="small">170 / 200 ч · остаток 30 ч</text>
+  <rect x="250" y="322" width="522" height="24" rx="6" fill="#f59e0b"/>
+  <text x="862" y="339" class="value">87 %</text>
+  <text x="250" y="364" class="small">174 / 200 ч · остаток 26 ч</text>
 
   <!-- Remaining -->
   <text x="40" y="414" class="h2">Остаток работ, ч</text>
-  <text x="40" y="438" class="small">Суммарно 30 ч, включая буфер 3 ч</text>
+  <text x="40" y="438" class="small">Суммарно 26 ч, включая буфер 3 ч</text>
 
   <!-- rows: label y, hours, width scale 18 px per hour -->
   <text x="40" y="474" class="label">M2b · инфляция node-работы</text>
-  <rect x="300" y="460" width="216" height="22" rx="5" fill="#dc2626"/>
-  <text x="526" y="476" class="value">12 ч</text>
+  <rect x="300" y="460" width="144" height="22" rx="5" fill="#dc2626"/>
+  <text x="526" y="476" class="value">8 ч</text>
 
   <text x="40" y="514" class="label">M4 · Federation drain / broker hot path</text>
   <rect x="300" y="500" width="144" height="22" rx="5" fill="#ea580c"/>
@@ -71,5 +71,5 @@
     <rect x="576" y="0" width="132" height="30" rx="15" fill="#dcfce7"/><text x="590" y="20" class="chip" fill="#166534">G5 scale  ok</text>
     <rect x="720" y="0" width="132" height="30" rx="15" fill="#dcfce7"/><text x="734" y="20" class="chip" fill="#166534">G6 tests  ok</text>
   </g>
-  <text x="40" y="756" class="small">LB L 5.0× / 5.9× · Relay 5.3× / 6.4× · Fed 4.0–4.2× / 5.0–5.3× · LB ref 2.98× / 3.36×</text>
+  <text x="40" y="756" class="small">LB L 4.98× / 6.00× · Relay 5.26× / 6.28× · Fed 3.9–4.2× / 4.9–5.3× · LB ref 2.98× / 3.36×</text>
 </svg>
