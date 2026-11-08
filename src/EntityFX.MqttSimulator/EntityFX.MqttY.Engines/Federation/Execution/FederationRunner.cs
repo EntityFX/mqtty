@@ -1,5 +1,6 @@
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Engines.Execution;
 using EntityFX.MqttY.Experiment;
 using EntityFX.MqttY.Utils;
 using System.Threading;
@@ -17,7 +18,8 @@ public sealed class FederationRunner
         var runtime = RuntimeOptions.FromEnvironment();
         var o = input.Options; var ledger = new FederationDeliveryLedger(o); var traffic = new TransmissionLedger(ledger);
         FederationTopology? topology = null; var phases = new List<FederationPhase>(); var phase = "construct"; long phaseStart = 0;
-        long scheduled = 0, rejected = 0, uniqueBefore = 0, completeBefore = 0;
+        var metrics = new MetricsCollector();
+        long uniqueBefore = 0, completeBefore = 0;
         var measured = false; var measurementStarted = false; var status = "failed"; string? error = null; string? graphMl = null;
         TransitNetworkSnapshot? transitBaseline = null;
         try
@@ -84,12 +86,12 @@ public sealed class FederationRunner
                             : FederationTopics.Input(publication.Origin);
                         if (!topology.Publishers[publisher].Publish(topic, publication.Payload, (MqttQos)o.Qos) && measurement)
                         {
-                            Interlocked.Increment(ref rejected);
+                            metrics.RecordRejected();
                         }
                     },
                     Refresh,
                     par && runtime.ParallelPublish);
-                if (measurement) scheduled += slots;
+                if (measurement) metrics.RecordScheduled(slots);
             }
         }
         catch (Exception ex)
@@ -108,8 +110,8 @@ public sealed class FederationRunner
             double? Rate(long value) => measured ? value / o.MeasurementSeconds : null;
             double? P(double q) => o.Qos == 0 ? null : FederationStatistics.Quantile(ph, q, o.TickPeriod.TotalMilliseconds);
             double? R(double q) => FederationStatistics.Quantile(rh, q, o.TickPeriod.TotalMilliseconds);
-            var summary = new FederationSummary(status, error, o.MeasurementSeconds, o.TickPeriod.TotalMilliseconds, scheduled,
-                ledger.Attempted, rejected, scheduled - ledger.Attempted, completed, completeBefore, completed - completeBefore, Rate(completed),
+            var summary = new FederationSummary(status, error, o.MeasurementSeconds, o.TickPeriod.TotalMilliseconds, metrics.Scheduled,
+                ledger.Attempted, metrics.Rejected, metrics.Scheduled - ledger.Attempted, completed, completeBefore, completed - completeBefore, Rate(completed),
                 ledger.Expected, ledger.Unique, uniqueBefore, ledger.Unique - uniqueBefore, receivers.Length == 0 ? null : ledger.FullyDelivered,
                 ledger.Expected > 0 ? 1d - (double)ledger.Unique / ledger.Expected : null, Rate(ledger.Unique),
                 receivers.Sum(r => r.Duplicates), ledger.UnexpectedDeliveries, ledger.UnknownDeliveries,

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Engines.Execution;
 using EntityFX.MqttY.Federation;
 using EntityFX.MqttY.LoadBalancing;
 using EntityFX.MqttY.Network;
@@ -455,60 +456,17 @@ internal static class Hardware
 
 internal static class Metrics
 {
-    public static MetricSet Lb(ExperimentSummary s) => new(
-        JsonSerializer.Serialize(new Dictionary<string, object?>
-        {
-            ["status"] = s.Status,
-            ["scheduled"] = s.ScheduledPublishes,
-            ["attempts"] = s.ApiAttempts,
-            ["rejected"] = s.SendRejected,
-            ["unique"] = s.Delivery.UniqueDelivered,
-            ["goodput"] = s.UniqueGoodput,
-            ["publishP50"] = s.PublishP50Ms,
-            ["publishP95"] = s.PublishP95Ms,
-            ["publishP99"] = s.PublishP99Ms,
-            ["errors"] = s.GraphErrors,
-        }),
-        JsonSerializer.Serialize(new Dictionary<string, object?>
-        {
-            ["receiverP50"] = s.ReceiverP50Ms,
-            ["receiverP95"] = s.ReceiverP95Ms,
-            ["receiverP99"] = s.ReceiverP99Ms,
-            ["duplicates"] = s.Delivery.DuplicateDeliveries,
-            ["unexpected"] = s.Delivery.UnexpectedDeliveries,
-            ["unknown"] = s.Delivery.UnknownDeliveries,
-        }));
+    public static MetricSet Lb(ExperimentSummary s)
+    {
+        var metrics = MetricsCollector.FromLoadBalancing(s);
+        return new MetricSet(MetricsCollector.Serialize(metrics.Core),
+            MetricsCollector.Serialize(metrics.Diagnostics));
+    }
 
-    public static MetricSet Fed(FederationSummary s) => new(
-        JsonSerializer.Serialize(new Dictionary<string, object?>
-        {
-            ["status"] = s.Status,
-            ["scheduled"] = s.ScheduledPublishes,
-            ["attempts"] = s.ApiAttempts,
-            ["rejected"] = s.SendRejected,
-            ["unique"] = s.UniqueDeliveries,
-            ["goodput"] = s.UniqueGoodput,
-            ["publishP50"] = s.PublishP50Ms,
-            ["publishP95"] = s.PublishP95Ms,
-            ["publishP99"] = s.PublishP99Ms,
-        }),
-        JsonSerializer.Serialize(new Dictionary<string, object?>
-        {
-            ["receiverP50"] = s.ReceiverP50Ms,
-            ["receiverP95"] = s.ReceiverP95Ms,
-            ["receiverP99"] = s.ReceiverP99Ms,
-            ["forwardRejected"] = s.ForwardRejected,
-            ["queueDrops"] = s.QueueDrops,
-            ["hopLimitDrops"] = s.HopLimitDrops,
-            ["unknown"] = s.UnknownDeliveries,
-        }));
-
-    public static MetricSet Relay(EntityFX.MqttY.Contracts.Network.INetworkSimulator graph) => new(
-        JsonSerializer.Serialize(new Dictionary<string, object?>
-        {
-            ["ticks"] = graph.TotalTicks,
-            ["steps"] = graph.TotalSteps,
-            ["errors"] = graph.Errors,
-        }),
-        "{}");
+    public static MetricSet Fed(FederationSummary s)
+    {
+        var metrics = MetricsCollector.FromFederation(s);
+        return new MetricSet(MetricsCollector.Serialize(metrics.Core),
+            MetricsCollector.Serialize(metrics.Diagnostics));
+    }
 }

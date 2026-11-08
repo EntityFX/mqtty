@@ -1,5 +1,6 @@
 using EntityFX.MqttY.Contracts.Mqtt;
 using EntityFX.MqttY.Contracts.Network;
+using EntityFX.MqttY.Engines.Execution;
 using EntityFX.MqttY.Experiment;
 using EntityFX.MqttY.Utils;
 using System.Diagnostics;
@@ -53,7 +54,8 @@ public sealed class LoadBalancingExperimentRunner
         var phases = new List<PhaseResult>();
         var status = "failed";
         string? error = null;
-        long start = 0, end = 0, attempts = 0, rejected = 0, scheduled = 0;
+        var metrics = new MetricsCollector();
+        long start = 0, end = 0;
         int pendingBefore = 0;
         long phaseStart = 0;
         var phase = "construct";
@@ -148,13 +150,13 @@ public sealed class LoadBalancingExperimentRunner
                             LoadBalancingTopologyBuilder.Topic, payload, (MqttQos)options.PublishQos);
                         if (measurement)
                         {
-                            Interlocked.Increment(ref attempts);
-                            if (!accepted) Interlocked.Increment(ref rejected);
+                            metrics.RecordAttempt();
+                            if (!accepted) metrics.RecordRejected();
                         }
                     },
                     Refresh,
                     par && runtime.ParallelPublish);
-                if (measurement) scheduled += slots;
+                if (measurement) metrics.RecordScheduled(slots);
             }
         }
         catch (Exception exception)
@@ -178,13 +180,13 @@ public sealed class LoadBalancingExperimentRunner
             var expected = backends.Sum(b => b.Metrics.ExpectedDeliveries);
             double? PublishQuantile(double q) => options.PublishQos == 0 ? null : Quantile(histogram, q, options.TickPeriod.TotalMilliseconds);
             double? ReceiverQuantile(double q) => Quantile(delivery.LatencyHistogramTicks, q, options.TickPeriod.TotalMilliseconds);
-            var summary = new ExperimentSummary(status, error, options.OfferedRps, scheduled, attempts, rejected,
-                scheduled - attempts, pendingBefore, topology?.Publishers.Count(c => c.HasPendingPublish) ?? 0,
+            var summary = new ExperimentSummary(status, error, options.OfferedRps, metrics.Scheduled, metrics.Attempts, metrics.Rejected,
+                metrics.Scheduled - metrics.Attempts, pendingBefore, topology?.Publishers.Count(c => c.HasPendingPublish) ?? 0,
                 start, end, topology?.Graph.TotalTicks ?? 0, topology?.Graph.Errors ?? 0, options.MeasurementSeconds,
                 options.TickPeriod.TotalMilliseconds,
                 completeMeasurement ? completed / options.MeasurementSeconds : null,
                 completeMeasurement ? delivery.UniqueDelivered / options.MeasurementSeconds : null,
-                attempts > 0 ? 1d - (double)delivery.UniqueDelivered / attempts : null,
+                metrics.Attempts > 0 ? 1d - (double)delivery.UniqueDelivered / metrics.Attempts : null,
                 backendAttempted > 0 ? (double)backends.Sum(b => b.Metrics.RateRejected + b.Metrics.PublishFailed) / backendAttempted : null,
                 expected > 0 ? 1d - (double)backends.Sum(b => b.Metrics.Delivered) / expected : null,
                 PublishQuantile(.5), PublishQuantile(.95), PublishQuantile(.99),

@@ -251,7 +251,19 @@ attempts/unique/core-метрики. `--no-export` по-прежнему не м
 
 **Оценка:** 4 ч/д.
 
-### S4g. MetricsCollector
+### S4g. MetricsCollector — ВЫПОЛНЕНО
+
+**Факт:** добавлен общий `EntityFX.MqttY.Engines.Execution.MetricsCollector`:
+atomic counters для scheduled/attempts/rejected/unique/errors и
+publication-latency samples. Snapshot возвращает типизированные
+`CoreMetrics`/`DiagnosticMetrics`; LB/Fed-раннеры используют коллектор для
+счётчиков, benchmark сериализует core/diagnostics через него. Экспорт остаётся
+раздельным (`summary.json`, `histograms.json`), дублирования summary нет.
+Integration **431/431**, добавлены тесты goodput/nearest-rank/concurrency.
+
+Замеры 12C/24T, workers=12, repeat 3: LB reference **2.01×/2.08×**; Relay
+(product FederationRunner, 16 брокеров, 64 публикатора, 2k rps) —
+**4.08×/4.91×**, `core=match`, `diagnostics=match`.
 
 1. Один collector: credit scheduler → attempts/rejected/unique/goodput/quantiles.
 2. Core vs diagnostics — явные типы; экспорт не дублирует summary.
