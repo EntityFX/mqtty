@@ -35,6 +35,26 @@ public sealed class SimulationsApiTests : IClassFixture<MqttYWebFactory>
     }
 
     [Fact]
+    public async Task CreateSimulation_WithoutRunSettings_ReturnsBadRequest()
+    {
+        var client = _factory.CreateClient();
+        var body = new
+        {
+            engine = "relay",
+            runSettings = (object?)null,
+            spec = new
+            {
+                kind = "line", chainLength = 2, brokerPresetId = "ideal-demo", clientsPerBroker = 1,
+                warmupTicks = 10, measurementTicks = 200, drainTimeoutTicks = 10000, offeredRps = 1000
+            }
+        };
+
+        var response = await client.PostAsJsonAsync("/api/simulations", body);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetSimulations_ReturnsList()
     {
         var client = _factory.CreateClient();

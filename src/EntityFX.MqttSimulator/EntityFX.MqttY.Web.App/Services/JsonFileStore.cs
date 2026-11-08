@@ -22,6 +22,20 @@ public sealed class JsonFileStore
 
     public string Root => _root;
 
+    /// <summary>True when <paramref name="path"/> resolves inside the data directory.</summary>
+    public bool IsWithinRoot(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        var full = Path.GetFullPath(path);
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        return string.Equals(full, _root, comparison) ||
+            full.StartsWith(Path.TrimEndingDirectorySeparator(_root) + Path.DirectorySeparatorChar, comparison);
+    }
+
     public string Resolve(string relativePath)
     {
         if (Path.IsPathRooted(relativePath))

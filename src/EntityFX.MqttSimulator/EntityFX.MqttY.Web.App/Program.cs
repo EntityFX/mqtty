@@ -72,6 +72,20 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// Unhandled controller/service exceptions become RFC 7807-style responses
+// instead of a framework-generated 500 body. This also keeps stack traces out
+// of production responses.
+app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
+{
+    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+    context.Response.ContentType = "application/problem+json";
+    await context.Response.WriteAsJsonAsync(new Microsoft.AspNetCore.Mvc.ProblemDetails
+    {
+        Status = StatusCodes.Status500InternalServerError,
+        Title = "Unhandled server error"
+    });
+}));
+
 if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("MqttYWeb:EnableSwagger"))
 {
     app.UseSwagger();

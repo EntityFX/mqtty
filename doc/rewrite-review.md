@@ -403,6 +403,21 @@ Smoke с экспортом и warmup проходит; gate LB `activity=ok`, `
 **Следующее по плану:** eviction завершённых QoS2-маркеров / общий result schema, затем S2
 (data-oriented транспорт) и S5 (Web/Designer).
 
+### Статус S5a (2026-11-08)
+
+Web hardening без изменения API:
+
+- `JsonFileStore.IsWithinRoot` + проверка persisted `OutputDir` в `GetResults`, `Download` и
+  `ExportManifest`; путь результата дополнительно проверяется после `Path.Combine`.
+- Глобальный `UseExceptionHandler` возвращает `application/problem+json` вместо
+  framework-500 и не раскрывает stack trace.
+- `RunSettings=null` даёт 400; `ToStatusDto` null-safe по `RunOptions.Graph.Ticks`.
+- Тесты: `FileStoreSafetyTests.IsWithinRoot_*`, `SimulationsApiTests.CreateSimulation_WithoutRunSettings_*`.
+  Web **53/53**, Integration **399/399**.
+
+**Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем eviction
+QoS2-маркеров и общий result schema.
+
 ---
 
 ## 7. Быстрые исправления независимо от переписывания

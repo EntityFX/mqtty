@@ -25,4 +25,20 @@ public sealed class FileStoreSafetyTests
         }
         finally { Directory.Delete(directory); }
     }
+
+    [Fact]
+    public void IsWithinRoot_RejectsSiblingAndOutsidePaths()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "mqtty-root-" + Guid.NewGuid().ToString("N"));
+        var store = new JsonFileStore(directory);
+        try
+        {
+            Assert.True(store.IsWithinRoot(store.Resolve("valid/data.json")));
+            Assert.True(store.IsWithinRoot(directory));
+            Assert.False(store.IsWithinRoot(""));
+            Assert.False(store.IsWithinRoot(Path.Combine(Path.GetTempPath(), "outside-" + Guid.NewGuid().ToString("N"))));
+            Assert.False(store.IsWithinRoot(directory + "-evil"));
+        }
+        finally { Directory.Delete(directory); }
+    }
 }

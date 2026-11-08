@@ -46,6 +46,8 @@ public sealed class SimulationsController : ControllerBase
     {
         try
         {
+        if (request == null) return BadRequest(new { error = "Request body is required." });
+        if (request.RunSettings == null) return BadRequest(new { error = "RunSettings is required." });
         SimulationStorageGuard.Check(_options, Path.GetFullPath(_options.DataDirectory));
         if (request.Engine is not ("relay" or "federation" or "loadBalancing")) return BadRequest(new { error = "Unknown engine." });
         if (request.RunSettings.ExecutionMode is not ("" or "InProcess" or "OutOfProcess")) return BadRequest(new { error = "Unknown execution mode." });
@@ -191,7 +193,7 @@ public sealed class SimulationsController : ControllerBase
     public IActionResult GetResults(string id)
     {
         var job = _registry.Get(id);
-        if (job?.OutputDir == null || !Directory.Exists(job.OutputDir))
+        if (job?.OutputDir == null || !_store.IsWithinRoot(job.OutputDir) || !Directory.Exists(job.OutputDir))
         {
             return NotFound();
         }
@@ -206,8 +208,9 @@ public sealed class SimulationsController : ControllerBase
     public IActionResult Download(string id, string file)
     {
         var job = _registry.Get(id);
-        if (job?.OutputDir == null || Path.GetFileName(file) != file) return NotFound();
+        if (job?.OutputDir == null || Path.GetFileName(file) != file || !_store.IsWithinRoot(job.OutputDir)) return NotFound();
         var path = Path.Combine(job.OutputDir, file);
+        if (!_store.IsWithinRoot(path)) return NotFound();
         return System.IO.File.Exists(path) ? PhysicalFile(path, "application/octet-stream", file) : NotFound();
     }
 
@@ -216,10 +219,10 @@ public sealed class SimulationsController : ControllerBase
     public IActionResult ExportManifest(string id)
     {
         var job = _registry.Get(id);
-        if (job?.OutputDir == null || !Directory.Exists(job.OutputDir)) return NotFound();
+        if (job?.OutputDir == null || !_store.IsWithinRoot(job.OutputDir) || !Directory.Exists(job.OutputDir)) return NotFound();
         var manifestPath = Path.Combine(job.OutputDir, "experiment-manifest.json");
         if (!System.IO.File.Exists(manifestPath)) manifestPath = Path.Combine(job.OutputDir, "manifest.json");
-        if (!System.IO.File.Exists(manifestPath)) return NotFound(new { error = "Manifest not found." });
+        if (!System.IO.File.Exists(manifestPath) || !_store.IsWithinRoot(manifestPath)) return NotFound(new { error = "Manifest not found." });
         return PhysicalFile(manifestPath, "application/json", $"manifest-{id}.json");
     }
 
@@ -313,7 +316,7 @@ public sealed class SimulationsController : ControllerBase
             Id = job.Id,
             TopologyId = job.TopologyId,
             Name = job.Name,
-            TickMilliseconds = job.RunOptions.Graph.Ticks.TickPeriod.TotalMilliseconds,
+            TickMilliseconds = job.RunOptions?.Graph?.Ticks?.TickPeriod.TotalMilliseconds ?? 0,
             Engine = job.Engine,
             State = job.State,
             TotalTicks = job.TotalTicks,
