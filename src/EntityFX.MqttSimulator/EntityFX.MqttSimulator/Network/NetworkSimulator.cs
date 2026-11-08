@@ -31,6 +31,10 @@ public class NetworkSimulator : INetworkSimulator
     private long _packetId = 0;
     private long _orderedTopologyVersion = -1;
     private KeyValuePair<string, INetwork>[] _orderedNetworks = Array.Empty<KeyValuePair<string, INetwork>>();
+    // Parallel phase 1 starts with the densest networks. The shared client LAN
+    // owns most nodes and takes far longer than a backend hop; starting it last
+    // makes its worker the tick tail and inflates the phase fence.
+    private KeyValuePair<string, INetwork>[] _parallelNetworks = Array.Empty<KeyValuePair<string, INetwork>>();
     private KeyValuePair<(string Address, NodeType NodeType), ILeafNode>[] _orderedNodes = Array.Empty<KeyValuePair<(string Address, NodeType NodeType), ILeafNode>>();
     private readonly object _measurementResetLock = new();
     private readonly SimulationClock _clock = new();
@@ -321,6 +325,10 @@ public class NetworkSimulator : INetworkSimulator
         if (_orderedTopologyVersion != snapshot.Version)
         {
             _orderedNetworks = snapshot.Networks;
+            _parallelNetworks = snapshot.Networks
+                .OrderByDescending(network => network.Value.Nodes.Count)
+                .ThenBy(network => network.Key, StringComparer.Ordinal)
+                .ToArray();
             _orderedNodes = snapshot.Nodes;
             _orderedTopologyVersion = snapshot.Version;
             if (NodeStatsEnabled)
@@ -424,15 +432,16 @@ public class NetworkSimulator : INetworkSimulator
         // schedule is both faster and deterministic. Parallel refresh therefore
         // intentionally ignores `context.Strategy`.
         var pool = EnsureTickWorkerPool();
+        var parallelNetworks = _parallelNetworks;
         var statsStart = RefreshStatsEnabled ? Stopwatch.GetTimestamp() : 0;
         // Networks are few and fairly uniform, so batching their claims is
         // fine. Nodes differ by orders of magnitude in cost (idle client vs
         // loaded broker); claiming them one at a time avoids a heavy tail.
         var networkChunk = _runtime.NetworkChunk
-            ?? Math.Max(1, networks.Length / (pool.WorkerCount * 4));
+            ?? Math.Max(1, parallelNetworks.Length / (pool.WorkerCount * 4));
         var nodeChunk = _runtime.NodeChunk ?? 1;
         pool.Run(
-            i => RefreshNetwork(networks[i], tick, scope), networks.Length,
+            i => RefreshNetwork(parallelNetworks[i], tick, scope), parallelNetworks.Length,
             i => RefreshNode(nodes[i], tick, scope, i), nodes.Length,
             networkChunk, nodeChunk);
         if (RefreshStatsEnabled)
