@@ -355,6 +355,10 @@ Xeon E5-2680 v3, **12 физических / 24 логических** ядра,
 При фиксированных \(P=32\), \(R=1000\) и \(M=1000\) измерены star, ring и
 line. Число сетей: \(N_{\mathrm{star}}=B+1\), \(N_{\mathrm{ring}}=N_{\mathrm{line}}=B\).
 
+| Star | Ring | Line |
+|---|---|---|
+| ![Star](figures/topology-star.svg) | ![Ring](figures/topology-ring.svg) | ![Line](figures/topology-line.svg) |
+
 | \(B\) | star \(X/M\) | ring \(X/M\) | line \(X/M\) |
 |---:|---:|---:|---:|
 | 2 | 20.30 | 18.28 | 18.28 |
