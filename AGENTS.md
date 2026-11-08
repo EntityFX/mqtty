@@ -63,7 +63,7 @@ refresh (сети → fence → узлы → fence) на постоянном п
 | LB L (64 брокера, 256 publishers, 20k rps) | **4.98×** | **6.00×** | match |
 | LB reference | **2.98×** | **3.36×** | match |
 | Relay (2k rps) | **5.26×** | **6.28×** | match |
-| Federation L (16 брокеров, 256 publishers, 2k rps) | **3.9–4.2×** | **4.9–5.3×** | match / diag differ |
+| Federation L (16 брокеров, 256 publishers, 2k rps) | **4.1–4.2×** | **5.0–5.1×** | match / diag differ |
 
 Ключевые факты:
 
