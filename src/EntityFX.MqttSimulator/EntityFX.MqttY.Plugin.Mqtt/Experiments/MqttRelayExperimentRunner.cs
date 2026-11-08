@@ -13,6 +13,7 @@ using EntityFX.MqttY.Plugin.Mqtt.Application.Mqtt;
 using EntityFX.MqttY.Plugin.Mqtt.BrokerProfile;
 using EntityFX.MqttY.Plugin.Mqtt.Factories;
 using EntityFX.MqttY.Plugin.Mqtt.Helper;
+using EntityFX.MqttY.Results;
 using EntityFX.MqttY.Utils;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Experiments;
@@ -22,6 +23,7 @@ public sealed class MqttRelayExperimentRunner
     private readonly TicksOptions _ticks;
     private readonly NetworkOptions _network;
     private readonly IBrokerBenchmarkRepository _profiles;
+    private static readonly IResultWriter ResultWriter = JsonResultWriter.Default;
     private readonly JsonSerializerOptions _json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -481,7 +483,8 @@ public sealed class MqttRelayExperimentRunner
         IReadOnlyDictionary<string, BrokerMetricsSnapshot> snapshots,
         MqttRelayExperimentSummary summary, IReadOnlyDictionary<string, long> receiverBaselines)
     {
-        var manifest = new ExperimentManifest(runId, DateTimeOffset.UtcNow, options,
+        var manifest = new ExperimentManifest(ResultSchema.Version,
+            ResultSchema.RelayExperiment, runId, DateTimeOffset.UtcNow, options,
             assignedTypes, provenance, RuntimeInformation.OSDescription,
             RuntimeInformation.FrameworkDescription, Environment.ProcessorCount,
             _ticks.TickPeriod, phases, summary.MeasurementStartTick, summary.MeasurementEndTick,
@@ -506,20 +509,14 @@ public sealed class MqttRelayExperimentRunner
             graph == null ? string.Empty : new SimpleGraphMlGenerator().SerializeNetworkGraph(graph));
         WriteTextNew(Path.Combine(directory, "topology.puml"),
             graph == null ? "@startuml\n@enduml\n" : new PlantUmlGraphGenerator().Generate(graph));
+        ResultWriter.Seal(directory, _json);
     }
 
-    private void WriteJsonNew<T>(string path, T value)
-    {
-        using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
-        JsonSerializer.Serialize(stream, value, _json);
-    }
+    private void WriteJsonNew<T>(string path, T value) =>
+        ResultWriter.WriteJson(path, value, _json);
 
-    private static void WriteTextNew(string path, string value)
-    {
-        using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
-        using var writer = new StreamWriter(stream);
-        writer.Write(value);
-    }
+    private static void WriteTextNew(string path, string value) =>
+        ResultWriter.WriteText(path, value);
 
     private static byte[] CreatePayload(int size, int seed)
     {
@@ -556,6 +553,8 @@ public sealed class MqttRelayExperimentRunner
     private sealed record BrokerClientCount(string Broker, int ConnectedClients, int ProfileClients);
 
     private sealed record ExperimentManifest(
+        int SchemaVersion,
+        string Experiment,
         string RunId,
         DateTimeOffset CreatedAtUtc,
         MqttRelayExperimentOptions Options,

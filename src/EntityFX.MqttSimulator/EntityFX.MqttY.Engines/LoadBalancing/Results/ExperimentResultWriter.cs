@@ -3,37 +3,31 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
+using EntityFX.MqttY.Results;
 
 namespace EntityFX.MqttY.LoadBalancing;
 
 public static class ExperimentResultWriter
 {
     private static readonly Lazy<object> RuntimeIdentity = new(ReadRuntimeIdentity);
-    public static void CreateOutput(string directory)
-    {
-        directory = Path.GetFullPath(directory);
-        if (Directory.Exists(directory) || File.Exists(directory)) throw new IOException("Choose a new output directory: " + directory);
-        Directory.CreateDirectory(directory);
-        // CreateNew protects the ownership marker from being overwritten by a competing invocation.
-        using var marker = new FileStream(Path.Combine(directory, ".experiment"), FileMode.CreateNew, FileAccess.Write, FileShare.None);
-    }
+    private static readonly IResultWriter Writer = JsonResultWriter.Default;
+    public static void CreateOutput(string directory) => Writer.CreateOutput(directory);
 
     public static void Write(string directory, PreparedExperiment input, ExperimentSummary summary, string? graphMl, string? plantUml)
     {
         var options = input.Options;
         var inputs = Path.Combine(directory, "inputs");
         Directory.CreateDirectory(inputs);
-        File.WriteAllBytes(Path.Combine(inputs, "config.json"), input.Configuration.Bytes);
+        Writer.WriteBytes(Path.Combine(inputs, "config.json"), input.Configuration.Bytes);
         WriteJson(Path.Combine(directory, "run-config.json"), options with
         {
             BrokerProfiles = null, BrokerProfilePath = input.Profile == null ? null : "inputs/profile.json"
         });
-        if (input.Profile != null) File.WriteAllBytes(Path.Combine(inputs, "profile.json"), input.Profile.Source.Bytes);
-        if (input.CalibrationObservations != null) File.WriteAllBytes(Path.Combine(inputs, "calibration-observations.json"), input.CalibrationObservations.Bytes);
+        if (input.Profile != null) Writer.WriteBytes(Path.Combine(inputs, "profile.json"), input.Profile.Source.Bytes);
+        if (input.CalibrationObservations != null) Writer.WriteBytes(Path.Combine(inputs, "calibration-observations.json"), input.CalibrationObservations.Bytes);
         WriteJson(Path.Combine(directory, "manifest.json"), new
         {
-            schemaVersion = 1, experiment = "connection-balancing-v1", transportTiming = "fixed",
+            schemaVersion = ResultSchema.Version, experiment = ResultSchema.LoadBalancingExperiment, transportTiming = "fixed",
             loadScheduling = "equal per-publisher slots; closed-loop QoS1/2; bounded per-publisher credit, no reassignment of blocked load",
             scope = options.Ideal ? "ideal mechanism check" : "exploratory calibrated connection-balancing model; not native LB fidelity",
             assumptions = new[] { "No TCP proxy overhead, health checks or session migration", "One direct receiver per independent backend",
@@ -63,8 +57,9 @@ public static class ExperimentResultWriter
             Number(b.Metrics.Completed/summary.MeasurementSeconds), b.UniqueReceived, b.UniqueReceivedBeforeDrain,
             b.UniqueReceived-b.UniqueReceivedBeforeDrain, Number(b.UniqueReceived/summary.MeasurementSeconds)
         }))), new UTF8Encoding(false));
-        if (graphMl != null) File.WriteAllText(Path.Combine(directory, "topology.graphml"), graphMl.Replace("encoding=\"utf-16\"", "encoding=\"utf-8\""), new UTF8Encoding(false));
-        if (plantUml != null) File.WriteAllText(Path.Combine(directory, "topology.puml"), plantUml, new UTF8Encoding(false));
+        if (graphMl != null) Writer.WriteText(Path.Combine(directory, "topology.graphml"),
+            graphMl.Replace("encoding=\"utf-16\"", "encoding=\"utf-8\""));
+        if (plantUml != null) Writer.WriteText(Path.Combine(directory, "topology.puml"), plantUml);
         var report = new StringBuilder("# Балансировка подключений MQTT\n\n");
         var brokerLabel = options.Ideal ? "идеальная модель без реального профиля" : options.BrokerType;
         report.AppendLine($"Брокер: **{brokerLabel}**; режим: **{options.Mode}**; QoS: **{options.PublishQos}**; seed: **{options.Seed}**. Статус: **{summary.Status}**.\n");
@@ -87,20 +82,15 @@ public static class ExperimentResultWriter
         report.AppendLine("\nGoodput и завершения включают drain измерительной когорты и делятся на длительность подачи нагрузки. Нагрузка прогрева исключена по ID/поколению. SendRejected — немедленный отказ метода, а не все протокольные ошибки. Завершения backend не сопоставляются с отдельными ID. null/notApplicable означает отсутствие применимой оценки; для QoS 0 ACK latency неприменима. Глобальные квантили вычислены по объединённым гистограммам методом ближайшего верхнего ранга.");
         if (summary.Error != null) report.AppendLine("\n## Причина технического отказа\n\n```text\n" + summary.Error + "\n```");
         report.AppendLine("\nЧисла сохранены в summary.json, backend-metrics.csv, assignments.csv и histograms.json. Точные входные байты — в inputs; происхождение — в manifest.json. SHA-256 подтверждает целостность, а проверка вычислений требует повторного запуска с этими входами и сопоставления summary.json.");
-        File.WriteAllText(Path.Combine(directory, "report.md"), report.ToString(), new UTF8Encoding(false));
+        Writer.WriteText(Path.Combine(directory, "report.md"), report.ToString());
         Seal(directory);
     }
 
-    public static void WriteJson(string path, object value)
-    {
-        var temporary = path + ".tmp";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(value, ExperimentInput.Json), new UTF8Encoding(false));
-        File.Move(temporary, path, overwrite: true);
-    }
-    public static void Seal(string directory) => WriteJson(Path.Combine(directory, "sha256.json"), Directory.GetFiles(directory, "*", SearchOption.AllDirectories)
-        .Where(p => Path.GetFullPath(p) != Path.GetFullPath(Path.Combine(directory, "sha256.json")) && Path.GetFileName(p) != ".experiment")
-        .OrderBy(p => p, StringComparer.Ordinal).ToDictionary(p => Path.GetRelativePath(directory, p).Replace('\\', '/'),
-            p => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(p))).ToLowerInvariant()));
+    public static void WriteJson(string path, object value) =>
+        Writer.WriteJson(path, value, ExperimentInput.Json);
+
+    public static void Seal(string directory) =>
+        Writer.Seal(directory, ExperimentInput.Json);
     private static string Number(double? value) => value?.ToString("G17", CultureInfo.InvariantCulture) ?? "notApplicable";
 
     private static object ReadRuntimeIdentity()

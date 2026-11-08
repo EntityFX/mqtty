@@ -2,39 +2,23 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using EntityFX.MqttY.Results;
 namespace EntityFX.MqttY.Federation;
 
 public static class FederationResultWriter
 {
     private static readonly Lazy<object> Runtime = new(FederationRuntimeIdentity.Read);
-    public static void Claim(string output)
-    {
-        if (Directory.Exists(output) || File.Exists(output)) throw new IOException("Choose a new output directory: " + output);
-        Directory.CreateDirectory(output);
-        using var marker = new FileStream(Path.Combine(output, ".experiment"), FileMode.CreateNew, FileAccess.Write, FileShare.None);
-    }
-    public static void Json(string path, object value)
-    {
-        var temp = path + ".tmp";
-        using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
-            JsonSerializer.Serialize(stream, value, FederationInput.Json);
-        File.Move(temp, path, true);
-    }
-    public static void Seal(string output) => Json(Path.Combine(output, "sha256.json"), Directory.GetFiles(output, "*", SearchOption.AllDirectories)
-        .Where(p => Path.GetFullPath(p) != Path.GetFullPath(Path.Combine(output, "sha256.json")) && Path.GetFileName(p) != ".experiment")
-        .OrderBy(p => p, StringComparer.Ordinal).ToDictionary(p => Path.GetRelativePath(output, p).Replace('\\', '/'), FileSha256));
-    private static string FileSha256(string path)
-    {
-        using var stream = File.OpenRead(path);
-        using var sha256 = SHA256.Create();
-        return Convert.ToHexString(sha256.ComputeHash(stream)).ToLowerInvariant();
-    }
+    private static readonly IResultWriter Writer = JsonResultWriter.Default;
+    public static void Claim(string output) => Writer.CreateOutput(output);
+    public static void Json(string path, object value) =>
+        Writer.WriteJson(path, value, FederationInput.Json);
+    public static void Seal(string output) => Writer.Seal(output, FederationInput.Json);
     public static void Write(string output, FederationInput input, FederationSummary s, FederationPublication[] publications, DeliveryReceipt[] receipts, TransmissionResult[] transmissions, string? graphMl, TransitNetworkEvidence? networkEvidence = null,
         FederationDrainDiagnostics? drainDiagnostics = null)
     {
         var o = input.Options; var inputs = Path.Combine(output, "inputs"); Directory.CreateDirectory(inputs);
-        File.WriteAllBytes(Path.Combine(inputs, "config.json"), input.Configuration);
-        if (input.ProfileBytes != null) File.WriteAllBytes(Path.Combine(inputs, "profile.json"), input.ProfileBytes);
+        Writer.WriteBytes(Path.Combine(inputs, "config.json"), input.Configuration);
+        if (input.ProfileBytes != null) Writer.WriteBytes(Path.Combine(inputs, "profile.json"), input.ProfileBytes);
         Json(Path.Combine(output, "run-config.json"), o with { BrokerProfilePath = input.ProfileBytes == null ? null : "inputs/profile.json" });
         Json(Path.Combine(output, "summary.json"), s); Json(Path.Combine(output, "publications.json"), publications); Json(Path.Combine(output, "transmissions.json"), transmissions);
         Json(Path.Combine(output, "delivery-receipts.json"), receipts);
@@ -43,8 +27,8 @@ public static class FederationResultWriter
         Json(Path.Combine(output, "phases.json"), s.Phases); Json(Path.Combine(output, "histograms.json"), new { publish = s.PublishHistogramTicks, receiver = s.ReceiverHistogramTicks, s.TickMilliseconds });
         Json(Path.Combine(output, "manifest.json"), new
         {
-            schemaVersion = 1,
-            experiment = "static-federation-v1",
+            schemaVersion = ResultSchema.Version,
+            experiment = ResultSchema.FederationExperiment,
             resolvedOptions = o,
             configurationSha256 = Convert.ToHexString(SHA256.HashData(input.Configuration)).ToLowerInvariant(),
             input.ProfileSha256,
@@ -61,7 +45,8 @@ public static class FederationResultWriter
         File.WriteAllLines(Path.Combine(output, "sources.csv"), new[] { "publisher,site,broker,attempted,admitted,completed,rateRejected,publishFailed" }.Concat(s.Sources.Select(p => $"{p.Publisher},{p.Site},{p.Broker},{p.Metrics.Attempted},{p.Metrics.Admitted},{p.Metrics.Completed},{p.Metrics.RateRejected},{p.Metrics.PublishFailed}")), new UTF8Encoding(false));
         if (graphMl != null)
         {
-            File.WriteAllText(Path.Combine(output, "topology.graphml"), graphMl.Replace("encoding=\"utf-16\"", "encoding=\"utf-8\""), new UTF8Encoding(false));
+            Writer.WriteText(Path.Combine(output, "topology.graphml"),
+                graphMl.Replace("encoding=\"utf-16\"", "encoding=\"utf-8\""));
             FederationDiagrams.Write(output, o, graphMl);
         }
         string N(double? n) => n?.ToString("0.######", CultureInfo.InvariantCulture) ?? "notApplicable";
@@ -72,7 +57,7 @@ public static class FederationResultWriter
         report.AppendLine("## Формулы и ограничения\n\nRPS исходных завершений = завершения только publishers / длительность нагрузки. Goodput = число уникальных пар ID–получатель / ту же длительность. Ожидаемые пары = API-попытки × число subscribers; потери включают немедленные отказы исходного Publish. Backpressure = заданные слоты − API-попытки. Drain входит в измерительную когорту; прогрев исключён по ID. Квантили рассчитаны по объединённым гистограммам методом верхнего ранга. QoS 0 ACK latency и показатели доставки при отсутствии subscribers неприменимы.\n\nЭто статическая пересылка, не самоорганизующийся алгоритм статьи Ribas–Spohn. Федерация рассылает по соседям с подавлением повторов; Relay соединяет каждый брокер со всеми остальными; экспортирует только исходные локальные сообщения и не пересылает импорт повторно. Темы input/routing/delivered разделены. CPU/RSS, EST, выбор ядра и отказоустойчивость не моделируются. Профилированные результаты не подтверждают натурную точность при дополнительной пересылке и fanout. Короткое окно проверяет механизм, а не стационарный p99.\n");
         if (s.Error != null) report.AppendLine("## Причина отказа\n\n```text\n" + s.Error + "\n```\n");
         report.AppendLine("Повтор: `run --config run-config.json --output <новый-каталог>`. Входы сохранены в inputs; summary.json не содержит сведений о компьютере. Хэши подтверждают целостность, проверяемость требует пересчёта и повторного запуска. SVG/Mermaid построены после сверки площадок, связей и расположения клиентов с GraphML.");
-        File.WriteAllText(Path.Combine(output, "report.md"), report.ToString(), new UTF8Encoding(false)); Seal(output);
+        Writer.WriteText(Path.Combine(output, "report.md"), report.ToString()); Seal(output);
     }
     private static JsonElement? ProfileProvenance(byte[]? bytes)
     {

@@ -188,7 +188,18 @@ session resume/DUP либо отсутствуют, либо заглушены.
 **Цель:** один набор примитивов для LB/Relay/Federation, версионированные результаты,
 детерминированный экспорт, единый CLI, benchmark на продуктовых движках.
 
-### S4d. Result schema и writer
+### S4d. Result schema и writer — ВЫПОЛНЕНО
+
+**Факт:** добавлен единый `EntityFX.MqttY.Results`:
+`ResultSchema.Version = 1`, `ExperimentManifestV1`, `ExperimentArtifactV1`,
+`IResultWriter`/`JsonResultWriter`. Writer делает атомарную замену через
+`.tmp`, потоковую JSON-сериализацию, сортированный `sha256.json` (потоковый
+хеш, без чтения файла в массив) и умеет писать текст/байты. LB, Federation и
+Relay используют его; имена файлов не изменились. Relay теперь тоже пишет
+`sha256.json`, а его manifest получил `schemaVersion`/`experiment`.
+Integration **427/427**; golden-тест `JsonResultWriterTests` проверяет, что две
+одинаковые записи дают побайтно одинаковые `summary.json` и `sha256.json`, а
+неудачная запись не заменяет существующий артефакт.
 
 1. `ExperimentResultV1` (schemaVersion, provenance, phases, metrics core/diagnostics,
    artifacts, hashes). `ExperimentManifestV1` отдельно.
