@@ -41,7 +41,9 @@ public abstract class NodeBase : ISender
     //Создаём ManualResetEventSlim 
     public bool Send(INetworkPacket packet)
     {
-        NetworkSimulator!.Step();
+        var simulator = NetworkSimulator!;
+        PacketTrace.RecordSend(simulator.TotalTicks, packet);
+        simulator.Step();
         var result = SendImplementation(packet);
 
         return result;
@@ -52,7 +54,9 @@ public abstract class NodeBase : ISender
     //Добавляем и Снимаем ManualResetEventSlim 
     public bool Receive(INetworkPacket packet)
     {
-        NetworkSimulator!.Step();
+        var simulator = NetworkSimulator!;
+        PacketTrace.RecordReceive(simulator.TotalTicks, packet);
+        simulator.Step();
         var result = ReceiveImplementation(packet);
 
         return result;
