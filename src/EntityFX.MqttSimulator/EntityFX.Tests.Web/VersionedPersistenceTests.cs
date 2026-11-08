@@ -13,9 +13,8 @@ public class VersionedPersistenceTests
         {
             var path = store.Resolve("topologies/v1.json");
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            await File.WriteAllTextAsync(path, """
-                { "id": "v1", "name": "legacy", "graph": { "nodes": [], "networks": [], "links": [] }, "spec": {} }
-                """);
+            await File.WriteAllTextAsync(path,
+                "{ \"id\": \"v1\", \"name\": \"legacy\", \"graph\": { \"nodes\": [], \"networks\": [], \"links\": [] }, \"spec\": {} }");
 
             var saved = await store.ReadAsync<SavedTopologyDto>("topologies/v1.json");
 

@@ -335,7 +335,19 @@ Rate limit возвращает `429 application/problem+json`. Пути дан�
 
 **Оценка:** 4 ч/д.
 
-### S5g. Designer `DesignDocument`
+### S5g. Designer `DesignDocument` — ВЫПОЛНЕНО ЧАСТИЧНО
+
+**Факт:** добавлен UI-независимый слой `EntityFX.MqttY.Design`:
+POCO `DesignDocument`/`DesignNetwork`/`DesignNode`/`DesignLink`/`DesignNetworkType`,
+двусторонний маппинг `NetworkGraphOption ↔ DesignDocument`, JSON save/load,
+`IDesignLayoutEngine` + детерминированный `GridDesignLayoutEngine` и чистый
+`GraphMlDesignReader` (GraphML → DesignDocument без Avalonia/ReactiveUI).
+Тесты в Integration: round-trip options, layout determinism, JSON round-trip,
+GraphML import; Integration **435/435**.
+
+**Осталось:** перевести `NetworkEditorViewModel`/`GraphMLImporterService` на
+новый слой и убрать дублирующие Avalonia-модели; сейчас старый Designer
+продолжает работать как раньше.
 
 1. Чистый POCO `DesignDocument` (сети/узлы/связи/позиции/zoom/ticks), без Avalonia/ReactiveUI.
 2. `IDesignLayoutEngine` + `GraphMLReader → ImportDto → validator → DesignDocument`.
