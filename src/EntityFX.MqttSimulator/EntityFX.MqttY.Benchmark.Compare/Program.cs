@@ -262,10 +262,24 @@ EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSam
 
     Console.WriteLine($"  seq wall  median={(seq.Length > 0 ? seqWall.ToString("F4") : "n/a"),8}s  min={(seq.Length > 0 ? seq.Min(s => s.Wall).ToString("F4") : "n/a"),8}  max={(seq.Length > 0 ? seq.Max(s => s.Wall).ToString("F4") : "n/a"),8}  cv={(seq.Length > 0 ? cv(seq.Select(s => s.Wall)) : 0):F1}%");
     Console.WriteLine($"  par wall  median={(par.Length > 0 ? parWall.ToString("F4") : "n/a"),8}s  min={(par.Length > 0 ? par.Min(s => s.Wall).ToString("F4") : "n/a"),8}  max={(par.Length > 0 ? par.Max(s => s.Wall).ToString("F4") : "n/a"),8}  cv={(par.Length > 0 ? cv(par.Select(s => s.Wall)) : 0):F1}%");
-    Console.WriteLine($"  refresh   seq={seqRefresh:F4}s  par={parRefresh:F4}s  speedup={(refreshSpeedup > 0 ? refreshSpeedup.ToString("F2") + "x" : "n/a")}");
+    var hasBoth = seq.Length > 0 && par.Length > 0;
+    var wallCi = hasBoth
+        ? BootstrapRatioCi(seq.Select(s => s.Wall).ToArray(), par.Select(s => s.Wall).ToArray())
+        : (Low: 0.0, High: 0.0);
+    var refreshCi = hasBoth
+        ? BootstrapRatioCi(seq.Select(s => s.Refresh).ToArray(), par.Select(s => s.Refresh).ToArray())
+        : (Low: 0.0, High: 0.0);
+    if (hasBoth)
+    {
+        Console.WriteLine($"  wall CI   speedup 95%=[{wallCi.Low:F2}x, {wallCi.High:F2}x]");
+    }
+    Console.WriteLine($"  refresh   seq={seqRefresh:F4}s  par={parRefresh:F4}s  speedup={(refreshSpeedup > 0 ? refreshSpeedup.ToString("F2") + "x" : "n/a")}" +
+                      (hasBoth ? $"  95%=[{refreshCi.Low:F2}x, {refreshCi.High:F2}x]" : ""));
     Console.WriteLine($"  export    seq={seqExport:F4}s  par={parExport:F4}s");
     Console.WriteLine($"  cpu       seq={seqCpu:F3}s  par={parCpu:F3}s  ({(seqCpu > 0 ? parCpu / seqCpu : 0):F2}x)");
-    Console.WriteLine($"  speedup   {(wallSpeedup > 0 ? wallSpeedup.ToString("F2") + "x" : "n/a")}   status={status}   errors={errors}   activity={(activity ? "ok" : "EMPTY")}   core={(metricsMatch ? "match" : "MISMATCH")}   diagnostics={(diagnosticsMatch ? "match" : "differ")}");
+    Console.WriteLine($"  speedup   {(wallSpeedup > 0 ? wallSpeedup.ToString("F2") + "x" : "n/a")}" +
+                      (hasBoth ? $"  95%=[{wallCi.Low:F2}x, {wallCi.High:F2}x]" : "") +
+                      $"  status={status}   errors={errors}   activity={(activity ? "ok" : "EMPTY")}   core={(metricsMatch ? "match" : "MISMATCH")}   diagnostics={(diagnosticsMatch ? "match" : "differ")}");
     Console.WriteLine();
 
     return new EngineReport(name, seqWall, parWall, wallSpeedup, seqRefresh, parRefresh, refreshSpeedup,
@@ -277,6 +291,28 @@ EngineReport RunEngine(string name, BenchOptions options, Func<bool, int, RunSam
         return ordered.Length == 0 ? 0 : ordered.Length % 2 == 1
             ? ordered[ordered.Length / 2]
             : (ordered[ordered.Length / 2 - 1] + ordered[ordered.Length / 2]) / 2;
+    }
+
+    static (double Low, double High) BootstrapRatioCi(double[] seqValues, double[] parValues, int iterations = 2000)
+    {
+        if (seqValues.Length == 0 || parValues.Length == 0) return (0, 0);
+        var random = new Random(42);
+        var ratios = new double[iterations];
+        for (var i = 0; i < iterations; i++)
+        {
+            var seqMedian = median(Sample(seqValues, random));
+            var parMedian = median(Sample(parValues, random));
+            ratios[i] = parMedian > 0 ? seqMedian / parMedian : 0;
+        }
+        Array.Sort(ratios);
+        return (ratios[(int)(iterations * 0.025)], ratios[(int)(iterations * 0.975) - 1]);
+    }
+
+    static IEnumerable<double> Sample(double[] values, Random random)
+    {
+        var result = new double[values.Length];
+        for (var i = 0; i < result.Length; i++) result[i] = values[random.Next(values.Length)];
+        return result;
     }
 
     static double cv(IEnumerable<double> values)
@@ -344,7 +380,7 @@ FederationOptions BuildRelayOptions(BenchOptions o)
         Topology = "star",
         Publishers = Math.Max(o.Publishers, Math.Min(o.Brokers, 16)),
         PayloadBytes = 16,
-        Qos = 1,
+        Qos = o.LbQos,
         OfferedRps = o.FedRps,
         Seed = o.Seed,
         WarmupSeconds = o.Warmup,
@@ -373,7 +409,7 @@ FederationOptions BuildFedOptions(BenchOptions o)
         Topology = o.FedTopology,
         Publishers = Math.Max(o.Publishers, Math.Min(o.Brokers, 16)),
         PayloadBytes = 16,
-        Qos = 1,
+        Qos = o.LbQos,
         OfferedRps = o.FedRps,
         Seed = o.Seed,
         WarmupSeconds = o.Warmup,
