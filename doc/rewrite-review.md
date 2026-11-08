@@ -432,6 +432,22 @@ QoS2-маркеров и общий result schema.
 **Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем общий
 result schema и Designer (`DesignDocument`).
 
+### Статус S5b (2026-11-08)
+
+Designer больше не теряет параметры сети и layout:
+
+- `NetworkTypeModel.QueueSize` → `NetworkOptions.QueueCapacity` (0 → прежний default 50000);
+  `RefreshTicks` → `TransferTicks`; `SendTicks` при загрузке берётся из глобального
+  `Ticks.OutgoingWaitTicks`, а не подменяется `TransferTicks`.
+- `RebuildGraph` сохраняет текущие позиции, рассчитывает layout для новых элементов и
+  накладывает сохранённые позиции сверху (раньше `_layout` перезаписывался и позиции терялись).
+- Добавлены `DesignerModelTests` (round-trip queue/send ticks + default). Web **55/55**.
+
+Осталось: persisted layout (позиции/zoom) в сохраняемой топологии — это часть `DesignDocument`.
+
+**Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем общий
+result schema и persisted `DesignDocument`.
+
 ### Статус S2a (2026-11-08)
 
 Подготовка к S2 без смены модели доставки:

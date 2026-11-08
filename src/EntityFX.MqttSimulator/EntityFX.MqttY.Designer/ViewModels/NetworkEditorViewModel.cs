@@ -219,11 +219,22 @@ public class NetworkEditorViewModel : ReactiveObject
     {
         if (DesignModel == null) return;
 
-        // Save current positions from graph items before recalculating
+        // Keep manually arranged positions: save them into the current layout,
+        // calculate a layout for the new topology, then overlay the saved
+        // positions (new items keep their calculated position).
+        var previous = _layout;
         SaveCurrentPositions();
+        var calculated = _graphLayoutService.CalculateLayout(DesignModel);
+        foreach (var (name, position) in previous.NetworkPositions)
+        {
+            calculated.NetworkPositions[name] = position;
+        }
+        foreach (var (name, position) in previous.NodePositions)
+        {
+            calculated.NodePositions[name] = position;
+        }
 
-        // Calculate layout for new items only (existing positions preserved)
-        _layout = _graphLayoutService.CalculateLayout(DesignModel);
+        _layout = calculated;
         BuildGraphItems();
         BuildGraphLinks();
     }

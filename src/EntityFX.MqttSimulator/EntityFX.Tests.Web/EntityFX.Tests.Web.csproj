@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\EntityFX.MqttY.Web.App\EntityFX.MqttY.Web.App.csproj" />
     <ProjectReference Include="..\EntityFX.MqttY.Engines\EntityFX.MqttY.Engines.csproj" />
+    <ProjectReference Include="..\EntityFX.MqttY.Designer\EntityFX.MqttY.Designer.csproj" />
   </ItemGroup>
 
 </Project>

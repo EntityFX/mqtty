@@ -28,6 +28,7 @@ public class NetworkDesignModel
             {
                 Speed = nt.Speed,
                 TransferTicks = nt.RefreshTicks,
+                QueueCapacity = nt.QueueSize > 0 ? (int)Math.Min(nt.QueueSize, int.MaxValue) : 50000,
                 NetworkType = nt.Name
             };
         }
@@ -81,8 +82,8 @@ public class NetworkDesignModel
                 Name = name,
                 Speed = nt.Speed,
                 RefreshTicks = nt.TransferTicks,
-                SendTicks = nt.TransferTicks,
-                QueueSize = 100000
+                SendTicks = option.Ticks.OutgoingWaitTicks,
+                QueueSize = nt.QueueCapacity
             });
         }
 
