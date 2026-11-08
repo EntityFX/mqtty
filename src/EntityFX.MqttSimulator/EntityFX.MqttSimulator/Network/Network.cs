@@ -22,7 +22,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
     /// <summary>
     /// TODO: Add max size limit
     /// </summary>
-    private ConcurrentQueue<NetworkMonitoringPacket> _monitoringPacketsQueue = new();
+    private ConcurrentQueue<NetworkPacketSlot> _monitoringPacketsQueue = new();
 
     // Number of items currently in _monitoringPacketsQueue. ConcurrentQueue.Count
     // walks the segment list and takes locks, which turned every send into a
@@ -32,8 +32,8 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
     // Deferred (not-yet-due) network packets, split from the ready queue so each
     // tick only touches packets once and never re-enqueues the whole backlog
     // (O(ready) per tick instead of O(whole queue)) (R1).
-    private List<NetworkMonitoringPacket> _deferredPackets = new();
-    private List<NetworkMonitoringPacket> _deferredPacketsNext = new();
+    private List<NetworkPacketSlot> _deferredPackets = new();
+    private List<NetworkPacketSlot> _deferredPacketsNext = new();
 
     private readonly NetworkOptions _networkTypeOption;
     private readonly object _admissionLock = new();
@@ -275,14 +275,14 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         return true;
     }
 
-    internal bool TransferNext(NetworkMonitoringPacket networkMonitoringPacket)
+    internal bool TransferNext(ref NetworkPacketSlot networkPacket)
     {
-        if (networkMonitoringPacket.Path.Count == 0)
+        if (networkPacket.NextHop >= networkPacket.Path.Length)
         {
-            networkMonitoringPacket.Type = NetworkPacketType.Local;
+            networkPacket.Type = NetworkPacketType.Local;
         }
 
-        return TryEnqueue(networkMonitoringPacket, isTransfer: true);
+        return TryEnqueue(networkPacket, isTransfer: true);
     }
 
     //TODO: If queue limit is exceeded then reject Send
@@ -294,7 +294,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         return TryEnqueue(networkPacket);
     }
 
-    private bool TryEnqueue(NetworkMonitoringPacket networkPacket, bool isTransfer = false)
+    private bool TryEnqueue(NetworkPacketSlot networkPacket, bool isTransfer = false)
     {
         var packet = networkPacket.Packet;
 
@@ -332,14 +332,15 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         return true;
     }
 
-    private NetworkMonitoringPacket GetNetworkPacketType(INetworkPacket packet)
+    private NetworkPacketSlot GetNetworkPacketType(INetworkPacket packet)
     {
         var destionationNode = GetDestinationNode(packet.To!, packet.ToType);
 
         if (destionationNode != null)
         {
-            return new NetworkMonitoringPacket(NetworkSimulator!.TotalTicks, 
-            _networkTypeOption.TransferTicks, false, packet, new Queue<INetwork>(), NetworkPacketType.Local, destionationNode);
+            return new NetworkPacketSlot(NetworkSimulator!.TotalTicks,
+                _networkTypeOption.TransferTicks, passTillNextTick: false, packet,
+                Array.Empty<INetwork>(), 0, NetworkPacketType.Local, destionationNode);
         }
 
         var sourceNode = NetworkSimulator!.GetNode(packet.From, packet.FromType);
@@ -350,27 +351,21 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
         if (sourceNode == null || fromNetwork == null || toNetwork == null)
         {
-            return new NetworkMonitoringPacket(
-                NetworkSimulator!.TotalTicks, 
-            _networkTypeOption.TransferTicks, false, packet, new Queue<INetwork>(), NetworkPacketType.Unreachable, null);
+            return new NetworkPacketSlot(NetworkSimulator!.TotalTicks,
+                _networkTypeOption.TransferTicks, passTillNextTick: false, packet,
+                Array.Empty<INetwork>(), 0, NetworkPacketType.Unreachable, null);
         }
 
-        var pathToRemote = NetworkSimulator.PathFinder.GetPath(fromNetwork, toNetwork);
-
-        var pathQueue = new Queue<INetwork>(pathToRemote);
+        var pathToRemote = NetworkSimulator.PathFinder.GetPath(fromNetwork, toNetwork).ToArray();
         destionationNode = (toNetwork as Network)?.GetDestinationNode(packet.To!, packet.ToType);
 
-        var waitTime = _networkTypeOption.TransferTicks;
-
-        return new NetworkMonitoringPacket(NetworkSimulator!.TotalTicks, 
-            _networkTypeOption.TransferTicks, true, packet, pathQueue, NetworkPacketType.Remote, destionationNode)
-        {
-            TransferWaitTicks = waitTime
-        };
+        return new NetworkPacketSlot(NetworkSimulator!.TotalTicks,
+            _networkTypeOption.TransferTicks, passTillNextTick: true, packet,
+            pathToRemote, 0, NetworkPacketType.Remote, destionationNode);
     }
 
 
-    private bool SendToLocal(INetwork network, NetworkMonitoringPacket networkPacket)
+    private bool SendToLocal(INetwork network, NetworkPacketSlot networkPacket)
     {
         var packet = networkPacket.Packet;
         if (string.IsNullOrEmpty(packet.From))
@@ -378,7 +373,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
             throw new ArgumentException($"'{nameof(packet.To)}' cannot be null or empty.", nameof(packet.To));
         }
 
-        if (networkPacket.DestionationNode == null)
+        if (networkPacket.DestinationNode == null)
         {
             return false;
         }
@@ -386,28 +381,28 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
         if (NetworkSimulator!.EnableMonitoring)
         {
-            NetworkSimulator.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, network, networkPacket.DestionationNode, packet.Payload, NetworkLoggerType.Push,
-                $"Push packet from network to node: {network.Name} ~> {networkPacket.DestionationNode.Name}",
+            NetworkSimulator.Monitoring.Push(networkPacket.Packet.Id, NetworkSimulator.TotalTicks, network, networkPacket.DestinationNode, packet.Payload, NetworkLoggerType.Push,
+                $"Push packet from network to node: {network.Name} ~> {networkPacket.DestinationNode.Name}",
                 "Network", packet.Category, null, packet.Ttl, queueLength: _monitoringPacketsQueue.Count);
             NetworkSimulator.Monitoring.WithEndScope(NetworkSimulator.TotalTicks, ref packet);
         }
 
         _networkCounters.CountOutbound(packet);
-        return networkPacket.DestionationNode!.Receive(packet);
+        return networkPacket.DestinationNode!.Receive(packet);
     }
 
 
-    private bool SendToRemote(NetworkMonitoringPacket networkPacket, out bool deferred)
+    private bool SendToRemote(NetworkPacketSlot networkPacket, out bool deferred)
     {
         deferred = false;
         var packet = networkPacket.Packet;
 
-        if (networkPacket.Path.Count == 0)
+        if (networkPacket.NextHop >= networkPacket.Path.Length)
         {
             return false;
         }
 
-        var next = networkPacket.Path.Peek() as Network;
+        var next = networkPacket.Path[networkPacket.NextHop] as Network;
 
         if (next == null)
         {
@@ -426,15 +421,14 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
             return false;
         }
 
-        var nextNetworkPacket = new NetworkMonitoringPacket(NetworkSimulator!.TotalTicks,
-            _networkTypeOption.TransferTicks, true, packet,
-            new Queue<INetwork>(networkPacket.Path.Skip(1)), networkPacket.Type, networkPacket.DestionationNode);
-        if (!next.TransferNext(nextNetworkPacket))
+        var nextNetworkPacket = new NetworkPacketSlot(NetworkSimulator!.TotalTicks,
+            _networkTypeOption.TransferTicks, passTillNextTick: true, packet,
+            networkPacket.Path, networkPacket.NextHop + 1, networkPacket.Type, networkPacket.DestinationNode);
+        if (!next.TransferNext(ref nextNetworkPacket))
         {
             deferred = true;
             return false;
         }
-        networkPacket.Path.Dequeue();
 
         if (NetworkSimulator!.EnableMonitoring)
         {
@@ -474,7 +468,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         for (var i = 0; i < pendingCount && _monitoringPacketsQueue.TryDequeue(out var pendingPacket); i++)
         {
             Interlocked.Decrement(ref _queueLength);
-            if (!ProcessNetworkPacket(pendingPacket, totalTicks, deferredNext))
+            if (!ProcessNetworkPacket(ref pendingPacket, totalTicks))
             {
                 deferredNext.Add(pendingPacket);
             }
@@ -484,7 +478,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         for (var i = 0; i < deferred.Count; i++)
         {
             var pendingPacket = deferred[i];
-            if (!ProcessNetworkPacket(pendingPacket, totalTicks, deferredNext))
+            if (!ProcessNetworkPacket(ref pendingPacket, totalTicks))
             {
                 deferredNext.Add(pendingPacket);
             }
@@ -502,12 +496,13 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
     }
 
     /// <returns>true when the packet is fully processed; false when it must stay deferred.</returns>
-    private bool ProcessNetworkPacket(
-        NetworkMonitoringPacket pendingPacket, long totalTicks, List<NetworkMonitoringPacket> deferredNext)
+    private bool ProcessNetworkPacket(ref NetworkPacketSlot pendingPacket, long totalTicks)
     {
-        if (pendingPacket.PassTillNextTick && pendingPacket.Tick == totalTicks)
+        if (pendingPacket.PassTillNextTick && pendingPacket.CreatedTick == totalTicks)
         {
-            var to = pendingPacket.Path.FirstOrDefault();
+            INetwork? to = pendingPacket.NextHop < pendingPacket.Path.Length
+                ? pendingPacket.Path[pendingPacket.NextHop]
+                : null;
             if (to == null || !NetworkSimulator!.EnableMonitoring)
             {
                 return false;
@@ -525,7 +520,6 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         if (pendingPacket.TransferWaitTicks <= 0 && !pendingPacket.Released)
         {
             ProcessTransferPacket(pendingPacket, out var deferred);
-            pendingPacket.Released = !deferred;
             return !deferred;
         }
 
@@ -534,7 +528,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
 
     //TODO: need VIRTUAL wait 
-    private bool ProcessTransferPacket(NetworkMonitoringPacket networkPacket, out bool deferred)
+    private bool ProcessTransferPacket(NetworkPacketSlot networkPacket, out bool deferred)
     {
         deferred = false;
         var result = false;

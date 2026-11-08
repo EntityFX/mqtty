@@ -454,10 +454,10 @@ Designer больше не теряет параметры сети и layout:
 Подготовка к S2 без смены модели доставки:
 
 - `Node.SendToNetwork` уважает `MQTTY_NO_PACKET_POOL` — при выключенном пуле пакет больше не
-  добавляется в `ConcurrentBag` (раньше bag рос без границ).
+  добавляется в `ConcurrentBag` (раньше bag рос без границ). **Устарело: в S2 пул удалён.**
 - `NodeMonitoringPacket.Reset` очищает `ManualResetEventSlim` в WaitMode; переиспользованный
-  пакет больше не наследует старое `Release()`.
-- Добавлен `NodeMonitoringPacketTests`. Проверка: **400/400**.
+  пакет больше не наследует старое `Release()`. **Устарело: в S2 wrapper заменён слотом.**
+- Добавлен `NodeMonitoringPacketTests`. Проверка: **400/400**. **Заменено `NodePacketSlotTests`.**
 
 Полный S2 (slot rings вместо обёрток/deferred/pool) остаётся отдельным крупным шагом.
 
@@ -478,8 +478,25 @@ Layout Designer сохраняется вместе с топологией:
   (текущие позиции имеют приоритет над сохранёнными);
 - добавлен round-trip тест. Web **56/56**, Integration **403/403**.
 
-**Следующее по плану:** S2 (data-oriented транспорт) — под golden-трассами S0; затем общий
-result schema.
+### Статус S2 (2026-11-08)
+
+Транспорт переведён на data-oriented слоты:
+
+- `NodeMonitoringPacket` заменён на `NodePacketSlot` (struct), `NetworkMonitoringPacket` — на
+  `NetworkPacketSlot`; статические пулы и `MQTTY_NO_PACKET_POOL` удалены.
+- сетевой путь — `INetwork[]` + `NextHop`, без `Queue<INetwork>` и `Path.Skip(1)` на каждом хопе.
+- сохранена семантика ожидания: `CreatedTick` + `WaitTicks` уменьшаются на **каждый Refresh**
+  (не только на `Tick()`), `PassTillNextTick` запрещает доставку в том же тике; это
+  зафиксировано `DeterministicCoreTests` и golden-трассами.
+- deferred-списки пока остаются: следующий шаг — заменить их ring-буфером, если это даст
+  измеримый выигрыш.
+
+Проверка: **404/404**, golden-трассы seq/par совпали. Замеры (4 воркера):
+LB `1.63× wall / 1.78× refresh`, Relay `2.29× / 2.49×`, Federation `1.93× / 2.33×` —
+в пределах шума/без регрессии относительно S1.
+
+**Следующее по плану:** общий result schema/экспорт; затем ring-буферы deferred и быстрые
+исправления из §7.
 
 ---
 
@@ -494,7 +511,7 @@ result schema.
 | 2 | outbound-счётчик берёт inbound `TickFirstValue`, деление без guard | `Counter/NetworkCounters.cs:145-153` | неверная серия throughput |
 | 3 | `RefreshWithCounters` делает `Reset()` при ошибке; relay-runner игнорирует `bool` | `NetworkSimulator.cs:910-925`, `MqttRelayExperimentRunner.cs:340-366` | «Completed» при пустых метриках |
 | 4 | `InMemoryRepository.Update` пересобирает snapshot | `Internals/InMemoryRepository.cs:34-38` | O(сессий) аллокаций на пакет |
-| 5 | packet pool асимметричен при `MQTTY_NO_PACKET_POOL` | `Node.cs:195-212` | утечка bag |
+| 5 | packet pool асимметричен при `MQTTY_NO_PACKET_POOL` | `Node.cs:195-212` | утечка bag — **устранено в S2 (пул удалён)** |
 | 6 | `_responseCount` не декрементится при доставке | `Node.cs:276,321,366` | ложный `HasPendingResponse` |
 | 7 | `AddClient` оставляет `_clients` при провале `_nodes.TryAdd` | `NetworkSimulator.cs:775-798` | фантомный клиент |
 | 8 | `Pump` игнорирует результат `Publish` | `StaticFederator.cs:97-107` | потеря доставки без счётчика |

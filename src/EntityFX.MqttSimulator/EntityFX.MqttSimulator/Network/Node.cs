@@ -26,8 +26,8 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     // MQTT publish handshakes have their own state machine; only legacy blocking
     // request APIs need the generic transport response table.
     protected virtual bool ShouldTrackResponse(INetworkPacket packet) => true;
-    private readonly ConcurrentQueue<NodeMonitoringPacket> _outgoingMessages = new();
-    private readonly ConcurrentQueue<NodeMonitoringPacket> _incommingMessages = new();
+    private readonly ConcurrentQueue<NodePacketSlot> _outgoingMessages = new();
+    private readonly ConcurrentQueue<NodePacketSlot> _incommingMessages = new();
     private int _outgoingQueueLength;
     private int _incommingQueueLength;
     private int _responseCount;
@@ -38,18 +38,11 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     // Deferred (not-yet-due) packets, split from the ready queues so each tick
     // only touches packets once and never re-enqueues the whole backlog
     // (O(ready) per tick instead of O(whole queue)).
-    private List<NodeMonitoringPacket> _outgoingDeferred = new();
-    private List<NodeMonitoringPacket> _outgoingDeferredNext = new();
-    private List<NodeMonitoringPacket> _incommingDeferred = new();
-    private List<NodeMonitoringPacket> _incommingDeferredNext = new();
+    private List<NodePacketSlot> _outgoingDeferred = new();
+    private List<NodePacketSlot> _outgoingDeferredNext = new();
+    private List<NodePacketSlot> _incommingDeferred = new();
+    private List<NodePacketSlot> _incommingDeferredNext = new();
 
-    // Packet pool shared across nodes. ConcurrentBag is optimized for the
-    // common pattern where the same thread produces and consumes; per-node
-    // pools with ConcurrentStack showed no benefit in measurements (interlocked
-    // cost on every Push/Pop outweighs thread-local advantage).
-    private static readonly ConcurrentBag<NodeMonitoringPacket> _packetPool = new();
-    private static readonly bool PacketPoolDisabled =
-        Environment.GetEnvironmentVariable("MQTTY_NO_PACKET_POOL") == "1";
     protected readonly TicksOptions TicksOptions;
 
     protected NodeCounters counters;
@@ -145,18 +138,18 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     /// (ready items first, then previously deferred ones).
     /// </summary>
     private static void ProcessReady(
-        ConcurrentQueue<NodeMonitoringPacket> queue,
-        List<NodeMonitoringPacket> deferred,
-        List<NodeMonitoringPacket> deferredNext,
+        ConcurrentQueue<NodePacketSlot> queue,
+        List<NodePacketSlot> deferred,
+        List<NodePacketSlot> deferredNext,
         long totalTicks,
-        Action<NodeMonitoringPacket> process,
+        Action<NodePacketSlot> process,
         ref int queueLength)
     {
         var readyCount = Volatile.Read(ref queueLength);
         for (var i = 0; i < readyCount && queue.TryDequeue(out var packet); i++)
         {
             Interlocked.Decrement(ref queueLength);
-            if (!ProcessPacket(packet, totalTicks, process))
+            if (!ProcessSlot(ref packet, totalTicks, process))
             {
                 deferredNext.Add(packet);
             }
@@ -165,7 +158,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         for (var i = 0; i < deferred.Count; i++)
         {
             var packet = deferred[i];
-            if (!ProcessPacket(packet, totalTicks, process))
+            if (!ProcessSlot(ref packet, totalTicks, process))
             {
                 deferredNext.Add(packet);
             }
@@ -174,40 +167,41 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         deferred.Clear();
     }
 
-    private static bool ProcessPacket(
-        NodeMonitoringPacket packet, long totalTicks, Action<NodeMonitoringPacket> process)
+    private static bool ProcessSlot(
+        ref NodePacketSlot slot, long totalTicks, Action<NodePacketSlot> process)
     {
-        if (packet.PassTillNextTick && packet.Tick == totalTicks)
+        if (slot.PassTillNextTick && slot.CreatedTick == totalTicks)
         {
             return false; // keep deferred until the next tick
         }
 
-        packet.ReduceWaitTicks();
-        if (packet.WaitTicks <= 0 && !packet.Released)
+        if (slot.WaitTicks > 0)
         {
-            process(packet);
+            slot.WaitTicks--;
+        }
+
+        if (slot.WaitTicks <= 0 && !slot.Released)
+        {
+            process(slot);
             return true;
         }
 
         return false;
     }
 
-    private void SendToNetwork(NodeMonitoringPacket outgoing)
+    private void SendToNetwork(NodePacketSlot outgoing)
     {
-        var packet = outgoing.RequestPacket;
+        var packet = outgoing.Packet;
         outgoing.Release();
 
         Network?.Send(packet);
-
-        if (!PacketPoolDisabled) _packetPool.Add(outgoing);
     }
 
-    private void CompleteReceive(NodeMonitoringPacket incomming)
+    private void CompleteReceive(NodePacketSlot incomming)
     {
-        var packet = incomming.RequestPacket;
+        var packet = incomming.Packet;
         incomming.Release();
         CompleteReceiveImplementation(packet);
-        if (!PacketPoolDisabled) _packetPool.Add(incomming);
     }
 
     protected override bool SendImplementation(INetworkPacket packet)
@@ -250,20 +244,8 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     {
         var sim = NetworkSimulator!;
         var tick = sim.TotalTicks;
-        NodeMonitoringPacket outgoing;
-        if (PacketPoolDisabled || !_packetPool.TryTake(out outgoing!))
-        {
-            outgoing = new NodeMonitoringPacket(tick, packet, true, sim.WaitMode)
-            {
-                WaitTicks = TicksOptions.OutgoingWaitTicks,
-                Id = sim.GetPacketId(),
-                SendTick = tick
-            };
-        }
-        else
-        {
-            outgoing.Reset(tick, packet, true, sim.WaitMode, TicksOptions.OutgoingWaitTicks, sim.GetPacketId(), tick);
-        }
+        var outgoing = new NodePacketSlot(tick, packet, passTillNextTick: true, sim.WaitMode,
+            TicksOptions.OutgoingWaitTicks, sim.GetPacketId());
         if (ShouldTrackResponse(packet))
         {
             _responseMessages[packet.Id] = new ResponseMonitoringPacket(sim.WaitMode, _refreshCount)
@@ -283,20 +265,8 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     {
         var sim = NetworkSimulator!;
         var tick = sim.TotalTicks;
-        NodeMonitoringPacket incoming;
-        if (PacketPoolDisabled || !_packetPool.TryTake(out incoming!))
-        {
-            incoming = new NodeMonitoringPacket(tick, packet, true, sim.WaitMode)
-            {
-                WaitTicks = TicksOptions.OutgoingWaitTicks,
-                Id = sim.GetPacketId(),
-                SendTick = tick
-            };
-        }
-        else
-        {
-            incoming.Reset(tick, packet, true, sim.WaitMode, TicksOptions.OutgoingWaitTicks, sim.GetPacketId(), tick);
-        }
+        var incoming = new NodePacketSlot(tick, packet, passTillNextTick: true, sim.WaitMode,
+            TicksOptions.OutgoingWaitTicks, sim.GetPacketId());
         _incommingMessages.Enqueue(incoming);
         Interlocked.Increment(ref _incommingQueueLength);
     }
@@ -337,16 +307,16 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
 
         if (monitorPacket == null)
         {
-            var outgoingMessage = _outgoingMessages.FirstOrDefault(o => o.RequestPacket.Id == packetId);
+            var outgoingMessage = _outgoingMessages.FirstOrDefault(o => o.Packet != null && o.Packet.Id == packetId);
 
-            if (outgoingMessage == null)
+            if (outgoingMessage.Packet == null)
             {
                 return null;
             }
 
             var released = outgoingMessage.WaitIsReleased(TimeSpan.FromMinutes(1));
 
-            if (released != true)
+            if (!released)
             {
                 return null;
             }
