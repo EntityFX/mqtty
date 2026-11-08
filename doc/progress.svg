@@ -16,9 +16,9 @@
   <!-- Overall -->
   <text x="40" y="116" class="h2">Общий объём</text>
   <rect x="40" y="130" width="900" height="40" rx="8" fill="#e5e7eb"/>
-  <rect x="40" y="130" width="860" height="40" rx="8" fill="#16a34a"/>
-  <text x="52" y="156" class="chip" fill="#ffffff">выполнено 558 ч · 95 %</text>
-  <text x="806" y="156" class="chip" fill="#7c2d12">26 ч</text>
+  <rect x="40" y="130" width="864" height="40" rx="8" fill="#16a34a"/>
+  <text x="52" y="156" class="chip" fill="#ffffff">выполнено 561 ч · 96 %</text>
+  <text x="806" y="156" class="chip" fill="#7c2d12">23 ч</text>
   <text x="40" y="190" class="small">Всего 584 ч: переписывание S0–S5 — 384 ч, производительность M0–M8 — 200 ч.</text>
 
   <!-- Streams -->
@@ -32,13 +32,13 @@
 
   <text x="40" y="336" class="label">Производительность M0–M8</text>
   <rect x="250" y="322" width="600" height="24" rx="6" fill="#e5e7eb"/>
-  <rect x="250" y="322" width="522" height="24" rx="6" fill="#f59e0b"/>
-  <text x="862" y="339" class="value">87 %</text>
-  <text x="250" y="364" class="small">174 / 200 ч · остаток 26 ч</text>
+  <rect x="250" y="322" width="531" height="24" rx="6" fill="#f59e0b"/>
+  <text x="862" y="339" class="value">89 %</text>
+  <text x="250" y="364" class="small">177 / 200 ч · остаток 23 ч</text>
 
   <!-- Remaining -->
   <text x="40" y="414" class="h2">Остаток работ, ч</text>
-  <text x="40" y="438" class="small">Суммарно 26 ч, включая буфер 3 ч</text>
+  <text x="40" y="438" class="small">Суммарно 23 ч, включая буфер 3 ч</text>
 
   <!-- rows: label y, hours, width scale 18 px per hour -->
   <text x="40" y="474" class="label">M2b · инфляция node-работы</text>
@@ -54,12 +54,12 @@
   <text x="382" y="556" class="value">4 ч</text>
 
   <text x="40" y="594" class="label">M6 · CI-порог G1/G2</text>
-  <rect x="300" y="580" width="54" height="22" rx="5" fill="#eab308"/>
-  <text x="364" y="596" class="value">3 ч</text>
+  <rect x="300" y="580" width="0" height="22" rx="5" fill="#eab308"/>
+  <text x="364" y="596" class="value">0 ч</text>
 
   <text x="40" y="634" class="label">Буфер на замеры/откаты</text>
   <rect x="300" y="620" width="54" height="22" rx="5" fill="#94a3b8"/>
-  <text x="364" y="636" class="value">3 ч</text>
+  <text x="364" y="636" class="value">0 ч</text>
 
   <!-- Gates -->
   <text x="40" y="684" class="h2">Приёмочные гейты</text>

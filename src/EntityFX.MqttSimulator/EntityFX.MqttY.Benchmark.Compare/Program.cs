@@ -134,6 +134,24 @@ if (opt.Strict && engines.Any(e => !e.MetricsMatch || e.Status != "completed" ||
     Environment.ExitCode = 2;
 }
 
+if (opt.Strict && (opt.GateMinWall > 0 || opt.GateMinRefresh > 0))
+{
+    var failures = engines.Where(engine =>
+        engine.Status == "completed" &&
+        ((opt.GateMinWall > 0 && engine.WallSpeedup < opt.GateMinWall) ||
+         (opt.GateMinRefresh > 0 && engine.RefreshSpeedup < opt.GateMinRefresh))).ToArray();
+    foreach (var engine in failures)
+    {
+        Console.WriteLine($"GATE FAIL: {engine.Engine} wall={engine.WallSpeedup:F2}x " +
+                          $"refresh={engine.RefreshSpeedup:F2}x (min wall={opt.GateMinWall:F2}x, " +
+                          $"min refresh={opt.GateMinRefresh:F2}x)");
+    }
+    if (failures.Length > 0)
+    {
+        Environment.ExitCode = 3;
+    }
+}
+
 if (opt.JsonPath != null)
 {
     var report = new BenchReport(DateTimeOffset.UtcNow, logicalCpus, physicalCpus, opt, engines);
@@ -402,6 +420,8 @@ internal sealed class BenchOptions
     public string Mode { get; private set; } = "both";
     public bool NoExport { get; private set; }
     public bool Strict { get; private set; } = true;
+    public double GateMinWall { get; private set; }
+    public double GateMinRefresh { get; private set; }
     public string? JsonPath { get; private set; }
 
     public static BenchOptions Parse(string[] args)
@@ -436,9 +456,11 @@ internal sealed class BenchOptions
                 case "--mode": o.Mode = Next().ToLowerInvariant(); break;
                 case "--no-export": o.NoExport = true; break;
                 case "--no-strict": o.Strict = false; break;
+                case "--gate-min-wall": o.GateMinWall = double.Parse(Next(), CultureInfo.InvariantCulture); break;
+                case "--gate-min-refresh": o.GateMinRefresh = double.Parse(Next(), CultureInfo.InvariantCulture); break;
                 case "--json": o.JsonPath = Next(); break;
                 case "--help":
-                    Console.WriteLine("Options: --engines lb,relay,fed --mode both|seq|par --repeat N --warmup-runs N --workers N --measure S --warmup S --drain S --rps N --fed-rps N --brokers N --nets N --publishers N --relay-clients N --relay-repeats N --seed N --qos N --no-export --no-strict --json PATH");
+                    Console.WriteLine("Options: --engines lb,relay,fed --mode both|seq|par --repeat N --warmup-runs N --workers N --measure S --warmup S --drain S --rps N --fed-rps N --brokers N --nets N --publishers N --relay-clients N --relay-repeats N --seed N --qos N --no-export --no-strict --gate-min-wall X --gate-min-refresh X --json PATH");
                     Environment.Exit(0);
                     break;
                 default:
