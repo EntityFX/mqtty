@@ -1,8 +1,14 @@
 using System.Collections.ObjectModel;
 using EntityFX.MqttY.Contracts.Options;
+using EntityFX.MqttY.Design;
 
 namespace EntityFX.MqttY.Designer.Models;
 
+/// <summary>
+/// Avalonia-facing adapter over <see cref="DesignDocument"/>. The document owns
+/// the mapping and serialization logic; this model only exposes observable
+/// collections and mutable editor fields for the UI.
+/// </summary>
 public class NetworkDesignModel
 {
     public ObservableCollection<NetworkTypeModel> NetworkTypes { get; set; } = new();
@@ -10,112 +16,89 @@ public class NetworkDesignModel
     public ObservableCollection<NodeDesignModel> Nodes { get; set; } = new();
     public TicksOptions Ticks { get; set; } = new();
     public bool EnableCounters { get; set; }
+    public int RandomSeed { get; set; }
 
     /// <summary>Optional persisted editor layout (positions and zoom).</summary>
     public GraphLayoutOption? Layout { get; set; }
 
-    public NetworkGraphOption ToNetworkGraphOption()
-    {
-        var option = new NetworkGraphOption
-        {
-            Ticks = Ticks,
-            EnableCounters = EnableCounters,
-            Layout = Layout,
-            NetworkTypes = new SortedDictionary<string, NetworkOptions>(),
-            Networks = new SortedDictionary<string, NetworkNodeOption>(),
-            Nodes = new SortedDictionary<string, NodeOption>()
-        };
+    public DesignDocument ToDesignDocument() => new(
+        Networks.Select(network => new DesignNetwork(
+            network.Name,
+            network.Index,
+            network.NetworkType,
+            network.Links
+                .Where(link => !string.IsNullOrWhiteSpace(link.TargetNetwork))
+                .Select(link => new DesignLink(link.TargetNetwork!, link.Weight))
+                .ToArray())).ToArray(),
+        Nodes.Select(node => new DesignNode(
+            node.Name,
+            node.Type,
+            node.Protocol,
+            node.Specification,
+            node.Network,
+            node.ConnectsToServer,
+            node.Quantity,
+            node.Index,
+            node.Broker,
+            node.Configuration,
+            new Dictionary<string, string[]>(node.Additional),
+            node.SendTicks)).ToArray(),
+        NetworkTypes.Select(type => new DesignNetworkType(
+            type.Name,
+            type.Speed,
+            type.RefreshTicks,
+            type.QueueSize > 0 ? (int)Math.Min(type.QueueSize, int.MaxValue) : 50000)).ToArray(),
+        Ticks,
+        EnableCounters,
+        RandomSeed,
+        Layout);
 
-        foreach (var nt in NetworkTypes)
-        {
-            option.NetworkTypes[nt.Name] = new NetworkOptions
-            {
-                Speed = nt.Speed,
-                TransferTicks = nt.RefreshTicks,
-                QueueCapacity = nt.QueueSize > 0 ? (int)Math.Min(nt.QueueSize, int.MaxValue) : 50000,
-                NetworkType = nt.Name
-            };
-        }
-
-        foreach (var n in Networks)
-        {
-            var nodeOption = new NetworkNodeOption
-            {
-                Index = n.Index,
-                NetworkType = n.NetworkType,
-                Links = n.Links.Select(l => new NetworkLinkOption
-                {
-                    Network = l.TargetNetwork,
-                    W = l.Weight
-                }).ToArray()
-            };
-            option.Networks[n.Name] = nodeOption;
-        }
-
-        foreach (var node in Nodes)
-        {
-            var nodeOption = new NodeOption
-            {
-                Type = node.Type,
-                Protocol = node.Protocol,
-                Specification = node.Specification,
-                Network = node.Network,
-                ConnectsToServer = node.ConnectsToServer,
-                Quantity = node.Quantity,
-                Index = node.Index,
-                Configuration = node.Configuration
-            };
-            option.Nodes[node.Name] = nodeOption;
-        }
-
-        return option;
-    }
-
-    public static NetworkDesignModel FromNetworkGraphOption(NetworkGraphOption option)
+    public static NetworkDesignModel FromDesignDocument(DesignDocument document)
     {
         var model = new NetworkDesignModel
         {
-            Ticks = option.Ticks,
-            EnableCounters = option.EnableCounters,
-            Layout = option.Layout
+            Ticks = document.Ticks,
+            EnableCounters = document.EnableCounters,
+            RandomSeed = document.RandomSeed,
+            Layout = document.Layout
         };
 
-        foreach (var (name, nt) in option.NetworkTypes)
+        foreach (var type in document.NetworkTypes)
         {
             model.NetworkTypes.Add(new NetworkTypeModel
             {
-                Name = name,
-                Speed = nt.Speed,
-                RefreshTicks = nt.TransferTicks,
-                SendTicks = option.Ticks.OutgoingWaitTicks,
-                QueueSize = nt.QueueCapacity
+                Name = type.Name,
+                Speed = type.Speed,
+                RefreshTicks = type.TransferTicks,
+                SendTicks = document.Ticks.OutgoingWaitTicks,
+                QueueSize = type.QueueCapacity
             });
         }
 
-        foreach (var (name, n) in option.Networks)
+        foreach (var network in document.Networks)
         {
             var networkModel = new NetworkNodeDesignModel
             {
-                Name = name,
-                Index = n.Index,
-                NetworkType = n.NetworkType
+                Name = network.Name,
+                Index = network.Index,
+                NetworkType = network.NetworkType
             };
-            foreach (var link in n.Links)
+            foreach (var link in network.Links)
             {
                 networkModel.Links.Add(new LinkDesignModel
                 {
-                    TargetNetwork = link.Network,
-                    Weight = link.W
+                    TargetNetwork = link.TargetNetwork,
+                    Weight = link.Weight
                 });
             }
             model.Networks.Add(networkModel);
         }
 
-        foreach (var (name, node) in option.Nodes)
+        foreach (var node in document.Nodes)
         {
             model.Nodes.Add(new NodeDesignModel
             {
-                Name = name,
+                Name = node.Name,
                 Type = node.Type,
                 Protocol = node.Protocol,
                 Specification = node.Specification,
@@ -123,10 +106,18 @@ public class NetworkDesignModel
                 ConnectsToServer = node.ConnectsToServer,
                 Quantity = node.Quantity,
                 Index = node.Index,
-                Configuration = node.Configuration
+                Broker = node.Broker,
+                Configuration = node.Configuration,
+                Additional = new Dictionary<string, string[]>(node.Additional),
+                SendTicks = node.SendTicks
             });
         }
 
         return model;
     }
+
+    public NetworkGraphOption ToNetworkGraphOption() => ToDesignDocument().ToNetworkGraphOption();
+
+    public static NetworkDesignModel FromNetworkGraphOption(NetworkGraphOption option) =>
+        FromDesignDocument(DesignDocument.FromNetworkGraphOption(option));
 }

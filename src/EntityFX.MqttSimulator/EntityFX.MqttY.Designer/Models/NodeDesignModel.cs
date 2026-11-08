@@ -13,6 +13,8 @@ public class NodeDesignModel : ReactiveObject
     private string? _connectsToServer;
     private int? _quantity;
     private int? _index;
+    private int _sendTicks;
+    private string? _broker;
     private object? _configuration;
 
     public string Name
@@ -63,9 +65,26 @@ public class NodeDesignModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref _index, value);
     }
 
+    public int SendTicks
+    {
+        get => _sendTicks;
+        set => this.RaiseAndSetIfChanged(ref _sendTicks, value);
+    }
+
+    /// <summary>Optional broker assignment; preserved across load/save.</summary>
+    public string? Broker
+    {
+        get => _broker;
+        set => this.RaiseAndSetIfChanged(ref _broker, value);
+    }
+
     public object? Configuration
     {
         get => _configuration;
         set => this.RaiseAndSetIfChanged(ref _configuration, value);
     }
+
+    /// <summary>Extra node options; kept as a plain dictionary because the
+    /// editor mutates it through dedicated dialogs rather than bindings.</summary>
+    public Dictionary<string, string[]> Additional { get; set; } = new();
 }

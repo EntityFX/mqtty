@@ -32,7 +32,8 @@ namespace EntityFX.Tests.Integration
                     ["broker"] = new NodeOption
                     {
                         Type = NodeOptionType.Server, Protocol = "mqtt", Specification = "mqtt-server",
-                        Network = "net1", Index = 1
+                        Network = "net1", Index = 1, SendTicks = 7, Broker = "mosquitto",
+                        Additional = { ["role"] = new[] { "broker", "primary" } }
                     }
                 }
             };
@@ -46,6 +47,10 @@ namespace EntityFX.Tests.Integration
             Assert.AreEqual(3, restored.Networks["net1"].Links[0].W);
             Assert.AreEqual(NodeOptionType.Server, restored.Nodes["broker"].Type);
             Assert.AreEqual(1_000, restored.NetworkTypes["eth"].Speed);
+            Assert.AreEqual(7, restored.Nodes["broker"].SendTicks);
+            Assert.AreEqual("mosquitto", restored.Nodes["broker"].Broker);
+            CollectionAssert.AreEqual(new[] { "broker", "primary" },
+                restored.Nodes["broker"].Additional["role"]);
         }
 
         [TestMethod]
@@ -119,6 +124,32 @@ namespace EntityFX.Tests.Integration
             Assert.AreEqual("net1", document.Nodes[0].Network);
             Assert.AreEqual("net2", document.Networks[0].Links[0].TargetNetwork);
             Assert.AreEqual(3, document.Networks[0].Links[0].Weight);
+        }
+
+        [TestMethod]
+        public void GraphMlReader_UsesTypeDefaultsForServerAndClient()
+        {
+            const string graphml = @"<graphml xmlns=""http://graphml.graphdrawing.org/xmlns"">
+  <key id=""d0"" attr.name=""type"" attr.type=""string"" for=""node""/>
+  <key id=""d1"" attr.name=""label"" attr.type=""string"" for=""node""/>
+  <graph>
+    <node id=""n0""><data key=""d0"">network</data><data key=""d1"">net1</data></node>
+    <node id=""s0""><data key=""d0"">server</data><data key=""d1"">broker1</data></node>
+    <node id=""c0""><data key=""d0"">client</data><data key=""d1"">client1</data></node>
+    <edge source=""s0"" target=""n0""/>
+    <edge source=""c0"" target=""n0""/>
+  </graph>
+</graphml>";
+
+            var document = GraphMlDesignReader.Read(graphml);
+            var server = document.Nodes.Single(node => node.Name == "broker1");
+            var client = document.Nodes.Single(node => node.Name == "client1");
+
+            Assert.AreEqual(NodeOptionType.Server, server.Type);
+            Assert.AreEqual("mqtt-broker", server.Specification);
+            Assert.AreEqual("net1", server.Network);
+            Assert.AreEqual("mqtt-client", client.Specification);
+            Assert.AreEqual("net1", client.Network);
         }
     }
 }

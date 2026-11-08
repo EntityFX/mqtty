@@ -65,12 +65,19 @@ public static class GraphMlDesignReader
                         : NodeOptionType.Client
             };
 
+            var defaultSpecification = nodeType switch
+            {
+                NodeOptionType.Server => "mqtt-broker",
+                NodeOptionType.Application => "mqtt-relay",
+                _ => "mqtt-client"
+            };
+
             nodeIds[id] = new DesignNodeBuilder
             {
                 Name = label,
                 Type = nodeType,
                 Protocol = Data(element, "protocol", "mqtt"),
-                Specification = Data(element, "specification", string.Empty),
+                Specification = Data(element, "specification", defaultSpecification),
                 Network = Data(element, "network", string.Empty),
                 ConnectsToServer = Data(element, "connectsTo", string.Empty),
                 Broker = Data(element, "broker", null!)

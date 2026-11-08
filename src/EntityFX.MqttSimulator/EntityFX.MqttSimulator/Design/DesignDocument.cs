@@ -11,7 +11,8 @@ public sealed record DesignNetwork(string Name, int Index, string NetworkType,
 
 public sealed record DesignNode(string Name, NodeOptionType Type, string? Protocol,
     string? Specification, string? Network, string? ConnectsToServer, int? Quantity, int? Index,
-    string? Broker, object? Configuration, IReadOnlyDictionary<string, string[]> Additional);
+    string? Broker, object? Configuration, IReadOnlyDictionary<string, string[]> Additional,
+    int SendTicks = 0);
 
 public sealed record DesignNetworkType(string Name, int Speed, int TransferTicks, int QueueCapacity);
 
@@ -35,7 +36,7 @@ public sealed record DesignDocument(
         option.Nodes.Select(pair => new DesignNode(pair.Key, pair.Value.Type, pair.Value.Protocol,
             pair.Value.Specification, pair.Value.Network, pair.Value.ConnectsToServer,
             pair.Value.Quantity, pair.Value.Index, pair.Value.Broker, pair.Value.Configuration,
-            new Dictionary<string, string[]>(pair.Value.Additional))).ToArray(),
+            new Dictionary<string, string[]>(pair.Value.Additional), pair.Value.SendTicks)).ToArray(),
         option.NetworkTypes.Select(pair => new DesignNetworkType(pair.Key, pair.Value.Speed,
             pair.Value.TransferTicks, pair.Value.QueueCapacity)).ToArray(),
         option.Ticks, option.EnableCounters, option.RandomSeed, option.Layout);
@@ -88,7 +89,8 @@ public sealed record DesignDocument(
                 Index = node.Index,
                 Broker = node.Broker,
                 Configuration = node.Configuration,
-                Additional = new Dictionary<string, string[]>(node.Additional)
+                Additional = new Dictionary<string, string[]>(node.Additional),
+                SendTicks = node.SendTicks
             };
         }
 

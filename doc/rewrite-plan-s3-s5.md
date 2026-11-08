@@ -335,19 +335,28 @@ Rate limit возвращает `429 application/problem+json`. Пути дан�
 
 **Оценка:** 4 ч/д.
 
-### S5g. Designer `DesignDocument` — ВЫПОЛНЕНО ЧАСТИЧНО
+### S5g. Designer `DesignDocument` — ВЫПОЛНЕНО
 
 **Факт:** добавлен UI-независимый слой `EntityFX.MqttY.Design`:
 POCO `DesignDocument`/`DesignNetwork`/`DesignNode`/`DesignLink`/`DesignNetworkType`,
 двусторонний маппинг `NetworkGraphOption ↔ DesignDocument`, JSON save/load,
 `IDesignLayoutEngine` + детерминированный `GridDesignLayoutEngine` и чистый
 `GraphMlDesignReader` (GraphML → DesignDocument без Avalonia/ReactiveUI).
-Тесты в Integration: round-trip options, layout determinism, JSON round-trip,
-GraphML import; Integration **435/435**.
 
-**Осталось:** перевести `NetworkEditorViewModel`/`GraphMLImporterService` на
-новый слой и убрать дублирующие Avalonia-модели; сейчас старый Designer
-продолжает работать как раньше.
+**Миграция Designer:** `GraphMLImporterService` больше не содержит собственный
+парсер — он делегирует в `GraphMlDesignReader`. `NetworkDesignModel` стал тонким
+адаптером: `ToDesignDocument`/`FromDesignDocument`, а `ToNetworkGraphOption`/
+`FromNetworkGraphOption` целиком используют общий слой. Заодно сохранены
+`Broker`, `Additional` и `SendTicks` (раньше терялись при load/save).
+`NetworkEditorViewModel` работает поверх этого адаптера, бизнес-логика в нём
+не дублируется. `DesignNode` получил `SendTicks`, GraphML-ридер — прежние
+default-спецификации (`mqtt-broker`/`mqtt-client`/`mqtt-relay`).
+
+Проверка: Integration **436/436** (round-trip options/Broker/SendTicks, layout,
+JSON, GraphML defaults); Web **62/62**.
+Локальный restore в этом окружении требует
+`DOTNET_NUGET_SIGNATURE_VERIFICATION=false` (в системе нет цепочки доверия
+для подписи пакетов NuGet); это не изменение кода.
 
 1. Чистый POCO `DesignDocument` (сети/узлы/связи/позиции/zoom/ticks), без Avalonia/ReactiveUI.
 2. `IDesignLayoutEngine` + `GraphMLReader → ImportDto → validator → DesignDocument`.
@@ -366,9 +375,10 @@ GraphML import; Integration **435/435**.
 
 **После каждого шага:**
 - build 0 ошибок;
-- Integration 407/407 + новые тесты; Web 56/56;
+- Integration 436/436; Web 62/62;
 - golden-трассы S0 совпадают;
 - benchmark: `activity=ok`, `core=match`, регрессия wall/refresh ≤5%;
 - детерминизм: два прогона с одним seed дают одинаковые отсортированные экспорты.
 
-**Итоговая оценка остатка:** ~46–50 ч/д (S3 ~17, S4 ~13, S5 ~18), с буфером ~55–60 ч/д.
+**Итог:** S3–S5 закрыты (S5g — последний шаг). Остаток по этому плану — 0;
+дальнейшие работы — performance plan (`M7`, `M8`, горячий путь Federation).
