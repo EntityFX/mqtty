@@ -19,7 +19,9 @@ mqtty/
 ├── config/                     # примеры конфигураций экспериментов
 ├── doc/
 │   ├── architecture.md         # устройство, инварианты, статус S0–S5
-│   └── performance.md          # методика, результаты, отклонённые оптимизации
+│   ├── performance.md          # методика, результаты, отклонённые оптимизации
+│   ├── progress.md             # прогресс плана и гейты
+│   └── analysis/message-scaling/  # статья, топологии, данные, скрипты
 ├── results/                    # результаты экспериментов (не коммитить)
 ├── src/EntityFX.MqttSimulator/
 │   ├── EntityFX.MqttSimulator.Contracts/  # базовые контракты сети/счётчиков
@@ -34,7 +36,8 @@ mqtty/
 │   ├── EntityFX.MqttY.Plugin.Mqtt/        # MQTT-плагин, профили брокеров
 │   ├── EntityFX.MqttY.Plugin.Scenarios/   # сценарии и действия
 │   ├── EntityFX.MqttY.Web.App/            # веб-интерфейс и API
-│   ├── EntityFX.MqttY.Cli/                # общий CLI
+│   ├── EntityFX.MqttY.Cli/                # legacy CLI приложений
+│   ├── EntityFX.MqttY.Experiment.Cli/     # единый host экспериментов LB/Relay/Fed
 │   ├── EntityFX.MqttY.Designer/           # GUI-редактор (Avalonia)
 │   ├── EntityFX.Tests.Integration/
 │   └── EntityFX.Tests.Web/
@@ -44,7 +47,7 @@ mqtty/
 
 ## 3. Окружение
 
-- .NET SDK: `6.0.136` и `8.0.121` (проверка: `dotnet --list-sdks`).
+- .NET SDK: `6.0.136`, `8.0.121`, `9.0.111`, `10.0.200` (проверка: `dotnet --list-sdks`).
 - `net6.0` выведен из поддержки — предупреждения `NETSDK1138` ожидаемы.
 - Текущий хост: **24 логических CPU = 12 физических ядер / 24 потока** (Xeon E5-2680 v3). Для гейта используйте `workers=12` (физические ядра); SMT-переподписка на 24 потоках даёт регрессию.
 
@@ -60,9 +63,9 @@ refresh (сети → fence → узлы → fence) на постоянном п
 
 | Конфиг | wall speedup | refresh speedup | core |
 |---|---:|---:|---|
-| LB L (64 брокера, 256 publishers, 20k rps) | **4.98×** | **6.00×** | match |
+| LB L (64 брокера, 256 publishers, 20k rps) | **4.76×** | **5.72×** | match |
 | LB reference | **2.98×** | **3.36×** | match |
-| Relay (2k rps) | **5.26×** | **6.28×** | match |
+| Relay (2k rps) | **5.63×** | **6.77×** | match |
 | Federation L (16 брокеров, 256 publishers, 2k rps) | **4.1–4.2×** | **5.0–5.1×** | match / diag differ |
 
 Ключевые факты:
@@ -182,9 +185,12 @@ DOTNET_NUGET_SIGNATURE_VERIFICATION=false \
   dotnet test src/EntityFX.MqttSimulator/EntityFX.Tests.Web/EntityFX.Tests.Web.csproj -c Release --nologo
 ```
 
-Integration и Web наборы нельзя запускать одновременно: API-тесты поднимают
+Integration использует MSTest, Web — xUnit. Наборы нельзя запускать одновременно: API-тесты поднимают
 in-process host и делят временные каталоги, из-за чего часть тестов падает по
 таймаутам. Запускайте последовательно; Web — 62/62, Integration — 436/436.
+Порог производительности задаётся в benchmark: `--gate-min-wall` /
+`--gate-min-refresh` (strict, exit code 3). Публичный CI-workflow не
+настроен: gate рассчитан на self-hosted 12-ядерный runner.
 
 ## 8. Ключевые компоненты
 
@@ -221,5 +227,6 @@ in-process host и делят временные каталоги, из-за ч�
 - `doc/skills/dotnet-performance.md` — сохранённый skill по C#/.NET-производительности.
 - `doc/analysis/message-scaling/article.md` — математическая статья о связи числа сообщений с топологией; данные и скрипты рядом.
 - `doc/analysis/message-scaling/topologies.md` — отдельное описание топологий star/ring/line, Relay и LB.
+- `doc/analysis/message-scaling/topologies-summary.md` — краткая сводка и научные результаты по топологиям.
 - `src/EntityFX.MqttSimulator/EntityFX.MqttY.Web.App/README.md` — API и запуск Web.
 - Внешние исследовательские отчёты и данные: `github.com/EntityFX/mqtty-meta`.

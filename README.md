@@ -31,6 +31,7 @@ dotnet run --project src/EntityFX.MqttSimulator/EntityFX.MqttY.LoadBalancing.App
 - [`doc/skills/dotnet-performance.md`](doc/skills/dotnet-performance.md) — skill по C#/.NET-производительности и параллелизации.
 - [`doc/analysis/message-scaling/article.md`](doc/analysis/message-scaling/article.md) — статья о масштабировании числа сообщений.
 - [`doc/analysis/message-scaling/topologies.md`](doc/analysis/message-scaling/topologies.md) — отдельное описание топологий star/ring/line, Relay и LB.
+- [`doc/analysis/message-scaling/topologies-summary.md`](doc/analysis/message-scaling/topologies-summary.md) — краткая научная сводка и результаты по топологиям.
 - [`AGENTS.md`](AGENTS.md) — команды сборки/тестов и правила работы агента.
 
 Исходники находятся в `src/EntityFX.MqttSimulator`, solution — `EntityFX.Mqtty.sln`. Готовые исследовательские отчёты и данные хранятся в [mqtty-meta/reports](https://github.com/EntityFX/mqtty-meta/blob/develop/reports/mqtty/README.md).
