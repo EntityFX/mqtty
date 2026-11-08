@@ -66,7 +66,9 @@ if (opt.Engines.Contains("lb"))
         return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds, timing.RefreshWallSeconds,
             timing.ExportWallSeconds, summary.GraphErrors, summary.Status, Metrics.Lb(summary), cpu,
             Attempts: summary.ApiAttempts, Unique: summary.Delivery.UniqueDelivered,
-            Steps: summary.ScheduledPublishes);
+            Steps: summary.ScheduledPublishes,
+            NetworkInbound: timing.NetworkInboundPackets,
+            NetworkOutbound: timing.NetworkOutboundPackets);
     }));
 }
 
@@ -82,8 +84,10 @@ if (opt.Engines.Contains("relay"))
         var sw = Stopwatch.StartNew();
         var cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
         var relayPhaseWalls = new Dictionary<string, double>();
+        long relayNetIn = 0, relayNetOut = 0;
         var summary = relayRunner.Run(relayInput, ExportDir("relay", parallel, rep), diagnostics: false,
-            parallel: parallel, refreshStrategy: 1, phaseWallSeconds: relayPhaseWalls);
+            parallel: parallel, refreshStrategy: 1, phaseWallSeconds: relayPhaseWalls,
+            networkPackets: (inbound, outbound) => { relayNetIn = inbound; relayNetOut = outbound; });
         sw.Stop();
         if (parallel && Environment.GetEnvironmentVariable("MQTTY_PHASE_STATS") == "1")
         {
@@ -94,7 +98,8 @@ if (opt.Engines.Contains("relay"))
             summary.RefreshWallSeconds, 0, summary.ForwardRejected + summary.QueueDrops,
             summary.Status, Metrics.Fed(summary), cpu,
             Attempts: summary.ApiAttempts, Unique: summary.UniqueDeliveries,
-            Steps: summary.ScheduledPublishes);
+            Steps: summary.ScheduledPublishes,
+            NetworkInbound: relayNetIn, NetworkOutbound: relayNetOut);
     }));
 }
 
@@ -108,8 +113,10 @@ if (opt.Engines.Contains("fed"))
         var sw = Stopwatch.StartNew();
         var cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
         var fedPhaseWalls = new Dictionary<string, double>();
+        long fedNetIn = 0, fedNetOut = 0;
         var summary = fedRunner.Run(fedInput, ExportDir("fed", parallel, rep), diagnostics: false,
-            parallel: parallel, refreshStrategy: 1, phaseWallSeconds: fedPhaseWalls);
+            parallel: parallel, refreshStrategy: 1, phaseWallSeconds: fedPhaseWalls,
+            networkPackets: (inbound, outbound) => { fedNetIn = inbound; fedNetOut = outbound; });
         sw.Stop();
         if (parallel && Environment.GetEnvironmentVariable("MQTTY_PHASE_STATS") == "1")
         {
@@ -119,7 +126,8 @@ if (opt.Engines.Contains("fed"))
         return new RunSample(parallel ? "par" : "seq", rep, sw.Elapsed.TotalSeconds, summary.RefreshWallSeconds, 0,
             summary.ForwardRejected + summary.QueueDrops, summary.Status, Metrics.Fed(summary), cpu,
             Attempts: summary.ApiAttempts, Unique: summary.UniqueDeliveries,
-            Steps: summary.ScheduledPublishes);
+            Steps: summary.ScheduledPublishes,
+            NetworkInbound: fedNetIn, NetworkOutbound: fedNetOut);
     }));
 }
 
@@ -389,7 +397,8 @@ internal sealed record MetricSet(string Core, string Diagnostics);
 
 internal sealed record RunSample(string Mode, int Repetition, double Wall, double Refresh, double Export,
     long Errors, string Status, MetricSet Metrics, double CpuSeconds,
-    long Attempts = 0, long Unique = 0, long Steps = 0, string? Failure = null);
+    long Attempts = 0, long Unique = 0, long Steps = 0, string? Failure = null,
+    long NetworkInbound = 0, long NetworkOutbound = 0);
 
 internal sealed record EngineReport(string Engine, double SeqWall, double ParWall, double WallSpeedup,
     double SeqRefresh, double ParRefresh, double RefreshSpeedup, double SeqExport, double ParExport,

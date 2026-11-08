@@ -136,6 +136,10 @@ public class NetworkSimulator : INetworkSimulator
 
     public long TotalSteps => _clock.TotalSteps;
 
+    public long InboundPackets => _topology.Networks.Values.OfType<Network>().Sum(n => n.InboundPacketCount);
+    public long OutboundPackets => _topology.Networks.Values.OfType<Network>().Sum(n => n.OutboundPacketCount);
+    public long Transfers => _topology.Networks.Values.OfType<Network>().Sum(n => n.TransferCount);
+
     public bool WaitMode { get; private set; }
     public bool EnableCounters { get; private set; }
     public bool EnableMonitoring { get; set; }

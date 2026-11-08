@@ -79,6 +79,10 @@ namespace EntityFX.MqttY.Counter
             _counters.Add(incrementable);
         }
 
+        public long InboundPacketCount => _inboundPacketsCounter.Value;
+        public long OutboundPacketCount => _outboundPacketsCounter.Value;
+        public long TransferCount => _transferPacketsCounter.Value;
+
         public void CountInbound(INetworkPacket networkPacket)
         {
             _inboundPacketsCounter!.Increment();

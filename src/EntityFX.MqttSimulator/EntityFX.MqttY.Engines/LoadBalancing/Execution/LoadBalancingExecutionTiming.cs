@@ -11,6 +11,8 @@ public sealed class LoadBalancingExecutionTiming
     public long StopwatchFrequency => Stopwatch.Frequency;
     public double RunnerWallSeconds { get; internal set; }
     public double ExportWallSeconds { get; internal set; }
+    public long NetworkInboundPackets { get; internal set; }
+    public long NetworkOutboundPackets { get; internal set; }
     public IReadOnlyDictionary<string, double> PhaseWallSeconds => phaseSeconds;
     public IReadOnlyDictionary<string, long> RefreshCallsByPhase => refreshCalls;
     public IReadOnlyDictionary<string, double> RefreshWallSecondsByPhase =>

@@ -198,6 +198,11 @@ public sealed class LoadBalancingExperimentRunner
                 ExperimentResultWriter.Write(output, input, summary, graphMl, plantUml);
                 if (timing != null) timing.ExportWallSeconds = (double)(Stopwatch.GetTimestamp() - exportStart) / Stopwatch.Frequency;
             }
+            if (timing != null && topology != null)
+            {
+                timing.NetworkInboundPackets = topology.Graph.InboundPackets;
+                timing.NetworkOutboundPackets = topology.Graph.OutboundPackets;
+            }
             return summary;
 
             BrokerQosMetricsSnapshot Normalize(BrokerQosMetricsSnapshot metrics) =>

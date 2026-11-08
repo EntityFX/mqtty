@@ -13,7 +13,8 @@ public sealed class FederationRunner
     public FederationSummary Run(FederationInput input, string? output = null, bool diagnostics = false,
         CancellationToken cancellationToken = default, Action<INetworkSimulator, string>? onProgress = null,
         bool parallel = true, int refreshStrategy = 1,
-        IDictionary<string, double>? phaseWallSeconds = null)
+        IDictionary<string, double>? phaseWallSeconds = null,
+        Action<long, long>? networkPackets = null)
     {
         var drainDiagnostics = diagnostics ? new FederationDrainDiagnostics() : null;
         if (output != null) FederationResultWriter.Claim(output);
@@ -128,6 +129,7 @@ public sealed class FederationRunner
             if (output != null) FederationResultWriter.Write(output, input, summary, ledger.Publications(), ledger.Receipts(), transmissions, graphMl,
                 o.Topology == "star" && topology != null ? TransitNetworkEvidence.Capture(o, topology, transitBaseline) : null,
                 drainDiagnostics);
+            networkPackets?.Invoke(topology?.Graph.InboundPackets ?? 0, topology?.Graph.OutboundPackets ?? 0);
             return summary with { RefreshWallSeconds = topology?.Graph.RefreshWallSeconds ?? 0 };
         }
         finally { topology?.Dispose(); }

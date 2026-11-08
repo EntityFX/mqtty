@@ -120,6 +120,10 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
 
     public override NodeType NodeType => NodeType.Network;
 
+    public long InboundPacketCount => _networkCounters.InboundPacketCount;
+    public long OutboundPacketCount => _networkCounters.OutboundPacketCount;
+    public long TransferCount => _networkCounters.TransferCount;
+
     public long QueueSize =>
         Volatile.Read(ref _queueLength) + _deferredPackets.Count + _deferredPacketsNext.Count;
 
