@@ -159,10 +159,29 @@ public sealed class FederationDeliveryLedger
         .ThenBy(publication => publication.Id)
         .ToArray();
 
-    public DeliveryReceipt[] Receipts() => receipts
-        .OrderBy(r => r.Tick).ThenBy(r => r.Receiver)
-        .ThenBy(r => r.PublicationId).ThenBy(r => r.Topic, StringComparer.Ordinal)
-        .ThenBy(r => r.PayloadSha256, StringComparer.Ordinal).ToArray();
+    public DeliveryReceipt[] Receipts()
+    {
+        var result = receipts.ToArray();
+        Array.Sort(result, DeliveryReceiptOrder.Instance);
+        return result;
+    }
+
+    private sealed class DeliveryReceiptOrder : IComparer<DeliveryReceipt>
+    {
+        public static readonly DeliveryReceiptOrder Instance = new();
+
+        public int Compare(DeliveryReceipt a, DeliveryReceipt b)
+        {
+            var c = a.Tick.CompareTo(b.Tick);
+            if (c != 0) return c;
+            c = a.Receiver.CompareTo(b.Receiver);
+            if (c != 0) return c;
+            c = a.PublicationId.CompareTo(b.PublicationId);
+            if (c != 0) return c;
+            c = string.CompareOrdinal(a.Topic, b.Topic);
+            return c != 0 ? c : string.CompareOrdinal(a.PayloadSha256, b.PayloadSha256);
+        }
+    }
 
     private sealed class ReceiverState
     {

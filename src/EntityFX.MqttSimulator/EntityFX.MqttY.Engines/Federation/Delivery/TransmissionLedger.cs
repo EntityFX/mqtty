@@ -19,11 +19,43 @@ public sealed class TransmissionLedger
     }
     // Same-tick callbacks can finish in any thread order. Export a total order,
     // retaining every record, including duplicate attempts and rejected sends.
-    public TransmissionResult[] Snapshot() => records.ToArray()
-        .OrderBy(r => r.Tick).ThenBy(r => r.Client, StringComparer.Ordinal)
-        .ThenBy(r => r.Site).ThenBy(r => r.Target).ThenBy(r => r.PublicationId)
-        .ThenBy(r => r.Measurement).ThenBy(r => r.Role, StringComparer.Ordinal)
-        .ThenBy(r => r.Topic, StringComparer.Ordinal).ThenBy(r => r.PayloadBytes)
-        .ThenBy(r => r.PayloadSha256, StringComparer.Ordinal)
-        .ThenBy(r => r.TopicPayloadBytes).ThenBy(r => r.Accepted).ToArray();
+    // Array.Sort with one comparer avoids the LINQ OrderBy/ThenBy chain, which
+    // dominates the post-drain summary for ~1M forwarding records.
+    public TransmissionResult[] Snapshot()
+    {
+        var result = records.ToArray();
+        Array.Sort(result, TransmissionOrder.Instance);
+        return result;
+    }
+
+    private sealed class TransmissionOrder : IComparer<TransmissionResult>
+    {
+        public static readonly TransmissionOrder Instance = new();
+
+        public int Compare(TransmissionResult a, TransmissionResult b)
+        {
+            var c = a.Tick.CompareTo(b.Tick);
+            if (c != 0) return c;
+            c = string.CompareOrdinal(a.Client, b.Client);
+            if (c != 0) return c;
+            c = a.Site.CompareTo(b.Site);
+            if (c != 0) return c;
+            c = a.Target.CompareTo(b.Target);
+            if (c != 0) return c;
+            c = a.PublicationId.CompareTo(b.PublicationId);
+            if (c != 0) return c;
+            c = a.Measurement.CompareTo(b.Measurement);
+            if (c != 0) return c;
+            c = string.CompareOrdinal(a.Role, b.Role);
+            if (c != 0) return c;
+            c = string.CompareOrdinal(a.Topic, b.Topic);
+            if (c != 0) return c;
+            c = a.PayloadBytes.CompareTo(b.PayloadBytes);
+            if (c != 0) return c;
+            c = string.CompareOrdinal(a.PayloadSha256, b.PayloadSha256);
+            if (c != 0) return c;
+            c = a.TopicPayloadBytes.CompareTo(b.TopicPayloadBytes);
+            return c != 0 ? c : a.Accepted.CompareTo(b.Accepted);
+        }
+    }
 }
