@@ -11,78 +11,59 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
         {
             ValidateHeaderFlag(bytes, t => t == MqttPacketType.SubscribeAck, 0x00);
 
-            var remainingLengthBytesLength = 0;
-            var remainingLength = Encoding.DecodeRemainingLength(bytes, out remainingLengthBytesLength);
+            ReadOnlySpan<byte> packet = bytes;
+            var remainingLength = Encoding.DecodeRemainingLength(packet, out var remainingLengthBytesLength);
 
             var packetIdentifierStartIndex = remainingLengthBytesLength + 1;
-            var packetIdentifier = bytes.Bytes(packetIdentifierStartIndex, 2).ToUInt16();
+            var packetIdentifier = packet.Slice(packetIdentifierStartIndex, 2).ToUInt16();
 
             var headerLength = 1 + remainingLengthBytesLength + 2;
-            var returnCodeBytes = bytes.Bytes(headerLength);
+            var returnCodeLength = remainingLength - 2;
 
-            if (!returnCodeBytes.Any())
+            if (returnCodeLength <= 0)
                 throw new MqttException("SubscribeAckFormatter_MissingReturnCodes");
 
-            if (returnCodeBytes.Any(b => !Enum.IsDefined(typeof(SubscribeReturnCode), b)))
+            if (headerLength + returnCodeLength > bytes.Length)
                 throw new MqttException("SubscribeAckFormatter_InvalidReturnCodes");
 
-            var returnCodes = returnCodeBytes.Select(b => (SubscribeReturnCode)b).ToArray();
+            var returnCodes = new SubscribeReturnCode[returnCodeLength];
+            for (var i = 0; i < returnCodeLength; i++)
+            {
+                var value = packet[headerLength + i];
+                if (!Enum.IsDefined(typeof(SubscribeReturnCode), value))
+                    throw new MqttException("SubscribeAckFormatter_InvalidReturnCodes");
+
+                returnCodes[i] = (SubscribeReturnCode)value;
+            }
 
             return new SubscribeAckPacket(packetIdentifier, returnCodes);
         }
 
         protected override byte[] Write(SubscribeAckPacket packet)
         {
-            var bytes = new List<byte>();
+            if (packet.ReturnCodes == null || packet.ReturnCodes.Length == 0)
+                throw new MqttException("SubscribeAckFormatter_MissingReturnCodes");
 
-            var variableHeader = GetVariableHeader(packet);
-            var payload = GetPayload(packet);
-            var remainingLength = Encoding.EncodeRemainingLength(variableHeader.Length + payload.Length);
-            var fixedHeader = GetFixedHeader(remainingLength);
-
-            bytes.AddRange(fixedHeader);
-            bytes.AddRange(variableHeader);
-            bytes.AddRange(payload);
-
-            return bytes.ToArray();
-        }
-
-        byte[] GetFixedHeader(byte[] remainingLength)
-        {
-            var fixedHeader = new List<byte>();
+            var remainingLength = 2 + packet.ReturnCodes.Length;
+            var remainingLengthBytes = MqttEncoder.GetRemainingLengthByteCount(remainingLength);
+            var bytes = new byte[1 + remainingLengthBytes + remainingLength];
+            var destination = bytes.AsSpan();
 
             var flags = 0x00;
             var type = Convert.ToInt32(MqttPacketType.SubscribeAck) << 4;
+            destination[0] = Convert.ToByte(flags | type);
+            var written = 1 + MqttEncoder.WriteRemainingLength(
+                destination.Slice(1, remainingLengthBytes), remainingLength);
 
-            var fixedHeaderByte1 = Convert.ToByte(flags | type);
+            MqttEncoder.WriteInteger(destination.Slice(written), packet.PacketId);
+            written += 2;
 
-            fixedHeader.Add(fixedHeaderByte1);
-            fixedHeader.AddRange(remainingLength);
+            for (var i = 0; i < packet.ReturnCodes.Length; i++)
+            {
+                destination[written + i] = Convert.ToByte(packet.ReturnCodes[i]);
+            }
 
-            return fixedHeader.ToArray();
-        }
-
-        byte[] GetVariableHeader(SubscribeAckPacket packet)
-        {
-            var variableHeader = new List<byte>();
-
-            var packetIdBytes = Encoding.EncodeInteger(packet.PacketId);
-
-            variableHeader.AddRange(packetIdBytes);
-
-            return variableHeader.ToArray();
-        }
-
-        byte[] GetPayload(SubscribeAckPacket packet)
-        {
-            if (packet.ReturnCodes == null || !packet.ReturnCodes.Any())
-                throw new MqttException("SubscribeAckFormatter_MissingReturnCodes");
-
-            return packet.ReturnCodes
-                .Select(c => Convert.ToByte(c))
-                .ToArray();
+            return bytes;
         }
     }
-
-
 }

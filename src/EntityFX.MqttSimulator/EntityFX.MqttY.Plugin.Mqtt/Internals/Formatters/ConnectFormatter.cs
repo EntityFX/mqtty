@@ -9,6 +9,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
 
     internal class ConnectFormatter : Formatter<ConnectPacket>
     {
+        private static readonly Regex ClientIdRegex =
+            new("^[a-zA-Z0-9_-]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
         public override MqttPacketType PacketType { get { return MqttPacketType.Connect; } }
 
         protected override ConnectPacket Read(byte[] bytes)
@@ -123,74 +126,9 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
 
         protected override byte[] Write(ConnectPacket packet)
         {
-            var bytes = new List<byte>();
+            var userNameFlag = !string.IsNullOrEmpty(packet.UserName);
+            var passwordFlag = userNameFlag && !string.IsNullOrEmpty(packet.Password);
 
-            var variableHeader = GetVariableHeader(packet);
-            var payload = GetPayload(packet);
-            var remainingLength = Encoding.EncodeRemainingLength(variableHeader.Length + payload.Length);
-            var fixedHeader = GetFixedHeader(remainingLength);
-
-            bytes.AddRange(fixedHeader);
-            bytes.AddRange(variableHeader);
-            bytes.AddRange(payload);
-
-            return bytes.ToArray();
-        }
-
-        byte[] GetFixedHeader(byte[] remainingLength)
-        {
-            var fixedHeader = new List<byte>();
-
-            var flags = 0x00;
-            var type = Convert.ToInt32(MqttPacketType.Connect) << 4;
-
-            var fixedHeaderByte1 = Convert.ToByte(flags | type);
-
-            fixedHeader.Add(fixedHeaderByte1);
-            fixedHeader.AddRange(remainingLength);
-
-            return fixedHeader.ToArray();
-        }
-
-        byte[] GetVariableHeader(ConnectPacket packet)
-        {
-            var variableHeader = new List<byte>();
-
-            var protocolNameBytes = Encoding.EncodeString(MqttProtocolConsts.Name);
-            var protocolLevelByte = Convert.ToByte(MqttProtocolConsts.SupportedLevel);
-
-            var reserved = 0x00;
-            var cleanSession = Convert.ToInt32(packet.CleanSession);
-            var willFlag = 0;//Convert.ToInt32(packet.Will != null);
-            var willQos = 0;//packet.Will == null ? 0 : Convert.ToInt32(packet.Will.QualityOfService);
-            var willRetain = 0;//packet.Will == null ? 0 : Convert.ToInt32(packet.Will.Retain);
-            var userNameFlag = Convert.ToInt32(!string.IsNullOrEmpty(packet.UserName));
-            var passwordFlag = userNameFlag == 1 ? Convert.ToInt32(!string.IsNullOrEmpty(packet.Password)) : 0;
-
-            if (userNameFlag == 0 && passwordFlag == 1)
-                throw new MqttException("InvalidPasswordFlag");
-
-            cleanSession <<= 1;
-            willFlag <<= 2;
-            willQos <<= 3;
-            willRetain <<= 5;
-            passwordFlag <<= 6;
-            userNameFlag <<= 7;
-
-            var connectFlagsByte = Convert.ToByte(reserved | cleanSession | willFlag | willQos | willRetain | passwordFlag | userNameFlag);
-            var keepAliveBytes = Encoding.EncodeInteger(packet.KeepAlive);
-
-            variableHeader.AddRange(protocolNameBytes);
-            variableHeader.Add(protocolLevelByte);
-            variableHeader.Add(connectFlagsByte);
-            variableHeader.Add(keepAliveBytes[keepAliveBytes.Length - 2]);
-            variableHeader.Add(keepAliveBytes[keepAliveBytes.Length - 1]);
-
-            return variableHeader.ToArray();
-        }
-
-        byte[] GetPayload(ConnectPacket packet)
-        {
             if (packet.ClientId.Length > MqttProtocolConsts.ClientIdMaxLength)
                 throw new MqttException("ClientIdMaxLengthExceeded");
 
@@ -201,31 +139,81 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
                 throw new MqttException(error);
             }
 
-            var payload = new List<byte>();
-
-            var clientIdBytes = Encoding.EncodeString(packet.ClientId);
-
-            payload.AddRange(clientIdBytes);
-
-
-            if (string.IsNullOrEmpty(packet.UserName) && !string.IsNullOrEmpty(packet.Password))
+            if (!userNameFlag && !string.IsNullOrEmpty(packet.Password))
                 throw new MqttException("PasswordNotAllowed");
 
-            if (!string.IsNullOrEmpty(packet.UserName))
-            {
-                var userNameBytes = Encoding.EncodeString(packet.UserName);
+            var protocolNameLength = Encoding.GetStringByteCount(MqttProtocolConsts.Name);
+            var variableHeaderLength = MqttProtocolConsts.StringPrefixLength + protocolNameLength + 1 + 1 + 2;
+            var payloadLength = MqttProtocolConsts.StringPrefixLength +
+                Encoding.GetStringByteCount(packet.ClientId);
 
-                payload.AddRange(userNameBytes);
+            if (userNameFlag)
+            {
+                payloadLength += MqttProtocolConsts.StringPrefixLength +
+                    Encoding.GetStringByteCount(packet.UserName);
             }
 
-            if (!string.IsNullOrEmpty(packet.Password))
+            if (passwordFlag)
             {
-                var passwordBytes = Encoding.EncodeString(packet.Password);
-
-                payload.AddRange(passwordBytes);
+                payloadLength += MqttProtocolConsts.StringPrefixLength +
+                    Encoding.GetStringByteCount(packet.Password);
             }
 
-            return payload.ToArray();
+            var remainingLength = variableHeaderLength + payloadLength;
+            var remainingLengthBytes = MqttEncoder.GetRemainingLengthByteCount(remainingLength);
+            var bytes = new byte[1 + remainingLengthBytes + remainingLength];
+            var destination = bytes.AsSpan();
+
+            var flags = 0x00;
+            var type = Convert.ToInt32(MqttPacketType.Connect) << 4;
+            destination[0] = Convert.ToByte(flags | type);
+            var written = 1 + MqttEncoder.WriteRemainingLength(
+                destination.Slice(1, remainingLengthBytes), remainingLength);
+
+            Encoding.WriteString(destination.Slice(written), MqttProtocolConsts.Name);
+            written += MqttProtocolConsts.StringPrefixLength + protocolNameLength;
+            destination[written++] = Convert.ToByte(MqttProtocolConsts.SupportedLevel);
+            destination[written++] = GetConnectFlags(packet, userNameFlag, passwordFlag);
+
+            MqttEncoder.WriteInteger(destination.Slice(written), packet.KeepAlive);
+            written += 2;
+
+            Encoding.WriteString(destination.Slice(written), packet.ClientId);
+            written += MqttProtocolConsts.StringPrefixLength +
+                Encoding.GetStringByteCount(packet.ClientId);
+
+            if (userNameFlag)
+            {
+                Encoding.WriteString(destination.Slice(written), packet.UserName);
+                written += MqttProtocolConsts.StringPrefixLength +
+                    Encoding.GetStringByteCount(packet.UserName);
+            }
+
+            if (passwordFlag)
+            {
+                Encoding.WriteString(destination.Slice(written), packet.Password);
+            }
+
+            return bytes;
+        }
+
+        private static byte GetConnectFlags(ConnectPacket packet, bool userNameFlag, bool passwordFlag)
+        {
+            var reserved = 0x00;
+            var cleanSession = Convert.ToInt32(packet.CleanSession);
+            var willFlag = 0;//Convert.ToInt32(packet.Will != null);
+            var willQos = 0;//packet.Will == null ? 0 : Convert.ToInt32(packet.Will.QualityOfService);
+            var willRetain = 0;//packet.Will == null ? 0 : Convert.ToInt32(packet.Will.Retain);
+
+            cleanSession <<= 1;
+            willFlag <<= 2;
+            willQos <<= 3;
+            willRetain <<= 5;
+
+            var password = Convert.ToInt32(passwordFlag) << 6;
+            var user = Convert.ToInt32(userNameFlag) << 7;
+
+            return Convert.ToByte(reserved | cleanSession | willFlag | willQos | willRetain | password | user);
         }
 
         bool IsValidClientId(string clientId)
@@ -233,9 +221,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
             if (string.IsNullOrEmpty(clientId))
                 return true;
 
-            var regex = new Regex("^[a-zA-Z0-9_-]+$");
-
-            return regex.IsMatch(clientId);
+            return ClientIdRegex.IsMatch(clientId);
         }
     }
 

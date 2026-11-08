@@ -1,8 +1,8 @@
-﻿using System.Text;
+﻿using System.Buffers.Binary;
+using System.Text;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
 {
-
     internal static class ByteExtensions
     {
         internal static bool IsSet(this byte @byte, int bit)
@@ -18,7 +18,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
             if (bit > 7)
                 throw new ArgumentOutOfRangeException(nameof(bit), "InvalidBitPosition");
 
-            return Convert.ToByte(@byte | 1 << bit);
+            return (byte)(@byte | 1 << bit);
         }
 
         internal static byte Unset(this byte @byte, int bit)
@@ -26,13 +26,11 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
             if (bit > 7)
                 throw new ArgumentOutOfRangeException(nameof(bit), "InvalidBitPosition");
 
-            return Convert.ToByte(@byte & ~(1 << bit));
+            return (byte)(@byte & ~(1 << bit));
         }
 
-        internal static byte Bits(this byte @byte, int count)
-        {
-            return Convert.ToByte(@byte >> 8 - count);
-        }
+        internal static byte Bits(this byte @byte, int count) =>
+            (byte)(@byte >> 8 - count);
 
         internal static byte Bits(this byte @byte, int index, int count)
         {
@@ -50,58 +48,74 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
                 } while (i < index);
             }
 
-            var to = Convert.ToByte(@byte << index - 1);
-            var from = Convert.ToByte(to >> 8 - count);
-
-            return from;
+            var to = (byte)(@byte << index - 1);
+            return (byte)(to >> 8 - count);
         }
 
-        internal static byte Byte(this byte[] bytes, int index)
-        {
-            return bytes.Skip(index).Take(1).FirstOrDefault();
-        }
+        internal static byte Byte(this byte[] bytes, int index) =>
+            (uint)index < (uint)bytes.Length ? bytes[index] : (byte)0;
+
+        internal static byte Byte(this ReadOnlySpan<byte> bytes, int index) =>
+            (uint)index < (uint)bytes.Length ? bytes[index] : (byte)0;
 
         internal static byte[] Bytes(this byte[] bytes, int fromIndex)
         {
-            return bytes.Skip(fromIndex).ToArray();
+            if ((uint)fromIndex >= (uint)bytes.Length)
+            {
+                return Array.Empty<byte>();
+            }
+
+            return bytes.AsSpan(fromIndex).ToArray();
         }
 
         internal static byte[] Bytes(this byte[] bytes, int fromIndex, int count)
         {
-            return bytes.Skip(fromIndex).Take(count).ToArray();
+            if ((uint)fromIndex >= (uint)bytes.Length || count <= 0)
+            {
+                return Array.Empty<byte>();
+            }
+
+            var available = Math.Min(count, bytes.Length - fromIndex);
+            return bytes.AsSpan(fromIndex, available).ToArray();
         }
 
         internal static string GetString(this byte[] bytes, int index)
         {
-            var length = bytes.GetStringLenght(index);
+            ReadOnlySpan<byte> span = bytes;
+            return GetString(span, index);
+        }
 
-            return length == 0 ? string.Empty : Encoding.UTF8.GetString(bytes, index + MqttProtocolConsts.StringPrefixLength, length);
+        internal static string GetString(this ReadOnlySpan<byte> bytes, int index)
+        {
+            var length = bytes.GetStringLength(index);
+            return length == 0
+                ? string.Empty
+                : Encoding.UTF8.GetString(bytes.Slice(index + MqttProtocolConsts.StringPrefixLength, length));
         }
 
         internal static string GetString(this byte[] bytes, int index, out int nextIndex)
         {
-            var length = bytes.GetStringLenght(index);
+            ReadOnlySpan<byte> span = bytes;
+            return GetString(span, index, out nextIndex);
+        }
 
+        internal static string GetString(this ReadOnlySpan<byte> bytes, int index, out int nextIndex)
+        {
+            var length = bytes.GetStringLength(index);
             nextIndex = index + MqttProtocolConsts.StringPrefixLength + length;
 
-            return length == 0 ? string.Empty : Encoding.UTF8.GetString(bytes, index + MqttProtocolConsts.StringPrefixLength, length);
+            return length == 0
+                ? string.Empty
+                : Encoding.UTF8.GetString(bytes.Slice(index + MqttProtocolConsts.StringPrefixLength, length));
         }
 
-        internal static ushort ToUInt16(this byte[] bytes)
-        {
-            if (BitConverter.IsLittleEndian)
-            {
-                Array.Reverse(bytes);
-            }
+        internal static ushort ToUInt16(this byte[] bytes) =>
+            bytes.Length >= 2 ? BinaryPrimitives.ReadUInt16BigEndian(bytes) : (ushort)0;
 
-            return BitConverter.ToUInt16(bytes, 0);
-        }
+        internal static ushort ToUInt16(this ReadOnlySpan<byte> bytes) =>
+            bytes.Length >= 2 ? BinaryPrimitives.ReadUInt16BigEndian(bytes) : (ushort)0;
 
-        static ushort GetStringLenght(this byte[] bytes, int index)
-        {
-            return bytes.Bytes(index, 2).ToUInt16();
-        }
+        private static ushort GetStringLength(this ReadOnlySpan<byte> bytes, int index) =>
+            bytes.Slice(index, MqttProtocolConsts.StringPrefixLength).ToUInt16();
     }
-
-
 }

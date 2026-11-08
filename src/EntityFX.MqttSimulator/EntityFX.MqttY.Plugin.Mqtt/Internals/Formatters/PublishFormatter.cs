@@ -16,10 +16,10 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
 
         protected override PublishPacket Read(byte[] bytes)
         {
-            var remainingLengthBytesLength = 0;
-            var remainingLength = Encoding.DecodeRemainingLength(bytes, out remainingLengthBytesLength);
+            ReadOnlySpan<byte> packet = bytes;
+            var remainingLength = Encoding.DecodeRemainingLength(packet, out var remainingLengthBytesLength);
 
-            var packetFlags = bytes.Byte(0).Bits(5, 4);
+            var packetFlags = packet.Byte(0).Bits(5, 4);
 
             if (packetFlags.Bits(6, 2) == 0x03)
                 throw new MqttException("Formatter_InvalidQualityOfService");
@@ -33,8 +33,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
             var retainFlag = packetFlags.IsSet(0);
 
             var topicStartIndex = 1 + remainingLengthBytesLength;
-            var nextIndex = 0;
-            var topic = bytes.GetString(topicStartIndex, out nextIndex);
+            var topic = packet.GetString(topicStartIndex, out var nextIndex);
 
             if (!_topicEvaluator.IsValidTopicName(topic))
             {
@@ -43,12 +42,13 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
                 throw new MqttException(error);
             }
 
-            var variableHeaderLength = topic.Length + 2;
+            var variableHeaderLength = System.Text.Encoding.UTF8.GetByteCount(topic) +
+                MqttProtocolConsts.StringPrefixLength;
             var packetId = default(ushort?);
 
             if (qos != MqttQos.AtMostOnce)
             {
-                packetId = bytes.Bytes(nextIndex, 2).ToUInt16();
+                packetId = packet.Slice(nextIndex, 2).ToUInt16();
                 variableHeaderLength += 2;
             }
 
@@ -58,7 +58,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
             {
                 var payloadStartIndex = 1 + remainingLengthBytesLength + variableHeaderLength;
 
-                publish!.Payload = bytes.Bytes(payloadStartIndex);
+                publish!.Payload = packet.Slice(payloadStartIndex).ToArray();
             }
 
             return publish;
@@ -66,50 +66,40 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
 
         protected override byte[] Write(PublishPacket packet)
         {
-            var bytes = new List<byte>();
+            Validate(packet);
 
-            var variableHeader = GetVariableHeader(packet);
-            var payloadLength = packet.Payload == null ? 0 : packet.Payload.Length;
-            var remainingLength = Encoding.EncodeRemainingLength(variableHeader.Length + payloadLength);
-            var fixedHeader = GetFixedHeader(packet, remainingLength);
+            var topicLength = Encoding.GetStringByteCount(packet.Topic);
+            var packetIdLength = packet.PacketId.HasValue ? 2 : 0;
+            var payloadLength = packet.Payload?.Length ?? 0;
+            var variableHeaderLength = topicLength + MqttProtocolConsts.StringPrefixLength + packetIdLength;
+            var remainingLength = variableHeaderLength + payloadLength;
+            var remainingLengthBytes = MqttEncoder.GetRemainingLengthByteCount(remainingLength);
 
-            bytes.AddRange(fixedHeader);
-            bytes.AddRange(variableHeader);
+            var bytes = new byte[1 + remainingLengthBytes + remainingLength];
+            var destination = bytes.AsSpan();
 
-            if (packet.Payload != null)
+            destination[0] = GetFixedHeaderByte(packet);
+            var written = 1 + MqttEncoder.WriteRemainingLength(
+                destination.Slice(1, remainingLengthBytes), remainingLength);
+            written += MqttProtocolConsts.StringPrefixLength + topicLength + packetIdLength;
+            Encoding.WriteString(destination.Slice(1 + remainingLengthBytes), packet.Topic);
+
+            if (packet.PacketId.HasValue)
             {
-                bytes.AddRange(packet.Payload);
+                MqttEncoder.WriteInteger(
+                    destination.Slice(1 + remainingLengthBytes + MqttProtocolConsts.StringPrefixLength + topicLength, 2),
+                    packet.PacketId.Value);
             }
 
-            return bytes.ToArray();
+            if (payloadLength != 0)
+            {
+                packet.Payload!.CopyTo(destination.Slice(written));
+            }
+
+            return bytes;
         }
 
-        byte[] GetFixedHeader(PublishPacket packet, byte[] remainingLength)
-        {
-            if (packet.QualityOfService == MqttQos.AtMostOnce && packet.Duplicated)
-                throw new MqttException("PublishFormatter_InvalidDuplicatedWithQoSZero");
-
-            var fixedHeader = new List<byte>();
-
-            var retain = Convert.ToInt32(packet.Retain);
-            var qos = Convert.ToInt32(packet.QualityOfService);
-            var duplicated = Convert.ToInt32(packet.Duplicated);
-
-            qos <<= 1;
-            duplicated <<= 3;
-
-            var flags = Convert.ToByte(retain | qos | duplicated);
-            var type = Convert.ToInt32(MqttPacketType.Publish) << 4;
-
-            var fixedHeaderByte1 = Convert.ToByte(flags | type);
-
-            fixedHeader.Add(fixedHeaderByte1);
-            fixedHeader.AddRange(remainingLength);
-
-            return fixedHeader.ToArray();
-        }
-
-        byte[] GetVariableHeader(PublishPacket packet)
+        private void Validate(PublishPacket packet)
         {
             if (!_topicEvaluator.IsValidTopicName(packet.Topic))
                 throw new MqttException("PublishFormatter_InvalidTopicName");
@@ -120,22 +110,23 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
             if (!packet.PacketId.HasValue && packet.QualityOfService != MqttQos.AtMostOnce)
                 throw new MqttException("PublishFormatter_PacketIdRequired");
 
-            var variableHeader = new List<byte>();
+            if (packet.QualityOfService == MqttQos.AtMostOnce && packet.Duplicated)
+                throw new MqttException("PublishFormatter_InvalidDuplicatedWithQoSZero");
+        }
 
-            var topicBytes = Encoding.EncodeString(packet.Topic);
+        private static byte GetFixedHeaderByte(PublishPacket packet)
+        {
+            var retain = Convert.ToInt32(packet.Retain);
+            var qos = Convert.ToInt32(packet.QualityOfService);
+            var duplicated = Convert.ToInt32(packet.Duplicated);
 
-            variableHeader.AddRange(topicBytes);
+            qos <<= 1;
+            duplicated <<= 3;
 
-            if (packet.PacketId.HasValue)
-            {
-                var packetIdBytes = Encoding.EncodeInteger(packet.PacketId.Value);
+            var flags = Convert.ToByte(retain | qos | duplicated);
+            var type = Convert.ToInt32(MqttPacketType.Publish) << 4;
 
-                variableHeader.AddRange(packetIdBytes);
-            }
-
-            return variableHeader.ToArray();
+            return Convert.ToByte(flags | type);
         }
     }
-
-
 }

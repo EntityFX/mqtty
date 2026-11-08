@@ -1,4 +1,5 @@
-﻿using EntityFX.MqttY.Contracts.Mqtt.Packets;
+﻿using EntityFX.MqttY.Contracts.Mqtt;
+using EntityFX.MqttY.Contracts.Mqtt.Packets;
 
 namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
 {
@@ -21,45 +22,36 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Internals.Formatters
             ValidateHeaderFlag(bytes, t => t == MqttPacketType.PublishRelease, 0x02);
             ValidateHeaderFlag(bytes, t => t != MqttPacketType.PublishRelease, 0x00);
 
-            var remainingLengthBytesLength = 0;
+            ReadOnlySpan<byte> packet = bytes;
+            var remainingLength = Encoding.DecodeRemainingLength(packet, out var remainingLengthBytesLength);
 
-            Encoding.DecodeRemainingLength(bytes, out remainingLengthBytesLength);
+            if (remainingLength < 2)
+                throw new MqttException("InvalidPacketLength");
 
             var packetIdIndex = MqttProtocolConsts.PacketTypeLength + remainingLengthBytesLength;
-            var packetIdBytes = bytes.Bytes(packetIdIndex, 2);
-
-            return _packetFactory(packetIdBytes.ToUInt16());
+            return _packetFactory(packet.Slice(packetIdIndex, 2).ToUInt16());
         }
 
         protected override byte[] Write(T packet)
         {
-            var variableHeader = Encoding.EncodeInteger(packet.PacketId);
-            var remainingLength = Encoding.EncodeRemainingLength(variableHeader.Length);
-            var fixedHeader = GetFixedHeader(packet.Type, remainingLength);
-            var bytes = new byte[fixedHeader.Length + variableHeader.Length];
+            var bytes = new byte[4];
+            var fixedHeaderByte1 = GetFixedHeaderByte(packet.Type);
+            var remainingLengthBytes = MqttEncoder.WriteRemainingLength(bytes.AsSpan(1), 2);
+            var packetIdIndex = 1 + remainingLengthBytes;
 
-            fixedHeader.CopyTo(bytes, 0);
-            variableHeader.CopyTo(bytes, fixedHeader.Length);
+            bytes[0] = fixedHeaderByte1;
+            MqttEncoder.WriteInteger(bytes.AsSpan(packetIdIndex), packet.PacketId);
 
             return bytes;
         }
 
-        byte[] GetFixedHeader(MqttPacketType packetType, byte[] remainingLength)
+        private static byte GetFixedHeaderByte(MqttPacketType packetType)
         {
             // MQTT 2.2.2: http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/csprd02/mqtt-v3.1.1-csprd02.html#_Toc385349758
             // The flags for PUBREL are different than for the other flow packets.
             var flags = packetType == MqttPacketType.PublishRelease ? 0x02 : 0x00;
             var type = Convert.ToInt32(packetType) << 4;
-            var fixedHeaderByte1 = Convert.ToByte(flags | type);
-            var fixedHeader = new byte[1 + remainingLength.Length];
-
-            fixedHeader[0] = fixedHeaderByte1;
-            remainingLength.CopyTo(fixedHeader, 1);
-
-            return fixedHeader;
+            return Convert.ToByte(flags | type);
         }
     }
-
-
-
 }
