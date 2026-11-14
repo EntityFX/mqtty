@@ -8,9 +8,16 @@ namespace EntityFX.MqttY.MqttRelay.App;
 /// Which slice of the sweep this process owns. A single process owns
 /// <c>Count == 1</c>, which is the historical behaviour.
 /// </summary>
-public readonly record struct ShardSpec(int Index, int Count, string? OutputPath)
+public readonly record struct ShardSpec(int Index, int Count, string? OutputPath, HashSet<int>? Ordinals = null)
 {
-    public bool Contains(int ordinal) => Count <= 1 || ordinal % Count == Index;
+    /// <summary>
+    /// Ordinals are assigned by an LPT pass (heaviest configurations first) so
+    /// shards finish at roughly the same time; the hash set carries that
+    /// assignment. Without it the legacy round-robin split is used.
+    /// </summary>
+    public bool Contains(int ordinal) => Ordinals != null
+        ? Ordinals.Contains(ordinal)
+        : Count <= 1 || ordinal % Count == Index;
 }
 
 /// <summary>
@@ -59,7 +66,66 @@ public static class RelaySweepCommand
             throw new ArgumentException("--shard must be '<index>/<count>' with 0 <= index < count.");
         }
 
-        return new ShardSpec(index, count, Value(args, "output"));
+        return new ShardSpec(index, count, Value(args, "output"),
+            ComputeShardAssignments(args, count, index));
+    }
+
+    /// <summary>
+    /// Longest-processing-time first assignment: sort configurations by a
+    /// relative cost estimate and give each to the currently lightest shard.
+    /// A round-robin split can put several heavy configurations in one shard
+    /// and leave the others idle at the end of the sweep.
+    /// </summary>
+    private static HashSet<int> ComputeShardAssignments(string[] args, int shards, int index)
+    {
+        var brokers = Brokers(args);
+        var nets = Nets(args);
+        var clients = Clients(args);
+        var repeats = Repeats(args);
+        var strategies = Strategies(args);
+        var total = CheckedProduct(brokers.Length, nets.Length, clients.Length,
+            repeats.Length, strategies.Length);
+
+        var weights = new long[total];
+        var ordinal = 0;
+        foreach (var b in brokers)
+        foreach (var n in nets)
+        foreach (var c in clients)
+        foreach (var r in repeats)
+        foreach (var s in strategies)
+        {
+            weights[ordinal++] = Math.Max(1, (long)b) * Math.Max(1, n) * Math.Max(1, c) *
+                                 (Math.Max(1, r) + 1) * (s == 0 ? 1 : 2);
+        }
+
+        var order = Enumerable.Range(0, total)
+            .OrderByDescending(i => weights[i])
+            .ThenBy(i => i)
+            .ToArray();
+
+        var loads = new long[shards];
+        var assignments = new HashSet<int>[shards];
+        for (var s = 0; s < shards; s++)
+        {
+            assignments[s] = new HashSet<int>();
+        }
+
+        foreach (var task in order)
+        {
+            var target = 0;
+            for (var s = 1; s < shards; s++)
+            {
+                if (loads[s] < loads[target])
+                {
+                    target = s;
+                }
+            }
+
+            assignments[target].Add(task);
+            loads[target] += weights[task];
+        }
+
+        return assignments[Math.Clamp(index, 0, shards - 1)];
     }
 
     public static int[] Brokers(string[] args) => IntList(args, "brokers") ?? DefaultBrokers;

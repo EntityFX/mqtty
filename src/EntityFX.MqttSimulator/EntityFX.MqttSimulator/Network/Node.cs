@@ -1,3 +1,4 @@
+﻿using System.Runtime.CompilerServices;
 using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Network;
 using EntityFX.MqttY.Contracts.Options;
@@ -193,6 +194,7 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         deferred.Clear();
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool ProcessSlot(
         ref NodePacketSlot slot, long totalTicks, Action<NodePacketSlot> process)
     {

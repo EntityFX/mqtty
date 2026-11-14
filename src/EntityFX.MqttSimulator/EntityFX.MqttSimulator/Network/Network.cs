@@ -1,3 +1,4 @@
+﻿using System.Runtime.CompilerServices;
 using EntityFX.MqttY.Application;
 using EntityFX.MqttY.Contracts.Counters;
 using EntityFX.MqttY.Contracts.Network;
@@ -89,13 +90,73 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         }
     }
 
-    public IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks => _linkedNetworks.ToImmutableDictionary();
+    // These getters are read during refresh and publish; rebuilding an
+    // immutable dictionary on every access allocated heavily. Cache each
+    // snapshot and invalidate it when the topology version changes.
+    private IReadOnlyDictionary<string, INetwork>? _linkedCache;
+    private int _linkedCacheVersion = -1;
+    private int _linksVersion;
 
-    public IReadOnlyDictionary<string, IServer> Servers => _servers.ToImmutableDictionary();
+    private IReadOnlyDictionary<string, IServer>? _serversCache;
+    private int _serversCacheVersion = -1;
 
-    public IReadOnlyDictionary<string, IClient> Clients => _clients.ToImmutableDictionary();
+    private IReadOnlyDictionary<string, IClient>? _clientsCache;
+    private int _clientsCacheVersion = -1;
 
-    public IReadOnlyDictionary<string, IApplication> Applications => _applications.ToImmutableDictionary();
+    private IReadOnlyDictionary<string, IApplication>? _applicationsCache;
+    private int _applicationsCacheVersion = -1;
+
+    public IReadOnlyDictionary<string, INetwork> LinkedNearestNetworks
+    {
+        get
+        {
+            if (_linkedCache == null || _linkedCacheVersion != _linksVersion)
+            {
+                _linkedCache = _linkedNetworks.ToImmutableDictionary();
+                _linkedCacheVersion = _linksVersion;
+            }
+            return _linkedCache;
+        }
+    }
+
+    public IReadOnlyDictionary<string, IServer> Servers
+    {
+        get
+        {
+            if (_serversCache == null || _serversCacheVersion != _nodesVersion)
+            {
+                _serversCache = _servers.ToImmutableDictionary();
+                _serversCacheVersion = _nodesVersion;
+            }
+            return _serversCache;
+        }
+    }
+
+    public IReadOnlyDictionary<string, IClient> Clients
+    {
+        get
+        {
+            if (_clientsCache == null || _clientsCacheVersion != _nodesVersion)
+            {
+                _clientsCache = _clients.ToImmutableDictionary();
+                _clientsCacheVersion = _nodesVersion;
+            }
+            return _clientsCache;
+        }
+    }
+
+    public IReadOnlyDictionary<string, IApplication> Applications
+    {
+        get
+        {
+            if (_applicationsCache == null || _applicationsCacheVersion != _nodesVersion)
+            {
+                _applicationsCache = _applications.ToImmutableDictionary();
+                _applicationsCacheVersion = _nodesVersion;
+            }
+            return _applicationsCache;
+        }
+    }
 
     private IReadOnlyDictionary<string, INode>? _nodesCache;
     private int _nodesCacheVersion = -1;
@@ -189,6 +250,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
             return false;
         }
         _linkedNetworks[network.Name] = network;
+        _linksVersion++;
 
         var result = network.Link(this);
 
@@ -215,6 +277,10 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         {
             _linkedNetworks[network.Name] = network;
         }
+        else
+        {
+            _linksVersion++;
+        }
 
         if (NetworkSimulator!.EnableMonitoring)
         {
@@ -235,6 +301,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         _applications.Clear();
         _clients.Clear();
         _servers.Clear();
+        _nodesVersion++;
 
         foreach (var network in _linkedNetworks.Values)
         {
@@ -360,7 +427,11 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
                 Array.Empty<INetwork>(), 0, NetworkPacketType.Unreachable, null);
         }
 
-        var pathToRemote = NetworkSimulator.PathFinder.GetPath(fromNetwork, toNetwork).ToArray();
+        // The path finder backs its cache with an array; avoid copying it for
+        // every remote packet. Fall back to materialising only when a different
+        // implementation returns a lazy sequence.
+        var path = NetworkSimulator.PathFinder.GetPath(fromNetwork, toNetwork);
+        var pathToRemote = path as INetwork[] ?? path.ToArray();
         destionationNode = (toNetwork as Network)?.GetDestinationNode(packet.To!, packet.ToType);
 
         return new NetworkPacketSlot(NetworkSimulator!.TotalTicks,
@@ -561,6 +632,7 @@ public class Network : NodeBase, INetwork, IQuiescenceParticipant
         return $"N: {Address}";
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal ISender? GetDestinationNode(string id, NodeType destinationNodeType)
     {
         ISender? result = null;

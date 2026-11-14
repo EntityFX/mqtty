@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using System.Runtime.CompilerServices;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Xml.Linq;
@@ -319,6 +320,7 @@ public class NetworkSimulator : INetworkSimulator
     /// <summary>Upper bound of worker threads used by the parallel refresh (0 = default).</summary>
     public int MaxDegreeOfParallelism { get; set; } = 0;
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int NodePriority(NodeType type) => type switch
     {
         NodeType.Server => 0,
