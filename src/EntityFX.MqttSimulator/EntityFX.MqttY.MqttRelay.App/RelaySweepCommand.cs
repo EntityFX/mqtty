@@ -370,7 +370,10 @@ public static class RelaySweepCommand
 
     private static int IndexOf(string[] args, string name)
     {
-        for (var index = 0; index < args.Length; index += 2)
+        // Step by one, not two: the relay app accepts a positional mode word
+        // (for example `original`) before the --name value pairs, which would
+        // shift a stride-of-two scan off the pairs.
+        for (var index = 0; index < args.Length; index++)
         {
             if (string.Equals(args[index], "--" + name, StringComparison.OrdinalIgnoreCase))
             {

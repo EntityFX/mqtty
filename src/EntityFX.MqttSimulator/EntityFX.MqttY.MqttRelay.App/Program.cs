@@ -100,11 +100,14 @@ NetworkOptions? networkOptions = null;
 
 if (args.Length > 0 && args[0] == "original")
 {
-    brokers = new[] { 4 };
-    clients = new[] { 15 };
-    repeats = new[] { 131 };
-    netLength = new[] { 1 };
-    refreshStrategies = new[] { 0 };
+    // original keeps its demo sizes as defaults but still sweeps: any dimension
+    // passed explicitly (for example --brokers 4,5,10,15) is honoured instead
+    // of being overwritten by the single demo value.
+    if (!HasArg(args, "--brokers")) brokers = new[] { 4 };
+    if (!HasArg(args, "--clients")) clients = new[] { 15 };
+    if (!HasArg(args, "--repeats")) repeats = new[] { 131 };
+    if (!HasArg(args, "--nets")) netLength = new[] { 1 };
+    if (!HasArg(args, "--strategies")) refreshStrategies = new[] { 0 };
     bytes = 8;
 
     tickOptions = new TicksOptions()
@@ -116,7 +119,7 @@ if (args.Length > 0 && args[0] == "original")
 
 if (isOriginalMode && runFilter == null && !HasArg(args, "--shard") && !HasArg(args, "--sequential"))
 {
-    Environment.ExitCode = RunOriginalParallel(resultPath);
+    Environment.ExitCode = RunOriginalParallel(resultPath, args);
     return;
 }
 
@@ -279,7 +282,7 @@ static string? ArgValue(string[] values, string name)
 // original runs three independent variants. Starting them as processes keeps
 // the counter clock process-local (it is a static) and lets seq, par and
 // par+counters use the machine at the same time instead of one after another.
-int RunOriginalParallel(string outputDir)
+int RunOriginalParallel(string outputDir, string[] sourceArgs)
 {
     var runs = new[] { "seq", "par", "parc" };
     var children = new List<(string Run, Process Process, Task<string> Output, Task<string> Error)>();
@@ -309,6 +312,22 @@ int RunOriginalParallel(string outputDir)
         startInfo.ArgumentList.Add(run);
         startInfo.ArgumentList.Add("--output");
         startInfo.ArgumentList.Add(dir);
+        // Forward sweep dimensions and other user options so the children run
+        // exactly the same configuration matrix as the parent.
+        for (var index = 0; index + 1 < sourceArgs.Length; index++)
+        {
+            var name = sourceArgs[index];
+            if (!name.StartsWith("--", StringComparison.Ordinal))
+            {
+                continue;
+            }
+            if (name is "--run" or "--output" or "--sequential" or "--shard" or "--workers" or "--parallel")
+            {
+                continue;
+            }
+            startInfo.ArgumentList.Add(name);
+            startInfo.ArgumentList.Add(sourceArgs[index + 1]);
+        }
         // seq runs on the caller thread; par and par+counters share the
         // physical cores, so give each half the cores. With 12 workers each the
         // three processes would oversubscribe SMT and lose more than they gain.
@@ -760,6 +779,8 @@ static void PrintHelp()
     Console.WriteLine("        Run the legacy single-configuration demo (4 brokers, 15 clients, 131 repeats).");
     Console.WriteLine("        By default the seq/par/par+counters variants run in parallel processes;");
     Console.WriteLine("        --sequential runs them one after another in this process.");
+    Console.WriteLine("        Defaults are brokers=4, nets=1, clients=15, repeats=131, strategies=0;");
+    Console.WriteLine("        pass --brokers/--nets/--clients/--repeats/--strategies to sweep more values.");
     Console.WriteLine("  calibrate [args]");
     Console.WriteLine("        Run calibration for relay experiment timing.");
     Console.WriteLine("  experiment [args]");
