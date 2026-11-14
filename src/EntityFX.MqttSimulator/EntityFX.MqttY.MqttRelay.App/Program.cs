@@ -11,7 +11,15 @@ using System.Globalization;
 using System.Text;
 using System.Threading.Tasks;
 
-
+// Print help when --help or -h is passed (or no args at all).
+if (args.Length == 0 ||
+    args[0].Equals("--help", StringComparison.OrdinalIgnoreCase) ||
+    args[0].Equals("-h", StringComparison.OrdinalIgnoreCase) ||
+    args[0].Equals("/?", StringComparison.OrdinalIgnoreCase))
+{
+    PrintHelp();
+    return;
+}
 
 if (args.Length > 0 && args[0].Equals("calibrate", StringComparison.OrdinalIgnoreCase))
 {
@@ -520,3 +528,56 @@ static bool HasArg(string[] args, string name)
     }
     return false;
 }
+
+static void PrintHelp()
+{
+    var physicalCores = Environment.ProcessorCount;
+    Console.WriteLine("EntityFX.MqttY.MqttRelay.App — MQTT broker/network simulator in model time.");
+    Console.WriteLine();
+    Console.WriteLine("Usage:");
+    Console.WriteLine("  EntityFX.MqttY.MqttRelay.App [command] [options]");
+    Console.WriteLine();
+    Console.WriteLine("Commands:");
+    Console.WriteLine("  sweep [--parallel N] [--workers W] [--brokers b,...] [--nets n,...]");
+    Console.WriteLine("            [--clients c,...] [--repeats r,...] [--strategies s,...]");
+    Console.WriteLine("            [--output <dir>]");
+    Console.WriteLine("        Run a parameter sweep across independent simulations (default: sequential).");
+    Console.WriteLine("  original");
+    Console.WriteLine("        Run the legacy single-configuration demo (4 brokers, 15 clients, 131 repeats).");
+    Console.WriteLine("  calibrate [args]");
+    Console.WriteLine("        Run calibration for relay experiment timing.");
+    Console.WriteLine("  experiment [args]");
+    Console.WriteLine("        Run a single relay experiment.");
+    Console.WriteLine("  <results.csv>");
+    Console.WriteLine("        Process an existing results CSV into statistics.");
+    Console.WriteLine();
+    Console.WriteLine("Options:");
+    Console.WriteLine("  --brokers N,...     Broker counts (default: 4,5,10,15)");
+    Console.WriteLine("  --nets N,...        Networks per node (default: 2,5,10,50)");
+    Console.WriteLine("  --clients N,...     Client counts (default: 3,10,50)");
+    Console.WriteLine("  --repeats N,...     Publish repeats per configuration (default: 10,100)");
+    Console.WriteLine("  --strategies N,...  Refresh strategies (default: 0,1)");
+    Console.WriteLine("  --parallel N        Number of concurrent shard processes (default: physical cores)");
+    Console.WriteLine("  --workers W         Refresh workers per simulation (default: physical cores)");
+    Console.WriteLine("  --node-chunk N      Node claim chunk size (default: 1)");
+    Console.WriteLine("  --barrier spin|mon  Tick barrier mode (default: spin)");
+    Console.WriteLine("  --output <dir>      Output directory (default: results/<timestamp>)");
+    Console.WriteLine();
+    Console.WriteLine("Environment variables:");
+    Console.WriteLine("  MQTTY_WORKERS        Override refresh worker count");
+    Console.WriteLine("  MQTTY_NODE_CHUNK     Override node claim chunk size");
+    Console.WriteLine("  MQTTY_BARRIER        Override barrier mode (spin|monitor)");
+    Console.WriteLine("  MQTTY_PARALLEL_PUBLISH=1  Enable parallel publish across brokers (opt-in)");
+    Console.WriteLine("  MQTTY_DISABLE_COUNTERS=1  Disable counters for faster runs");
+    Console.WriteLine();
+    Console.WriteLine($"Multi-core defaults: --workers {physicalCores}, --node-chunk 1, --barrier spin");
+    Console.WriteLine("  (one worker per physical core; override via --workers/--node-chunk/--barrier");
+    Console.WriteLine("   or MQTTY_* environment variables)");
+    Console.WriteLine();
+    Console.WriteLine("Examples:");
+    Console.WriteLine("  EntityFX.MqttY.MqttRelay.App sweep --parallel 4 --workers 3");
+    Console.WriteLine("  EntityFX.MqttY.MqttRelay.App sweep --brokers 16 --nets 5 --clients 10 --repeats 100 --parallel 12 --workers 1");
+    Console.WriteLine("  EntityFX.MqttY.MqttRelay.App original");
+    Console.WriteLine();
+}
+
