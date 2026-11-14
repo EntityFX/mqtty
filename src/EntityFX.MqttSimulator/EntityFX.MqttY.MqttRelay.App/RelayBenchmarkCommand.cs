@@ -129,6 +129,10 @@ public static class RelayBenchmarkCommand
             ParRefresh = Median(par.Select(s => s.Refresh));
             SeqCv = Cv(seq.Select(s => s.Wall));
             ParCv = Cv(par.Select(s => s.Wall));
+            SeqMin = seq.Min(s => s.Wall);
+            SeqMax = seq.Max(s => s.Wall);
+            ParMin = par.Min(s => s.Wall);
+            ParMax = par.Max(s => s.Wall);
             WallSpeedup = ParWall > 0 ? SeqWall / ParWall : 0;
             RefreshSpeedup = ParRefresh > 0 ? SeqRefresh / ParRefresh : 0;
             SeqCpu = Median(seq.Select(s => s.CpuSeconds));
@@ -143,6 +147,9 @@ public static class RelayBenchmarkCommand
             ParPeakMemory = par.Max(s => s.PeakMemoryMb);
             Workers = workers;
             CoreMatches = CoreMetricsMatch(Seq, Par);
+            DiagnosticsMatch = DiagnosticsMetricsMatch(Seq, Par);
+            ActivityOk = Seq.ScheduledPublishes > 0 && Seq.UniqueDeliveries > 0 &&
+                         Par.ScheduledPublishes > 0 && Par.UniqueDeliveries > 0;
         }
 
         public string Name { get; }
@@ -154,6 +161,10 @@ public static class RelayBenchmarkCommand
         public double ParRefresh { get; }
         public double SeqCv { get; }
         public double ParCv { get; }
+        public double SeqMin { get; }
+        public double SeqMax { get; }
+        public double ParMin { get; }
+        public double ParMax { get; }
         public double WallSpeedup { get; }
         public double RefreshSpeedup { get; }
         public double SeqCpu { get; }
@@ -166,23 +177,31 @@ public static class RelayBenchmarkCommand
         public double ParPeakMemory { get; }
         public int Workers { get; }
         public bool CoreMatches { get; }
+        public bool DiagnosticsMatch { get; }
+        public bool ActivityOk { get; }
     }
 
     private static void PrintEngine(EngineRow row)
     {
         var errors = row.Seq.SendRejected + row.Seq.QueueDrops +
                      row.Par.SendRejected + row.Par.QueueDrops;
-        Console.WriteLine($"  seq wall  median={row.SeqWall,8:F4}s  cv={row.SeqCv:F1}%");
-        Console.WriteLine($"  par wall  median={row.ParWall,8:F4}s  cv={row.ParCv:F1}%");
+        var activity = row.ActivityOk ? "ok" : "invalid";
+        var core = row.CoreMatches ? "match" : "MISMATCH";
+        var diagnostics = row.DiagnosticsMatch ? "match" : "differ";
+        Console.WriteLine($"  seq wall  median={row.SeqWall,8:F4}s  min={row.SeqMin,8:F4}  max={row.SeqMax,8:F4}  " +
+                          $"cv={row.SeqCv:F1}%");
+        Console.WriteLine($"  par wall  median={row.ParWall,8:F4}s  min={row.ParMin,8:F4}  max={row.ParMax,8:F4}  " +
+                          $"cv={row.ParCv:F1}%");
         Console.WriteLine($"  refresh   seq={row.SeqRefresh,8:F4}s  par={row.ParRefresh,8:F4}s  " +
                           $"speedup={row.RefreshSpeedup:F2}x");
+        Console.WriteLine($"  export    seq=0,0000s  par=0,0000s");
         Console.WriteLine($"  cpu       seq={row.SeqCpu,7:F3}s  par={row.ParCpu,7:F3}s  " +
                           $"mean utilization: seq={row.SeqCpuUtilization:F1}%  " +
                           $"par={row.ParCpuUtilization:F1}% of {Environment.ProcessorCount} logical");
         Console.WriteLine($"  memory    mean working set: seq={row.SeqMemory:F0} MB  par={row.ParMemory:F0} MB  " +
                           $"peak: seq={row.SeqPeakMemory:F0} MB  par={row.ParPeakMemory:F0} MB");
-        Console.WriteLine($"  speedup   {row.WallSpeedup:F2}x   status={row.Seq.Status}/{row.Par.Status}   " +
-                          $"errors={errors}   core={(row.CoreMatches ? "match" : "MISMATCH")}");
+        Console.WriteLine($"  speedup   {row.WallSpeedup:F2}x   status={row.Seq.Status}   errors={errors}   " +
+                          $"activity={activity}   core={core}   diagnostics={diagnostics}");
         Console.WriteLine();
     }
 
@@ -192,18 +211,21 @@ public static class RelayBenchmarkCommand
             row.SeqCpuUtilization, row.ParCpuUtilization);
         var memoryText = string.Format(CultureInfo.InvariantCulture, "{0:F0}/{1:F0}",
             row.SeqMemory, row.ParMemory);
-        var statusText = row.Seq.Status + "/" + row.Par.Status;
+        var statusText = row.Seq.Status == row.Par.Status
+            ? row.Seq.Status
+            : row.Seq.Status + "/" + row.Par.Status;
         var coreText = row.CoreMatches ? "match" : "MISMATCH";
+        var diagText = row.DiagnosticsMatch ? "match" : "differ";
 
-        Console.WriteLine(new string('=', 78));
+        Console.WriteLine(new string('=', 110));
         Console.WriteLine("SUMMARY (wall-clock, median)");
-        Console.WriteLine(new string('=', 78));
+        Console.WriteLine(new string('=', 110));
         Console.WriteLine(
-            "Engine      seq        par    wall x   refresh x   cpu seq/par   mem seq/par MB   status        core");
+            "Engine        seq        par    wall x   refresh x   cpu seq/par   mem mean MB   status       core    diag");
         Console.WriteLine(new string('-', 110));
         Console.WriteLine(
             $"{row.Name,-10} {row.SeqWall,8:F3}s {row.ParWall,8:F3}s {row.WallSpeedup,8:F2}x " +
-            $"{row.RefreshSpeedup,10:F2}x {cpuText,13} {memoryText,16}   {statusText,-22} {coreText}");
+            $"{row.RefreshSpeedup,10:F2}x {cpuText,13} {memoryText,14}   {statusText,-14}{coreText,-8}{diagText}");
         Console.WriteLine();
         Console.WriteLine($"Wall speedup: {row.WallSpeedup:F2}x, refresh speedup: {row.RefreshSpeedup:F2}x " +
                           $"(workers={row.Workers})");
@@ -241,8 +263,29 @@ public static class RelayBenchmarkCommand
         public ResourceSampler(Process process)
         {
             _process = process;
+            // Immediate first sample so even sub-200 ms runs report a value.
+            Sample();
             _thread = new Thread(Loop) { IsBackground = true, Name = "mqtty-bench-sampler" };
             _thread.Start();
+        }
+
+        private void Sample()
+        {
+            try
+            {
+                var workingSet = _process.WorkingSet64;
+                Interlocked.Add(ref _sumWorkingSet, workingSet);
+                Interlocked.Increment(ref _samples);
+                var previousPeak = Interlocked.Read(ref _peakWorkingSet);
+                if (workingSet > previousPeak)
+                {
+                    Interlocked.CompareExchange(ref _peakWorkingSet, workingSet, previousPeak);
+                }
+            }
+            catch
+            {
+                // Property unavailable; ignore this sample.
+            }
         }
 
         public double AverageWorkingSetMb => _samples == 0
@@ -253,23 +296,9 @@ public static class RelayBenchmarkCommand
 
         private void Loop()
         {
-            while (!_stop.Wait(200))
+            while (!_stop.Wait(50))
             {
-                try
-                {
-                    var workingSet = _process.WorkingSet64;
-                    Interlocked.Add(ref _sumWorkingSet, workingSet);
-                    Interlocked.Increment(ref _samples);
-                    var previousPeak = Interlocked.Read(ref _peakWorkingSet);
-                    if (workingSet > previousPeak)
-                    {
-                        Interlocked.CompareExchange(ref _peakWorkingSet, workingSet, previousPeak);
-                    }
-                }
-                catch
-                {
-                    // Process exited or the property is unavailable; stop quietly.
-                }
+                Sample();
             }
         }
 
@@ -293,6 +322,14 @@ public static class RelayBenchmarkCommand
         seq.QueueDrops == par.QueueDrops &&
         seq.PublishP50Ms == par.PublishP50Ms &&
         seq.PublishP99Ms == par.PublishP99Ms;
+
+    private static bool DiagnosticsMetricsMatch(FederationSummary seq, FederationSummary par) =>
+        seq.ReceiverP50Ms == par.ReceiverP50Ms &&
+        seq.ReceiverP99Ms == par.ReceiverP99Ms &&
+        seq.DuplicateDeliveries == par.DuplicateDeliveries &&
+        seq.UnexpectedDeliveries == par.UnexpectedDeliveries &&
+        seq.UnknownDeliveries == par.UnknownDeliveries &&
+        seq.HopLimitDrops == par.HopLimitDrops;
 
     private static double Median(IEnumerable<double> values)
     {
