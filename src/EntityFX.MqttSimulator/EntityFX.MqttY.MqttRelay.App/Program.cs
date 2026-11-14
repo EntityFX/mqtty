@@ -787,6 +787,20 @@ static void ApplyParallelDefaults(string[] args)
     {
         Environment.SetEnvironmentVariable("MQTTY_BARRIER", "spin");
     }
+
+    // A tick is only tens of microseconds, so workers that park on the
+    // generation counter pay a wake-up on almost every tick. Spinning longer
+    // keeps them hot: measured ~6-8% on both the tiny original matrix and the
+    // large relay benchmark.
+    if (Environment.GetEnvironmentVariable("MQTTY_SPIN_ITERATIONS") == null)
+    {
+        Environment.SetEnvironmentVariable("MQTTY_SPIN_ITERATIONS", "4096");
+    }
+
+    if (Environment.GetEnvironmentVariable("MQTTY_BARRIER_SPIN") == null)
+    {
+        Environment.SetEnvironmentVariable("MQTTY_BARRIER_SPIN", "2048");
+    }
 }
 
 static bool HasArg(string[] args, string name)
