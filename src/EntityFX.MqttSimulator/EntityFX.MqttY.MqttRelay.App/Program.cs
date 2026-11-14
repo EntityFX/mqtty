@@ -163,6 +163,7 @@ for (int b = 0; b < brokers.Length; b++)
 
                     INetworkSimulator? networkSimulator = null;
                     double cpuPercent = 0;
+                    double? seqRealTimeSeconds = null;
 
                     if (runFilter is null or "seq")
                     {
@@ -173,7 +174,8 @@ for (int b = 0; b < brokers.Length; b++)
                         var result = new ResultItem(id, gid,
                             new InParams(brokerc, netc, clientc, repeatc, false, false, rs),
                             new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws, cpuPercent), false);
-                        PrintStatsForItem(result);
+                        PrintStatsForItem(result, null);
+                        seqRealTimeSeconds = networkSimulator.RealTime.TotalSeconds;
                         EmitRow(result);
                         SaveCounters(resultPath, prefixBase, networkSimulator);
                         SaveGraphML(resultPath, prefixBase, networkSimulator);
@@ -191,7 +193,8 @@ for (int b = 0; b < brokers.Length; b++)
                         var result = new ResultItem(id, gid,
                             new InParams(brokerc, netc, clientc, repeatc, true, false, rs),
                             new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws, cpuPercent), false);
-                        PrintStatsForItem(result);
+                        PrintStatsForItem(result, RelativeSpeedup(seqRealTimeSeconds,
+                            networkSimulator.RealTime.TotalSeconds));
                         EmitRow(result);
                         SaveCounters(resultPath, prefixBase, networkSimulator);
                         results.Add(result);
@@ -208,7 +211,8 @@ for (int b = 0; b < brokers.Length; b++)
                         var result = new ResultItem(id, gid,
                             new InParams(brokerc, netc, clientc, repeatc, true, true, rs),
                             new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws, cpuPercent), true);
-                        PrintStatsForItem(result);
+                        PrintStatsForItem(result, RelativeSpeedup(seqRealTimeSeconds,
+                            networkSimulator.RealTime.TotalSeconds));
                         EmitRow(result);
                         SaveCounters(resultPath, prefixBase, networkSimulator);
                         results.Add(result);
@@ -437,7 +441,12 @@ if (args.Any(arg => arg.StartsWith("--shard", StringComparison.OrdinalIgnoreCase
         " alloc_mb=" + (GC.GetTotalAllocatedBytes(precise: false) / (1024.0 * 1024.0)).ToString("F0", CultureInfo.InvariantCulture));
 }
 
-void PrintStats(TimeSpan v, TimeSpan r, long t, long s, long e, double m)
+static double? RelativeSpeedup(double? sequentialSeconds, double currentSeconds) =>
+    sequentialSeconds is > 0 && currentSeconds > 0
+        ? sequentialSeconds / currentSeconds
+        : null;
+
+void PrintStats(TimeSpan v, TimeSpan r, long t, long s, long e, double m, double? speedup)
 {
     Console.WriteLine("Virtual time: {0}", v);
     Console.WriteLine("Real time: {0}", r);
@@ -445,13 +454,17 @@ void PrintStats(TimeSpan v, TimeSpan r, long t, long s, long e, double m)
     Console.WriteLine("Steps: {0}", s);
     Console.WriteLine("Errors: {0}", e);
     Console.WriteLine("Memory (Mb): {0}", m);
+    if (speedup.HasValue)
+    {
+        Console.WriteLine("Speedup vs sequential: {0:F2}x", speedup.Value);
+    }
     Console.WriteLine("----------");
 }
 
-void PrintStatsForItem(ResultItem result)
+void PrintStatsForItem(ResultItem result, double? speedup)
 {
     PrintStats(result.Out.VirtualTime, result.Out.RealTime, result.Out.TotalTicks, result.Out.TotalSteps,
-        result.Out.Errors, result.Out.MemoryWorkingSet);
+        result.Out.Errors, result.Out.MemoryWorkingSet, speedup);
 }
 
 static void PrintBefore(bool parallel, int b, int n, int c, int r, bool counters)
