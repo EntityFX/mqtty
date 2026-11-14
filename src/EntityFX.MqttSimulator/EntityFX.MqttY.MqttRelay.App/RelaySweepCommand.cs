@@ -175,6 +175,14 @@ public static class RelaySweepCommand
         // side.
         startInfo.Environment["DOTNET_gcServer"] = workers >= 4 ? "1" : "0";
 
+        // Propagate the parallel-publish opt-in to shard children so they use
+        // the same PublishAll code path as the parent would.
+        var parallelPublish = Environment.GetEnvironmentVariable("MQTTY_PARALLEL_PUBLISH");
+        if (!string.IsNullOrEmpty(parallelPublish))
+        {
+            startInfo.Environment["MQTTY_PARALLEL_PUBLISH"] = parallelPublish;
+        }
+
         if (Environment.GetEnvironmentVariable("MQTTY_SWEEP_DEBUG") == "1")
         {
             Console.Error.WriteLine($"shard {index}: {startInfo.FileName} {string.Join(' ', startInfo.ArgumentList)}");

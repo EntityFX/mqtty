@@ -12,6 +12,7 @@ using EntityFX.MqttY.Utils;
 using EntityFX.MqttY.Contracts.NetworkLogger;
 using EntityFX.MqttY.Plugin.Mqtt.Factories;
 using System.Security.Cryptography;
+using System.Threading.Tasks;
 
 public record InParams(int Brokers, int Nets, int Clients, int Repeats, bool IsParallel, bool EnabledCounters, int RefreshStrategy);
 public record OutParams(TimeSpan VirtualTime, TimeSpan RealTime, long TotalTicks, long TotalSteps, long Errors, double MemoryWorkingSet);
@@ -94,16 +95,41 @@ public class MqttRelayApp
 
     private void PublishAll(bool isParallel, int sendRepeats, int strategy, INetworkSimulator graph, IMqttBroker[] brokers, long ticks, byte[] bytes)
     {
+        // Parallel publish across brokers: each broker lives on its own network
+        // with an independent queue, so publishes from different brokers in the
+        // same repeat never race. Only enabled when the user opts in via
+        // MQTTY_PARALLEL_PUBLISH=1 (order between clients of one broker is kept
+        // sequential to preserve per-client packet order).
+        var parallelPublish = isParallel &&
+            Environment.GetEnvironmentVariable("MQTTY_PARALLEL_PUBLISH") == "1";
+
         for (int r = 0; r < sendRepeats; r++)
         {
-            foreach (var broker in brokers)
+            if (parallelPublish && brokers.Length > 1)
             {
-                var brokerNetwork = broker.Network!;
-                var mqttClients = brokerNetwork.Clients.Values.OfType<MqttClient>().Where(c => c.Group == null);
-
-                foreach (var mqttClient in mqttClients)
+                Parallel.ForEach(brokers, broker =>
                 {
-                    mqttClient.Publish("telemetry/data", bytes, MqttQos.AtLeastOnce, false);
+                    var brokerNetwork = broker.Network!;
+                    var mqttClients = brokerNetwork.Clients.Values.OfType<MqttClient>()
+                        .Where(c => c.Group == null);
+
+                    foreach (var mqttClient in mqttClients)
+                    {
+                        mqttClient.Publish("telemetry/data", bytes, MqttQos.AtLeastOnce, false);
+                    }
+                });
+            }
+            else
+            {
+                foreach (var broker in brokers)
+                {
+                    var brokerNetwork = broker.Network!;
+                    var mqttClients = brokerNetwork.Clients.Values.OfType<MqttClient>().Where(c => c.Group == null);
+
+                    foreach (var mqttClient in mqttClients)
+                    {
+                        mqttClient.Publish("telemetry/data", bytes, MqttQos.AtLeastOnce, false);
+                    }
                 }
             }
 

@@ -116,10 +116,14 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
         // Most nodes are empty on most ticks. Processing two empty
         // ConcurrentQueues and rotating empty deferred lists is pure overhead;
         // counters still observe the same zero queue lengths.
-        if (Volatile.Read(ref _outgoingQueueLength) == 0 &&
-            Volatile.Read(ref _incommingQueueLength) == 0 &&
-            _outgoingDeferred.Count == 0 && _outgoingDeferredNext.Count == 0 &&
-            _incommingDeferred.Count == 0 && _incommingDeferredNext.Count == 0)
+        // Cheap List.Count checks first (no memory barrier), then the more
+        // expensive Volatile.Read queue-length checks. For idle nodes all
+        // checks are zero; for active nodes we typically fail fast on the
+        // first queue-length read.
+        if (_outgoingDeferred.Count == 0 && _outgoingDeferredNext.Count == 0 &&
+            _incommingDeferred.Count == 0 && _incommingDeferredNext.Count == 0 &&
+            Volatile.Read(ref _outgoingQueueLength) == 0 &&
+            Volatile.Read(ref _incommingQueueLength) == 0)
         {
             if (sim.EnableCounters)
             {
