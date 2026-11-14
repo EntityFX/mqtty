@@ -20,6 +20,12 @@ if (args[0].Equals("--help", StringComparison.OrdinalIgnoreCase) ||
     return;
 }
 
+// original runs three variants (seq, par, par+counters). They are independent
+// processes, so the parent starts all three at once and prints one merged
+// table; --run selects a single variant for a child process.
+var isOriginalMode = args.Length > 0 && args[0] == "original";
+var runFilter = ArgValue(args, "--run");
+
 if (args.Length > 0 && args[0].Equals("calibrate", StringComparison.OrdinalIgnoreCase))
 {
     Environment.ExitCode = MqttRelayExperimentCommand.RunCalibration(args.Skip(1).ToArray());
@@ -108,6 +114,12 @@ if (args.Length > 0 && args[0] == "original")
     };
 }
 
+if (isOriginalMode && runFilter == null && !HasArg(args, "--shard") && !HasArg(args, "--sequential"))
+{
+    Environment.ExitCode = RunOriginalParallel(resultPath);
+    return;
+}
+
 var results = new List<ResultItem>();
 
 var mqttRelayApp = new MqttRelayApp(tickOptions, networkOptions);
@@ -140,66 +152,223 @@ for (int b = 0; b < brokers.Length; b++)
                     var netc = netLength[n];
                     var clientc = clients[c];
                     var repeatc = repeats[r];
-                    id = ordinal * 3;
                     gid = ordinal;
 
                     var prefixBase = $"{ix}__b_{brokerc}__n_{netc}__c_{clientc}__r_{repeatc}";
 
-                    PrintBefore(false, brokerc, netc, clientc, repeatc, false);
-                    var (networkSimulator, cpuPercent) = RunMeasured(false, brokerc, netc, clientc, repeatc, false, rs);
+                    INetworkSimulator? networkSimulator = null;
+                    double cpuPercent = 0;
 
-                    var ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
+                    if (runFilter is null or "seq")
+                    {
+                        id = ordinal * 3;
+                        PrintBefore(false, brokerc, netc, clientc, repeatc, false);
+                        (networkSimulator, cpuPercent) = RunMeasured(false, brokerc, netc, clientc, repeatc, false, rs);
+                        var ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
+                        var result = new ResultItem(id, gid,
+                            new InParams(brokerc, netc, clientc, repeatc, false, false, rs),
+                            new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws, cpuPercent), false);
+                        PrintStatsForItem(result);
+                        EmitRow(result);
+                        SaveCounters(resultPath, prefixBase, networkSimulator);
+                        SaveGraphML(resultPath, prefixBase, networkSimulator);
+                        results.Add(result);
+                        networkSimulator.Clear();
+                        GC.Collect();
+                    }
 
-                    var result = new ResultItem(id, gid,
-                        new InParams(brokerc, netc, clientc, repeatc, false, false, rs),
-                        new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws, cpuPercent), false);
+                    if (runFilter is null or "par")
+                    {
+                        id = ordinal * 3 + 1;
+                        PrintBefore(true, brokerc, netc, clientc, repeatc, false);
+                        (networkSimulator, cpuPercent) = RunMeasured(true, brokerc, netc, clientc, repeatc, false, rs);
+                        var ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
+                        var result = new ResultItem(id, gid,
+                            new InParams(brokerc, netc, clientc, repeatc, true, false, rs),
+                            new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws, cpuPercent), false);
+                        PrintStatsForItem(result);
+                        EmitRow(result);
+                        SaveCounters(resultPath, prefixBase, networkSimulator);
+                        results.Add(result);
+                        networkSimulator.Clear();
+                        GC.Collect();
+                    }
 
-                    PrintStatsForItem(result);
-                    SaveCounters(resultPath, prefixBase, networkSimulator);
-                    SaveGraphML(resultPath, prefixBase, networkSimulator);
-
-                    results.Add(result);
-                    networkSimulator.Clear();
-                    id++;
-                    GC.Collect();
-
-                    PrintBefore(true, brokerc, netc, clientc, repeatc, false);
-                    (networkSimulator, cpuPercent) = RunMeasured(true, brokerc, netc, clientc, repeatc, false, rs);
-
-                    ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
-                    result = new ResultItem(id, gid,
-                        new InParams(brokerc, netc, clientc, repeatc, true, false, rs),
-                        new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws, cpuPercent), false);
-                    PrintStatsForItem(result);
-                    SaveCounters(resultPath, prefixBase, networkSimulator);
-                    results.Add(result);
-                    networkSimulator.Clear();
-                    id++;
-                    GC.Collect();
-
-                    PrintBefore(true, brokerc, netc, clientc, repeatc, true);
-                    (networkSimulator, cpuPercent) = RunMeasured(true, brokerc, netc, clientc, repeatc, true, rs);
-
-                    ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
-                    result = new ResultItem(id, gid,
-                        new InParams(brokerc, netc, clientc, repeatc, true, true, rs),
-                        new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws, cpuPercent), true);
-                    PrintStatsForItem(result);
-                    SaveCounters(resultPath, prefixBase, networkSimulator);
-                    results.Add(result);
-                    networkSimulator.Clear();
-                    id++;
-                    gid++;
-                    GC.Collect();
+                    if (runFilter is null or "parc")
+                    {
+                        id = ordinal * 3 + 2;
+                        PrintBefore(true, brokerc, netc, clientc, repeatc, true);
+                        (networkSimulator, cpuPercent) = RunMeasured(true, brokerc, netc, clientc, repeatc, true, rs);
+                        var ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
+                        var result = new ResultItem(id, gid,
+                            new InParams(brokerc, netc, clientc, repeatc, true, true, rs),
+                            new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws, cpuPercent), true);
+                        PrintStatsForItem(result);
+                        EmitRow(result);
+                        SaveCounters(resultPath, prefixBase, networkSimulator);
+                        results.Add(result);
+                        networkSimulator.Clear();
+                        GC.Collect();
+                    }
 
                     table = BuildTable(results);
                     SaveTableAsFile(resultPath, prefixBase, table);
                     SaveResultsToCsv(resultPath, prefixBase, results);
 
+
                 }
             }
         }
     }
+}
+
+void EmitRow(ResultItem result)
+{
+    if (runFilter == null)
+    {
+        return;
+    }
+
+    Console.WriteLine(string.Join(';',
+        "MQTTY_ROW",
+        result.Id, result.GroupId, result.In.IsParallel, result.In.EnabledCounters,
+        result.In.Brokers, result.In.Nets, result.In.Clients, result.In.Repeats,
+        result.Out.VirtualTime, result.Out.RealTime,
+        result.Out.RealTime.TotalMilliseconds.ToString(CultureInfo.InvariantCulture),
+        result.Out.TotalTicks, result.Out.TotalSteps, result.Out.Errors,
+        result.Out.MemoryWorkingSet.ToString(CultureInfo.InvariantCulture),
+        result.Out.CpuPercent.ToString(CultureInfo.InvariantCulture)));
+}
+
+ResultItem ParseRow(string line)
+{
+    var parts = line.Split(';');
+    var inParams = new InParams(
+        int.Parse(parts[5], CultureInfo.InvariantCulture),
+        int.Parse(parts[6], CultureInfo.InvariantCulture),
+        int.Parse(parts[7], CultureInfo.InvariantCulture),
+        int.Parse(parts[8], CultureInfo.InvariantCulture),
+        bool.Parse(parts[3]),
+        bool.Parse(parts[4]), 0);
+    var outParams = new OutParams(
+        TimeSpan.Parse(parts[9], CultureInfo.InvariantCulture),
+        TimeSpan.Parse(parts[10], CultureInfo.InvariantCulture),
+        long.Parse(parts[12], CultureInfo.InvariantCulture),
+        long.Parse(parts[13], CultureInfo.InvariantCulture),
+        long.Parse(parts[14], CultureInfo.InvariantCulture),
+        double.Parse(parts[15], CultureInfo.InvariantCulture),
+        double.Parse(parts[16], CultureInfo.InvariantCulture));
+    return new ResultItem(
+        int.Parse(parts[1], CultureInfo.InvariantCulture),
+        int.Parse(parts[2], CultureInfo.InvariantCulture),
+        inParams, outParams, inParams.IsParallel && inParams.EnabledCounters);
+}
+
+static string? ArgValue(string[] values, string name)
+{
+    for (var index = 0; index < values.Length - 1; index++)
+    {
+        if (string.Equals(values[index], name, StringComparison.OrdinalIgnoreCase))
+        {
+            return values[index + 1];
+        }
+    }
+    return null;
+}
+
+// original runs three independent variants. Starting them as processes keeps
+// the counter clock process-local (it is a static) and lets seq, par and
+// par+counters use the machine at the same time instead of one after another.
+int RunOriginalParallel(string outputDir)
+{
+    var runs = new[] { "seq", "par", "parc" };
+    var children = new List<(string Run, Process Process, Task<string> Output, Task<string> Error)>();
+    foreach (var run in runs)
+    {
+        var dir = Path.Combine(outputDir, run);
+        Directory.CreateDirectory(dir);
+        var host = Environment.ProcessPath ?? "dotnet";
+        var startInfo = new ProcessStartInfo(host)
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        if (string.Equals(Path.GetFileNameWithoutExtension(host), "dotnet", StringComparison.OrdinalIgnoreCase))
+        {
+            var entry = Environment.GetCommandLineArgs().FirstOrDefault();
+            if (!string.IsNullOrEmpty(entry) && entry.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            {
+                startInfo.ArgumentList.Add(entry);
+            }
+        }
+
+        startInfo.ArgumentList.Add("original");
+        startInfo.ArgumentList.Add("--run");
+        startInfo.ArgumentList.Add(run);
+        startInfo.ArgumentList.Add("--output");
+        startInfo.ArgumentList.Add(dir);
+        // seq runs on the caller thread; par and par+counters share the
+        // physical cores, so give each half the cores. With 12 workers each the
+        // three processes would oversubscribe SMT and lose more than they gain.
+        var physical = EntityFX.MqttY.Network.CpuTopology.PhysicalCoreCount();
+        var workersForRun = run == "seq" ? 1 : Math.Max(1, physical / 2);
+        startInfo.Environment["MQTTY_WORKERS"] = workersForRun.ToString(CultureInfo.InvariantCulture);
+        foreach (var name in new[]
+                 {
+                     "MQTTY_NODE_CHUNK", "MQTTY_BARRIER",
+                     "MQTTY_PARALLEL_PUBLISH", "MQTTY_DISABLE_COUNTERS"
+                 })
+        {
+            var value = Environment.GetEnvironmentVariable(name);
+            if (!string.IsNullOrEmpty(value))
+            {
+                startInfo.Environment[name] = value;
+            }
+        }
+
+        var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Cannot start original run " + run);
+        children.Add((run, process, process.StandardOutput.ReadToEndAsync(),
+            process.StandardError.ReadToEndAsync()));
+    }
+
+    var rows = new List<ResultItem>();
+    var failed = false;
+    Console.WriteLine("Running original variants in parallel: seq, par, par+counters");
+    foreach (var (run, process, outputTask, errorTask) in children)
+    {
+        process.WaitForExit();
+        var stdout = outputTask.GetAwaiter().GetResult();
+        var stderr = errorTask.GetAwaiter().GetResult();
+        foreach (var line in stdout.Split('\n'))
+        {
+            var trimmed = line.TrimEnd('\r');
+            if (trimmed.StartsWith("MQTTY_ROW;", StringComparison.Ordinal))
+            {
+                rows.Add(ParseRow(trimmed));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(stderr))
+        {
+            Console.Error.WriteLine("[" + run + "] " + stderr.Trim());
+        }
+
+        if (process.ExitCode != 0)
+        {
+            failed = true;
+        }
+        process.Dispose();
+    }
+
+    rows.Sort((left, right) => left.Id.CompareTo(right.Id));
+    SaveResultsToCsv(outputDir, "final", rows);
+    var table = BuildTable(rows);
+    SaveTableAsFile(outputDir, "final", table);
+    Console.WriteLine(table);
+    return failed ? 2 : 0;
 }
 
 (INetworkSimulator Simulator, double CpuPercent) RunMeasured(
@@ -227,10 +396,13 @@ void SaveGraphML(string resultPath, string prefixBase, INetworkSimulator network
     File.WriteAllText($"{filePath}.graphml", graphMl);
 }
 
-SaveResultsToCsv(resultPath, "final", results);
-table = BuildTable(results);
-SaveTableAsFile(resultPath, "final", table);
-Console.WriteLine(table);
+if (runFilter == null)
+{
+    SaveResultsToCsv(resultPath, "final", results);
+    table = BuildTable(results);
+    SaveTableAsFile(resultPath, "final", table);
+    Console.WriteLine(table);
+}
 
 // Shard children report their own resource usage so the sweep parent can sum
 // CPU across processes: a child's TotalProcessorTime is no longer readable
@@ -584,8 +756,10 @@ static void PrintHelp()
     Console.WriteLine("            [--clients c,...] [--repeats r,...] [--strategies s,...]");
     Console.WriteLine("            [--output <dir>]");
     Console.WriteLine("        Run a parameter sweep across independent simulations (default: sequential).");
-    Console.WriteLine("  original");
+    Console.WriteLine("  original [--sequential]");
     Console.WriteLine("        Run the legacy single-configuration demo (4 brokers, 15 clients, 131 repeats).");
+    Console.WriteLine("        By default the seq/par/par+counters variants run in parallel processes;");
+    Console.WriteLine("        --sequential runs them one after another in this process.");
     Console.WriteLine("  calibrate [args]");
     Console.WriteLine("        Run calibration for relay experiment timing.");
     Console.WriteLine("  experiment [args]");
