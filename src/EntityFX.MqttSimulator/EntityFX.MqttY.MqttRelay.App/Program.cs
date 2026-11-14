@@ -463,6 +463,30 @@ static void PrintBefore(bool parallel, int b, int n, int c, int r, bool counters
 
 static string BuildTable(List<ResultItem> results)
 {
+    // Parallel speedup is always relative to the sequential run of the same
+    // configuration, so intermediate sweep rows show their own speedup rather
+    // than only an end-to-end figure.
+    var seqWallByGroup = new Dictionary<int, double>();
+    foreach (var item in results)
+    {
+        if (!item.In.IsParallel && !seqWallByGroup.ContainsKey(item.GroupId))
+        {
+            seqWallByGroup[item.GroupId] = item.Out.RealTime.TotalSeconds;
+        }
+    }
+
+    double Speedup(ResultItem item)
+    {
+        if (!item.In.IsParallel ||
+            !seqWallByGroup.TryGetValue(item.GroupId, out var sequential) ||
+            item.Out.RealTime.TotalSeconds <= 0)
+        {
+            return 1.0;
+        }
+
+        return sequential / item.Out.RealTime.TotalSeconds;
+    }
+
     var table = PrettyPrinterHelper.PrintAsTable(
         new PrettyPrinterHelper.Header(
             new PrettyPrinterHelper.Columns(new Dictionary<string, PrettyPrinterHelper.Column>()
@@ -475,6 +499,7 @@ static string BuildTable(List<ResultItem> results)
                 ["Repeats"] = new PrettyPrinterHelper.Column("Repeats", 8, 0, DoubleColumnLine: true),
                 ["VirtualTime"] = new PrettyPrinterHelper.Column("Virt Time", 11, 0),
                 ["RealTime"] = new PrettyPrinterHelper.Column("Real Time", 11, 0),
+                ["Speedup"] = new PrettyPrinterHelper.Column("Speedup", 7, 0, Format: "f2"),
                 ["Ticks"] = new PrettyPrinterHelper.Column("Ticks", 8, 0),
                 ["Steps"] = new PrettyPrinterHelper.Column("Steps", 10, 0),
                 ["Ste"] = new PrettyPrinterHelper.Column("Step (ms)", 9, 0, Format: "f5", DoubleColumnLine: true),
@@ -485,7 +510,7 @@ static string BuildTable(List<ResultItem> results)
             new PrettyPrinterHelper.Columns(new Dictionary<string, PrettyPrinterHelper.Column>()
             {
                 ["In"] = new PrettyPrinterHelper.Column("In", 8 + 8 + 8 + 10 + 8 + 8 + 15, 0, DoubleColumnLine: true),
-                ["Out"] = new PrettyPrinterHelper.Column("Out", 9 + 9 + 8 + 10 + 6 + 9 + 11 + 20 + 9, 0)
+                ["Out"] = new PrettyPrinterHelper.Column("Out", 9 + 9 + 8 + 10 + 6 + 9 + 11 + 20 + 9 + 10, 0)
             })
             ), results.Select(r => new PrettyPrinterHelper.Row(
                 new PrettyPrinterHelper.Item[] {
@@ -497,6 +522,7 @@ static string BuildTable(List<ResultItem> results)
                                 new PrettyPrinterHelper.Item("Repeats", r.In.Repeats),
                                 new PrettyPrinterHelper.Item("VirtualTime", r.Out.VirtualTime),
                                 new PrettyPrinterHelper.Item("RealTime", r.Out.RealTime),
+                                new PrettyPrinterHelper.Item("Speedup", Speedup(r)),
                                 new PrettyPrinterHelper.Item("Ticks", r.Out.TotalTicks),
                                 new PrettyPrinterHelper.Item("Steps", r.Out.TotalSteps),
                                 new PrettyPrinterHelper.Item("Ste", r.Out.RealTime.TotalMilliseconds / r.Out.TotalSteps),
@@ -504,8 +530,23 @@ static string BuildTable(List<ResultItem> results)
                                 new PrettyPrinterHelper.Item("Cpu", r.Out.CpuPercent),
                                 new PrettyPrinterHelper.Item("Memory", r.Out.MemoryWorkingSet),
                 }, r.rowLine)).ToArray());
+
+    var seqTotal = results.Where(r => !r.In.IsParallel).Sum(r => r.Out.RealTime.TotalSeconds);
+    var parTotal = results.Where(r => r.In.IsParallel && !r.In.EnabledCounters)
+        .Sum(r => r.Out.RealTime.TotalSeconds);
+    var countedTotal = results.Where(r => r.In.IsParallel && r.In.EnabledCounters)
+        .Sum(r => r.Out.RealTime.TotalSeconds);
+    if (seqTotal > 0 && parTotal > 0)
+    {
+        var builder = new StringBuilder(table);
+        builder.AppendLine($"Total: seq={seqTotal:F3}s  par={parTotal:F3}s ({seqTotal / parTotal:F2}x)  " +
+                           $"par+counters={countedTotal:F3}s ({seqTotal / countedTotal:F2}x)");
+        return builder.ToString();
+    }
+
     return table;
 }
+
 
 static void SaveCounters(string path, string prefixBase, INetworkSimulator networkSimulator)
 {
