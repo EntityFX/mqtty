@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 
@@ -87,8 +87,14 @@ public static class RelaySweepCommand
             Console.WriteLine($"Sweep: {total} configurations, {shards} concurrent shards, {workers} worker(s) per simulation");
             Console.WriteLine($"Output: {output}");
 
+            // Cross-platform resource sampling: Process.TotalProcessorTime and
+            // WorkingSet64 are available on Linux, Windows and macOS without
+            // P/Invoke. CPU utilization is total process CPU time divided by
+            // wall time and logical processor count.
+            var cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
+            var allocatedBefore = GC.GetTotalAllocatedBytes(precise: false);
             var started = Stopwatch.StartNew();
-            var children = new List<(int Index, Process Process, Task Output, Task<string> Error)>();
+            var children = new List<(int Index, Process Process, Task<string> Output, Task<string> Error)>();
             for (var index = 0; index < shards; index++)
             {
                 var dir = Path.Combine(output, $"shard-{index}");
@@ -98,22 +104,29 @@ public static class RelaySweepCommand
                 // one child's stdout before reading the others can fill their
                 // pipes and block the sweep, and buffering all output grows with
                 // the size of the matrix.
-                children.Add((index, child, child.StandardOutput.BaseStream.CopyToAsync(Stream.Null),
+                children.Add((index, child, child.StandardOutput.ReadToEndAsync(),
                     child.StandardError.ReadToEndAsync()));
             }
 
             var failed = false;
+            var childrenCpu = TimeSpan.Zero;
+            var childrenAllocatedMb = 0.0;
+            long peakMemoryBytes = 0;
             for (var index = 0; index < children.Count; index++)
             {
                 var (childIndex, process, outputTask, errorTask) = children[index];
                 process.WaitForExit();
-                outputTask.GetAwaiter().GetResult();
+                var childOutput = outputTask.GetAwaiter().GetResult();
                 var error = errorTask.GetAwaiter().GetResult();
+                // Each shard reports its own CPU/memory before exiting; a
+                // child's TotalProcessorTime is not readable after exit.
+                ParseShardMetrics(childOutput, ref childrenCpu, ref childrenAllocatedMb, ref peakMemoryBytes);
                 if (process.ExitCode != 0 || !string.IsNullOrWhiteSpace(error))
                 {
                     failed = true;
                     Console.Error.WriteLine($"shard {childIndex} exited with {process.ExitCode}: {error.Trim()}");
                 }
+                process.Dispose();
             }
 
             var merged = Merge(output, shards);
@@ -125,6 +138,21 @@ public static class RelaySweepCommand
             started.Stop();
             Console.WriteLine($"Merged {merged} samples into {Path.Combine(output, "final.csv")}");
             Console.WriteLine($"Sweep finished in {started.Elapsed.TotalSeconds:F1} s");
+
+            var wallSeconds = started.Elapsed.TotalSeconds;
+            var cpuAfter = Process.GetCurrentProcess().TotalProcessorTime;
+            var totalCpuSeconds = (cpuAfter - cpuBefore + childrenCpu).TotalSeconds;
+            var allocatedMb = childrenAllocatedMb +
+                (GC.GetTotalAllocatedBytes(precise: false) - allocatedBefore) / (1024.0 * 1024.0);
+            try { peakMemoryBytes = Math.Max(peakMemoryBytes, Process.GetCurrentProcess().PeakWorkingSet64); } catch { }
+            var logicalCpus = Environment.ProcessorCount;
+            var utilization = wallSeconds > 0
+                ? totalCpuSeconds / wallSeconds / logicalCpus * 100.0
+                : 0;
+            Console.WriteLine($"CPU: {totalCpuSeconds:F1} s busy / {wallSeconds:F1} s wall " +
+                              $"= {utilization:F1}% of {logicalCpus} logical cores (parent + shards)");
+            Console.WriteLine($"Memory: peak working set {peakMemoryBytes / (1024.0 * 1024.0):F0} MB, " +
+                              $"managed allocations {allocatedMb:F0} MB");
             return failed ? 2 : 0;
         }
         catch (Exception exception)
@@ -209,6 +237,49 @@ public static class RelaySweepCommand
 
             target.Add(args[index]);
             target.Add(args[index + 1]);
+        }
+    }
+
+    /// <summary>Reads the MQTTY_METRICS line printed by each shard child.</summary>
+    private static void ParseShardMetrics(string output, ref TimeSpan cpu, ref double allocatedMb,
+        ref long peakMemoryBytes)
+    {
+        const string marker = "MQTTY_METRICS";
+        var index = output.IndexOf(marker, StringComparison.Ordinal);
+        if (index < 0)
+        {
+            return;
+        }
+
+        var end = output.IndexOf('\n', index);
+        var line = end < 0 ? output[index..] : output[index..end];
+        foreach (var token in line.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var separator = token.IndexOf('=');
+            if (separator <= 0)
+            {
+                continue;
+            }
+
+            var key = token[..separator];
+            if (!double.TryParse(token[(separator + 1)..], NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out var value))
+            {
+                continue;
+            }
+
+            switch (key)
+            {
+                case "cpu_s":
+                    cpu += TimeSpan.FromSeconds(value);
+                    break;
+                case "peak_mb":
+                    peakMemoryBytes = Math.Max(peakMemoryBytes, (long)(value * 1024 * 1024));
+                    break;
+                case "alloc_mb":
+                    allocatedMb += value;
+                    break;
+            }
         }
     }
 

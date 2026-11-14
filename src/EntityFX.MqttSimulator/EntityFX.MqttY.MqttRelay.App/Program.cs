@@ -32,6 +32,16 @@ if (args.Length > 0 && args[0].Equals("experiment", StringComparison.OrdinalIgno
     return;
 }
 
+// Relay benchmark on the production FederationRunner path (FederationMode.Relay).
+// This is the same relay architecture the reference benchmark measures: a
+// continuous credit load driven through MqttRelay applications, which is where
+// the parallel refresh reaches ~7.6x.
+if (args.Length > 0 && args[0].Equals("benchmark", StringComparison.OrdinalIgnoreCase))
+{
+    Environment.ExitCode = RelayBenchmarkCommand.Run(args.Skip(1).ToArray());
+    return;
+}
+
 // Coarse-grained parallelism: independent simulations are embarrassingly
 // parallel, so the sweep is sharded across processes. Every shard runs the
 // same, unmodified bulk-synchronous model, which keeps the results identical
@@ -204,6 +214,18 @@ void SaveGraphML(string resultPath, string prefixBase, INetworkSimulator network
 SaveResultsToCsv(resultPath, "final", results);
 table = PrintTable(results);
 SaveTableAsFile(resultPath, "final", table);
+
+// Shard children report their own resource usage so the sweep parent can sum
+// CPU across processes: a child's TotalProcessorTime is no longer readable
+// after it exits. The line is machine-parsable and cross-platform.
+if (args.Any(arg => arg.StartsWith("--shard", StringComparison.OrdinalIgnoreCase)))
+{
+    var process = Process.GetCurrentProcess();
+    Console.WriteLine("MQTTY_METRICS cpu_s=" +
+        process.TotalProcessorTime.TotalSeconds.ToString("F3", CultureInfo.InvariantCulture) +
+        " peak_mb=" + (process.PeakWorkingSet64 / (1024.0 * 1024.0)).ToString("F0", CultureInfo.InvariantCulture) +
+        " alloc_mb=" + (GC.GetTotalAllocatedBytes(precise: false) / (1024.0 * 1024.0)).ToString("F0", CultureInfo.InvariantCulture));
+}
 
 void PrintStats(TimeSpan v, TimeSpan r, long t, long s, long e, double m)
 {
@@ -537,6 +559,10 @@ static void PrintHelp()
     Console.WriteLine("  EntityFX.MqttY.MqttRelay.App [command] [options]");
     Console.WriteLine();
     Console.WriteLine("Commands:");
+    Console.WriteLine("  benchmark [--brokers N] [--publishers N] [--rps N] [--measure S] [--repeat N]");
+    Console.WriteLine("            [--workers W] [--seed N] [--qos N]");
+    Console.WriteLine("        Run the production relay path (FederationRunner, Relay mode) seq vs par");
+    Console.WriteLine("        and print the wall/refresh speedup on a continuous credit load.");
     Console.WriteLine("  sweep [--parallel N] [--workers W] [--brokers b,...] [--nets n,...]");
     Console.WriteLine("            [--clients c,...] [--repeats r,...] [--strategies s,...]");
     Console.WriteLine("            [--output <dir>]");
@@ -574,6 +600,7 @@ static void PrintHelp()
     Console.WriteLine("   or MQTTY_* environment variables)");
     Console.WriteLine();
     Console.WriteLine("Examples:");
+    Console.WriteLine("  EntityFX.MqttY.MqttRelay.App benchmark --brokers 16 --publishers 64 --rps 2000 --measure 3 --repeat 5");
     Console.WriteLine("  EntityFX.MqttY.MqttRelay.App sweep --parallel 4 --workers 3");
     Console.WriteLine("  EntityFX.MqttY.MqttRelay.App sweep --brokers 16 --nets 5 --clients 10 --repeats 100 --parallel 12 --workers 1");
     Console.WriteLine("  EntityFX.MqttY.MqttRelay.App original");
