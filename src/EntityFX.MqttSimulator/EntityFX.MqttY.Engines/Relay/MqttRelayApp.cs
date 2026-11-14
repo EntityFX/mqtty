@@ -103,17 +103,26 @@ public class MqttRelayApp
         var parallelPublish = isParallel &&
             Environment.GetEnvironmentVariable("MQTTY_PARALLEL_PUBLISH") == "1";
 
+        // Network.Clients rebuilds an immutable dictionary on every access, and
+        // this loop touched it once per broker per repeat (131 x 4 in the
+        // original configuration). The client set is fixed for the whole
+        // publish phase, so snapshot it once. Publish order is unchanged.
+        var clientsByBroker = new MqttClient[brokers.Length][];
+        for (var i = 0; i < brokers.Length; i++)
+        {
+            clientsByBroker[i] = brokers[i].Network!.Clients.Values
+                .OfType<MqttClient>()
+                .Where(c => c.Group == null)
+                .ToArray();
+        }
+
         for (int r = 0; r < sendRepeats; r++)
         {
             if (parallelPublish && brokers.Length > 1)
             {
-                Parallel.ForEach(brokers, broker =>
+                Parallel.For(0, brokers.Length, i =>
                 {
-                    var brokerNetwork = broker.Network!;
-                    var mqttClients = brokerNetwork.Clients.Values.OfType<MqttClient>()
-                        .Where(c => c.Group == null);
-
-                    foreach (var mqttClient in mqttClients)
+                    foreach (var mqttClient in clientsByBroker[i])
                     {
                         mqttClient.Publish("telemetry/data", bytes, MqttQos.AtLeastOnce, false);
                     }
@@ -121,12 +130,9 @@ public class MqttRelayApp
             }
             else
             {
-                foreach (var broker in brokers)
+                for (var i = 0; i < brokers.Length; i++)
                 {
-                    var brokerNetwork = broker.Network!;
-                    var mqttClients = brokerNetwork.Clients.Values.OfType<MqttClient>().Where(c => c.Group == null);
-
-                    foreach (var mqttClient in mqttClients)
+                    foreach (var mqttClient in clientsByBroker[i])
                     {
                         mqttClient.Publish("telemetry/data", bytes, MqttQos.AtLeastOnce, false);
                     }

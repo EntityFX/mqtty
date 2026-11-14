@@ -192,7 +192,7 @@ for (int b = 0; b < brokers.Length; b++)
                     gid++;
                     GC.Collect();
 
-                    table = PrintTable(results);
+                    table = BuildTable(results);
                     SaveTableAsFile(resultPath, prefixBase, table);
                     SaveResultsToCsv(resultPath, prefixBase, results);
 
@@ -228,8 +228,9 @@ void SaveGraphML(string resultPath, string prefixBase, INetworkSimulator network
 }
 
 SaveResultsToCsv(resultPath, "final", results);
-table = PrintTable(results);
+table = BuildTable(results);
 SaveTableAsFile(resultPath, "final", table);
+Console.WriteLine(table);
 
 // Shard children report their own resource usage so the sweep parent can sum
 // CPU across processes: a child's TotalProcessorTime is no longer readable
@@ -267,7 +268,7 @@ static void PrintBefore(bool parallel, int b, int n, int c, int r, bool counters
     Console.WriteLine("Couners enabled: {0}", counters);
 }
 
-static string PrintTable(List<ResultItem> results)
+static string BuildTable(List<ResultItem> results)
 {
     var table = PrettyPrinterHelper.PrintAsTable(
         new PrettyPrinterHelper.Header(
@@ -310,8 +311,6 @@ static string PrintTable(List<ResultItem> results)
                                 new PrettyPrinterHelper.Item("Cpu", r.Out.CpuPercent),
                                 new PrettyPrinterHelper.Item("Memory", r.Out.MemoryWorkingSet),
                 }, r.rowLine)).ToArray());
-    Console.WriteLine(table);
-
     return table;
 }
 
