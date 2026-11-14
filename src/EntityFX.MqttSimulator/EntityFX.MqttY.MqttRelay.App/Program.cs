@@ -11,9 +11,8 @@ using System.Globalization;
 using System.Text;
 using System.Threading.Tasks;
 
-// Print help when --help or -h is passed (or no args at all).
-if (args.Length == 0 ||
-    args[0].Equals("--help", StringComparison.OrdinalIgnoreCase) ||
+// Print help when --help or -h is passed.
+if (args[0].Equals("--help", StringComparison.OrdinalIgnoreCase) ||
     args[0].Equals("-h", StringComparison.OrdinalIgnoreCase) ||
     args[0].Equals("/?", StringComparison.OrdinalIgnoreCase))
 {
