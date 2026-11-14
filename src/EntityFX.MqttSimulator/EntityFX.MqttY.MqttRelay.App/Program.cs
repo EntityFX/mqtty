@@ -11,10 +11,12 @@ using System.Globalization;
 using System.Text;
 using System.Threading.Tasks;
 
-// Print help when --help or -h is passed.
-if (args[0].Equals("--help", StringComparison.OrdinalIgnoreCase) ||
-    args[0].Equals("-h", StringComparison.OrdinalIgnoreCase) ||
-    args[0].Equals("/?", StringComparison.OrdinalIgnoreCase))
+// Print help when --help or -h is passed. With no arguments at all the app
+// falls through to the default sweep, matching the historical behaviour.
+if (args.Length > 0 &&
+    (args[0].Equals("--help", StringComparison.OrdinalIgnoreCase) ||
+     args[0].Equals("-h", StringComparison.OrdinalIgnoreCase) ||
+     args[0].Equals("/?", StringComparison.OrdinalIgnoreCase)))
 {
     PrintHelp();
     return;
