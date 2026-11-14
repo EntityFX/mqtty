@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Xml.Linq;
@@ -319,6 +319,14 @@ public class NetworkSimulator : INetworkSimulator
     /// <summary>Upper bound of worker threads used by the parallel refresh (0 = default).</summary>
     public int MaxDegreeOfParallelism { get; set; } = 0;
 
+    private static int NodePriority(NodeType type) => type switch
+    {
+        NodeType.Server => 0,
+        NodeType.Application => 1,
+        NodeType.Client => 2,
+        _ => 3
+    };
+
     private static bool IsNodeIdle(object node) =>
         node is IQuiescenceParticipant participant && participant.IsQuiescent &&
         (node is not Node tracked || !tracked.HasPendingResponse);
@@ -333,7 +341,14 @@ public class NetworkSimulator : INetworkSimulator
                 .OrderByDescending(network => network.Value.Nodes.Count)
                 .ThenBy(network => network.Key, StringComparer.Ordinal)
                 .ToArray();
-            _orderedNodes = snapshot.Nodes;
+            // Longest-processing-time first: servers and applications carry
+            // most of the per-node work, clients are cheap. Refreshing the
+            // expensive nodes first keeps the phase tail short, which is what
+            // the barrier mostly waits for. Order is deterministic.
+            _orderedNodes = snapshot.Nodes
+                .OrderBy(node => NodePriority(node.Key.NodeType))
+                .ThenBy(node => node.Key.Address, StringComparer.Ordinal)
+                .ToArray();
             _orderedTopologyVersion = snapshot.Version;
             if (NodeStatsEnabled)
             {
