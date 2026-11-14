@@ -93,7 +93,8 @@ public static class RelayBenchmarkCommand
                 par.Add(RunOnce(input, parallel: true));
             }
 
-            var engine = new EngineRow("Relay", seq, par, repeats, workers, logical);
+            var engine = new EngineRow("Relay", seq, par, repeats, workers, logical,
+                brokers, options.Publishers, rps, measure);
             PrintEngine(engine);
             PrintSummary(engine);
             return engine.CoreMatches && engine.Seq.Status == "completed" && engine.Par.Status == "completed"
@@ -118,9 +119,13 @@ public static class RelayBenchmarkCommand
     private sealed class EngineRow
     {
         public EngineRow(string name, List<RunSample> seq, List<RunSample> par, int repeats,
-            int workers, int logicalCpus)
+            int workers, int logicalCpus, int brokers, int publishers, double rps, double measure)
         {
             Name = name;
+            Brokers = brokers;
+            Publishers = publishers;
+            Rps = rps;
+            Measure = measure;
             Seq = seq[seq.Count / 2].Summary;
             Par = par[par.Count / 2].Summary;
             SeqWall = Median(seq.Select(s => s.Wall));
@@ -153,6 +158,10 @@ public static class RelayBenchmarkCommand
         }
 
         public string Name { get; }
+        public int Brokers { get; }
+        public int Publishers { get; }
+        public double Rps { get; }
+        public double Measure { get; }
         public FederationSummary Seq { get; }
         public FederationSummary Par { get; }
         public double SeqWall { get; }
@@ -207,28 +216,83 @@ public static class RelayBenchmarkCommand
 
     private static void PrintSummary(EngineRow row)
     {
-        var cpuText = string.Format(CultureInfo.InvariantCulture, "{0:F0}/{1:F0}%",
-            row.SeqCpuUtilization, row.ParCpuUtilization);
-        var memoryText = string.Format(CultureInfo.InvariantCulture, "{0:F0}/{1:F0}",
-            row.SeqMemory, row.ParMemory);
-        var statusText = row.Seq.Status == row.Par.Status
-            ? row.Seq.Status
-            : row.Seq.Status + "/" + row.Par.Status;
-        var coreText = row.CoreMatches ? "match" : "MISMATCH";
-        var diagText = row.DiagnosticsMatch ? "match" : "differ";
+        var core = row.CoreMatches ? "match" : "MISMATCH";
+        var diag = row.DiagnosticsMatch ? "match" : "differ";
 
-        Console.WriteLine(new string('=', 110));
-        Console.WriteLine("SUMMARY (wall-clock, median)");
-        Console.WriteLine(new string('=', 110));
-        Console.WriteLine(
-            "Engine        seq        par    wall x   refresh x   cpu seq/par   mem mean MB   status       core    diag");
-        Console.WriteLine(new string('-', 110));
-        Console.WriteLine(
-            $"{row.Name,-10} {row.SeqWall,8:F3}s {row.ParWall,8:F3}s {row.WallSpeedup,8:F2}x " +
-            $"{row.RefreshSpeedup,10:F2}x {cpuText,13} {memoryText,14}   {statusText,-14}{coreText,-8}{diagText}");
-        Console.WriteLine();
+        var columns = new Dictionary<string, PrettyPrinterHelper.Column>
+        {
+            ["Run"] = new PrettyPrinterHelper.Column("Run", 7, 0, 1),
+            ["Brokers"] = new PrettyPrinterHelper.Column("Brokers", 7, 0),
+            ["Publish"] = new PrettyPrinterHelper.Column("Publish", 7, 0),
+            ["Rps"] = new PrettyPrinterHelper.Column("RPS", 6, 0, -1, "F0"),
+            ["Measure"] = new PrettyPrinterHelper.Column("Measure", 7, 0, -1, "F1", true),
+            ["Wall"] = new PrettyPrinterHelper.Column("Wall (s)", 9, 0, -1, "F4"),
+            ["Refresh"] = new PrettyPrinterHelper.Column("Refresh (s)", 11, 0, -1, "F4"),
+            ["WallX"] = new PrettyPrinterHelper.Column("Wall x", 7, 0, -1, "F2", true),
+            ["Cpu"] = new PrettyPrinterHelper.Column("CPU %", 6, 0, -1, "F1"),
+            ["Mem"] = new PrettyPrinterHelper.Column("Mem MB", 8, 0, -1, "F0", true),
+            ["Status"] = new PrettyPrinterHelper.Column("Status", 10, 0, 1),
+            ["Core"] = new PrettyPrinterHelper.Column("Core", 6, 0, 0),
+            ["Diag"] = new PrettyPrinterHelper.Column("Diag", 6, 0, 0),
+        };
+
+        var header = new PrettyPrinterHelper.Header(new PrettyPrinterHelper.Columns(columns));
+        var rows = new[]
+        {
+            new PrettyPrinterHelper.Row(new PrettyPrinterHelper.Item[]
+            {
+                new("Run", "seq"),
+                new("Brokers", row.Brokers),
+                new("Publish", row.Publishers),
+                new("Rps", row.Rps),
+                new("Measure", row.Measure),
+                new("Wall", row.SeqWall),
+                new("Refresh", row.SeqRefresh),
+                new("WallX", 1.0),
+                new("Cpu", row.SeqCpuUtilization),
+                new("Mem", row.SeqMemory),
+                new("Status", row.Seq.Status),
+                new("Core", core),
+                new("Diag", diag),
+            }),
+            new PrettyPrinterHelper.Row(new PrettyPrinterHelper.Item[]
+            {
+                new("Run", "par"),
+                new("Brokers", row.Brokers),
+                new("Publish", row.Publishers),
+                new("Rps", row.Rps),
+                new("Measure", row.Measure),
+                new("Wall", row.ParWall),
+                new("Refresh", row.ParRefresh),
+                new("WallX", row.WallSpeedup),
+                new("Cpu", row.ParCpuUtilization),
+                new("Mem", row.ParMemory),
+                new("Status", row.Par.Status),
+                new("Core", core),
+                new("Diag", diag),
+            }),
+            new PrettyPrinterHelper.Row(new PrettyPrinterHelper.Item[]
+            {
+                new("Run", "speedup"),
+                new("Brokers", row.Brokers),
+                new("Publish", row.Publishers),
+                new("Rps", row.Rps),
+                new("Measure", row.Measure),
+                new("Wall", row.WallSpeedup),
+                new("Refresh", row.RefreshSpeedup),
+                new("WallX", row.WallSpeedup),
+                new("Cpu", ""),
+                new("Mem", ""),
+                new("Status", ""),
+                new("Core", ""),
+                new("Diag", ""),
+            }),
+        };
+
+        Console.WriteLine(PrettyPrinterHelper.PrintAsTable(header, rows));
         Console.WriteLine($"Wall speedup: {row.WallSpeedup:F2}x, refresh speedup: {row.RefreshSpeedup:F2}x " +
-                          $"(workers={row.Workers})");
+                          $"(workers={row.Workers}, peak working set: seq={row.SeqPeakMemory:F0} MB " +
+                          $"par={row.ParPeakMemory:F0} MB)");
     }
 
     private static RunSample RunOnce(FederationInput input, bool parallel)

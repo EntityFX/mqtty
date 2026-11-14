@@ -146,13 +146,13 @@ for (int b = 0; b < brokers.Length; b++)
                     var prefixBase = $"{ix}__b_{brokerc}__n_{netc}__c_{clientc}__r_{repeatc}";
 
                     PrintBefore(false, brokerc, netc, clientc, repeatc, false);
-                    var networkSimulator = mqttRelayApp.ExecuteSimulation(false, brokerc, netc, clientc, repeatc, false, rs, bytes);
+                    var (networkSimulator, cpuPercent) = RunMeasured(false, brokerc, netc, clientc, repeatc, false, rs);
 
                     var ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
 
                     var result = new ResultItem(id, gid,
                         new InParams(brokerc, netc, clientc, repeatc, false, false, rs),
-                        new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws), false);
+                        new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws, cpuPercent), false);
 
                     PrintStatsForItem(result);
                     SaveCounters(resultPath, prefixBase, networkSimulator);
@@ -164,12 +164,12 @@ for (int b = 0; b < brokers.Length; b++)
                     GC.Collect();
 
                     PrintBefore(true, brokerc, netc, clientc, repeatc, false);
-                    networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, false, rs, bytes);
+                    (networkSimulator, cpuPercent) = RunMeasured(true, brokerc, netc, clientc, repeatc, false, rs);
 
                     ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
                     result = new ResultItem(id, gid,
                         new InParams(brokerc, netc, clientc, repeatc, true, false, rs),
-                        new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws), false);
+                        new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws, cpuPercent), false);
                     PrintStatsForItem(result);
                     SaveCounters(resultPath, prefixBase, networkSimulator);
                     results.Add(result);
@@ -178,12 +178,12 @@ for (int b = 0; b < brokers.Length; b++)
                     GC.Collect();
 
                     PrintBefore(true, brokerc, netc, clientc, repeatc, true);
-                    networkSimulator = mqttRelayApp.ExecuteSimulation(true, brokerc, netc, clientc, repeatc, true, rs, bytes);
+                    (networkSimulator, cpuPercent) = RunMeasured(true, brokerc, netc, clientc, repeatc, true, rs);
 
                     ws = Process.GetCurrentProcess().WorkingSet64 / 1024.0 / 1024.0;
                     result = new ResultItem(id, gid,
                         new InParams(brokerc, netc, clientc, repeatc, true, true, rs),
-                        new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws), true);
+                        new OutParams(networkSimulator.VirtualTime, networkSimulator.RealTime, networkSimulator.TotalTicks, networkSimulator.TotalSteps, networkSimulator.Errors, ws, cpuPercent), true);
                     PrintStatsForItem(result);
                     SaveCounters(resultPath, prefixBase, networkSimulator);
                     results.Add(result);
@@ -200,6 +200,22 @@ for (int b = 0; b < brokers.Length; b++)
             }
         }
     }
+}
+
+(INetworkSimulator Simulator, double CpuPercent) RunMeasured(
+    bool isParallel, int b, int n, int c, int r, bool counters, int strategy)
+{
+    var process = Process.GetCurrentProcess();
+    var cpuBefore = process.TotalProcessorTime;
+    var stopwatch = Stopwatch.StartNew();
+    var simulator = mqttRelayApp.ExecuteSimulation(isParallel, b, n, c, r, counters, strategy, bytes);
+    stopwatch.Stop();
+    var cpuSeconds = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalSeconds;
+    var logical = Environment.ProcessorCount;
+    var percent = stopwatch.Elapsed.TotalSeconds > 0
+        ? cpuSeconds / stopwatch.Elapsed.TotalSeconds / logical * 100.0
+        : 0;
+    return (simulator, percent);
 }
 
 void SaveGraphML(string resultPath, string prefixBase, INetworkSimulator networkSimulator)
@@ -269,12 +285,13 @@ static string PrintTable(List<ResultItem> results)
                 ["Steps"] = new PrettyPrinterHelper.Column("Steps", 10, 0),
                 ["Ste"] = new PrettyPrinterHelper.Column("Step (ms)", 9, 0, Format: "f5", DoubleColumnLine: true),
                 ["Errors"] = new PrettyPrinterHelper.Column("Errors", 6, 0),
+                ["Cpu"] = new PrettyPrinterHelper.Column("CPU %", 6, 0, Format: "f1"),
                 ["Memory"] = new PrettyPrinterHelper.Column("Mem (Mb)", 8, 0, Format: "f1"),
             }),
             new PrettyPrinterHelper.Columns(new Dictionary<string, PrettyPrinterHelper.Column>()
             {
                 ["In"] = new PrettyPrinterHelper.Column("In", 8 + 8 + 8 + 10 + 8 + 8 + 15, 0, DoubleColumnLine: true),
-                ["Out"] = new PrettyPrinterHelper.Column("Out", 9 + 9 + 8 + 10 + 6 + 9 + 11 + 20, 0)
+                ["Out"] = new PrettyPrinterHelper.Column("Out", 9 + 9 + 8 + 10 + 6 + 9 + 11 + 20 + 9, 0)
             })
             ), results.Select(r => new PrettyPrinterHelper.Row(
                 new PrettyPrinterHelper.Item[] {
@@ -290,6 +307,7 @@ static string PrintTable(List<ResultItem> results)
                                 new PrettyPrinterHelper.Item("Steps", r.Out.TotalSteps),
                                 new PrettyPrinterHelper.Item("Ste", r.Out.RealTime.TotalMilliseconds / r.Out.TotalSteps),
                                 new PrettyPrinterHelper.Item("Errors", r.Out.Errors),
+                                new PrettyPrinterHelper.Item("Cpu", r.Out.CpuPercent),
                                 new PrettyPrinterHelper.Item("Memory", r.Out.MemoryWorkingSet),
                 }, r.rowLine)).ToArray());
     Console.WriteLine(table);
