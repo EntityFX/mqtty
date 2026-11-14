@@ -1,6 +1,20 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace EntityFX.MqttY.Network;
+
+/// <summary>
+/// Cache-line padded counter. The work-claim index and the tick generation are
+/// hammered by every worker on every tick; when they share a cache line each
+/// claim also invalidates the other workers' spin on the generation counter and
+/// the tick tail grows. 128 bytes covers the 64-byte line plus the adjacent
+/// prefetcher pair on current x86 CPUs.
+/// </summary>
+[StructLayout(LayoutKind.Explicit, Size = 128)]
+internal struct PaddedCounter
+{
+    [FieldOffset(0)] public int Value;
+}
 
 /// <summary>
 /// Persistent worker threads for the bulk-synchronous simulation refresh.
@@ -31,18 +45,20 @@ internal sealed class TickWorkerPool : IDisposable
     private readonly long[] _phase1Busy;
     private readonly long[] _phase2Busy;
     private readonly long[] _barrierBusy;
+    private readonly PaddedCounter[] _heads1;
+    private readonly PaddedCounter[] _heads2;
     private readonly IPhaseBarrier _phaseBarrier;
     private readonly object _gate = new();
 
     private volatile bool _stop;
-    private int _generation;
+    private PaddedCounter _generation;
 
     private Action<int>? _phase1;
     private Action<int>? _phase2;
     private int _count1;
     private int _count2;
-    private int _index1;
-    private int _index2;
+    private PaddedCounter _index1;
+    private PaddedCounter _index2;
     private int _chunkSize1;
     private int _chunkSize2;
     private bool _twoPhase = true;
@@ -56,6 +72,8 @@ internal sealed class TickWorkerPool : IDisposable
         _phase1Busy = new long[_workerCount];
         _phase2Busy = new long[_workerCount];
         _barrierBusy = new long[_workerCount];
+        _heads1 = new PaddedCounter[_workerCount];
+        _heads2 = new PaddedCounter[_workerCount];
 
         // The calling thread is worker 0; the background threads are 1..N-1.
         _threads = new Thread[_workerCount - 1];
@@ -109,8 +127,8 @@ internal sealed class TickWorkerPool : IDisposable
         if (_threads.Length == 0)
         {
             var start = Stopwatch.GetTimestamp();
-            _index1 = 0;
-            RunPhaseChunked(body, count, ref _index1, chunkSize);
+            _index1.Value = 0;
+            RunPhaseChunked(body, count, ref _index1.Value, chunkSize);
             var end = Stopwatch.GetTimestamp();
             LastNetworkPhaseTicks = end - start;
             LastNodePhaseTicks = 0;
@@ -124,13 +142,13 @@ internal sealed class TickWorkerPool : IDisposable
             _phase2 = null;
             _count1 = count;
             _count2 = 0;
-            _index1 = 0;
-            _index2 = 0;
+            _index1.Value = 0;
+            _index2.Value = 0;
             _error = null;
             _chunkSize1 = chunkSize;
             _chunkSize2 = 1;
             _twoPhase = false;
-            _generation++;
+            Volatile.Write(ref _generation.Value, _generation.Value + 1);
             Monitor.PulseAll(_gate);
         }
 
@@ -156,11 +174,11 @@ internal sealed class TickWorkerPool : IDisposable
         if (_threads.Length == 0)
         {
             var start = Stopwatch.GetTimestamp();
-            _index1 = 0;
-            _index2 = 0;
-            RunPhaseChunked(phase1, count1, ref _index1, chunkSize1);
+            _index1.Value = 0;
+            _index2.Value = 0;
+            RunPhaseChunked(phase1, count1, ref _index1.Value, chunkSize1);
             var networkEnd = Stopwatch.GetTimestamp();
-            RunPhaseChunked(phase2, count2, ref _index2, chunkSize2);
+            RunPhaseChunked(phase2, count2, ref _index2.Value, chunkSize2);
             var end = Stopwatch.GetTimestamp();
             LastNetworkPhaseTicks = networkEnd - start;
             LastNodePhaseTicks = end - networkEnd;
@@ -174,13 +192,18 @@ internal sealed class TickWorkerPool : IDisposable
             _phase2 = phase2;
             _count1 = count1;
             _count2 = count2;
-            _index1 = 0;
-            _index2 = 0;
+            _index1.Value = 0;
+            _index2.Value = 0;
             _error = null;
             _chunkSize1 = chunkSize1;
             _chunkSize2 = chunkSize2;
             _twoPhase = true;
-            _generation++;
+            if (UseOwnedRanges(count2))
+            {
+                ResetHeads(_heads1, count1);
+                ResetHeads(_heads2, count2);
+            }
+            Volatile.Write(ref _generation.Value, _generation.Value + 1);
             Monitor.PulseAll(_gate);
         }
 
@@ -208,26 +231,17 @@ internal sealed class TickWorkerPool : IDisposable
                 return;
             }
 
-            Action<int>? phase1;
-            Action<int>? phase2;
-            int count1;
-            int count2;
-            bool twoPhase;
+            if (_stop) return;
 
-            lock (_gate)
-            {
-                if (_stop)
-                {
-                    return;
-                }
-
-                lastGeneration = _generation;
-                phase1 = _phase1;
-                phase2 = _phase2;
-                count1 = _count1;
-                count2 = _count2;
-                twoPhase = _twoPhase;
-            }
+            // The acquire pairs with Run's release publication. Work fields
+            // stay immutable until EVERY participant reaches the final fence,
+            // so readers need no monitor (and no per-tick lock convoy).
+            lastGeneration = Volatile.Read(ref _generation.Value);
+            var phase1 = _phase1;
+            var phase2 = _phase2;
+            var count1 = _count1;
+            var count2 = _count2;
+            var twoPhase = _twoPhase;
 
             ExecuteTick(phase1, count1, phase2, count2, worker + 1, twoPhase);
         }
@@ -240,7 +254,7 @@ internal sealed class TickWorkerPool : IDisposable
         // acquire the lock to publish the next tick.
         for (var spin = 0; spin < _runtime.SpinIterations; spin++)
         {
-            if (Volatile.Read(ref _generation) != lastGeneration)
+            if (Volatile.Read(ref _generation.Value) != lastGeneration)
             {
                 return true;
             }
@@ -257,7 +271,7 @@ internal sealed class TickWorkerPool : IDisposable
         // reacquires it, so the caller can copy the published work safely.
         lock (_gate)
         {
-            while (!_stop && _generation == lastGeneration)
+            while (!_stop && _generation.Value == lastGeneration)
             {
                 Monitor.Wait(_gate);
             }
@@ -279,19 +293,24 @@ internal sealed class TickWorkerPool : IDisposable
     private void ExecuteTick(Action<int>? phase1, int count1, Action<int>? phase2, int count2, int worker,
         bool twoPhase)
     {
-        var tickStart = Stopwatch.GetTimestamp();
-        var busyStart = _runtime.WorkerStats ? tickStart : 0;
+        var stats = _runtime.WorkerStats;
+        var caller = worker == 0;
+        var tickStart = stats || caller ? Stopwatch.GetTimestamp() : 0;
+        var busyStart = tickStart;
 
         try
         {
-            RunPhaseChunked(phase1, count1, ref _index1, _chunkSize1);
+            if (twoPhase && UseOwnedRanges(count2))
+                RunOwnedPhase(phase1, count1, _heads1, _chunkSize1, worker);
+            else
+                RunPhaseChunked(phase1, count1, ref _index1.Value, _chunkSize1);
         }
         catch (Exception exception)
         {
             RecordError(exception);
         }
 
-        if (_runtime.WorkerStats)
+        if (stats)
         {
             var now = Stopwatch.GetTimestamp();
             _phase1Busy[worker] += now - busyStart;
@@ -300,10 +319,10 @@ internal sealed class TickWorkerPool : IDisposable
 
         // Networks must all be refreshed before nodes start: a node send must
         // not race with the refresh of the destination network in the same tick.
-        var barrierStart = Stopwatch.GetTimestamp();
-        _phaseBarrier.SignalAndWait();
-        var networkPhaseEnd = Stopwatch.GetTimestamp();
-        if (_runtime.WorkerStats)
+        var barrierStart = stats ? Stopwatch.GetTimestamp() : 0;
+        _phaseBarrier.SignalAndWait(worker);
+        var networkPhaseEnd = stats || caller ? Stopwatch.GetTimestamp() : 0;
+        if (stats)
         {
             _barrierBusy[worker] += networkPhaseEnd - barrierStart;
             // Phase 2 timing must start after the barrier, otherwise the wait
@@ -311,11 +330,27 @@ internal sealed class TickWorkerPool : IDisposable
             busyStart = networkPhaseEnd;
         }
 
+        if (!twoPhase)
+        {
+            // RunSingle has no second phase to fence. The first barrier above
+            // already guarantees that all of its work is visible to the caller.
+            if (caller)
+            {
+                LastNetworkPhaseTicks = networkPhaseEnd - tickStart;
+                LastNodePhaseTicks = 0;
+                LastTickTicks = networkPhaseEnd - tickStart;
+            }
+            return;
+        }
+
         if (Volatile.Read(ref _error) == null)
         {
             try
             {
-                RunPhaseChunked(phase2, count2, ref _index2, _chunkSize2);
+                if (UseOwnedRanges(count2))
+                    RunOwnedPhase(phase2, count2, _heads2, _chunkSize2, worker);
+                else
+                    RunPhaseChunked(phase2, count2, ref _index2.Value, _chunkSize2);
             }
             catch (Exception exception)
             {
@@ -323,19 +358,27 @@ internal sealed class TickWorkerPool : IDisposable
             }
         }
 
-        if (_runtime.WorkerStats)
+        if (stats)
         {
             _phase2Busy[worker] += Stopwatch.GetTimestamp() - busyStart;
         }
 
-        barrierStart = Stopwatch.GetTimestamp();
-        _phaseBarrier.SignalAndWait();
-        if (_runtime.WorkerStats)
+        barrierStart = stats ? Stopwatch.GetTimestamp() : 0;
+        _phaseBarrier.SignalAndWait(worker);
+        var tickEnd = stats || caller ? Stopwatch.GetTimestamp() : 0;
+        if (stats)
         {
-            _barrierBusy[worker] += Stopwatch.GetTimestamp() - barrierStart;
+            _barrierBusy[worker] += tickEnd - barrierStart;
         }
-        LastNodePhaseTicks = Stopwatch.GetTimestamp() - networkPhaseEnd;
-        LastTickTicks = Stopwatch.GetTimestamp() - tickStart;
+        // Only the caller publishes wall timings. Other workers can leave the
+        // final fence later; allowing their writes here races the next Run and
+        // puts an unnecessary shared cache line in every worker's hot path.
+        if (caller)
+        {
+            LastNetworkPhaseTicks = networkPhaseEnd - tickStart;
+            LastNodePhaseTicks = tickEnd - networkPhaseEnd;
+            LastTickTicks = tickEnd - tickStart;
+        }
     }
 
     private void RecordError(Exception exception)
@@ -343,7 +386,34 @@ internal sealed class TickWorkerPool : IDisposable
         Interlocked.CompareExchange(ref _error, exception, null);
     }
 
-    private static void RunPhase(Action<int>? body, int count, ref int index)
+    // Dense node lists pay more for a single contended atomic index than for
+    // scanning the worker ranges. Small lists (including heavy LB backends)
+    // instead benefit from the original global fine-grained load balancing.
+    private bool UseOwnedRanges(int count) => count >= _workerCount * 16;
+
+    private void ResetHeads(PaddedCounter[] heads, int count)
+    {
+        for (var i = 0; i < heads.Length; i++) heads[i].Value = (int)((long)count * i / _workerCount);
+    }
+
+    private void RunOwnedPhase(Action<int>? body, int count, PaddedCounter[] heads, int chunkSize, int worker)
+    {
+        if (body == null || count <= 0) return;
+        for (var offset = 0; offset < _workerCount; offset++)
+        {
+            var victim = (worker + offset) % _workerCount;
+            var limit = (int)((long)count * (victim + 1) / _workerCount);
+            ref var next = ref heads[victim].Value;
+            while (Volatile.Read(ref next) < limit)
+            {
+                var start = Interlocked.Add(ref next, chunkSize) - chunkSize;
+                var end = Math.Min(start + chunkSize, limit);
+                for (var item = start; item < end; item++) body(item);
+            }
+        }
+    }
+
+    private void RunPhase(Action<int>? body, int count, ref int index)
     {
         if (body == null || count <= 0)
         {
@@ -366,10 +436,19 @@ internal sealed class TickWorkerPool : IDisposable
     /// Claims work in chunks of <paramref name="chunkSize"/> to reduce
     /// <see cref="Interlocked.Increment"/> contention on tiny per-item bodies.
     /// </summary>
-    private static void RunPhaseChunked(Action<int>? body, int count, ref int index, int chunkSize)
+    private void RunPhaseChunked(Action<int>? body, int count, ref int index, int chunkSize)
     {
-        if (body == null || count <= 0 || chunkSize <= 1)
+        if (body == null || count <= 0)
         {
+            return;
+        }
+
+        if (chunkSize <= 1)
+        {
+            // Unit claims. Nodes differ by orders of magnitude in cost (an idle
+            // publisher vs a broker with many subscribers), so the fine tail is
+            // worth the extra atomic: flat chunks above one were measured to
+            // leave a heavy tail that the phase fence then waits for.
             RunPhase(body, count, ref index);
             return;
         }
@@ -389,6 +468,7 @@ internal sealed class TickWorkerPool : IDisposable
             }
         }
     }
+
 
     public void Dispose()
     {
@@ -428,7 +508,7 @@ internal sealed class TickWorkerPool : IDisposable
 
     private interface IPhaseBarrier : IDisposable
     {
-        void SignalAndWait();
+        void SignalAndWait(int worker);
     }
 
     /// <summary>Default fence: the BCL Barrier (monitor-based, efficient when oversubscribed).</summary>
@@ -436,51 +516,80 @@ internal sealed class TickWorkerPool : IDisposable
     {
         private readonly Barrier _barrier;
         public MonitorBarrier(int participants) => _barrier = new Barrier(participants);
-        public void SignalAndWait() => _barrier.SignalAndWait();
+        public void SignalAndWait(int worker) => _barrier.SignalAndWait();
         public void Dispose() => _barrier.Dispose();
     }
 
     /// <summary>
-    /// Sense-reversing spin fence for one worker per physical core. The last
-    /// arrival flips the generation; the others spin on it. It is faster than
-    /// the monitor barrier when the worker count equals the physical core count,
-    /// but it must not be used on an SMT-oversubscribed machine (spinners starve
-    /// the worker they are waiting for).
+    /// Dissemination (butterfly) spin fence for one worker per physical core.
+    ///
+    /// The previous sense-reversing counter had every worker spin on the same
+    /// word that all workers decremented, so each arrival invalidated the line
+    /// twelve workers were polling. After a few iterations the wait also fell
+    /// back to <see cref="Thread.Yield"/>, which is a syscall: the fence cost
+    /// ~9 µs of a ~50 µs tick, i.e. about a third of the refresh.
+    ///
+    /// A dissemination fence does log2(N) rounds; in round r a worker writes
+    /// its own ticket and waits for the worker 2^r positions ahead. Every cell
+    /// has exactly one writer and one reader and lives on its own cache line,
+    /// so the fence is a few cache-line round trips of pure spinning. It must
+    /// not be used on an SMT-oversubscribed machine (spinners starve the worker
+    /// they wait for), which is why the caller still falls back to the blocking
+    /// barrier above physical core count.
     /// </summary>
     private sealed class SpinBarrier : IPhaseBarrier
     {
+        // Longs per cache line: each (worker, round) cell gets a private line.
+        private const int Stride = 8;
+
         private readonly int _participants;
+        private readonly int _rounds;
         private readonly int _spinLimit;
-        private int _remaining;
-        private int _generation;
+        private readonly long[] _tickets;
+        private readonly long[] _sequence;
 
         public SpinBarrier(int participants, int spinLimit)
         {
             _participants = Math.Max(1, participants);
+            _rounds = 1;
+            while ((1 << _rounds) < _participants)
+            {
+                _rounds++;
+            }
+
             _spinLimit = Math.Max(0, spinLimit);
-            _remaining = _participants;
+            _tickets = new long[_participants * _rounds * Stride];
+            _sequence = new long[_participants * Stride];
         }
 
-        public void SignalAndWait()
+        public void SignalAndWait(int worker)
         {
-            var generation = Volatile.Read(ref _generation);
-            if (Interlocked.Decrement(ref _remaining) == 0)
+            if (_participants == 1)
             {
-                Volatile.Write(ref _remaining, _participants);
-                Volatile.Write(ref _generation, generation + 1);
                 return;
             }
 
-            var spin = 0;
-            while (Volatile.Read(ref _generation) == generation)
+            var me = worker;
+            var sequence = ++_sequence[me * Stride];
+
+            for (var round = 0; round < _rounds; round++)
             {
-                if (spin++ < _spinLimit)
+                var cell = (me * _rounds + round) * Stride;
+                Volatile.Write(ref _tickets[cell], sequence);
+
+                var partner = (me + (1 << round)) % _participants;
+                var partnerCell = (partner * _rounds + round) * Stride;
+                var spin = 0;
+                while (Volatile.Read(ref _tickets[partnerCell]) < sequence)
                 {
-                    Thread.SpinWait(32);
-                }
-                else
-                {
-                    Thread.Yield();
+                    if (spin++ < _spinLimit)
+                    {
+                        Thread.SpinWait(32);
+                    }
+                    else
+                    {
+                        Thread.Yield();
+                    }
                 }
             }
         }

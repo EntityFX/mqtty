@@ -42,6 +42,8 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     private List<NodePacketSlot> _outgoingDeferredNext = new();
     private List<NodePacketSlot> _incommingDeferred = new();
     private List<NodePacketSlot> _incommingDeferredNext = new();
+    private readonly Action<NodePacketSlot> _sendToNetwork;
+    private readonly Action<NodePacketSlot> _completeReceive;
 
     protected readonly TicksOptions TicksOptions;
 
@@ -76,6 +78,8 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
     {
         ticksOptions.Validate();
         TicksOptions = ticksOptions;
+        _sendToNetwork = SendToNetwork;
+        _completeReceive = CompleteReceive;
         counters = new NodeCounters(Name, "N", Group ?? "Node", "NG", TicksOptions.CounterHistoryDepth, enableCounters);
     }
 
@@ -127,9 +131,9 @@ public abstract class Node : NodeBase, IQuiescenceParticipant, INodeQueueDiagnos
             return;
         }
 
-        ProcessReady(_outgoingMessages, _outgoingDeferred, _outgoingDeferredNext, totalTicks, SendToNetwork,
+        ProcessReady(_outgoingMessages, _outgoingDeferred, _outgoingDeferredNext, totalTicks, _sendToNetwork,
             ref _outgoingQueueLength);
-        ProcessReady(_incommingMessages, _incommingDeferred, _incommingDeferredNext, totalTicks, CompleteReceive,
+        ProcessReady(_incommingMessages, _incommingDeferred, _incommingDeferredNext, totalTicks, _completeReceive,
             ref _incommingQueueLength);
 
         // Rotate the deferred lists so packets deferred this tick are processed

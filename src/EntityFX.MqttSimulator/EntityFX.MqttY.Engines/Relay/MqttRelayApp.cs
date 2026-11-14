@@ -84,9 +84,6 @@ public class MqttRelayApp
         //subscribe all mqtt clients
         SubscribeAll(isParallel, strategy, graph, mqttRelays, mqttReceivers, ticks);
 
-        var plantUmlGraphGenerator = new SimpleGraphMlGenerator();
-        var uml = plantUmlGraphGenerator.SerializeNetworkGraph(graph!);
-
         var bytes = GenerateTelemetry(bytesTelemetry);
 
         //publish all

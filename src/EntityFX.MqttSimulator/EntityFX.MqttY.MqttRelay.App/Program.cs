@@ -25,21 +25,40 @@ if (args.Length > 0 && args[0].Equals("experiment", StringComparison.OrdinalIgno
     return;
 }
 
-if (args.Length > 0 && args[0] != "original")
+// Coarse-grained parallelism: independent simulations are embarrassingly
+// parallel, so the sweep is sharded across processes. Every shard runs the
+// same, unmodified bulk-synchronous model, which keeps the results identical
+// to a single-process run.
+if (args.Length > 0 && args[0].Equals("sweep", StringComparison.OrdinalIgnoreCase))
+{
+    var sweepArgs = args.Skip(1).ToArray();
+    if (!RelaySweepCommand.HasShard(sweepArgs))
+    {
+        Environment.ExitCode = RelaySweepCommand.Run(sweepArgs);
+        return;
+    }
+
+    // Shard child: fall through to the ordinary sweep with the shard filter.
+    args = sweepArgs;
+}
+
+
+if (args.Length > 0 && args[0] != "original" && !args[0].StartsWith("--", StringComparison.Ordinal))
 {
     ProcessResults(args[0]);
     return;
 }
 
 var date = DateTime.Now.ToString("yyyy_MM_dd__HH_mm_ss");
-var resultPath = Path.Combine("results", date);
+var shard = RelaySweepCommand.ReadShard(args);
+var resultPath = shard.OutputPath ?? Path.Combine("results", date);
 FileExtensions.CreateDirectory(resultPath);
 
-var brokers = new[] { 4, 5, 10, 15 };
-var netLength = new[] { 2, 5, 10, 50 };
-var clients = new[] { 3, 10, 50 };
-var repeats = new[] { 10, 100 };
-var refreshStrategies = new[] { 0, 1 };
+var brokers = RelaySweepCommand.Brokers(args);
+var netLength = RelaySweepCommand.Nets(args);
+var clients = RelaySweepCommand.Clients(args);
+var repeats = RelaySweepCommand.Repeats(args);
+var refreshStrategies = RelaySweepCommand.Strategies(args);
 int? bytes = null;
 
 TicksOptions? tickOptions = null;
@@ -70,6 +89,7 @@ var table = string.Empty;
 
 var id = 0;
 var gid = 0;
+var configOrdinal = 0;
 for (int b = 0; b < brokers.Length; b++)
 {
     for (int n = 0; n < netLength.Length; n++)
@@ -80,10 +100,21 @@ for (int b = 0; b < brokers.Length; b++)
             {
                 for (int rs = 0, ix = 0; rs < refreshStrategies.Length; rs++, ix++)
                 {
+                    // The ordinal is stable across shards, so ids and group ids
+                    // match a single-process run and the merged CSV can be
+                    // post-processed exactly as before.
+                    var ordinal = configOrdinal++;
+                    if (!shard.Contains(ordinal))
+                    {
+                        continue;
+                    }
+
                     var brokerc = brokers[b];
                     var netc = netLength[n];
                     var clientc = clients[c];
                     var repeatc = repeats[r];
+                    id = ordinal * 3;
+                    gid = ordinal;
 
                     var prefixBase = $"{ix}__b_{brokerc}__n_{netc}__c_{clientc}__r_{repeatc}";
 

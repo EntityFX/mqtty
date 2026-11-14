@@ -5,6 +5,12 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- The sweep simulates a large object graph and allocates heavily. Server
+         GC keeps collection pauses off the tick path (same rationale as the
+         reference benchmark); shard children override it to workstation GC
+         when a simulation runs with a single worker. -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
   </PropertyGroup>
 
   <ItemGroup>

@@ -9,6 +9,12 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
 {
     internal class MqttCounters : CounterGroup
     {
+        // Counter groups are created per client/broker; the enum value sets never
+        // change, so enumerate them once instead of allocating the arrays for
+        // every group.
+        private static readonly MqttPacketType[] PacketTypes = Enum.GetValues<MqttPacketType>();
+        private static readonly MqttQos[] QosValues = Enum.GetValues<MqttQos>();
+
         private readonly double _ticksPerSecond;
         private readonly TicksOptions _ticksOptions;
         private long _lastTicks;
@@ -67,7 +73,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
             _ticksPerSecond = 1 / ticksOptions.TickPeriod.TotalSeconds;
             _ticksOptions = ticksOptions;
 
-            PacketTypeCounters = Enum.GetValues<MqttPacketType>()
+            PacketTypeCounters = PacketTypes
                 .ToDictionary(k => k, v => new GenericCounter(
                     v.GetEnumDescription(), 
                     v.GetEnumCategory(),
@@ -75,7 +81,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                     enabled: enabled
                 ));
 
-            RefusedPacketTypeCounters = Enum.GetValues<MqttPacketType>()
+            RefusedPacketTypeCounters = PacketTypes
             .ToDictionary(k => k, v => new GenericCounter(
                 v.GetEnumDescription() + "_Refused",
                 v.GetEnumCategory() + "-",
@@ -83,14 +89,14 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                     enabled: enabled
             ));
 
-            RpsPacketTypeCounters = Enum.GetValues<MqttPacketType>()
+            RpsPacketTypeCounters = PacketTypes
             .ToDictionary(k => k, v => new ValueCounter<double>(
                 v.GetEnumDescription() + "_Rps",
                 v.GetEnumCategory() + "-", ticksOptions.CounterHistoryDepth, "Rps",
                     enabled: enabled
             ));
 
-            PublishByQos = Enum.GetValues<MqttQos>()
+            PublishByQos = QosValues
                 .ToDictionary(k => k, v => new GenericCounter(
                     $"PublishQos{(byte)v}",
                     $"PQ{(byte)v}",
@@ -99,7 +105,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                     historyEnabled: true
                 ));
 
-            PublishRpsByQos = Enum.GetValues<MqttQos>()
+            PublishRpsByQos = QosValues
                 .ToDictionary(k => k, v => new ValueCounter<double>(
                     $"PublishQos{(byte)v}_Rps",
                     $"PQ{(byte)v}-",
@@ -109,7 +115,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                     historyEnabled: true
                 ));
 
-            RefusedByRateLimit = Enum.GetValues<MqttQos>()
+            RefusedByRateLimit = QosValues
                 .ToDictionary(k => k, v => new GenericCounter(
                     $"PublishQos{(byte)v}_RefusedByRateLimit",
                     $"PR{(byte)v}",
@@ -118,7 +124,7 @@ namespace EntityFX.MqttY.Plugin.Mqtt.Counter
                     historyEnabled: true
                 ));
 
-            RefusedByFailRate = Enum.GetValues<MqttQos>()
+            RefusedByFailRate = QosValues
                 .ToDictionary(k => k, v => new GenericCounter(
                     $"PublishQos{(byte)v}_RefusedByFailRate",
                     $"PF{(byte)v}",
