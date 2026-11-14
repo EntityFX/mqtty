@@ -389,7 +389,7 @@ internal sealed class TickWorkerPool : IDisposable
     // Dense node lists pay more for a single contended atomic index than for
     // scanning the worker ranges. Small lists (including heavy LB backends)
     // instead benefit from the original global fine-grained load balancing.
-    private bool UseOwnedRanges(int count) => count >= _workerCount * 16;
+    private bool UseOwnedRanges(int count) => count >= _workerCount * 8;
 
     private void ResetHeads(PaddedCounter[] heads, int count)
     {
