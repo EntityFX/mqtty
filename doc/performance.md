@@ -377,3 +377,48 @@ MqttY между собой, но и модель брокера с натурн
 Aedes требуется параметр профиля в `RelayBenchmarkCommand` — это следующий шаг
 перед сравнением с натурными наблюдениями.
 
+## 11. Профили четырёх брокеров и результаты моделирования
+
+Встроенный профиль `EntityFX.MqttY.Plugin.Mqtt/Data/broker-benchmark.v2.json`
+(schemaVersion 2) содержит натурные наблюдения для четырёх брокеров:
+Mosquitto, ActiveMQ, Aedes, EMQX. Он подключается к симуляции через
+`brokerProfilePath` в конфиге `experiment`; ключи `brokers[].name` и
+`messageSizes[].qos[].samples[]` задают capacity/failure/latency для каждого
+размера payload, QoS и числа клиентов.
+
+Параметры профиля, payload 16 байт, QoS 1 (фрагмент):
+
+| Брокер | capacityRps, 1 клиент | 16 клиентов | 64 клиента | publishFailureRate, 1/16/64 |
+|---|---:|---:|---:|---|
+| Mosquitto | 3916,4 | 7256,4 | 35 941,3 | 0 / 0 / 0,71 |
+| ActiveMQ | 3511,0 | 7083,5 | 42 301,3 | 0 / 0 / 0 |
+| Aedes | 3491,2 | 5736,2 | 6866,3 | 0 / 0 / 0 |
+| EMQX | 3157,6 | 36 460,6 | 51 032,5 | 0 / 0,97 / 0,99 |
+
+Результаты моделирования (mqttRelay, `brokerAssignmentMode=mixed`, по одному
+клиенту на брокера, offered 2000 rps, измерение 30 000 тиков = 3 с, QoS 1):
+
+| Брокер | attempted | admitted | completed | RPS | rateRejected | publishFailed | delivered | p50/p95/p99, мс |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| Mosquitto | 4501 | 4501 | 4501 | 1500,3 | 0 | 0 | 6001 | 0,90 / 1,70 / 1,70 |
+| ActiveMQ | 6002 | 3001 | 3001 | 1000,3 | 3001 | 0 | 3001 | 0,90 / 1,70 / 1,70 |
+| Aedes | 4502 | 4502 | 4502 | 1500,7 | 0 | 0 | 6002 | 1,00 / 1,80 / 1,80 |
+| EMQX | 6002 | 3001 | 3001 | 1000,3 | 3001 | 0 | 3001 | 0,90 / 1,70 / 1,70 |
+
+Наблюдения: профили различаются формой кривой capacity от числа клиентов —
+у Mosquitto и ActiveMQ она резко растёт к 64 клиентам, у Aedes почти плоская,
+у EMQX резко растёт, но с почти полным отказом публикаций при 16+ клиентах.
+Латентность модели (p99 1,7–1,8 мс) определяется тиком 0,1 мс и профилем
+обработки; отказы `rateRejected` — следствие ограничения бюджета, а не сбоев
+брокера (`publishFailed=0`).
+
+Запуск (в конфиге `experiment` указывается путь к встроенному профилю):
+
+```bash
+EntityFX.MqttY.MqttRelay.App experiment --config four-broker.json --output results/four-broker
+```
+
+Артефакты прогона: `summary.json`, `counters.json` (per-broker `byQos`),
+`latency-histogram.json`, `experiment-manifest.json` (assignedBrokerTypes),
+`topology.graphml`.
+
