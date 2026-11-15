@@ -394,6 +394,28 @@ serial/parallel: i7 1.338–1.346×, Xeon 1.190–1.268×, Эльбрус 1.377�
 эксперименты и примеры кода «было → стало» —
 [`performance.md`](../../performance.md), [`engine-acceleration.md`](../../engine-acceleration.md).
 
+### 10.2 Рост стоимости шага
+
+При фиксированном темпе (`steps = rps × measure`) стоимость шага растёт с
+числом брокеров по-разному в зависимости от топологии (8 брокеров, 2000 rps,
+последовательный режим):
+
+| Параметр | LB | Relay | Fed star |
+|---|---:|---:|---:|
+| 2 брокера, с | 0,587 | 0,983 | 1,097 |
+| 16 брокеров, с | 0,688 | 4,984 | 15,024 |
+| показатель степени `wall ~ b^k` | 0,08 | 0,77 | 1,27 |
+| трафик `net_in` | почти const | `b^1.08` | `b^2.18` |
+
+Топология при 8 брокерах: line 2,00 с / 158 тыс. пакетов, ring 2,08 с /
+182 тыс., star 4,24 с / 865 тыс. — звезда в 2,1 раза дороже по времени и в
+4,8–5,5 раза по трафику. Число сетей даёт `wall ~ n^0.08`, число
+публикующих при фиксированном темпе — `p^0.05…0.06`. Темп: `steps ~ rps`,
+`net_in ~ rps`, `wall ~ rps^0.14…0.33` (суб-линейно из-за фиксированного
+`construct`).
+
+Сырые данные: [`compute-scaling.csv`](compute-scaling.csv).
+
 ## 11. Ограничения
 
 - только payload 16 байт и идеальные брокеры в основной сети;
@@ -440,4 +462,6 @@ python3 doc/analysis/message-scaling/run_large.py
 python3 doc/analysis/message-scaling/run_robustness.py
 python3 doc/analysis/message-scaling/analyze.py
 python3 doc/analysis/message-scaling/analyze_large.py
+python3 doc/analysis/message-scaling/run_compute_scaling.py
+python3 doc/analysis/message-scaling/analyze_compute_scaling.py
 ```
