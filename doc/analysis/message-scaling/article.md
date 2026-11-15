@@ -657,7 +657,8 @@ Federation star: $B=16$, $P=256$, $R=1000$:
 шаг ускорение — около 14×.
 
 Подробный протокол, фазовые профили и отклонённые эксперименты —
-[`doc/performance.md`](../../performance.md).
+[`doc/performance.md`](../../performance.md); примеры кода «было → стало» —
+[`doc/engine-acceleration.md`](../../engine-acceleration.md).
 
 ## 6. Корреляционный анализ
 
