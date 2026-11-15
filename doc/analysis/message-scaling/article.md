@@ -50,7 +50,7 @@ $L$ — длина пути. Мы совмещаем аналитический 
 
 > Формулы записаны в GitHub-flavored Markdown: `$...$` и `$$...$$`.
 > В просмотрщиках без MathJax используйте plain-text сводку
-> [topologies-summary.md](topologies-summary.md).
+> [project-reviews-and-skills.md](../../project-reviews-and-skills.md).
 
 ## 2. Переменные и единицы
 
@@ -519,7 +519,7 @@ Star-топология даёт квадратичный рост: при $B=16
 
 Подробное описание каждой топологии — в отдельном документе
 [topologies.md](topologies.md); краткая сводка и выводы —
-[topologies-summary.md](topologies-summary.md).
+[project-reviews-and-skills.md](../../project-reviews-and-skills.md).
 
 ### 5.6 Holdout-верификация моделей
 

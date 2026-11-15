@@ -450,7 +450,7 @@ ring/line $O(MN)$), а **успех доставки** — ещё и очере�
 
 Локальные данные: `measurements.csv`, `large-topologies.csv`,
 `robustness.csv`, `hardware-validation.csv`, `results.json`,
-`topologies.md`, `topologies-summary.md`, [article.md](article.md).
+`topologies.md`, [project-reviews-and-skills.md](../../project-reviews-and-skills.md), [article.md](article.md).
 Внешняя серия доставки и стоимости:
 [article-2-relay-federation.md](https://github.com/EntityFX/mqtty-meta/blob/develop/docs/dissertation/articles/article-2-relay-federation.md).
 

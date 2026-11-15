@@ -20,7 +20,7 @@ mqtty/
 ├── doc/
 │   ├── architecture.md         # устройство, инварианты, статус S0–S5
 │   ├── performance.md          # методика, результаты, отклонённые оптимизации
-│   ├── progress.md             # прогресс плана и гейты
+│   ├── project-reviews-and-skills.md  # прогресс плана, гейты, навыки, сводка по топологиям
 │   └── analysis/message-scaling/  # статья, топологии, данные, скрипты
 ├── results/                    # результаты экспериментов (не коммитить)
 ├── src/EntityFX.MqttSimulator/
@@ -223,11 +223,5 @@ in-process host и делят временные каталоги, из-за ч�
 - `README.md` — быстрый старт и обзор.
 - `doc/architecture.md` — слои, инварианты, тик, MQTT, harness, Web/Designer, статус S0–S5.
 - `doc/performance.md` — методика замеров, текущие результаты, фазовый профиль, принятые и отклонённые оптимизации.
-- `doc/progress.md` — прогресс плана, остаток в часах и статус гейтов.
-- `doc/skills/dotnet-performance.md` — сохранённый skill по C#/.NET-производительности.
-- `doc/analysis/message-scaling/super-article.md` — единая статья: топологии, трафик и стоимость доставки.
-- `doc/analysis/message-scaling/article.md` — математическая статья о связи числа сообщений с топологией; данные и скрипты рядом.
-- `doc/analysis/message-scaling/topologies.md` — отдельное описание топологий star/ring/line, Relay и LB.
-- `doc/analysis/message-scaling/topologies-summary.md` — краткая сводка и научные результаты по топологиям.
-- `src/EntityFX.MqttSimulator/EntityFX.MqttY.Web.App/README.md` — API и запуск Web.
+- `doc/project-reviews-and-skills.md` — прогресс плана, остаток в часах, статус гейтов, научный критик, навыки, сводка по топологиям, skill по производительности, Web App.
 - Внешние исследовательские отчёты и данные: `github.com/EntityFX/mqtty-meta`.
