@@ -125,6 +125,10 @@ if (isOriginalMode && runFilter == null && !HasArg(args, "--shard") && !HasArg(a
     return;
 }
 
+// Artifacts (counter dump + GraphML) are serial and do not affect the model,
+// so they can be skipped for throughput runs of the sweep.
+var saveArtifacts = Environment.GetEnvironmentVariable("MQTTY_NO_ARTIFACTS") != "1";
+
 var results = new List<ResultItem>();
 
 var mqttRelayApp = new MqttRelayApp(tickOptions, networkOptions);
@@ -177,8 +181,14 @@ for (int b = 0; b < brokers.Length; b++)
                         PrintStatsForItem(result, null);
                         seqRealTimeSeconds = networkSimulator.RealTime.TotalSeconds;
                         EmitRow(result);
-                        SaveCounters(resultPath, prefixBase, networkSimulator);
-                        SaveGraphML(resultPath, prefixBase, networkSimulator);
+                        if (saveArtifacts)
+                        {
+                            if (saveArtifacts)
+                        {
+                            SaveCounters(resultPath, prefixBase, networkSimulator);
+                        }
+                            SaveGraphML(resultPath, prefixBase, networkSimulator);
+                        }
                         results.Add(result);
                         networkSimulator.Clear();
                         GC.Collect();
@@ -196,7 +206,10 @@ for (int b = 0; b < brokers.Length; b++)
                         PrintStatsForItem(result, RelativeSpeedup(seqRealTimeSeconds,
                             networkSimulator.RealTime.TotalSeconds));
                         EmitRow(result);
-                        SaveCounters(resultPath, prefixBase, networkSimulator);
+                        if (saveArtifacts)
+                        {
+                            SaveCounters(resultPath, prefixBase, networkSimulator);
+                        }
                         results.Add(result);
                         networkSimulator.Clear();
                         GC.Collect();
@@ -214,7 +227,10 @@ for (int b = 0; b < brokers.Length; b++)
                         PrintStatsForItem(result, RelativeSpeedup(seqRealTimeSeconds,
                             networkSimulator.RealTime.TotalSeconds));
                         EmitRow(result);
-                        SaveCounters(resultPath, prefixBase, networkSimulator);
+                        if (saveArtifacts)
+                        {
+                            SaveCounters(resultPath, prefixBase, networkSimulator);
+                        }
                         results.Add(result);
                         networkSimulator.Clear();
                         GC.Collect();
